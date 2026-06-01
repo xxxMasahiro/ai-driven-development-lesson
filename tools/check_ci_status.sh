@@ -70,14 +70,35 @@ if ! command -v gh >/dev/null 2>&1; then
   [[ "$required" -eq 1 ]] && exit 1 || exit 0
 fi
 
-if ! gh auth status -h github.com >/dev/null 2>&1; then
+if ! gh auth token >/dev/null 2>&1; then
   printf 'gh is not authenticated; CI status check skipped.\n'
   [[ "$required" -eq 1 ]] && exit 1 || exit 0
 fi
 
-if ! repo="$(gh repo view --json nameWithOwner --jq .nameWithOwner 2>/dev/null)"; then
-  printf 'GitHub repository could not be resolved; CI status check skipped.\n'
-  [[ "$required" -eq 1 ]] && exit 1 || exit 0
+repo=""
+remote_url="$(git remote get-url origin 2>/dev/null || true)"
+case "$remote_url" in
+  https://github.com/*/*.git)
+    repo="${remote_url#https://github.com/}"
+    repo="${repo%.git}"
+    ;;
+  https://github.com/*/*)
+    repo="${remote_url#https://github.com/}"
+    ;;
+  git@github.com:*.git)
+    repo="${remote_url#git@github.com:}"
+    repo="${repo%.git}"
+    ;;
+  git@github.com:*)
+    repo="${remote_url#git@github.com:}"
+    ;;
+esac
+
+if [[ -z "$repo" ]]; then
+  if ! repo="$(gh repo view --json nameWithOwner --jq .nameWithOwner 2>/dev/null)"; then
+    printf 'GitHub repository could not be resolved; CI status check skipped.\n'
+    [[ "$required" -eq 1 ]] && exit 1 || exit 0
+  fi
 fi
 
 if [[ -z "$branch" ]]; then

@@ -27,7 +27,7 @@ description: Validate and enforce synchronization gates for this AI-driven devel
 - Mandatory CI gates must use `tools/check_ci_status.sh --required`.
 - Product CI gates must use `tools/check_ci_status.sh --product --required`.
 - Remote sync gates must use `tools/check_git_sync.sh --product --required`.
-- Product commit gates must use `tools/check_git_sync.sh --product`.
+- Product commit gates must use `tools/check_git_sync.sh --product --clean-required`.
 - Day 14 must require both Git sync and CI status.
 - 14-day learning records must use `_14_DAYS` files.
 - 14-day entry must be `index-14-days.md`.

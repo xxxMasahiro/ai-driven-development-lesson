@@ -21,12 +21,14 @@ Use required mode when the gate says Git or CI is mandatory:
 ```bash
 ./tools/check_git_sync.sh --required
 ./tools/check_ci_status.sh --required
+./tools/check_git_sync.sh --product --clean-required
 ./tools/check_git_sync.sh --product --required
 ./tools/check_ci_status.sh --product --required
 ```
 
 Use optional mode only for exploratory status checks.
 Use `--product` when the gate is checking the task-tracker product repository rather than the lesson repository.
+Use `--clean-required` when a local commit is required but upstream sync is not required yet.
 
 ## Document Sync
 

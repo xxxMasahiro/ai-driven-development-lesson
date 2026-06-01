@@ -119,7 +119,7 @@ if ! awk -F '\t' '
       printf "remote sync gate must use required git sync check at %s\n", $1 > "/dev/stderr"
       bad = 1
     }
-    if ($4 ~ /commit/ && $6 !~ /check_git_sync\.sh --product/) {
+    if ($4 ~ /commit/ && $6 !~ /check_git_sync\.sh --product (--clean-required|--required)/) {
       printf "product commit gate must check product git state at %s\n", $1 > "/dev/stderr"
       bad = 1
     }

@@ -6,6 +6,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/lib/lesson_common.sh"
 
 required=0
+clean_required=0
 target_dir=""
 target_label="current"
 
@@ -13,6 +14,11 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     --required)
       required=1
+      clean_required=1
+      shift
+      ;;
+    --clean-required)
+      clean_required=1
       shift
       ;;
     --lesson)
@@ -63,7 +69,8 @@ printf 'Branch: %s\n' "${branch:-detached}"
 if [[ -n "$status" ]]; then
   printf 'Working tree: dirty\n'
   printf '%s\n' "$status"
-  exit 1
+  [[ "$clean_required" -eq 1 ]] && exit 1
+  exit 0
 fi
 
 printf 'Working tree: clean\n'

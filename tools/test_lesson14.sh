@@ -112,6 +112,10 @@ git remote add origin "$work/origin.git"
 git push -u origin main >/dev/null
 "$work/lesson/tools/check_git_sync.sh" --required | grep 'Git sync: local and upstream match'
 printf 'dirty\n' >> file.txt
+"$work/lesson/tools/check_git_sync.sh" >/tmp/lesson14-git-dirty-optional.out 2>&1
+grep 'Working tree: dirty' /tmp/lesson14-git-dirty-optional.out >/dev/null
+"$work/lesson/tools/check_git_sync.sh" --clean-required >/tmp/lesson14-git-dirty-clean-required.out 2>&1 && exit 1 || true
+grep 'Working tree: dirty' /tmp/lesson14-git-dirty-clean-required.out >/dev/null
 "$work/lesson/tools/check_git_sync.sh" --required >/tmp/lesson14-git-dirty.out 2>&1 && exit 1 || true
 grep 'Working tree: dirty' /tmp/lesson14-git-dirty.out >/dev/null
 
@@ -120,6 +124,11 @@ mkdir "$fake_bin"
 cat > "$fake_bin/gh" <<'GH'
 #!/usr/bin/env bash
 if [[ "$1 $2 $3 $4" == "auth status -h github.com" ]]; then
+  exit 0
+fi
+
+if [[ "$1 $2" == "auth token" ]]; then
+  printf 'fake-token\n'
   exit 0
 fi
 
