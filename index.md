@@ -60,7 +60,7 @@
 
 ```text
 $HOME/projects/
-├─ ai-driven-development/       教材リポジトリ
+├─ ai-driven-development-lesson/       教材リポジトリ
 └─ task-tracker-repository/     成果物リポジトリ
 ```
 
@@ -106,7 +106,7 @@ git rev-parse --show-toplevel
 ./tools/check_repository_boundary.sh
 ```
 
-`task-tracker-repository/` が `ai-driven-development/` の中にある場合は誤配置です。
+`task-tracker-repository/` が `ai-driven-development-lesson/` の中にある場合は誤配置です。
 
 ## Git管理
 

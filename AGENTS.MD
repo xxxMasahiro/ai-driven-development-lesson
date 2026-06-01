@@ -28,7 +28,7 @@
 ## 不変ルール
 
 1. 学習用リポジトリと成果物リポジトリは、2つのUbuntu/WSL CLI画面で分けて扱う。
-   学習用は `$HOME/projects/ai-driven-development/`、成果物は `$HOME/projects/task-tracker-repository/` です。両方を同時並行で使うため、エージェントは作業前にどちらのCLI画面、どちらのGitリポジトリにいるか確認し、Git管理を混線させません。
+   学習用は `$HOME/projects/ai-driven-development-lesson/`、成果物は `$HOME/projects/task-tracker-repository/` です。両方を同時並行で使うため、エージェントは作業前にどちらのCLI画面、どちらのGitリポジトリにいるか確認し、Git管理を混線させません。
    成果物リポジトリの開発に入る前には、必ず学習者へ別画面でUbuntu/WSL CLIを起動し、成果物リポジトリ専用画面として使うよう促します。
 
 2. 既存機能とのトレードオフは一切禁止する。

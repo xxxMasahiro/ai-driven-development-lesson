@@ -65,7 +65,7 @@ tools/: 構成チェック、順番制御、学習記録コマンド
 
 ```text
 $HOME/projects/
-├─ ai-driven-development/       教材リポジトリ
+├─ ai-driven-development-lesson/       教材リポジトリ
 └─ task-tracker-repository/     成果物リポジトリ
 ```
 

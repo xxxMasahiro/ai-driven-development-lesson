@@ -56,7 +56,7 @@ PlaywrightによるE2Eテストを導入する
 ## CLI画面の分離
 
 成果物リポジトリの開発に入る前に、学習者は別画面でUbuntu/WSL CLIを起動します。
-学習用リポジトリ `$HOME/projects/ai-driven-development/` と、成果物リポジトリ `$HOME/projects/task-tracker-repository/` を別々のCLI画面で扱うことで、Git管理の混線を防ぎます。
+学習用リポジトリ `$HOME/projects/ai-driven-development-lesson/` と、成果物リポジトリ `$HOME/projects/task-tracker-repository/` を別々のCLI画面で扱うことで、Git管理の混線を防ぎます。
 
 ## ロードマップとヘルプデスク
 

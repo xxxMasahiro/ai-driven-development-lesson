@@ -38,7 +38,7 @@ Day 14: 最終同期とふりかえり
 ## CLI画面の分離
 
 成果物リポジトリの開発に入る前には、別画面でUbuntu/WSL CLIを起動します。
-学習用リポジトリ `$HOME/projects/ai-driven-development/` と、成果物リポジトリ `$HOME/projects/task-tracker-repository/` を別々のCLI画面で扱うことで、Git管理の混線を防ぎます。
+学習用リポジトリ `$HOME/projects/ai-driven-development-lesson/` と、成果物リポジトリ `$HOME/projects/task-tracker-repository/` を別々のCLI画面で扱うことで、Git管理の混線を防ぎます。
 
 ## 学習者が使う主なコマンド
 

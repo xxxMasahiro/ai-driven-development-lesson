@@ -100,7 +100,7 @@
 
 ```text
 # key	value
-lesson_repo_name	ai-driven-development
+lesson_repo_name	ai-driven-development-lesson
 product_repo_name	task-tracker-repository
 project_root	$HOME/projects
 flow_file	lesson/LESSON_FLOW.tsv

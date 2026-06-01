@@ -503,7 +503,7 @@ AIエージェントに「この範囲を見て作業する」と伝えやすく
 
 ```text
 $HOME/projects/
-├─ ai-driven-development/
+├─ ai-driven-development-lesson/
 │  ├─ index.md
 │  ├─ ai-driven-task-tracker-scenario.md
 │  ├─ github-login-setup-guide.md
@@ -556,7 +556,7 @@ git rev-parse --show-toplevelで今のGit管理範囲を見る
 教材側ではtools/check_repository_boundary.shを実行する
 ```
 
-`task-tracker-repository/` が `ai-driven-development/` の中にある場合は誤配置です。  
+`task-tracker-repository/` が `ai-driven-development-lesson/` の中にある場合は誤配置です。
 この場合は成果物リポジトリを `$HOME/projects/task-tracker-repository/` に作り直します。
 
 この配置イメージは、最初から全部のファイルがあるという意味ではありません。  
