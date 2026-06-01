@@ -21,12 +21,14 @@ jobs:
           bash -n tools/check_lesson14_sync.sh
           bash -n tools/check_git_sync.sh
           bash -n tools/check_ci_status.sh
+          bash -n tools/check_agents_skills.sh
           bash -n tools/test_lesson14.sh
 
       - name: Existing lesson checks
         run: |
           ./tools/check_lesson_structure.sh
           ./tools/check_repository_boundary.sh
+          ./tools/check_agents_skills.sh
 
       - name: Lesson14 structure and sync
         run: |

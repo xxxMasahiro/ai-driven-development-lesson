@@ -5,3 +5,6 @@ ROOT="$(git rev-parse --show-toplevel)"
 
 "$ROOT/tools/check_lesson_structure.sh"
 "$ROOT/tools/check_repository_boundary.sh" >/dev/null
+"$ROOT/tools/check_lesson14_structure.sh"
+"$ROOT/tools/check_lesson14_sync.sh"
+"$ROOT/tools/check_agents_skills.sh"

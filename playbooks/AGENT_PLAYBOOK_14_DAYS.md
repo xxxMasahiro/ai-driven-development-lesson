@@ -12,6 +12,7 @@
 必要なプロンプトは学習者がコピペできる形で提示する
 各日の最後に同期ゲートを確認する
 危険な操作、曖昧な操作、認証操作は学習者に確認する
+成果物リポジトリの開発に入る前に、別画面でUbuntu/WSL CLIを起動するよう必ず促す
 ```
 
 ## 開始時の確認順
@@ -25,6 +26,8 @@
 6. prompts/PROMPTS_14_DAYS.md
 7. learning/LEARNING_HANDOFF_14_DAYS.md
 8. learning/LEARNING_TASK_TRACKER_14_DAYS.md
+9. AGENTS.MD
+10. 必要な skills/*/SKILL.md
 ```
 
 ## 最初に実行する検査
@@ -32,6 +35,7 @@
 ```bash
 ./tools/check_lesson14_structure.sh
 ./tools/check_lesson14_sync.sh
+./tools/check_agents_skills.sh
 ./tools/lesson14 status
 ./tools/roadmap status
 ```
@@ -42,10 +46,11 @@
 1. tools/lesson14 statusで現在地を確認する
 2. 現在ステップのtitleとrequired_outputを読む
 3. 学習者へ質問を1つだけ出す
-4. 必要ならコピペ用プロンプトを提示する
-5. 実行結果を確認する
-6. 同期対象がある場合は更新案を先に提示する
-7. 条件を満たしたらtools/lesson14 通過を実行する
+4. 成果物リポジトリの作業に入る場合は、別画面のUbuntu/WSL CLI起動を促してから進める
+5. 必要ならコピペ用プロンプトを提示する
+6. 実行結果を確認する
+7. 同期対象がある場合は更新案を先に提示する
+8. 条件を満たしたらtools/lesson14 通過を実行する
 ```
 
 ## 同期ゲートで確認すること
@@ -62,6 +67,7 @@ SPECIFICATION.md
 IMPLEMENTATION_PLAN.md
 Git status
 GitHub Actions
+AGENTS.MDとrepo-local skills
 ```
 
 ## 代替ルール

@@ -14,6 +14,7 @@ required_files=(
   ".gitignore"
   ".githooks/pre-commit"
   ".github/workflows/ci.yml"
+  "AGENTS.MD"
   "LICENSE"
   "README.md"
   "index.md"
@@ -30,6 +31,7 @@ required_files=(
   "learning/LEARNING_HANDOFF.md"
   "tools/check_lesson_structure.sh"
   "tools/check_repository_boundary.sh"
+  "tools/check_agents_skills.sh"
   "tools/lib/lesson_common.sh"
   "tools/lesson"
   "tools/learn"
@@ -63,7 +65,7 @@ for file in "${misplaced_files[@]}"; do
   fi
 done
 
-for script in "tools/check_lesson_structure.sh" "tools/check_repository_boundary.sh" "tools/lesson" "tools/learn"; do
+for script in "tools/check_lesson_structure.sh" "tools/check_repository_boundary.sh" "tools/check_agents_skills.sh" "tools/lesson" "tools/learn"; do
   if [[ ! -x "$ROOT/$script" ]]; then
     printf 'not executable: %s\n' "$script" >&2
     missing=1

@@ -2,7 +2,7 @@
 001	setup.index	Setup	index.mdでレッスン全体の順番を確認する	設定から体験開発へ進む順番の了承
 002	setup.github-login	Setup	github-login-setup-guide.mdでGitHub接続を確認する	github-loginでGitHub接続確認
 003	day1.mode	Day 1	デモモードと実作業モード、承認ルールを確認する	モードと承認ルールの了承
-004	day1.project-directory	Day 1	教材リポジトリと成果物リポジトリの並列配置を確認する	配置方針の了承
+004	day1.project-directory	Day 1	教材リポジトリと成果物リポジトリの並列配置を確認する	配置方針と別CLI起動の了承
 005	day1.folder-overview	Day 1	全体のフォルダ構成を確認する	フォルダ構成の確認
 006	day1.memory-files	Day 1	AGENT.mdなどメモリー用Markdownの役割を確認する	メモリー文書の役割理解
 007	day1.requirements	Day 1	REQUIREMENTS.mdの初期案を作成する	要件初期案

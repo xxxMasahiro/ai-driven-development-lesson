@@ -4,6 +4,8 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
+export HOME="$work/home"
+mkdir -p "$HOME/projects"
 
 cp -a "$ROOT" "$work/lesson"
 cd "$work/lesson"
@@ -78,6 +80,24 @@ grep 'only completed steps' /tmp/lesson14-revisit-current.out >/dev/null
 
 ./tools/check_lesson14_structure.sh
 
+gate_product_missing="$work/gate-product-missing"
+cp -a "$work/lesson" "$gate_product_missing"
+rm -rf "$gate_product_missing/.git"
+cd "$gate_product_missing"
+git init -b main >/dev/null
+tmp_state="$(mktemp)"
+awk -F '\t' -v OFS='\t' '
+  /^#/ { print; next }
+  $2 == "day3.sync-gate" { $3 = "current"; $4 = ""; $5 = ""; print; next }
+  $1 + 0 < 14 { $3 = "completed"; if ($4 == "") $4 = "2026-06-01 00:00:00"; if ($5 == "") $5 = "2026-06-01 00:00:00"; print; next }
+  { $3 = "locked"; $4 = ""; $5 = ""; print }
+' learning/LESSON_STATE_14_DAYS.tsv > "$tmp_state"
+mv "$tmp_state" learning/LESSON_STATE_14_DAYS.tsv
+git add .
+git -c user.name=Test -c user.email=test@example.com commit -m gate >/dev/null
+./tools/lesson14 通過 day3.sync-gate "should fail without product repository" >/tmp/lesson14-gate-product-missing.out 2>&1 && exit 1 || true
+grep 'expected product repository does not exist' /tmp/lesson14-gate-product-missing.out >/dev/null
+
 git_check="$work/git-check"
 mkdir "$git_check"
 cd "$git_check"
@@ -99,35 +119,51 @@ fake_bin="$work/fake-bin"
 mkdir "$fake_bin"
 cat > "$fake_bin/gh" <<'GH'
 #!/usr/bin/env bash
-case "$*" in
-  "auth status -h github.com")
-    exit 0
-    ;;
-  "repo view --json nameWithOwner --jq .nameWithOwner")
-    printf 'owner/repo\n'
-    ;;
-  "run list --repo owner/repo --limit 1")
-    printf 'completed\tsuccess\tCI\tCI\tmain\tpush\t1\t1s\t2026-06-01T00:00:00Z\n'
-    ;;
-  "run list --repo owner/repo --limit 1 --branch main")
-    printf 'completed\tsuccess\tCI\tCI\tmain\tpush\t1\t1s\t2026-06-01T00:00:00Z\n'
-    ;;
-  "run list --repo owner/repo --limit 1 --workflow CI")
-    printf 'completed\tsuccess\tCI\tCI\tmain\tpush\t1\t1s\t2026-06-01T00:00:00Z\n'
-    ;;
-  "run list --repo owner/repo --limit 1 --branch fail")
+if [[ "$1 $2 $3 $4" == "auth status -h github.com" ]]; then
+  exit 0
+fi
+
+if [[ "$1 $2 $3 $4 $5" == "repo view --json nameWithOwner --jq" ]]; then
+  printf 'owner/repo\n'
+  exit 0
+fi
+
+if [[ "$1 $2" == "run list" ]]; then
+  branch="main"
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --branch)
+        branch="$2"
+        shift 2
+        ;;
+      *)
+        shift
+        ;;
+    esac
+  done
+  if [[ "$branch" == "fail" ]]; then
     printf 'completed\tfailure\tCI\tCI\tfail\tpush\t2\t1s\t2026-06-01T00:00:00Z\n'
-    ;;
-  *)
-    printf 'unexpected gh args: %s\n' "$*" >&2
-    exit 1
-    ;;
-esac
+  else
+    printf 'completed\tsuccess\tCI\tCI\t%s\tpush\t1\t1s\t2026-06-01T00:00:00Z\n' "$branch"
+  fi
+  exit 0
+fi
+
+printf 'unexpected gh args: %s\n' "$*" >&2
+exit 1
 GH
 chmod +x "$fake_bin/gh"
 PATH="$fake_bin:$PATH" "$work/lesson/tools/check_ci_status.sh" --required --branch main | grep 'CI status: latest run succeeded'
 PATH="$fake_bin:$PATH" "$work/lesson/tools/check_ci_status.sh" --required --branch fail >/tmp/lesson14-ci-fail.out 2>&1 && exit 1 || true
 grep 'CI status: latest run is not successful' /tmp/lesson14-ci-fail.out >/dev/null
+
+product_repo="$HOME/projects/task-tracker-repository"
+mkdir -p "$product_repo"
+cd "$product_repo"
+git init -b main >/dev/null
+printf 'task tracker\n' > README.md
+git add README.md
+git -c user.name=Test -c user.email=test@example.com commit -m initial-product >/dev/null
 
 gate_required="$work/gate-required"
 cp -a "$work/lesson" "$gate_required"
@@ -146,9 +182,9 @@ git add .
 git -c user.name=Test -c user.email=test@example.com commit -m gate >/dev/null
 ./tools/lesson14 通過 day14.release-readiness "should fail without upstream" >/tmp/lesson14-gate-required.out 2>&1 && exit 1 || true
 grep 'Upstream: none' /tmp/lesson14-gate-required.out >/dev/null
-git init --bare --initial-branch=main "$work/gate-origin.git" >/dev/null
-git remote add origin "$work/gate-origin.git"
-git push -u origin main >/dev/null
+git -C "$product_repo" init --bare --initial-branch=main "$work/product-origin.git" >/dev/null
+git -C "$product_repo" remote add origin "$work/product-origin.git"
+git -C "$product_repo" push -u origin main >/dev/null
 PATH="$fake_bin:$PATH" ./tools/lesson14 通過 day14.release-readiness "main同期とCIを確認した" | grep 'Passed step'
 ./tools/lesson14 status | grep 'day14.retrospective'
 

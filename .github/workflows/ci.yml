@@ -17,11 +17,14 @@ jobs:
           bash -n tools/lib/lesson_common.sh
           bash -n tools/check_lesson_structure.sh
           bash -n tools/check_repository_boundary.sh
+          bash -n tools/check_agents_skills.sh
           bash -n tools/lesson
           bash -n tools/learn
 
       - name: Lesson structure
-        run: ./tools/check_lesson_structure.sh
+        run: |
+          ./tools/check_lesson_structure.sh
+          ./tools/check_agents_skills.sh
 
       - name: Repository boundary
         run: ./tools/check_repository_boundary.sh

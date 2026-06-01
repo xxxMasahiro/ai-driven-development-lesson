@@ -128,6 +128,7 @@ FAILURE_MEMORY.mdへ書く必要がある場合も、まず記録案だけ出し
 
 ```text
 Day 1として、AI駆動開発の土台を作ります。
+成果物リポジトリの開発に入る前には、別画面でUbuntu/WSL CLIを起動するよう必ず促してください。
 フォルダ構成、メモリー用Markdown、設計用Markdownの役割を確認し、
 REQUIREMENTS.md、SPECIFICATION.md、IMPLEMENTATION_PLAN.md、
 TASK_TRACKER.md、HANDOFF.mdの初期案を作ってください。

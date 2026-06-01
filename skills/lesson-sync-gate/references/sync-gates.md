@@ -1,0 +1,48 @@
+# Sync Gate Reference
+
+The sync-gate source of truth is `lesson/SYNC_GATES_14_DAYS.tsv`.
+Before product-repository gates, confirm the learner was prompted to open a separate Ubuntu/WSL CLI window for `$HOME/projects/task-tracker-repository/`.
+
+## Core Checks
+
+```bash
+./tools/check_lesson_structure.sh
+./tools/check_repository_boundary.sh
+./tools/check_lesson14_structure.sh
+./tools/check_lesson14_sync.sh
+./tools/check_agents_skills.sh
+./tools/test_lesson14.sh
+```
+
+## Git And CI
+
+Use required mode when the gate says Git or CI is mandatory:
+
+```bash
+./tools/check_git_sync.sh --required
+./tools/check_ci_status.sh --required
+./tools/check_git_sync.sh --product --required
+./tools/check_ci_status.sh --product --required
+```
+
+Use optional mode only for exploratory status checks.
+Use `--product` when the gate is checking the task-tracker product repository rather than the lesson repository.
+
+## Document Sync
+
+Initial creation flow:
+
+```text
+REQUIREMENTS.md
+SPECIFICATION.md
+IMPLEMENTATION_PLAN.md
+then TASK_TRACKER.md and HANDOFF.md
+```
+
+Change flow:
+
+```text
+TASK_TRACKER.md and HANDOFF.md first
+implementation next
+then REQUIREMENTS.md, SPECIFICATION.md, IMPLEMENTATION_PLAN.md
+```

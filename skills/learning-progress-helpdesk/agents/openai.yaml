@@ -1,0 +1,4 @@
+interface:
+  display_name: "Learning Progress Helpdesk"
+  short_description: "Record learning progress, questions, and restart handoffs."
+  default_prompt: "Use this skill to manage learner progress and helpdesk notes."

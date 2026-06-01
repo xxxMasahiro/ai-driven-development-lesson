@@ -1,0 +1,4 @@
+interface:
+  display_name: "Worklog Doc Sync"
+  short_description: "Synchronize design docs with task tracker and handoff."
+  default_prompt: "Use this skill to sync requirements, specs, plans, task tracker, and handoff."

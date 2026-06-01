@@ -1,0 +1,4 @@
+interface:
+  display_name: "GitHub Login Onboarding"
+  short_description: "Guide GitHub CLI, SSH, and github-login setup."
+  default_prompt: "Use this skill to guide GitHub login setup safely."

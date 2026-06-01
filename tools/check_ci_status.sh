@@ -1,18 +1,46 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=tools/lib/lesson_common.sh
+source "$SCRIPT_DIR/lib/lesson_common.sh"
+
 required=0
 branch=""
 workflow=""
+commit=""
+target_dir=""
+target_label="current"
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --required)
       required=1
       shift
       ;;
+    --lesson)
+      target_dir="$LESSON_ROOT"
+      target_label="lesson"
+      shift
+      ;;
+    --product)
+      target_dir="$(lesson_product_repo_root)"
+      target_label="product"
+      shift
+      ;;
+    --repo)
+      target_dir="$(lesson_expand_path "${2:-}")"
+      [[ -n "$target_dir" ]] || { printf '%s\n' '--repo requires a value' >&2; exit 1; }
+      target_label="custom"
+      shift 2
+      ;;
     --branch)
       branch="${2:-}"
       [[ -n "$branch" ]] || { printf '%s\n' '--branch requires a value' >&2; exit 1; }
+      shift 2
+      ;;
+    --commit)
+      commit="${2:-}"
+      [[ -n "$commit" ]] || { printf '%s\n' '--commit requires a value' >&2; exit 1; }
       shift 2
       ;;
     --workflow)
@@ -26,6 +54,16 @@ while [[ $# -gt 0 ]]; do
       ;;
   esac
 done
+
+if [[ -n "$target_dir" ]]; then
+  if [[ ! -d "$target_dir" ]]; then
+    printf 'CI target does not exist: %s\n' "$target_dir" >&2
+    [[ "$required" -eq 1 ]] && exit 1 || exit 0
+  fi
+  cd "$target_dir"
+fi
+
+printf 'CI target: %s\n' "$target_label"
 
 if ! command -v gh >/dev/null 2>&1; then
   printf 'gh is not installed; CI status check skipped.\n'
@@ -42,12 +80,22 @@ if ! repo="$(gh repo view --json nameWithOwner --jq .nameWithOwner 2>/dev/null)"
   [[ "$required" -eq 1 ]] && exit 1 || exit 0
 fi
 
+if [[ -z "$branch" ]]; then
+  branch="$(git branch --show-current 2>/dev/null || true)"
+fi
+
+if [[ -z "$commit" ]]; then
+  commit="$(git rev-parse HEAD 2>/dev/null || true)"
+fi
+
 args=(run list --repo "$repo" --limit 1)
 [[ -n "$branch" ]] && args+=(--branch "$branch")
+[[ -n "$commit" ]] && args+=(--commit "$commit")
 [[ -n "$workflow" ]] && args+=(--workflow "$workflow")
 latest="$(gh "${args[@]}" 2>/dev/null || true)"
 if [[ -z "$latest" ]]; then
   printf 'No GitHub Actions runs found for %s.\n' "$repo"
+  [[ -n "$commit" ]] && printf 'Commit: %s\n' "$commit"
   [[ "$required" -eq 1 ]] && exit 1 || exit 0
 fi
 

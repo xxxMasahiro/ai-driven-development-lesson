@@ -1,0 +1,133 @@
+# AGENTS.MD
+
+このファイルは、本教材リポジトリで作業するエージェント向けの入口です。
+重要プロトコル、ドキュメントルート、repo-local skills の呼び出し先をここで接続します。
+
+## 起動手順
+
+エージェントは、ユーザーに `index.md` や `index-14-days.md` を探させません。
+この `AGENTS.MD` を読んだうえで、ユーザーの意図に応じて内部的に正しい入口へ進みます。
+
+```text
+1. AGENTS.MDを読む
+2. ルーティングテーブルで入口を選ぶ
+3. 選んだ入口ドキュメントを読む
+4. 必要なrepo-local skillを読む
+5. 対応する検査コマンドで現在地を確認する
+6. ユーザーには現在地、次の一問、必要なコピペ用プロンプトだけを提示する
+```
+
+既定の入口:
+
+```text
+公開導入や教材全体の案内: README.md
+7日版レッスン: index.md
+14日版レッスン: index-14-days.md
+```
+
+## 不変ルール
+
+1. 学習用リポジトリと成果物リポジトリは、2つのUbuntu/WSL CLI画面で分けて扱う。
+   学習用は `$HOME/projects/ai-driven-development/`、成果物は `$HOME/projects/task-tracker-repository/` です。両方を同時並行で使うため、エージェントは作業前にどちらのCLI画面、どちらのGitリポジトリにいるか確認し、Git管理を混線させません。
+   成果物リポジトリの開発に入る前には、必ず学習者へ別画面でUbuntu/WSL CLIを起動し、成果物リポジトリ専用画面として使うよう促します。
+
+2. 既存機能とのトレードオフは一切禁止する。
+   7日版、14日版、既存CI、既存チェック、既存ドキュメント導線を壊して新機能を入れることはできません。追加は既存機能と両立する形にします。
+
+3. コード実装は、再利用性、リファクタリング性、汎用性、変更可能性を満たす。
+   固定値や場当たり的な分岐を増やさず、既存の設定ファイル、共通ライブラリ、検査コマンド、repo-local skills と接続できる設計にします。
+
+4. `AGENTS.MD` と `AGENT.md` を混同しない。
+   `AGENTS.MD` は本教材リポジトリで最初に読むエージェント入口です。`AGENT.md` は成果物リポジトリ側で作るメモリー文書です。
+
+5. 既存の7日版レッスンは正本として残す。
+   `index.md`、`lesson/LESSON_FLOW.tsv`、`learning/LESSON_STATE.tsv`、`tools/lesson` は7日版の導線です。
+
+6. 14日版レッスンは拡張版として扱う。
+   14日版は `index-14-days.md`、`lesson/LESSON_FLOW_14_DAYS.tsv`、`learning/LESSON_STATE_14_DAYS.tsv`、`tools/lesson14` を使います。
+
+7. 未来ステップへのスキップは禁止する。
+   7日版は `tools/lesson`、14日版は `tools/lesson14` の現在地だけを進めます。完了済みステップだけ復習できます。
+
+8. 教材リポジトリと成果物リポジトリを入れ子にしない。
+   成果物リポジトリは標準では `$HOME/projects/task-tracker-repository` です。作業前に必要なら `tools/check_repository_boundary.sh` を実行します。
+
+9. 14日版の学習記録は14日版専用ファイルへ書く。
+   `learning/LEARNING_TASK_TRACKER_14_DAYS.md` と `learning/LEARNING_HANDOFF_14_DAYS.md` を使い、7日版の学習記録とは混ぜません。
+
+10. 同期ゲートを省略しない。
+   14日版では `lesson/SYNC_GATES_14_DAYS.tsv` を正本とし、必要な Git 同期、CI 確認、文書同期を完了してから `tools/lesson14 通過` を実行します。
+
+11. 危険操作、認証操作、曖昧な書き込みはユーザー確認を先に行う。
+   認証情報、SSH鍵、GitHub device flow、破壊的 Git 操作、成果物リポジトリの公開や削除は確認なしに進めません。
+
+12. 書き込み前にリポジトリ文脈を確認する。
+   教材側で作業しているのか、成果物側で作業しているのかを `pwd`、`git rev-parse --show-toplevel`、境界チェックで確認します。
+
+13. repo-local skills を優先して使う。
+   14日版進行、同期ゲート、成果物文書作成に該当する作業では `skills/` 配下の該当スキルを読んでから進めます。
+
+14. テストを通してから完了する。
+    既存チェック、14日版チェック、AGENTS/skillsチェック、必要な GitHub Actions を確認します。
+
+## ドキュメントルート
+
+| 用途 | 入口 |
+| --- | --- |
+| 公開リポジトリの導入 | `README.md` |
+| 7日版レッスン入口 | `index.md` |
+| 14日版レッスン入口 | `index-14-days.md` |
+| GitHub初期設定 | `github-login-setup-guide.md` |
+| 7日版体験開発 | `ai-driven-task-tracker-scenario.md` |
+| 14日版ロードマップ | `learning/ROADMAP.md` |
+| 14日版進行台本 | `playbooks/AGENT_PLAYBOOK_14_DAYS.md` |
+| 14日版プロンプト | `prompts/PROMPTS_14_DAYS.md` |
+| 14日版フロー | `lesson/LESSON_FLOW_14_DAYS.tsv` |
+| 14日版同期ゲート | `lesson/SYNC_GATES_14_DAYS.tsv` |
+| 14日版ヘルプデスク | `learning/HELP_DESK.md` |
+| 成果物文書雛形 | `templates/TEMPLATES.md` |
+| repo-local skills | `skills/*/SKILL.md` |
+
+## ルーティングテーブル
+
+| ユーザー意図 | 最初に読む | 使うスキル | 主なコマンド |
+| --- | --- | --- | --- |
+| 公開リポジトリから開始したい | `README.md` | なし | `git clone`、`./tools/lesson status` |
+| レッスン開始、再開、現在地確認 | 意図に応じて `index.md` または `index-14-days.md` | 14日版なら `skills/lesson14-facilitator/SKILL.md` | `./tools/lesson status` または `./tools/lesson14 status` |
+| 7日版を進めたい | `index.md` | なし | `./tools/check_lesson_structure.sh`、`./tools/lesson status` |
+| 14日版を進めたい | `index-14-days.md` | `skills/lesson14-facilitator/SKILL.md` | `./tools/check_lesson14_structure.sh`、`./tools/lesson14 status` |
+| 現在地やロードマップを知りたい | `learning/ROADMAP.md` | `skills/lesson14-facilitator/SKILL.md` | `./tools/roadmap status` |
+| GitHub初期設定を進めたい | `github-login-setup-guide.md` | `skills/github-login-onboarding/SKILL.md` | `gh auth status -h github.com`、`ssh -T github.com` |
+| 学習進捗、再開、中断、つまずき相談 | `learning/ROADMAP.md`、`learning/HELP_DESK.md` | `skills/learning-progress-helpdesk/SKILL.md` | `./tools/roadmap status`、`./tools/helpdesk 相談 "..."` |
+| 同期ゲートを通したい | `lesson/SYNC_GATES_14_DAYS.tsv` | `skills/lesson-sync-gate/SKILL.md` | `./tools/check_lesson14_sync.sh`、`./tools/lesson14 通過 ...` |
+| Git/CI同期を確認したい | `lesson/SYNC_GATES_14_DAYS.tsv` | `skills/lesson-sync-gate/SKILL.md` | `./tools/check_git_sync.sh --required`、`./tools/check_ci_status.sh --required` |
+| 成果物文書を作りたい | `templates/TEMPLATES.md` | `skills/task-tracker-docs/SKILL.md` | 境界確認後に更新案を提示 |
+| TASK_TRACKER/HANDOFFを同期したい | `ai-driven-task-tracker-scenario.md`、`lesson/SYNC_GATES_14_DAYS.tsv` | `skills/worklog-doc-sync/SKILL.md`、`skills/lesson-sync-gate/SKILL.md` | 更新案、同期チェック、通過 |
+| Playwright E2Eを扱う | `prompts/PROMPTS_14_DAYS.md` Day 10-11 | `skills/lesson-sync-gate/SKILL.md` | ローカルE2E、CI、失敗復旧 |
+| サブエージェントで精査する | `playbooks/AGENT_PLAYBOOK_14_DAYS.md` Day 12 | `skills/lesson-sync-gate/SKILL.md` | レビュー、テスト、同期確認 |
+| スキル/MCPを体験する | `prompts/PROMPTS_14_DAYS.md` Day 13 | `skills/lesson14-facilitator/SKILL.md` | 最小構成で実施 |
+
+## repo-local skills
+
+```text
+skills/github-login-onboarding/SKILL.md
+skills/learning-progress-helpdesk/SKILL.md
+skills/lesson14-facilitator/SKILL.md
+skills/lesson-sync-gate/SKILL.md
+skills/task-tracker-docs/SKILL.md
+skills/worklog-doc-sync/SKILL.md
+```
+
+これらは本リポジトリに同梱された教材運用スキルです。
+自動発見されない環境では、該当 `SKILL.md` を明示的に読んでから作業します。
+
+## 標準検査
+
+```bash
+./tools/check_lesson_structure.sh
+./tools/check_repository_boundary.sh
+./tools/check_lesson14_structure.sh
+./tools/check_lesson14_sync.sh
+./tools/check_agents_skills.sh
+./tools/test_lesson14.sh
+```

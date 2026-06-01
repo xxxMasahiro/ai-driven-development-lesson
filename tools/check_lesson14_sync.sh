@@ -103,16 +103,28 @@ if ! awk -F '\t' '
         bad = 1
       }
     }
-    if ($5 ~ /CI/ && $5 !~ /必要なら/ && $5 != "-" && $6 !~ /check_ci_status\.sh --required/) {
+    if ($5 ~ /CI/ && $5 !~ /必要なら/ && $5 != "-" && $6 !~ /check_ci_status\.sh --product --required/) {
       printf "mandatory CI gate must use required CI check at %s\n", $1 > "/dev/stderr"
       bad = 1
     }
-    if ($1 == "Day 14" && $6 !~ /check_git_sync\.sh --required/) {
+    if ($3 != "-" && $5 ~ /CI/ && $5 !~ /必要なら/ && $5 != "-" && $6 !~ /check_ci_status\.sh --product --required/) {
+      printf "product CI gate must target product repository at %s\n", $1 > "/dev/stderr"
+      bad = 1
+    }
+    if ($1 == "Day 14" && $6 !~ /check_git_sync\.sh --product --required/) {
       printf "Day 14 must use required git sync check\n" > "/dev/stderr"
       bad = 1
     }
-    if ($4 ~ /同期/ && $6 !~ /check_git_sync\.sh --required/) {
+    if ($4 ~ /push|remote|PR|merge|pull|同期/ && $6 !~ /check_git_sync\.sh --product --required/) {
       printf "remote sync gate must use required git sync check at %s\n", $1 > "/dev/stderr"
+      bad = 1
+    }
+    if ($4 ~ /commit/ && $6 !~ /check_git_sync\.sh --product/) {
+      printf "product commit gate must check product git state at %s\n", $1 > "/dev/stderr"
+      bad = 1
+    }
+    if ($1 == "Day 3" && $6 !~ /check_repository_boundary\.sh --product-required/) {
+      printf "Day 3 must require the product repository boundary\n" > "/dev/stderr"
       bad = 1
     }
   }

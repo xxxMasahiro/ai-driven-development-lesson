@@ -9,7 +9,7 @@
 008	day2.github-connection	Day 2	gh、SSH、GitHub接続を確認する	GitHub接続確認
 009	day2.remote-sync	Day 2	remote、push、pull、fetchの役割を確認する	ローカルとリモート同期の理解
 010	day2.sync-gate	Day 2	Day 2同期ゲートを通過する	GitHub接続と学習記録の同期
-011	day3.product-repo	Day 3	成果物リポジトリを教材外に作る流れを確認する	成果物リポジトリ境界の理解
+011	day3.product-repo	Day 3	成果物リポジトリを教材外に作る流れを確認する	成果物リポジトリ境界と別CLI起動の理解
 012	day3.memory-docs	Day 3	AGENT.mdと各メモリー文書の役割を確認する	メモリー文書の役割理解
 013	day3.initial-commit	Day 3	成果物リポジトリで初回commitを体験する	初回commit体験
 014	day3.sync-gate	Day 3	Day 3同期ゲートを通過する	成果物リポジトリ状態と学習記録の同期

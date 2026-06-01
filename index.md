@@ -56,6 +56,7 @@
 どちらも `$HOME/projects/` 直下に並列で置きます。  
 `$HOME` は学習者のホームディレクトリを表すため、ユーザーごとに実際のパスは変わります。
 リポジトリ名や配置先を変えたい場合は、`lesson/LESSON_CONFIG.tsv` を変更します。
+成果物リポジトリの開発に入る前には、別画面でUbuntu/WSL CLIを起動し、成果物リポジトリ専用画面として使います。
 
 ```text
 $HOME/projects/
@@ -117,6 +118,7 @@ git rev-parse --show-toplevel
 ```text
 tools/check_lesson_structure.sh
 tools/check_repository_boundary.sh
+tools/check_agents_skills.sh
 ```
 
 Git hooksは `.githooks/pre-commit` に置き、`core.hooksPath` で有効化します。

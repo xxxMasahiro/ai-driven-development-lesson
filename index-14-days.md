@@ -26,6 +26,8 @@ PlaywrightによるE2Eテストを導入する
 5. prompts/PROMPTS_14_DAYS.md
 6. lesson/LESSON_FLOW_14_DAYS.tsv
 7. lesson/SYNC_GATES_14_DAYS.tsv
+8. AGENTS.MD
+9. skills/lesson14-facilitator/SKILL.md
 ```
 
 ## 最初に実行するコマンド
@@ -33,6 +35,7 @@ PlaywrightによるE2Eテストを導入する
 ```bash
 ./tools/check_lesson14_structure.sh
 ./tools/check_lesson14_sync.sh
+./tools/check_agents_skills.sh
 ./tools/lesson14 status
 ./tools/roadmap status
 ```
@@ -49,6 +52,11 @@ PlaywrightによるE2Eテストを導入する
 
 未来項目へのスキップは禁止です。
 完了済み項目だけ、復習として自由に戻れます。
+
+## CLI画面の分離
+
+成果物リポジトリの開発に入る前に、学習者は別画面でUbuntu/WSL CLIを起動します。
+学習用リポジトリ `$HOME/projects/ai-driven-development/` と、成果物リポジトリ `$HOME/projects/task-tracker-repository/` を別々のCLI画面で扱うことで、Git管理の混線を防ぎます。
 
 ## ロードマップとヘルプデスク
 
@@ -78,6 +86,7 @@ tools/lesson14 通過 <step_id> "メモ" が通る
 ```
 
 同期ゲートの正本は `lesson/SYNC_GATES_14_DAYS.tsv` です。
+スキルやAGENTS.MDの整合性は `tools/check_agents_skills.sh` で確認します。
 
 ## エージェントへの開始プロンプト
 

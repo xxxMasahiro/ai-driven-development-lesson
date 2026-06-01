@@ -36,6 +36,7 @@ required_files=(
   "tools/check_lesson14_sync.sh"
   "tools/check_git_sync.sh"
   "tools/check_ci_status.sh"
+  "tools/check_agents_skills.sh"
   "tools/test_lesson14.sh"
 )
 
@@ -47,6 +48,7 @@ executable_files=(
   "tools/check_lesson14_sync.sh"
   "tools/check_git_sync.sh"
   "tools/check_ci_status.sh"
+  "tools/check_agents_skills.sh"
   "tools/test_lesson14.sh"
 )
 

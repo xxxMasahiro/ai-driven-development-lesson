@@ -1,0 +1,4 @@
+interface:
+  display_name: "Lesson Sync Gate"
+  short_description: "Validate lesson documents, Git state, CI, and handoff sync."
+  default_prompt: "Use this skill to run synchronization gates and resolve inconsistencies."

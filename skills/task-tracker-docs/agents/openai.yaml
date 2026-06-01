@@ -1,0 +1,4 @@
+interface:
+  display_name: "Task Tracker Docs"
+  short_description: "Create and synchronize task-tracker product documents."
+  default_prompt: "Use this skill when creating or updating task tracker product docs."

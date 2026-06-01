@@ -1,0 +1,4 @@
+interface:
+  display_name: "Lesson14 Facilitator"
+  short_description: "Run the 14-day AI-driven development lesson."
+  default_prompt: "Use this skill to guide the 14-day lesson from the current repository state."
