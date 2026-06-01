@@ -1,0 +1,14 @@
+# Local editor and OS files
+.DS_Store
+Thumbs.db
+*~
+*.swp
+
+# Lesson runtime scratch files
+*.tmp
+*.bak
+
+# The learner's product repository must be a sibling of this lesson repository,
+# not a child directory. This ignore is defensive; the structure checker also
+# fails if this directory appears here.
+task-tracker-repository/

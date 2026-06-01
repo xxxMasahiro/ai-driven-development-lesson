@@ -1,0 +1,23 @@
+# order	step_id	status	started_at	completed_at
+001	setup.index	current		
+002	setup.github-login	locked		
+003	day1.mode	locked		
+004	day1.project-directory	locked		
+005	day1.folder-overview	locked		
+006	day1.memory-files	locked		
+007	day1.requirements	locked		
+008	day1.specification	locked		
+009	day1.implementation-plan	locked		
+010	day1.initial-tracker-handoff	locked		
+011	day1.learning-controls	locked		
+012	day2.screen-structure	locked		
+013	day3.visual-design	locked		
+014	day4.task-add-behavior	locked		
+015	day5.change-start	locked		
+016	day5.change-implementation	locked		
+017	day5.sync-design-docs	locked		
+018	day6.readme	locked		
+019	day6.work-handoff	locked		
+020	day7.completion-check	locked		
+021	day7.github-readiness	locked		
+022	day7.retrospective	locked		

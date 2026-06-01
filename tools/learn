@@ -1,0 +1,132 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=tools/lib/lesson_common.sh
+source "$SCRIPT_DIR/lib/lesson_common.sh"
+
+ROOT="$LESSON_ROOT"
+FLOW="$(lesson_flow_file)"
+STATE="$(lesson_state_file)"
+TRACKER="$(lesson_tracker_file)"
+HANDOFF="$(lesson_handoff_file)"
+COMMAND="${1:-}"
+shift || true
+MESSAGE="${*:-}"
+STAMP="$(date '+%Y-%m-%d %H:%M:%S')"
+
+usage() {
+  cat <<'USAGE'
+Usage:
+  tools/learn 現在地
+  tools/learn 記録 "今日やったこと"
+  tools/learn 理解 "分かったこと"
+  tools/learn つまずき "分からないこと"
+  tools/learn 中断 "次回のためのメモ"
+  tools/learn 再開
+
+This command only writes learning progress files:
+  learning/LEARNING_TASK_TRACKER.md
+  learning/LEARNING_HANDOFF.md
+USAGE
+}
+
+require_files() {
+  [[ -f "$FLOW" ]] || { printf 'missing: %s\n' "$FLOW" >&2; exit 1; }
+  [[ -f "$STATE" ]] || { printf 'missing: %s\n' "$STATE" >&2; exit 1; }
+  [[ -f "$TRACKER" ]] || { printf 'missing: %s\n' "$TRACKER" >&2; exit 1; }
+  [[ -f "$HANDOFF" ]] || { printf 'missing: %s\n' "$HANDOFF" >&2; exit 1; }
+}
+
+validate_structure() {
+  lesson_structure_check
+}
+
+current_lesson_step() {
+  local current
+  current="$(awk -F '\t' '$1 !~ /^#/ && $3 == "current" { print $2; exit }' "$STATE")"
+  if [[ -z "$current" ]]; then
+    printf 'すべて完了'
+    return
+  fi
+  awk -F '\t' -v step="$current" '
+    $1 !~ /^#/ && $2 == step {
+      printf "%s / %s / %s", $2, $3, $4
+      found = 1
+      exit
+    }
+    END {
+      if (!found) printf "%s", step
+    }
+  ' "$FLOW"
+}
+
+append_tracker() {
+  local kind="$1"
+  local text="$2"
+  {
+    printf '\n## %s\n\n' "学習ログ: $STAMP"
+    printf '```text\n'
+    printf '種別: %s\n' "$kind"
+    printf '現在のレッスン項目: %s\n' "$(current_lesson_step)"
+    printf '内容: %s\n' "$text"
+    printf '```\n'
+  } >> "$TRACKER"
+}
+
+append_handoff() {
+  local kind="$1"
+  local text="$2"
+  {
+    printf '\n## %s\n\n' "学習ハンドオフ: $STAMP"
+    printf '```text\n'
+    printf '種別: %s\n' "$kind"
+    printf '現在のレッスン項目: %s\n' "$(current_lesson_step)"
+    printf '内容: %s\n' "$text"
+    printf '次回の最初の一問: 前回の続きから再開します。今の現在地を確認してよいですか？\n'
+    printf '```\n'
+  } >> "$HANDOFF"
+}
+
+show_current() {
+  printf 'Current lesson step:\n'
+  printf '%s\n\n' "$(current_lesson_step)"
+  printf 'Learning files:\n'
+  printf '%s\n' "- $TRACKER"
+  printf '%s\n\n' "- $HANDOFF"
+  printf 'Recent learning tracker entries:\n'
+  tail -n 20 "$TRACKER"
+  printf '\nRecent learning handoff entries:\n'
+  tail -n 20 "$HANDOFF"
+}
+
+require_files
+validate_structure
+
+case "$COMMAND" in
+  現在地)
+    show_current
+    ;;
+  記録|理解|つまずき)
+    [[ -n "$MESSAGE" ]] || { printf 'message is required.\n' >&2; usage; exit 1; }
+    append_tracker "$COMMAND" "$MESSAGE"
+    append_handoff "$COMMAND" "$MESSAGE"
+    printf 'Recorded learning progress: %s\n' "$COMMAND"
+    ;;
+  中断)
+    [[ -n "$MESSAGE" ]] || MESSAGE="中断。次回は現在地の確認から再開する。"
+    append_handoff "$COMMAND" "$MESSAGE"
+    printf 'Recorded learning handoff for interruption.\n'
+    ;;
+  再開)
+    show_current
+    ;;
+  ""|-h|--help|help)
+    usage
+    ;;
+  *)
+    printf 'unknown command: %s\n' "$COMMAND" >&2
+    usage
+    exit 1
+    ;;
+esac

@@ -1,0 +1,8 @@
+# key	value
+lesson_repo_name	ai-driven-development
+product_repo_name	task-tracker-repository
+project_root	$HOME/projects
+flow_file	lesson/LESSON_FLOW.tsv
+state_file	learning/LESSON_STATE.tsv
+learning_tracker_file	learning/LEARNING_TASK_TRACKER.md
+learning_handoff_file	learning/LEARNING_HANDOFF.md
