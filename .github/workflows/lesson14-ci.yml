@@ -1,0 +1,37 @@
+name: Lesson14 CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  lesson14-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Shell syntax
+        run: |
+          bash -n tools/lib/lesson_runtime.sh
+          bash -n tools/lesson14
+          bash -n tools/roadmap
+          bash -n tools/helpdesk
+          bash -n tools/check_lesson14_structure.sh
+          bash -n tools/check_lesson14_sync.sh
+          bash -n tools/check_git_sync.sh
+          bash -n tools/check_ci_status.sh
+          bash -n tools/test_lesson14.sh
+
+      - name: Existing lesson checks
+        run: |
+          ./tools/check_lesson_structure.sh
+          ./tools/check_repository_boundary.sh
+
+      - name: Lesson14 structure and sync
+        run: |
+          ./tools/check_lesson14_structure.sh
+          ./tools/check_lesson14_sync.sh
+
+      - name: Lesson14 CLI regression
+        run: ./tools/test_lesson14.sh

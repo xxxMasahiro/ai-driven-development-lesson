@@ -1,0 +1,157 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+work="$(mktemp -d)"
+trap 'rm -rf "$work"' EXIT
+
+cp -a "$ROOT" "$work/lesson"
+cd "$work/lesson"
+
+./tools/check_lesson_structure.sh
+./tools/check_repository_boundary.sh >/dev/null
+./tools/check_lesson14_structure.sh
+./tools/check_lesson14_sync.sh
+./tools/lesson14 現在地 | grep 'setup.index'
+./tools/lesson14 一覧 | grep 'day14.complete'
+./tools/roadmap 現在地 | grep 'setup.index'
+./tools/roadmap Day 14 | grep 'day14.complete'
+
+bad_duplicate="$work/bad-duplicate"
+cp -a "$work/lesson" "$bad_duplicate"
+awk -F '\t' '$1 !~ /^#/ && $2 == "setup.index" { print; exit }' "$bad_duplicate/lesson/LESSON_FLOW_14_DAYS.tsv" >> "$bad_duplicate/lesson/LESSON_FLOW_14_DAYS.tsv"
+(cd "$bad_duplicate" && ./tools/check_lesson14_structure.sh >/tmp/lesson14-duplicate.out 2>&1 && exit 1 || true)
+grep 'duplicate flow' /tmp/lesson14-duplicate.out >/dev/null
+
+bad_empty="$work/bad-empty-required-output"
+cp -a "$work/lesson" "$bad_empty"
+tmp_flow="$(mktemp)"
+awk -F '\t' -v OFS='\t' '$1 !~ /^#/ && $2 == "day1.roadmap" { $5 = "" } { print }' "$bad_empty/lesson/LESSON_FLOW_14_DAYS.tsv" > "$tmp_flow"
+mv "$tmp_flow" "$bad_empty/lesson/LESSON_FLOW_14_DAYS.tsv"
+(cd "$bad_empty" && ./tools/check_lesson14_structure.sh >/tmp/lesson14-empty-required.out 2>&1 && exit 1 || true)
+grep 'empty flow field' /tmp/lesson14-empty-required.out >/dev/null
+
+bad_entry="$work/bad-entry"
+cp -a "$work/lesson" "$bad_entry"
+tmp_flow="$(mktemp)"
+awk -F '\t' -v OFS='\t' '$1 !~ /^#/ && $2 == "setup.index" { $4 = "index.mdでレッスン全体と14日版の入口を確認する" } { print }' "$bad_entry/lesson/LESSON_FLOW_14_DAYS.tsv" > "$tmp_flow"
+mv "$tmp_flow" "$bad_entry/lesson/LESSON_FLOW_14_DAYS.tsv"
+(cd "$bad_entry" && ./tools/check_lesson14_sync.sh >/tmp/lesson14-bad-entry.out 2>&1 && exit 1 || true)
+grep '14-day setup index entry' /tmp/lesson14-bad-entry.out >/dev/null
+
+bad_learning_files="$work/bad-learning-files"
+cp -a "$work/lesson" "$bad_learning_files"
+tmp_gates="$(mktemp)"
+awk -F '\t' -v OFS='\t' '$1 !~ /^#/ && $1 == "Day 1" { $2 = "LEARNING_TASK_TRACKER.md,LEARNING_HANDOFF.md" } { print }' "$bad_learning_files/lesson/SYNC_GATES_14_DAYS.tsv" > "$tmp_gates"
+mv "$tmp_gates" "$bad_learning_files/lesson/SYNC_GATES_14_DAYS.tsv"
+(cd "$bad_learning_files" && ./tools/check_lesson14_sync.sh >/tmp/lesson14-bad-learning-files.out 2>&1 && exit 1 || true)
+grep 'sync gates must use 14-day learning files only' /tmp/lesson14-bad-learning-files.out >/dev/null
+
+bad_day14_gate="$work/bad-day14-gate"
+cp -a "$work/lesson" "$bad_day14_gate"
+tmp_gates="$(mktemp)"
+awk -F '\t' -v OFS='\t' '$1 !~ /^#/ && $1 == "Day 14" { $6 = "tools/check_ci_status.sh --required" } { print }' "$bad_day14_gate/lesson/SYNC_GATES_14_DAYS.tsv" > "$tmp_gates"
+mv "$tmp_gates" "$bad_day14_gate/lesson/SYNC_GATES_14_DAYS.tsv"
+(cd "$bad_day14_gate" && ./tools/check_lesson14_sync.sh >/tmp/lesson14-bad-day14-gate.out 2>&1 && exit 1 || true)
+grep 'Day 14 must use required git sync check' /tmp/lesson14-bad-day14-gate.out >/dev/null
+
+./tools/lesson14 通過 day2.git-basics "future step" >/tmp/lesson14-future.out 2>&1 && exit 1 || true
+grep 'locked' /tmp/lesson14-future.out >/dev/null
+
+./tools/lesson14 通過 setup.index >/tmp/lesson14-empty-pass.out 2>&1 && exit 1 || true
+grep 'pass memo is required' /tmp/lesson14-empty-pass.out >/dev/null
+
+./tools/lesson14 復習 setup.index >/tmp/lesson14-revisit-current.out 2>&1 && exit 1 || true
+grep 'only completed steps' /tmp/lesson14-revisit-current.out >/dev/null
+
+./tools/lesson14 通過 setup.index "14日版の目的と順番を確認した"
+./tools/lesson14 現在地 | grep 'setup.github-login'
+./tools/lesson14 復習 setup.index | grep 'Revisit allowed'
+./tools/lesson14 現在地 | grep 'setup.github-login'
+./tools/lesson14 通過 setup.github-login "GitHub接続を確認した"
+./tools/lesson14 現在地 | grep 'day1.roadmap'
+
+./tools/helpdesk 相談 "テスト用の相談"
+./tools/helpdesk 解決 "テスト用の解決"
+./tools/helpdesk 一覧 | grep 'テスト用の相談'
+./tools/helpdesk 一覧 | grep 'テスト用の解決'
+
+./tools/check_lesson14_structure.sh
+
+git_check="$work/git-check"
+mkdir "$git_check"
+cd "$git_check"
+git init -b main >/dev/null
+printf 'x\n' > file.txt
+git add file.txt
+git -c user.name=Test -c user.email=test@example.com commit -m initial >/dev/null
+"$work/lesson/tools/check_git_sync.sh" --required >/tmp/lesson14-git-no-upstream.out 2>&1 && exit 1 || true
+grep 'Upstream: none' /tmp/lesson14-git-no-upstream.out >/dev/null
+git init --bare --initial-branch=main "$work/origin.git" >/dev/null
+git remote add origin "$work/origin.git"
+git push -u origin main >/dev/null
+"$work/lesson/tools/check_git_sync.sh" --required | grep 'Git sync: local and upstream match'
+printf 'dirty\n' >> file.txt
+"$work/lesson/tools/check_git_sync.sh" --required >/tmp/lesson14-git-dirty.out 2>&1 && exit 1 || true
+grep 'Working tree: dirty' /tmp/lesson14-git-dirty.out >/dev/null
+
+fake_bin="$work/fake-bin"
+mkdir "$fake_bin"
+cat > "$fake_bin/gh" <<'GH'
+#!/usr/bin/env bash
+case "$*" in
+  "auth status -h github.com")
+    exit 0
+    ;;
+  "repo view --json nameWithOwner --jq .nameWithOwner")
+    printf 'owner/repo\n'
+    ;;
+  "run list --repo owner/repo --limit 1")
+    printf 'completed\tsuccess\tCI\tCI\tmain\tpush\t1\t1s\t2026-06-01T00:00:00Z\n'
+    ;;
+  "run list --repo owner/repo --limit 1 --branch main")
+    printf 'completed\tsuccess\tCI\tCI\tmain\tpush\t1\t1s\t2026-06-01T00:00:00Z\n'
+    ;;
+  "run list --repo owner/repo --limit 1 --workflow CI")
+    printf 'completed\tsuccess\tCI\tCI\tmain\tpush\t1\t1s\t2026-06-01T00:00:00Z\n'
+    ;;
+  "run list --repo owner/repo --limit 1 --branch fail")
+    printf 'completed\tfailure\tCI\tCI\tfail\tpush\t2\t1s\t2026-06-01T00:00:00Z\n'
+    ;;
+  *)
+    printf 'unexpected gh args: %s\n' "$*" >&2
+    exit 1
+    ;;
+esac
+GH
+chmod +x "$fake_bin/gh"
+PATH="$fake_bin:$PATH" "$work/lesson/tools/check_ci_status.sh" --required --branch main | grep 'CI status: latest run succeeded'
+PATH="$fake_bin:$PATH" "$work/lesson/tools/check_ci_status.sh" --required --branch fail >/tmp/lesson14-ci-fail.out 2>&1 && exit 1 || true
+grep 'CI status: latest run is not successful' /tmp/lesson14-ci-fail.out >/dev/null
+
+gate_required="$work/gate-required"
+cp -a "$work/lesson" "$gate_required"
+rm -rf "$gate_required/.git"
+cd "$gate_required"
+git init -b main >/dev/null
+tmp_state="$(mktemp)"
+awk -F '\t' -v OFS='\t' '
+  /^#/ { print; next }
+  $2 == "day14.release-readiness" { $3 = "current"; $4 = ""; $5 = ""; print; next }
+  $1 + 0 < 56 { $3 = "completed"; if ($4 == "") $4 = "2026-06-01 00:00:00"; if ($5 == "") $5 = "2026-06-01 00:00:00"; print; next }
+  { $3 = "locked"; $4 = ""; $5 = ""; print }
+' learning/LESSON_STATE_14_DAYS.tsv > "$tmp_state"
+mv "$tmp_state" learning/LESSON_STATE_14_DAYS.tsv
+git add .
+git -c user.name=Test -c user.email=test@example.com commit -m gate >/dev/null
+./tools/lesson14 通過 day14.release-readiness "should fail without upstream" >/tmp/lesson14-gate-required.out 2>&1 && exit 1 || true
+grep 'Upstream: none' /tmp/lesson14-gate-required.out >/dev/null
+git init --bare --initial-branch=main "$work/gate-origin.git" >/dev/null
+git remote add origin "$work/gate-origin.git"
+git push -u origin main >/dev/null
+PATH="$fake_bin:$PATH" ./tools/lesson14 通過 day14.release-readiness "main同期とCIを確認した" | grep 'Passed step'
+./tools/lesson14 status | grep 'day14.retrospective'
+
+cd "$work/lesson"
+
+printf 'Lesson14 CLI tests passed.\n'

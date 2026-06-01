@@ -1,0 +1,68 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+HELP_DESK="$ROOT/learning/HELP_DESK.md"
+STATE="$ROOT/learning/LESSON_STATE_14_DAYS.tsv"
+FLOW="$ROOT/lesson/LESSON_FLOW_14_DAYS.tsv"
+COMMAND="${1:-}"
+[[ $# -gt 0 ]] && shift || true
+MESSAGE="${*:-}"
+STAMP="$(date '+%Y-%m-%d %H:%M:%S')"
+
+usage() {
+  cat <<'USAGE'
+Usage:
+  tools/helpdesk 相談 "分からないこと"
+  tools/helpdesk 解決 "分かったこと"
+  tools/helpdesk 一覧
+USAGE
+}
+
+current_label() {
+  local step
+  step="$(awk -F '\t' '$1 !~ /^#/ && $3 == "current" { print $2; exit }' "$STATE")"
+  if [[ -z "$step" ]]; then
+    printf 'すべて完了'
+    return
+  fi
+  awk -F '\t' -v step="$step" '$1 !~ /^#/ && $2 == step { printf "%s / %s / %s", $2, $3, $4; exit }' "$FLOW"
+}
+
+append_entry() {
+  local kind="$1"
+  local text="$2"
+  {
+    printf '\n## %s\n\n' "ヘルプデスク: $STAMP"
+    printf '```text\n'
+    printf '種別: %s\n' "$kind"
+    printf '現在のレッスン項目: %s\n' "$(current_label)"
+    printf '内容: %s\n' "$text"
+    printf '```\n'
+  } >> "$HELP_DESK"
+}
+
+case "$COMMAND" in
+  相談)
+    [[ -n "$MESSAGE" ]] || { printf 'message is required.\n' >&2; usage; exit 1; }
+    append_entry "$COMMAND" "$MESSAGE"
+    printf 'Recorded help desk consultation.\n'
+    ;;
+  解決)
+    [[ -n "$MESSAGE" ]] || { printf 'message is required.\n' >&2; usage; exit 1; }
+    append_entry "$COMMAND" "$MESSAGE"
+    printf 'Recorded help desk resolution.\n'
+    ;;
+  一覧|list)
+    tail -n 80 "$HELP_DESK"
+    ;;
+  ""|-h|--help|help)
+    usage
+    ;;
+  *)
+    printf 'unknown command: %s\n' "$COMMAND" >&2
+    usage
+    exit 1
+    ;;
+esac

@@ -1,0 +1,129 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+export LESSON_CONFIG="$ROOT/lesson/LESSON_CONFIG_14_DAYS.tsv"
+
+# shellcheck source=tools/lib/lesson_common.sh
+source "$SCRIPT_DIR/lib/lesson_common.sh"
+
+FLOW="$(lesson_flow_file)"
+STATE="$(lesson_state_file)"
+ROADMAP="$(lesson_abs_path "$(lesson_config_get roadmap_file "learning/ROADMAP.md")")"
+HELP_DESK="$(lesson_abs_path "$(lesson_config_get helpdesk_file "learning/HELP_DESK.md")")"
+SYNC_GATES="$(lesson_abs_path "$(lesson_config_get sync_gates_file "lesson/SYNC_GATES_14_DAYS.tsv")")"
+PROMPTS="$(lesson_abs_path "$(lesson_config_get prompt_file "prompts/PROMPTS_14_DAYS.md")")"
+INDEX="$ROOT/index-14-days.md"
+GUIDE="$ROOT/guides/LESSON_14_DAYS.md"
+PLAYBOOK="$ROOT/playbooks/AGENT_PLAYBOOK_14_DAYS.md"
+TRACKER="$(lesson_tracker_file)"
+HANDOFF="$(lesson_handoff_file)"
+
+missing=0
+
+require_pattern() {
+  local file="$1"
+  local pattern="$2"
+  local label="$3"
+  if ! grep -Eq "$pattern" "$file"; then
+    printf 'missing %s in %s\n' "$label" "$file" >&2
+    missing=1
+  fi
+}
+
+for file in "$FLOW" "$STATE" "$ROADMAP" "$HELP_DESK" "$SYNC_GATES" "$PROMPTS" "$INDEX" "$GUIDE" "$PLAYBOOK" "$TRACKER" "$HANDOFF"; do
+  if [[ ! -f "$file" ]]; then
+    printf 'missing: %s\n' "$file" >&2
+    missing=1
+  fi
+done
+
+if [[ $missing -ne 0 ]]; then
+  printf '\nLesson14 sync check failed.\n' >&2
+  exit 1
+fi
+
+require_pattern "$FLOW" '^001[[:space:]]+setup\.index[[:space:]]+Setup[[:space:]]+index-14-days\.md' "14-day setup index entry"
+require_pattern "$PROMPTS" 'index-14-days\.md' "14-day prompt entry"
+require_pattern "$INDEX" 'LEARNING_TASK_TRACKER_14_DAYS\.md' "14-day tracker reference"
+require_pattern "$INDEX" 'LEARNING_HANDOFF_14_DAYS\.md' "14-day handoff reference"
+require_pattern "$PLAYBOOK" 'LEARNING_TASK_TRACKER_14_DAYS\.md' "14-day tracker playbook reference"
+require_pattern "$PLAYBOOK" 'LEARNING_HANDOFF_14_DAYS\.md' "14-day handoff playbook reference"
+if grep -Eq 'LEARNING_TASK_TRACKER\.md|LEARNING_HANDOFF\.md' "$SYNC_GATES"; then
+  printf 'sync gates must use 14-day learning files only\n' >&2
+  missing=1
+fi
+
+for day in $(seq 1 14); do
+  if ! awk -F '\t' -v day="Day $day" '$1 !~ /^#/ && $3 == day { found=1 } END { exit found ? 0 : 1 }' "$FLOW"; then
+    printf 'missing Day %s in flow\n' "$day" >&2
+    missing=1
+  fi
+  if ! awk -F '\t' -v day="Day $day" '$1 !~ /^#/ && $1 == day { found=1 } END { exit found ? 0 : 1 }' "$SYNC_GATES"; then
+    printf 'missing Day %s in sync gates\n' "$day" >&2
+    missing=1
+  fi
+  require_pattern "$ROADMAP" "Day $day([^0-9]|$)" "Day $day"
+  require_pattern "$PROMPTS" "^## Day $day$" "Day $day prompt"
+  require_pattern "$TRACKER" "Day $day([^0-9]|$)" "Day $day tracker row"
+done
+
+combined="$(mktemp)"
+trap 'rm -f "$combined"' EXIT
+cat "$FLOW" "$ROADMAP" "$PROMPTS" "$SYNC_GATES" "$INDEX" "$GUIDE" "$PLAYBOOK" > "$combined"
+
+for topic in \
+  'GitHub' \
+  'CI' \
+  'Playwright' \
+  'サブエージェント' \
+  'スキル' \
+  'MCP' \
+  'ロードマップ' \
+  'ヘルプデスク' \
+  'TASK_TRACKER' \
+  'HANDOFF' \
+  'REQUIREMENTS' \
+  'SPECIFICATION' \
+  'IMPLEMENTATION_PLAN'
+do
+  require_pattern "$combined" "$topic" "$topic"
+done
+
+if ! awk -F '\t' '
+  $1 !~ /^#/ {
+    if (NF != 6) {
+      printf "invalid sync gate column count at %s: %d\n", $1, NF > "/dev/stderr"
+      bad = 1
+    }
+    for (i = 1; i <= NF; i++) {
+      if ($i == "") {
+        printf "empty sync gate field at %s column %d\n", $1, i > "/dev/stderr"
+        bad = 1
+      }
+    }
+    if ($5 ~ /CI/ && $5 !~ /必要なら/ && $5 != "-" && $6 !~ /check_ci_status\.sh --required/) {
+      printf "mandatory CI gate must use required CI check at %s\n", $1 > "/dev/stderr"
+      bad = 1
+    }
+    if ($1 == "Day 14" && $6 !~ /check_git_sync\.sh --required/) {
+      printf "Day 14 must use required git sync check\n" > "/dev/stderr"
+      bad = 1
+    }
+    if ($4 ~ /同期/ && $6 !~ /check_git_sync\.sh --required/) {
+      printf "remote sync gate must use required git sync check at %s\n", $1 > "/dev/stderr"
+      bad = 1
+    }
+  }
+  END { exit bad }
+' "$SYNC_GATES"; then
+  missing=1
+fi
+
+if [[ $missing -ne 0 ]]; then
+  printf '\nLesson14 sync check failed.\n' >&2
+  exit 1
+fi
+
+printf 'Lesson14 sync check passed.\n'

@@ -1,0 +1,59 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+FLOW="$ROOT/lesson/LESSON_FLOW_14_DAYS.tsv"
+STATE="$ROOT/learning/LESSON_STATE_14_DAYS.tsv"
+ROADMAP="$ROOT/learning/ROADMAP.md"
+COMMAND="${1:-現在地}"
+ARG="${2:-}"
+
+usage() {
+  cat <<'USAGE'
+Usage:
+  tools/roadmap 現在地
+  tools/roadmap 表示
+  tools/roadmap Day 10
+
+Aliases:
+  status, show
+USAGE
+}
+
+current_step() {
+  awk -F '\t' '$1 !~ /^#/ && $3 == "current" { print $2; exit }' "$STATE"
+}
+
+step_row() {
+  local step="$1"
+  awk -F '\t' -v step="$step" '$1 !~ /^#/ && $2 == step { print $2 "\t" $3 "\t" $4; exit }' "$FLOW"
+}
+
+case "$COMMAND" in
+  現在地|status)
+    step="$(current_step)"
+    if [[ -z "$step" ]]; then
+      printf '14日版レッスンはすべて完了しています。\n'
+    else
+      printf '14日版の現在地:\n'
+      step_row "$step"
+    fi
+    printf '\nロードマップ: %s\n' "$ROADMAP"
+    ;;
+  表示|show)
+    sed -n '1,220p' "$ROADMAP"
+    ;;
+  Day|day)
+    [[ -n "$ARG" ]] || { printf 'Day number is required.\n' >&2; usage; exit 1; }
+    awk -F '\t' -v day="Day $ARG" '$1 !~ /^#/ && $3 == day { print $1 "\t" $2 "\t" $4 "\t" $5 }' "$FLOW"
+    ;;
+  ""|-h|--help|help)
+    usage
+    ;;
+  *)
+    printf 'unknown command: %s\n' "$COMMAND" >&2
+    usage
+    exit 1
+    ;;
+esac

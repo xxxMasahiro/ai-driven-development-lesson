@@ -1,0 +1,82 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+export LESSON_CONFIG="$ROOT/lesson/LESSON_CONFIG_14_DAYS.tsv"
+
+# shellcheck source=tools/lib/lesson_common.sh
+source "$SCRIPT_DIR/lib/lesson_common.sh"
+# shellcheck source=tools/lib/lesson_runtime.sh
+source "$SCRIPT_DIR/lib/lesson_runtime.sh"
+
+LESSON_RUNTIME_NAME="lesson14"
+LESSON_RUNTIME_FLOW="$(lesson_flow_file)"
+LESSON_RUNTIME_STATE="$(lesson_state_file)"
+LESSON_RUNTIME_TRACKER="$(lesson_tracker_file)"
+LESSON_RUNTIME_HANDOFF="$(lesson_handoff_file)"
+LESSON_RUNTIME_CHECK="$ROOT/tools/check_lesson14_structure.sh"
+LESSON_RUNTIME_BEFORE_PASS="lesson14_before_pass"
+
+lesson_runtime_name="$LESSON_RUNTIME_NAME"
+lesson_runtime_flow="$LESSON_RUNTIME_FLOW"
+lesson_runtime_state="$LESSON_RUNTIME_STATE"
+lesson_runtime_tracker="$LESSON_RUNTIME_TRACKER"
+lesson_runtime_handoff="$LESSON_RUNTIME_HANDOFF"
+lesson_runtime_check="$LESSON_RUNTIME_CHECK"
+lesson_runtime_before_pass="$LESSON_RUNTIME_BEFORE_PASS"
+
+lesson14_sync_gate_command_for_day() {
+  local day="$1"
+  awk -F '\t' -v day="$day" '$1 !~ /^#/ && $1 == day { print $6; found=1; exit } END { if (!found) exit 1 }' "$ROOT/lesson/SYNC_GATES_14_DAYS.tsv"
+}
+
+lesson14_run_command_segment() {
+  local segment="$1"
+  local -a args
+  read -r -a args <<< "$segment"
+  [[ ${#args[@]} -gt 0 ]] || return 0
+  case "${args[0]}" in
+    -)
+      return 0
+      ;;
+    tools/*)
+      args[0]="$ROOT/${args[0]}"
+      ;;
+    ./tools/*)
+      args[0]="$ROOT/${args[0]#./}"
+      ;;
+    *)
+      printf 'unsupported lesson14 gate command: %s\n' "$segment" >&2
+      exit 1
+      ;;
+  esac
+  (cd "$ROOT" && "${args[@]}")
+}
+
+lesson14_run_required_command() {
+  local command="$1"
+  local segment
+  [[ -n "$command" && "$command" != "-" ]] || return 0
+  while [[ "$command" == *" && "* ]]; do
+    segment="${command%% && *}"
+    command="${command#* && }"
+    lesson14_run_command_segment "$segment"
+  done
+  lesson14_run_command_segment "$command"
+}
+
+lesson14_before_pass() {
+  local step_id="$1"
+  local day command
+  case "$step_id" in
+    *.sync-gate|day14.release-readiness)
+      day="$(lesson_runtime_flow_field "$step_id" 3)"
+      command="$(lesson14_sync_gate_command_for_day "$day")"
+      printf 'Running required sync gate for %s: %s\n' "$day" "$command"
+      lesson14_run_required_command "$command"
+      ;;
+  esac
+}
+
+lesson_runtime_main "$@"

@@ -1,0 +1,206 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+export LESSON_CONFIG="$ROOT/lesson/LESSON_CONFIG_14_DAYS.tsv"
+
+# shellcheck source=tools/lib/lesson_common.sh
+source "$SCRIPT_DIR/lib/lesson_common.sh"
+
+FLOW="$(lesson_flow_file)"
+STATE="$(lesson_state_file)"
+ROADMAP="$(lesson_abs_path "$(lesson_config_get roadmap_file "learning/ROADMAP.md")")"
+HELP_DESK="$(lesson_abs_path "$(lesson_config_get helpdesk_file "learning/HELP_DESK.md")")"
+SYNC_GATES="$(lesson_abs_path "$(lesson_config_get sync_gates_file "lesson/SYNC_GATES_14_DAYS.tsv")")"
+PROMPTS="$(lesson_abs_path "$(lesson_config_get prompt_file "prompts/PROMPTS_14_DAYS.md")")"
+
+required_files=(
+  "index-14-days.md"
+  "guides/LESSON_14_DAYS.md"
+  "playbooks/AGENT_PLAYBOOK_14_DAYS.md"
+  "lesson/LESSON_CONFIG_14_DAYS.tsv"
+  "lesson/LESSON_FLOW_14_DAYS.tsv"
+  "lesson/SYNC_GATES_14_DAYS.tsv"
+  "learning/LESSON_STATE_14_DAYS.tsv"
+  "learning/LEARNING_TASK_TRACKER_14_DAYS.md"
+  "learning/LEARNING_HANDOFF_14_DAYS.md"
+  "learning/ROADMAP.md"
+  "learning/HELP_DESK.md"
+  "prompts/PROMPTS_14_DAYS.md"
+  "tools/lib/lesson_runtime.sh"
+  "tools/lesson14"
+  "tools/roadmap"
+  "tools/helpdesk"
+  "tools/check_lesson14_structure.sh"
+  "tools/check_lesson14_sync.sh"
+  "tools/check_git_sync.sh"
+  "tools/check_ci_status.sh"
+  "tools/test_lesson14.sh"
+)
+
+executable_files=(
+  "tools/lesson14"
+  "tools/roadmap"
+  "tools/helpdesk"
+  "tools/check_lesson14_structure.sh"
+  "tools/check_lesson14_sync.sh"
+  "tools/check_git_sync.sh"
+  "tools/check_ci_status.sh"
+  "tools/test_lesson14.sh"
+)
+
+missing=0
+
+for file in "${required_files[@]}"; do
+  if [[ ! -f "$ROOT/$file" ]]; then
+    printf 'missing: %s\n' "$file" >&2
+    missing=1
+  fi
+done
+
+for file in "${executable_files[@]}"; do
+  if [[ -f "$ROOT/$file" && ! -x "$ROOT/$file" ]]; then
+    printf 'not executable: %s\n' "$file" >&2
+    missing=1
+  fi
+done
+
+if [[ $missing -ne 0 ]]; then
+  printf '\nLesson14 structure check failed.\n' >&2
+  exit 1
+fi
+
+if ! awk -F '\t' '
+  NR == FNR {
+    if ($1 !~ /^#/) {
+      if (NF != 5) {
+        printf "invalid flow column count at %s: %d\n", $1, NF > "/dev/stderr"
+        bad = 1
+      }
+      if ($1 == "" || $2 == "" || $3 == "" || $4 == "" || $5 == "") {
+        printf "empty flow field at row %s\n", $1 > "/dev/stderr"
+        bad = 1
+      }
+      if (order_seen[$1]++) {
+        printf "duplicate flow order: %s\n", $1 > "/dev/stderr"
+        bad = 1
+      }
+      if (step_seen[$2]++) {
+        printf "duplicate flow step: %s\n", $2 > "/dev/stderr"
+        bad = 1
+      }
+      flow_count++
+      flow_order[flow_count] = $1
+      flow_step[flow_count] = $2
+      flow_day[flow_count] = $3
+      flow[$2] = $1
+      if ($3 ~ /^Day [0-9]+$/) {
+        day = $3
+        sub(/^Day /, "", day)
+        day_seen[day] = 1
+      }
+    }
+    next
+  }
+  $1 !~ /^#/ {
+    if (NF != 5) {
+      printf "invalid state column count at %s: %d\n", $1, NF > "/dev/stderr"
+      bad = 1
+    }
+    state_count++
+    state_order[state_count] = $1
+    state_step[state_count] = $2
+    state_status[state_count] = $3
+    if (state_count > flow_count) {
+      printf "extra state row: %s %s\n", $1, $2 > "/dev/stderr"
+      bad = 1
+    } else if ($1 != flow_order[state_count] || $2 != flow_step[state_count]) {
+      printf "lesson14 state order mismatch at row %d: expected %s %s, got %s %s\n", state_count, flow_order[state_count], flow_step[state_count], $1, $2 > "/dev/stderr"
+      bad = 1
+    }
+    if (!($2 in flow)) {
+      printf "state step not in flow: %s\n", $2 > "/dev/stderr"
+      bad = 1
+    }
+    if ($3 != "current" && $3 != "locked" && $3 != "completed") {
+      printf "invalid lesson14 state: %s %s\n", $2, $3 > "/dev/stderr"
+      bad = 1
+    }
+    if (state_step_seen[$2]++) {
+      printf "duplicate state step: %s\n", $2 > "/dev/stderr"
+      bad = 1
+    }
+    state[$2] = 1
+    if ($3 == "current") current++
+  }
+  END {
+    if (state_count != flow_count) {
+      printf "lesson14 state row count mismatch: expected %d, got %d\n", flow_count, state_count > "/dev/stderr"
+      bad = 1
+    }
+    for (step in flow) {
+      if (!(step in state)) {
+        printf "flow step missing in state: %s\n", step > "/dev/stderr"
+        bad = 1
+      }
+    }
+    for (i = 1; i <= 14; i++) {
+      if (!day_seen[i]) {
+        printf "missing Day %d in lesson14 flow\n", i > "/dev/stderr"
+        bad = 1
+      }
+    }
+    phase = "completed"
+    for (i = 1; i <= state_count; i++) {
+      status = state_status[i]
+      if (status == "completed") completed++
+      if (phase == "completed") {
+        if (status == "current") phase = "current"
+        else if (status == "locked") phase = "locked"
+      } else if (phase == "current") {
+        if (status == "locked") phase = "locked"
+        else {
+          printf "invalid lesson14 state order at %s: %s after current\n", state_step[i], status > "/dev/stderr"
+          bad = 1
+        }
+      } else if (phase == "locked") {
+        if (status != "locked") {
+          printf "invalid lesson14 state order at %s: %s after locked\n", state_step[i], status > "/dev/stderr"
+          bad = 1
+        }
+      }
+    }
+    if (current > 1) {
+      printf "multiple current lesson14 steps: %d\n", current > "/dev/stderr"
+      bad = 1
+    }
+    if (current == 0 && completed != state_count) {
+      printf "missing current lesson14 step while unfinished steps remain\n" > "/dev/stderr"
+      bad = 1
+    }
+    if (current == 1 && completed == state_count) {
+      printf "current lesson14 step exists even though all steps are completed\n" > "/dev/stderr"
+      bad = 1
+    }
+    exit bad
+  }
+' "$FLOW" "$STATE"; then
+  missing=1
+fi
+
+if ! "$ROOT/tools/check_lesson14_sync.sh" >/dev/null; then
+  "$ROOT/tools/check_lesson14_sync.sh" >&2 || true
+  missing=1
+fi
+
+for file in "$ROADMAP" "$HELP_DESK" "$SYNC_GATES" "$PROMPTS"; do
+  [[ -f "$file" ]] || missing=1
+done
+
+if [[ $missing -ne 0 ]]; then
+  printf '\nLesson14 structure check failed.\n' >&2
+  exit 1
+fi
+
+printf 'Lesson14 structure check passed.\n'
