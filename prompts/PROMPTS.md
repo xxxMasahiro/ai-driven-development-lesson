@@ -25,8 +25,9 @@ tools/lesson 現在地 を実行し、現在進められる項目を確認して
 Aは「じっくり説明」、Bは「ほどよく説明」、Cは「手順だけ」です。
 選択後に tools/lesson 学習モード <A|B|C> を実行してください。
 
-次に、教材・ワークフロー表示用の言語を確認し、tools/lesson 表示言語 <ja|en|ko|zh> を実行してください。
-成果物リポジトリの開発に入る前に、成果物側の開発言語を確認し、tools/lesson 開発言語 <ja|en|ko|zh> を実行してください。
+次に、教材・ワークフロー表示用の言語を確認し、tools/lesson 表示言語 <ja|en|ko|zh-CN|zh-TW|es|pt-BR|fr|de|id|vi|th|hi|ar> を実行してください。
+成果物リポジトリの開発に入る前に、成果物側の開発言語を確認し、tools/lesson 開発言語 <ja|en|ko|zh-CN|zh-TW|es|pt-BR|fr|de|id|vi|th|hi|ar> を実行してください。
+`zh` は既存互換のため `zh-CN` として扱います。
 ```
 
 ## レッスン項目の通過

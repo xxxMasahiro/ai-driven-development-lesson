@@ -153,6 +153,14 @@ lesson_show_learning_mode_file() {
   fi
 }
 
+lesson_supported_language_codes() {
+  printf 'ja|en|ko|zh-CN|zh-TW|es|pt-BR|fr|de|id|vi|th|hi|ar'
+}
+
+lesson_supported_language_examples() {
+  printf 'ja, en, ko, zh-CN, zh-TW, es, pt-BR, fr, de, id, vi, th, hi, ar'
+}
+
 lesson_normalize_language() {
   local raw="$1"
   case "$raw" in
@@ -165,14 +173,44 @@ lesson_normalize_language() {
     ko|KO|韓国語|Korean|korean)
       printf 'ko\t한국어'
       ;;
-    zh|ZH|中国語|Chinese|chinese)
-      printf 'zh\t中文'
+    zh|ZH|zh-CN|zh-cn|zh_CN|中国語|簡体中文|简体中文|Chinese|chinese|Simplified\ Chinese|simplified\ chinese)
+      printf 'zh-CN\t简体中文'
+      ;;
+    zh-TW|zh-tw|zh_TW|繁體中文|繁体中文|Traditional\ Chinese|traditional\ chinese)
+      printf 'zh-TW\t繁體中文'
+      ;;
+    es|ES|Español|Espanol|Spanish|spanish)
+      printf 'es\tEspañol'
+      ;;
+    pt-BR|pt-br|pt_BR|Português\ do\ Brasil|Portugues\ do\ Brasil|Brazilian\ Portuguese|brazilian\ portuguese)
+      printf 'pt-BR\tPortuguês do Brasil'
+      ;;
+    fr|FR|Français|Francais|French|french)
+      printf 'fr\tFrançais'
+      ;;
+    de|DE|Deutsch|German|german)
+      printf 'de\tDeutsch'
+      ;;
+    id|ID|Bahasa\ Indonesia|Indonesian|indonesian)
+      printf 'id\tBahasa Indonesia'
+      ;;
+    vi|VI|Tiếng\ Việt|Tieng\ Viet|Vietnamese|vietnamese)
+      printf 'vi\tTiếng Việt'
+      ;;
+    th|TH|ไทย|Thai|thai)
+      printf 'th\tไทย'
+      ;;
+    hi|HI|हिन्दी|Hindi|hindi)
+      printf 'hi\tहिन्दी'
+      ;;
+    ar|AR|العربية|Arabic|arabic)
+      printf 'ar\tالعربية'
       ;;
     *)
       if [[ -n "$raw" ]]; then
         printf 'custom\t%s' "$raw"
       else
-        printf 'language is required. Examples: ja, en, ko, zh.\n' >&2
+        printf 'language is required. Examples: %s.\n' "$(lesson_supported_language_examples)" >&2
         exit 1
       fi
       ;;

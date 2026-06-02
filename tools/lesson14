@@ -22,6 +22,7 @@ LESSON_RUNTIME_BEFORE_PASS="lesson14_before_pass"
 LESSON14_LEARNING_MODE_FILE="$(lesson_learning_mode_file)"
 LESSON14_WORKFLOW_LANGUAGE_FILE="$(lesson_workflow_language_file)"
 LESSON14_PRODUCT_LANGUAGE_FILE="$(lesson_product_language_file)"
+LESSON14_LANGUAGE_CODES="$(lesson_supported_language_codes)"
 
 lesson_runtime_name="$LESSON_RUNTIME_NAME"
 lesson_runtime_flow="$LESSON_RUNTIME_FLOW"
@@ -114,12 +115,12 @@ lesson14_require_language_settings() {
   local missing=0
   if ! lesson14_language_file_has_value "$LESSON14_WORKFLOW_LANGUAGE_FILE"; then
     printf 'Workflow display language is required before passing setup.index.\n' >&2
-    printf 'Run: ./tools/lesson14 表示言語 <ja|en|ko|zh>\n' >&2
+    printf 'Run: ./tools/lesson14 表示言語 <%s>\n' "$LESSON14_LANGUAGE_CODES" >&2
     missing=1
   fi
   if ! lesson14_language_file_has_value "$LESSON14_PRODUCT_LANGUAGE_FILE"; then
     printf 'Product development language is required before passing setup.index.\n' >&2
-    printf 'Run: ./tools/lesson14 開発言語 <ja|en|ko|zh>\n' >&2
+    printf 'Run: ./tools/lesson14 開発言語 <%s>\n' "$LESSON14_LANGUAGE_CODES" >&2
     missing=1
   fi
   [[ "$missing" -eq 0 ]] || exit 1

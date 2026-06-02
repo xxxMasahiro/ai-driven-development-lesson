@@ -96,6 +96,7 @@ if [[ $missing -eq 0 ]]; then
     'internal step ID|Internal step ID' \
     'workflow display language|Workflow display language' \
     'product development language|Product development language' \
+    'zh-CN.*pt-BR|pt-BR.*zh-CN' \
     'learning-mode display|Learning Mode Display|learning-mode label' \
     'approval gate|Approval And Passage|start/pass approval' \
     'command-block|copy-paste command|command block' \

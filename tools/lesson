@@ -13,18 +13,19 @@ HANDOFF="$(lesson_handoff_file)"
 LEARNING_MODE="$(lesson_learning_mode_file)"
 WORKFLOW_LANGUAGE="$(lesson_workflow_language_file)"
 PRODUCT_LANGUAGE="$(lesson_product_language_file)"
+LANGUAGE_CODES="$(lesson_supported_language_codes)"
 COMMAND="${1:-}"
 [[ $# -gt 0 ]] && shift || true
 STAMP="$(date '+%Y-%m-%d %H:%M:%S')"
 
 usage() {
-  cat <<'USAGE'
+  cat <<USAGE
 Usage:
   tools/lesson 現在地
   tools/lesson 一覧
   tools/lesson 学習モード <A|B|C>
-  tools/lesson 表示言語 <ja|en|ko|zh>
-  tools/lesson 開発言語 <ja|en|ko|zh>
+  tools/lesson 表示言語 <$LANGUAGE_CODES>
+  tools/lesson 開発言語 <$LANGUAGE_CODES>
   tools/lesson 開始 <step_id>
   tools/lesson 開始位置 <step_id> --confirm
   tools/lesson 通過 <step_id> "メモ"
@@ -125,12 +126,12 @@ require_setup_settings() {
   fi
   if ! lesson_language_file_has_value "$WORKFLOW_LANGUAGE"; then
     printf 'Workflow display language is required before passing setup.index.\n' >&2
-    printf 'Run: ./tools/lesson 表示言語 <ja|en|ko|zh>\n' >&2
+    printf 'Run: ./tools/lesson 表示言語 <%s>\n' "$LANGUAGE_CODES" >&2
     missing=1
   fi
   if ! lesson_language_file_has_value "$PRODUCT_LANGUAGE"; then
     printf 'Product development language is required before passing setup.index.\n' >&2
-    printf 'Run: ./tools/lesson 開発言語 <ja|en|ko|zh>\n' >&2
+    printf 'Run: ./tools/lesson 開発言語 <%s>\n' "$LANGUAGE_CODES" >&2
     missing=1
   fi
   [[ "$missing" -eq 0 ]] || exit 1
@@ -209,8 +210,8 @@ status() {
   fi
   printf '\nUse:\n'
   printf '  ./tools/lesson 学習モード <A|B|C>\n'
-  printf '  ./tools/lesson 表示言語 <ja|en|ko|zh>\n'
-  printf '  ./tools/lesson 開発言語 <ja|en|ko|zh>\n'
+  printf '  ./tools/lesson 表示言語 <%s>\n' "$LANGUAGE_CODES"
+  printf '  ./tools/lesson 開発言語 <%s>\n' "$LANGUAGE_CODES"
   printf '  ./tools/lesson 開始 <step_id>\n'
   printf '  ./tools/lesson 開始位置 <step_id> --confirm\n'
   printf '  ./tools/lesson 通過 <step_id> "メモ"\n'

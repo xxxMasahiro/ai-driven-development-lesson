@@ -22,8 +22,8 @@
 
 ```bash
 ./tools/lesson 学習モード <A|B|C>
-./tools/lesson 表示言語 <ja|en|ko|zh>
-./tools/lesson 開発言語 <ja|en|ko|zh>
+./tools/lesson 表示言語 <ja|en|ko|zh-CN|zh-TW|es|pt-BR|fr|de|id|vi|th|hi|ar>
+./tools/lesson 開発言語 <ja|en|ko|zh-CN|zh-TW|es|pt-BR|fr|de|id|vi|th|hi|ar>
 ```
 
 学習モードの表示名:
@@ -36,6 +36,7 @@ C: 手順だけ
 
 `表示言語` は教材・ワークフローの説明表示に使います。
 `開発言語` は成果物リポジトリ側の要件、仕様、実装計画、README、UI文言などに使います。
+`zh` は既存互換のため `zh-CN` として扱います。
 
 ## 使うファイル
 
@@ -159,8 +160,8 @@ Git hooksは `.githooks/pre-commit` に置き、`core.hooksPath` で有効化し
 
 ```bash
 ./tools/lesson 学習モード <A|B|C>
-./tools/lesson 表示言語 <ja|en|ko|zh>
-./tools/lesson 開発言語 <ja|en|ko|zh>
+./tools/lesson 表示言語 <ja|en|ko|zh-CN|zh-TW|es|pt-BR|fr|de|id|vi|th|hi|ar>
+./tools/lesson 開発言語 <ja|en|ko|zh-CN|zh-TW|es|pt-BR|fr|de|id|vi|th|hi|ar>
 ./tools/lesson 現在地
 ./tools/lesson 開始位置 <step_id> --confirm
 ./tools/lesson 開始 <step_id>

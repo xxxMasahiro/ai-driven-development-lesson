@@ -5,6 +5,7 @@
 The lesson repository includes mechanical enforcement, flexible lesson entry, Free Development Mode, Team Development and Docker advanced module, dialogue-centered learning, as-built synchronization checks, sub-agent review protocol, menu/dashboard/illustration entry points, 7-day and 14-day lesson language controls, and lesson-side aggregate testing.
 
 The current task implements the follow-up requirement that 7-day lessons must have the same learning-mode, workflow display language, and product development language controls that were added to the 14-day lesson.
+It also expands the shared language list for both lesson versions to `ja`, `en`, `ko`, `zh-CN`, `zh-TW`, `es`, `pt-BR`, `fr`, `de`, `id`, `vi`, `th`, `hi`, and `ar`, while keeping `zh` as a `zh-CN` alias and preserving `custom` language flexibility.
 The implementation remains additive and keeps the existing 7-day lesson, 14-day lesson, free-development flow, advanced modules, existing checks, and repository-boundary behavior intact.
 
 ## Completed
@@ -13,6 +14,7 @@ The implementation remains additive and keeps the existing 7-day lesson, 14-day 
 - Added 14-day approval receipts and enforcement.
 - Added learning mode A/B/C selection and switching for 7-day and 14-day lessons.
 - Added workflow display language and product development language controls for 7-day and 14-day lessons.
+- Added shared standard language choices for 7-day and 14-day language settings.
 - Added setup.index gates so both structured lessons require learning mode, workflow display language, and product development language before passing the entry step.
 - Added learner-selected start position commands for 7-day and 14-day lessons.
 - Added 14-day runtime reset command.
@@ -82,10 +84,11 @@ Required lesson-side verification target:
 
 ```text
 7-day lesson CLI tests passed.
+Lesson14 CLI tests passed.
 Lesson repository test passed.
 ```
 
-Latest local verification reached this target after synchronizing the 7-day parity implementation.
+Latest local verification reached this target after synchronizing the 7-day parity implementation and the expanded language-list implementation.
 Real product operations testing remains available through `tools/test_production_operations.sh` when an external product repository is intentionally recreated.
 
 ## Remaining Work

@@ -52,6 +52,8 @@ C: 解説不要でワークフローのみ
 
 `表示言語` は教材・ワークフローの説明表示に使います。
 `開発言語` は成果物リポジトリ側の要件、仕様、実装計画、README、UI文言などに使います。
+対応言語コードは `ja|en|ko|zh-CN|zh-TW|es|pt-BR|fr|de|id|vi|th|hi|ar` です。
+`zh` は既存互換のため `zh-CN` として扱います。
 
 ## 承認ルール
 
@@ -106,8 +108,8 @@ C: 解説不要でワークフローのみ
 ./tools/lesson14 初期化 --confirm
 ./tools/lesson14 開始位置 <step_id> --confirm
 ./tools/lesson14 学習モード <A|B|C>
-./tools/lesson14 表示言語 <ja|en|ko|zh>
-./tools/lesson14 開発言語 <ja|en|ko|zh>
+./tools/lesson14 表示言語 <ja|en|ko|zh-CN|zh-TW|es|pt-BR|fr|de|id|vi|th|hi|ar>
+./tools/lesson14 開発言語 <ja|en|ko|zh-CN|zh-TW|es|pt-BR|fr|de|id|vi|th|hi|ar>
 ./tools/lesson14 開始 <step_id>
 ./tools/lesson14 承認 start <step_id> "承認メモ"
 ./tools/lesson14 承認 pass <step_id> "承認メモ"

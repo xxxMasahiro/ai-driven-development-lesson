@@ -159,6 +159,8 @@ Developer feedback:
 
 - Add a language selection step immediately after lesson start.
 - Candidate display languages include Japanese, English, Korean, Chinese, and other major learner-facing languages.
+- Standard language choices should include `ja`, `en`, `ko`, `zh-CN`, `zh-TW`, `es`, `pt-BR`, `fr`, `de`, `id`, `vi`, `th`, `hi`, and `ar`.
+- Preserve `zh` as a backward-compatible alias for `zh-CN`, and keep non-empty custom language labels available for cases outside the standard list.
 - Repository source content must remain English-only across implementation programs, documentation, and license files.
 - The selected language is not a source-document language. It is an instruction to the agent to translate lesson and workflow runtime messages when presenting them to the learner.
 - The language setting should affect displayed lesson guidance, prompts, workflow explanations, and agent-facing runtime facilitation text.

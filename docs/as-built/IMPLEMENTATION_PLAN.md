@@ -29,8 +29,9 @@
     - `docs/workflow/TASK_TRACKER.md`
     - `docs/workflow/HANDOFF.md`
 22. Add workflow display language and product development language settings for 7-day and 14-day lessons.
-23. Add `tools/test_lesson.sh` for 7-day setup gating and setting regression coverage.
-24. Preserve existing behavior while keeping additions refactorable, reusable, ecosystem-friendly, and general.
+23. Expand supported standard language choices to `ja`, `en`, `ko`, `zh-CN`, `zh-TW`, `es`, `pt-BR`, `fr`, `de`, `id`, `vi`, `th`, `hi`, and `ar`, while preserving `zh` as a `zh-CN` alias and keeping `custom` values available.
+24. Add `tools/test_lesson.sh` for 7-day setup gating and setting regression coverage.
+25. Preserve existing behavior while keeping additions refactorable, reusable, ecosystem-friendly, and general.
 
 ## Implemented Remediation Plan
 
@@ -63,6 +64,7 @@ It is additive and must not trade away existing 7-day lessons, 14-step lessons, 
    - Add workflow display language state for 7-day and 14-day lessons.
    - Add product development language state for 7-day and 14-day lessons.
    - Add CLI commands and status output for both settings in `tools/lesson` and `tools/lesson14`.
+   - Add a shared supported-language list and language normalizer in `tools/lib/lesson_common.sh`.
    - Show both settings in dashboard output where relevant.
    - Add tests for selection, switching, and required prompts before product development.
 
@@ -155,8 +157,11 @@ Latest local verification for the 7-day parity change passed:
 
 ```text
 7-day lesson CLI tests passed.
+Lesson14 CLI tests passed.
 Lesson repository test passed.
 ```
+
+The same verification covers the expanded language list and confirms `zh` is normalized to `zh-CN`.
 
 ## Acceptance Criteria
 

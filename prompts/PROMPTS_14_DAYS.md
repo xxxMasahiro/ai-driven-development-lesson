@@ -12,8 +12,8 @@ AGENTS.MDと必要なskills/*/SKILL.mdも確認したうえで、
 最初に学習モードA/B/Cを確認してください。
 選択後、setup.index通過前に tools/lesson14 学習モード <A|B|C> を実行してください。
 学習者が希望した場合は、レッスン途中でも tools/lesson14 学習モード <A|B|C> で切り替えてください。
-レッスン開始直後に、教材・ワークフロー表示用の言語を確認し、tools/lesson14 表示言語 <ja|en|ko|zh> を実行してください。
-成果物リポジトリの開発に入る前に、成果物側の開発言語を確認し、tools/lesson14 開発言語 <ja|en|ko|zh> を実行してください。
+レッスン開始直後に、教材・ワークフロー表示用の言語を確認し、tools/lesson14 表示言語 <ja|en|ko|zh-CN|zh-TW|es|pt-BR|fr|de|id|vi|th|hi|ar> を実行してください。
+成果物リポジトリの開発に入る前に、成果物側の開発言語を確認し、tools/lesson14 開発言語 <ja|en|ko|zh-CN|zh-TW|es|pt-BR|fr|de|id|vi|th|hi|ar> を実行してください。
 未来の項目へスキップせず、各Stepの最後に同期ゲートを確認してください。
 各レッスンは、次へ進む前に必ず私の承認を取ってください。
 開始承認後は、開始前に tools/lesson14 承認 start <step_id> "承認メモ" を実行してください。
@@ -47,11 +47,12 @@ C: 解説不要でワークフローのみ
 
 ```text
 レッスン中の説明を表示する言語と、成果物リポジトリで作る文書・画面文言の言語を分けて選びます。
-まず表示言語を選んでください。例: 日本語なら ja、英語なら en、韓国語なら ko、中国語なら zh。
-選択後に tools/lesson14 表示言語 <ja|en|ko|zh> を実行してください。
+まず表示言語を選んでください。例: 日本語なら ja、英語なら en、韓国語なら ko、簡体字中国語なら zh-CN、繁体字中国語なら zh-TW、スペイン語なら es、ブラジルポルトガル語なら pt-BR。
+選択後に tools/lesson14 表示言語 <ja|en|ko|zh-CN|zh-TW|es|pt-BR|fr|de|id|vi|th|hi|ar> を実行してください。
+`zh` は既存互換のため `zh-CN` として扱います。
 
 成果物リポジトリの開発に入る前に、開発言語も選んでください。
-選択後に tools/lesson14 開発言語 <ja|en|ko|zh> を実行してください。
+選択後に tools/lesson14 開発言語 <ja|en|ko|zh-CN|zh-TW|es|pt-BR|fr|de|id|vi|th|hi|ar> を実行してください。
 ```
 
 ## 共通同期プロンプト

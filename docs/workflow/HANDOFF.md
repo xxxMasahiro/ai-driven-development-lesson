@@ -5,13 +5,15 @@
 The lesson repository is in a 7-day lesson parity remediation phase.
 The current validation scope is lesson-side only; it must not recreate or depend on `task-tracker-repository`.
 Existing 7-day lessons, 14-step lessons, free-development flow, advanced modules, checks, and repository-boundary behavior must not be weakened or replaced.
-The implementation adds 7-day learning-mode, workflow display language, and product development language controls while preserving refactorability, ecosystem fit, reusable design, generality, and the no-existing-feature-tradeoff rule.
+The implementation adds 7-day learning-mode, workflow display language, and product development language controls, then expands the shared standard language list for both lesson versions while preserving refactorability, ecosystem fit, reusable design, generality, and the no-existing-feature-tradeoff rule.
 
 ## Key Implemented Capabilities
 
 - 14-day approval enforcement.
 - Learning mode A/B/C selection and switching for 7-day and 14-day lessons.
 - Workflow display language and product development language selection for 7-day and 14-day lessons.
+- Standard language choices: `ja`, `en`, `ko`, `zh-CN`, `zh-TW`, `es`, `pt-BR`, `fr`, `de`, `id`, `vi`, `th`, `hi`, and `ar`.
+- Backward compatibility: `zh` remains accepted and is recorded as `zh-CN`; non-empty unsupported values remain available as `custom`.
 - Entry-step gates requiring learning mode, workflow display language, and product development language before passing `setup.index` in both structured lesson versions.
 - Learner-selected start positions.
 - Free Development Mode.
@@ -98,6 +100,7 @@ The expected terminal evidence is:
 
 ```text
 7-day lesson CLI tests passed.
+Lesson14 CLI tests passed.
 Lesson repository test passed.
 ```
 

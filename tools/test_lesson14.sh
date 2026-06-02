@@ -96,6 +96,10 @@ grep 'Product development language is required' /tmp/lesson14-language-required.
 ./tools/lesson14 現在地 | grep './tools/lesson14 開始 day1.roadmap'
 ./tools/lesson14 学習モード C | grep 'Learning mode recorded: C'
 ./tools/lesson14 学習モード | grep 'Current learning mode: C'
+./tools/lesson14 表示言語 zh | grep 'Workflow display language recorded: zh-CN'
+./tools/lesson14 開発言語 es | grep 'Product development language recorded: es'
+./tools/lesson14 表示言語 | grep 'Current workflow display language: zh-CN'
+./tools/lesson14 開発言語 | grep 'Current product development language: es'
 
 ./tools/helpdesk 相談 "テスト用の相談"
 ./tools/helpdesk 解決 "テスト用の解決"

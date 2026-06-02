@@ -13,6 +13,7 @@ The repository must help learners move from structured lessons into real product
 - Let learners choose explanation depth through learning modes A/B/C in both the 7-day and 14-day lessons.
 - Allow the learning mode to be switched during either lesson.
 - Let learners choose workflow display language and product development language in both the 7-day and 14-day lessons.
+- Support common language choices for both language settings: `ja`, `en`, `ko`, `zh-CN`, `zh-TW`, `es`, `pt-BR`, `fr`, `de`, `id`, `vi`, `th`, `hi`, and `ar`.
 - Allow learners to start from any lesson topic intentionally, without weakening normal ordered progression.
 - Teach agent dialogue and goal-oriented prompt refinement as a core skill.
 - Teach sub-agent use as role-based viewpoints that are orchestrated toward a goal.
@@ -47,6 +48,7 @@ The repository must keep the following remediation behavior active without tradi
 - Replace learner-facing `Day N` labels with `Step N` labels where practical.
 - Hide internal step IDs from ordinary learner-facing output while preserving them for state files, command arguments, and diagnostics.
 - Implement separate settings for workflow display language and product development language for both structured lesson versions.
+- Preserve `zh` as a backward-compatible alias for `zh-CN`.
 - Show learning-mode display names consistently while preserving A/B/C as internal IDs.
 - Strengthen approval gates so start/pass actions require matching start/pass approvals.
 - Make passage prompts invite questions and explain copy-paste command blocks in learner-friendly wording.
@@ -97,6 +99,7 @@ The repository must keep the following remediation behavior active without tradi
 - Developer-memory requirements check passes.
 - Lesson repository aggregate test passes.
 - Latest 7-day parity verification passes `./tools/test_lesson.sh` and `./tools/test_lesson_repository.sh`.
+- Latest language-list expansion verification passes `./tools/test_lesson.sh`, `./tools/test_lesson14.sh`, and `./tools/test_lesson_repository.sh`.
 - `docs/workflow/TASK_TRACKER.md`, `docs/workflow/HANDOFF.md`, `docs/as-built/REQUIREMENTS.md`, `docs/as-built/SPECIFICATION.md`, and `docs/as-built/IMPLEMENTATION_PLAN.md` reflect the same as-built state.
 - `task-tracker-repository` remains outside this repository and may remain deleted unless a real product operations test is explicitly requested.
 - The developer-memory audit remains cleared only while all remediation requirements in this document are implemented or mechanically enforced.

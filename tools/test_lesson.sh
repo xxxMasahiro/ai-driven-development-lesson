@@ -45,8 +45,10 @@ grep 'Product development language is required before passing setup.index' /tmp/
 
 ./tools/lesson 学習モード C | grep 'Learning mode recorded: C'
 ./tools/lesson 学習モード | grep 'Current learning mode: C'
-./tools/lesson 表示言語 | grep 'Current workflow display language: ja'
-./tools/lesson 開発言語 | grep 'Current product development language: ja'
+./tools/lesson 表示言語 zh-TW | grep 'Workflow display language recorded: zh-TW'
+./tools/lesson 開発言語 pt-BR | grep 'Product development language recorded: pt-BR'
+./tools/lesson 表示言語 | grep 'Current workflow display language: zh-TW'
+./tools/lesson 開発言語 | grep 'Current product development language: pt-BR'
 
 ./tools/check_lesson_structure.sh >/dev/null
 

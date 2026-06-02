@@ -8,11 +8,11 @@
 - `tools/lesson14` controls the 14-day lesson.
 - `tools/lesson14 承認 <start|pass> <step_id> "memo"` records approval receipts.
 - `tools/lesson 学習モード <A|B|C>` records and switches 7-day explanation depth.
-- `tools/lesson 表示言語 <ja|en|ko|zh>` records 7-day workflow display language.
-- `tools/lesson 開発言語 <ja|en|ko|zh>` records 7-day product development language.
+- `tools/lesson 表示言語 <ja|en|ko|zh-CN|zh-TW|es|pt-BR|fr|de|id|vi|th|hi|ar>` records 7-day workflow display language.
+- `tools/lesson 開発言語 <ja|en|ko|zh-CN|zh-TW|es|pt-BR|fr|de|id|vi|th|hi|ar>` records 7-day product development language.
 - `tools/lesson14 学習モード <A|B|C>` records and switches explanation depth.
-- `tools/lesson14 表示言語 <ja|en|ko|zh>` records 14-day workflow display language.
-- `tools/lesson14 開発言語 <ja|en|ko|zh>` records 14-day product development language.
+- `tools/lesson14 表示言語 <ja|en|ko|zh-CN|zh-TW|es|pt-BR|fr|de|id|vi|th|hi|ar>` records 14-day workflow display language.
+- `tools/lesson14 開発言語 <ja|en|ko|zh-CN|zh-TW|es|pt-BR|fr|de|id|vi|th|hi|ar>` records 14-day product development language.
 - `tools/lesson 開始位置 <step_id> --confirm` changes the 7-day start position intentionally.
 - `tools/lesson14 開始位置 <step_id> --confirm` changes the 14-day start position intentionally.
 - `tools/lesson14 初期化 --confirm` resets 14-day runtime state for a fresh run.
@@ -102,6 +102,7 @@
 - `tools/test_lesson_repository.sh` runs the lesson-side validation suite without requiring `task-tracker-repository`.
 - `tools/test_production_operations.sh` validates the end-to-end production operations path when an external product repository exists.
 - Latest local verification for the 7-day parity change passed `./tools/test_lesson.sh` and `./tools/test_lesson_repository.sh`.
+- Latest local verification for the language-list expansion passed `./tools/test_lesson.sh`, `./tools/test_lesson14.sh`, and `./tools/test_lesson_repository.sh`.
 
 ## Implemented Remediation Specification
 
@@ -127,6 +128,9 @@ They are additive to the current as-built components and must not weaken or repl
 ### Language Settings
 
 - Workflow display language and product development language are separate settings in both 7-day and 14-day flows.
+- Supported standard language codes are `ja`, `en`, `ko`, `zh-CN`, `zh-TW`, `es`, `pt-BR`, `fr`, `de`, `id`, `vi`, `th`, `hi`, and `ar`.
+- The legacy `zh` input is normalized to `zh-CN`.
+- Non-empty unsupported values remain accepted as `custom` to preserve existing flexibility.
 - Workflow display language controls lesson guidance, dashboard text, prompts, and facilitation output.
 - Product development language controls generated or proposed product-side documents and product-facing text.
 - The lesson repository source remains English.
