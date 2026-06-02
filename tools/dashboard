@@ -227,6 +227,9 @@ show_menu() {
   printf '\nMenu Readiness\n'
   printf '==============\n'
   "$ROOT/tools/menu" readiness
+  printf '\nMenu Git Workflow Policy\n'
+  printf '========================\n'
+  "$ROOT/tools/git-workflow" status --repo "$ROOT" || true
 }
 
 case "${1:-all}" in

@@ -2,11 +2,11 @@
 
 ## Current State
 
-The lesson repository is in an implemented as-built sync-contract state with implemented Git workflow policy settings.
+The lesson repository is in an implemented as-built sync-contract state with implemented Git workflow policy settings and implemented menu-wide Git workflow policy controls.
 The current validation scope is lesson-side only; it must not recreate or depend on `task-tracker-repository`.
 Existing 7-day lessons, 14-step lessons, free-development flow, advanced modules, checks, and repository-boundary behavior must not be weakened or replaced.
-The implementation adds `docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv`, `tools/check_as_built_sync_contract.sh`, `tools/as-built-sync`, `tools/test_as_built_sync_contract.sh`, `docs/workflow/GIT_WORKFLOW_POLICY.tsv`, `learning/GIT_WORKFLOW_SETTINGS.tsv`, `tools/lib/git_workflow_policy.sh`, `tools/git-workflow`, and `tools/test_git_workflow_policy.sh` while preserving product repository cleanup, shared menu prerequisite control for menu items 1 through 6, refactorability, ecosystem fit, reusable design, generality, and the no-existing-feature-tradeoff rule.
-The implemented Git workflow policy preserves all existing Git sync, CI, menu, dashboard, cleanup, lesson, and as-built synchronization behavior.
+The implementation adds `docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv`, `tools/check_as_built_sync_contract.sh`, `tools/as-built-sync`, `tools/test_as_built_sync_contract.sh`, `docs/workflow/GIT_WORKFLOW_POLICY.tsv`, `learning/GIT_WORKFLOW_SETTINGS.tsv`, `tools/lib/git_workflow_policy.sh`, `tools/git-workflow`, and `tools/test_git_workflow_policy.sh`; it also extends `tools/menu`, `tools/dashboard`, and `tools/test_menu_prerequisites.sh` for menu-wide Git policy controls while preserving product repository cleanup, shared menu prerequisite control for menu items 1 through 6, refactorability, ecosystem fit, reusable design, generality, and the no-existing-feature-tradeoff rule.
+The implemented Git workflow policy now applies at menu level for items 1 through 7 and preserves all existing Git sync, CI, menu, dashboard, cleanup, lesson, and as-built synchronization behavior.
 
 ## Key Implemented Capabilities
 
@@ -25,7 +25,7 @@ The implemented Git workflow policy preserves all existing Git sync, CI, menu, d
 - Developer-memory requirement checks.
 - Learner-facing menu, dashboard, and illustration review entry points.
 - Menu item 3 is `3. 応用レッスン`.
-- Menu items 1 through 6 have shared prerequisite checks for learning mode, workflow display language, product development language, repository boundary where relevant, and learner approval before start.
+- Menu items 1 through 7 have shared Git workflow policy visibility; menu items 1 through 6 also have shared prerequisite checks for learning mode, workflow display language, product development language, repository boundary where relevant, and learner approval before start.
 - `status` commands remain non-blocking; `start`, `gate`, and `check` enforce prerequisites.
 - `tools/product-improvement status|start|gate` provides the mechanical entry for product improvement.
 - `tools/product-repository-cleanup status|plan|local|remote` provides the mechanical entry for safe product repository cleanup.
@@ -34,7 +34,7 @@ The implemented Git workflow policy preserves all existing Git sync, CI, menu, d
 - `tools/test_as_built_sync_contract.sh` covers sync-contract success and failure paths.
 - `tools/git-workflow status|configure|set|allow|check|cleanup-plan` provides the Git workflow policy command surface.
 - `tools/test_git_workflow_policy.sh` covers Git workflow policy success and failure paths.
-- Dashboard readiness output shows menu items 1 through 6.
+- Dashboard readiness output shows menu items 1 through 7 and menu-wide Git workflow policy status.
 - As-built document checks.
 - Sub-agent review protocol.
 - Lesson repository aggregate test.
@@ -180,7 +180,31 @@ SYNC-ID: git_workflow_policy
 STATUS: implemented
 ARTIFACTS: docs/workflow/GIT_WORKFLOW_POLICY.tsv, learning/GIT_WORKFLOW_SETTINGS.tsv, tools/lib/git_workflow_policy.sh, tools/git-workflow, tools/test_git_workflow_policy.sh
 TESTS: tools/test_git_workflow_policy.sh
+
+SYNC-ID: menu_git_workflow_policy
+STATUS: implemented
+ARTIFACTS: tools/menu, tools/dashboard, tools/git-workflow, tools/test_menu_prerequisites.sh
+TESTS: tools/test_menu_prerequisites.sh
 ```
+
+The synchronized implementation is `menu_git_workflow_policy`.
+It promotes the existing Git workflow policy into a shared menu-level policy without weakening any existing lesson, menu, dashboard, cleanup, CI, pre-commit, or as-built synchronization behavior.
+
+Implemented menu-wide Git workflow policy scope:
+
+- Keep `tools/git-workflow status|configure|set|allow|check|cleanup-plan` as the existing policy source.
+- Make `tools/menu readiness` show Git policy readiness for menu items 1 through 7.
+- Added Git policy validation to `tools/menu check <1|2|3|4|5|6>` without weakening existing learning-mode, language, product-language, repository-boundary, or approval checks.
+- Added `tools/menu check 7` and `tools/menu start 7 --confirm` for lesson-repository maintenance.
+- Keep `automation_level=manual` valid and non-blocking.
+- Interpret automation levels consistently across learning, building/extending, and maintenance menu categories.
+  - `manual`: guidance and monitoring only.
+  - `commit`: commit-level automation only after required checks pass.
+  - `pr_ci`: push, PR, and CI-check automation where applicable.
+  - `sync`: main synchronization plus local/remote sync checks where applicable.
+- Keep merge, branch deletion, worktree deletion, remote deletion, and product repository cleanup behind explicit confirmation regardless of automation level.
+- Show menu-wide Git policy status in dashboard output.
+- Added runtime tests in `tools/test_menu_prerequisites.sh` and updated these five synchronized documents from planned to implemented.
 
 The synchronized product repository cleanup implementation remains represented across the same documents.
 

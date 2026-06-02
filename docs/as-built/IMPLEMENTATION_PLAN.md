@@ -393,6 +393,11 @@ SYNC-ID: git_workflow_policy
 STATUS: implemented
 ARTIFACTS: docs/workflow/GIT_WORKFLOW_POLICY.tsv, learning/GIT_WORKFLOW_SETTINGS.tsv, tools/lib/git_workflow_policy.sh, tools/git-workflow, tools/test_git_workflow_policy.sh
 TESTS: tools/test_git_workflow_policy.sh
+
+SYNC-ID: menu_git_workflow_policy
+STATUS: implemented
+ARTIFACTS: tools/menu, tools/dashboard, tools/git-workflow, tools/test_menu_prerequisites.sh
+TESTS: tools/test_menu_prerequisites.sh
 ```
 
 ## Implemented Git Workflow Policy Implementation Plan
@@ -470,6 +475,60 @@ It is additive and does not trade away existing 7-day, 14-day, menu, dashboard, 
    - Updated these five documents from planned to implemented state.
    - Updated `AGENTS.MD`, menu guidance, dashboard guidance, and runtime checks only where the runtime feature became active.
    - Keep unrelated existing content unchanged.
+
+## Implemented Menu-Wide Git Workflow Policy Implementation Plan
+
+This implementation promotes the existing Git workflow policy into a shared menu-level policy.
+It is additive and does not trade away existing 7-day, 14-day, applied-learning, Free Development, Product Improvement, External Integration, lesson-maintenance, dashboard, product cleanup, CI, pre-commit, or as-built sync-contract behavior.
+
+1. Preserve the existing Git policy source.
+   - Keep `tools/git-workflow status|configure|set|allow|check|cleanup-plan` unchanged as the reusable policy command surface.
+   - Reuse `docs/workflow/GIT_WORKFLOW_POLICY.tsv`, `learning/GIT_WORKFLOW_SETTINGS.tsv`, and `tools/lib/git_workflow_policy.sh`.
+
+2. Add menu-level Git policy readiness.
+   - Extended `tools/menu readiness` so menu items 1 through 7 show Git policy readiness.
+   - Show branch permission, worktree permission, direct-main permission, automation level, and repository-monitor availability.
+
+3. Extend menu checks without weakening existing prerequisites.
+   - Added Git policy validation to menu items 1 through 6.
+   - Keep current learning-mode, workflow display language, product development language, repository-boundary, and approval checks intact.
+   - Keep `automation_level=manual` as a valid non-blocking setting.
+
+4. Add a safe item 7 check/start path.
+   - Added `tools/menu check 7`.
+   - Added `tools/menu start 7 --confirm`.
+   - Treat item 7 as lesson-repository maintenance and use lesson repository Git context.
+
+5. Interpret automation levels consistently by menu item.
+   - `manual`: guidance and monitoring only.
+   - `commit`: commit-level automation only after required checks pass.
+   - `pr_ci`: push, PR, and CI-check automation where applicable.
+   - `sync`: main synchronization plus local/remote sync checks where applicable.
+
+6. Preserve explicit confirmation for destructive Git actions.
+   - Do not let menu-level policy bypass merge confirmation.
+   - Do not let menu-level policy bypass branch deletion, worktree deletion, remote deletion, or product repository cleanup confirmation.
+
+7. Update dashboard visibility.
+   - Added a menu-wide Git policy summary to dashboard output.
+   - Preserve existing lesson, docs, development, illustration, and menu readiness dashboard sections.
+
+8. Add or update tests.
+   - Extended `tools/test_menu_prerequisites.sh` for item 1 through 7 Git policy readiness and checks.
+   - Keep `tools/test_git_workflow_policy.sh` focused on the reusable Git policy command itself.
+   - Keep `tools/test_lesson_repository.sh`, CI, and pre-commit wiring additive.
+
+9. Synchronize documentation.
+   - Updated these five documents from planned to implemented after runtime implementation exists and tests pass.
+   - Updated `AGENTS.MD`, menu guidance, and dashboard guidance only where the runtime feature became active.
+   - Keep unrelated existing content unchanged.
+
+10. Verify with mechanical checks.
+   - Run as-built sync-contract checks.
+   - Run menu prerequisite tests.
+   - Run Git workflow policy tests.
+   - Run aggregate lesson-repository tests.
+   - Run pre-commit and GitHub Actions before declaring implementation complete.
 
 ## Verification Plan
 

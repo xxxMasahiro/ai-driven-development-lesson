@@ -189,6 +189,11 @@ SYNC-ID: git_workflow_policy
 STATUS: implemented
 ARTIFACTS: docs/workflow/GIT_WORKFLOW_POLICY.tsv, learning/GIT_WORKFLOW_SETTINGS.tsv, tools/lib/git_workflow_policy.sh, tools/git-workflow, tools/test_git_workflow_policy.sh
 TESTS: tools/test_git_workflow_policy.sh
+
+SYNC-ID: menu_git_workflow_policy
+STATUS: implemented
+ARTIFACTS: tools/menu, tools/dashboard, tools/git-workflow, tools/test_menu_prerequisites.sh
+TESTS: tools/test_menu_prerequisites.sh
 ```
 
 ## Implemented Git Workflow Policy Requirements
@@ -214,6 +219,29 @@ This implemented work is additive and does not trade away any existing 7-day les
 - Reuse existing `tools/lib` patterns, repository-boundary checks, Git sync checks, CI checks, menu prerequisites, dashboard views, and aggregate tests where practical.
 - Add `tools/test_git_workflow_policy.sh` to validate setting changes, invalid setting rejection, branch/worktree permission checks, automation-level decisions, dirty state detection, and local/remote sync monitoring.
 - Wire `tools/test_git_workflow_policy.sh` into structure checks, as-built checks, aggregate tests, CI, and pre-commit without replacing existing Git sync or CI checks.
+
+## Implemented Menu-Wide Git Workflow Policy Requirements
+
+The lesson repository promotes Git workflow policy from a standalone support setting into a shared menu-level policy used across learning, building/extending, and lesson-maintenance paths.
+This implemented work is additive and does not trade away any existing 7-day lesson, 14-day lesson, applied lesson, Free Development Mode, Product Improvement, External Integration, lesson-maintenance, dashboard, cleanup, CI, pre-commit, or as-built sync-contract behavior.
+
+- Keep `tools/git-workflow status|configure|set|allow|check|cleanup-plan` as the existing Git policy source and command surface.
+- Make menu categories reference the same Git policy:
+  - learning paths: 7-day lesson, 14-day lesson, and applied lesson,
+  - building and extending paths: Free Development Mode, Product Improvement, and External Integration,
+  - lesson-maintenance path: lesson repository improvement.
+- Show Git policy readiness in `tools/menu readiness` for menu items 1 through 7.
+- Extend menu checks so Git policy files, selected values, and repository context are validated before menu workflows start.
+- Keep `automation_level=manual` valid and non-blocking so existing workflows continue to start when Git automation is guidance-only.
+- Interpret automation levels consistently across menu items:
+  - `manual`: guidance and monitoring only,
+  - `commit`: allow commit-level automation after required checks pass,
+  - `pr_ci`: allow push, PR, and CI-check automation where applicable,
+  - `sync`: allow main synchronization and local/remote sync checks where applicable.
+- Keep merge, branch deletion, worktree deletion, remote deletion, and other destructive operations behind explicit user confirmation regardless of automation level.
+- Add a safe check/start path for menu item 7 without weakening existing item 1 through 6 checks.
+- Show menu-wide Git policy status in dashboard output.
+- Add tests so invalid Git policy values, missing policy files, menu readiness output, item 1 through 7 checks, and no-tradeoff behavior are mechanically verified.
 
 ## Mechanical Enforcement
 

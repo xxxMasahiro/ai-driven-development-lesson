@@ -4,6 +4,8 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=tools/lib/lesson_common.sh
 source "$SCRIPT_DIR/lib/lesson_common.sh"
+# shellcheck source=tools/lib/git_workflow_policy.sh
+source "$SCRIPT_DIR/lib/git_workflow_policy.sh"
 
 show_menu() {
   cat <<'MENU'
@@ -65,8 +67,8 @@ Usage:
   tools/menu
   tools/menu status
   tools/menu readiness
-  tools/menu check <1|2|3|4|5|6>
-  tools/menu start <1|2|3|4|5|6> --confirm
+  tools/menu check <1|2|3|4|5|6|7>
+  tools/menu start <1|2|3|4|5|6|7> --confirm
 USAGE
 }
 
@@ -78,6 +80,7 @@ menu_item_name() {
     4) printf '自由開発' ;;
     5) printf '成果物を改善' ;;
     6) printf '外部連携' ;;
+    7) printf '教材そのものを改善' ;;
     *) printf 'unknown menu item: %s\n' "$1" >&2; exit 1 ;;
   esac
 }
@@ -90,8 +93,69 @@ menu_item_entry() {
     4) printf './tools/free-development start --confirm' ;;
     5) printf './tools/product-improvement start --confirm' ;;
     6) printf './tools/external-integration start --confirm' ;;
+    7) printf 'docs/memory/DEVELOPER_MEMORY.md and ./tools/dashboard all' ;;
     *) printf 'unknown menu item: %s\n' "$1" >&2; exit 1 ;;
   esac
+}
+
+menu_git_workflow_repo_for_item() {
+  case "$1" in
+    5|6)
+      lesson_product_repo_root
+      ;;
+    *)
+      printf '%s\n' "$LESSON_ROOT"
+      ;;
+  esac
+}
+
+menu_require_git_workflow_policy() {
+  local item="$1"
+  local policy_file
+  local settings_file
+  local repo
+  local context
+  local key
+
+  policy_file="$(git_workflow_policy_file)"
+  settings_file="$(git_workflow_settings_file)"
+  if [[ ! -f "$policy_file" ]]; then
+    printf 'missing Git workflow policy file: %s\n' "$policy_file" >&2
+    exit 1
+  fi
+
+  while IFS=$'\t' read -r key _allowed _default _label _description; do
+    git_workflow_setting_value "$key" >/dev/null
+  done < <(git_workflow_policy_rows)
+
+  repo="$(menu_git_workflow_repo_for_item "$item")"
+  context="$(git_workflow_repository_context "$repo")" || {
+    printf 'missing Git workflow repository context for menu item %s: %s\n' "$item" "$repo" >&2
+    exit 1
+  }
+
+  printf 'Git workflow policy: ready\n'
+  printf 'Git workflow settings: %s\n' "$settings_file"
+  printf 'Git workflow repository context: %s\n' "$context"
+  printf 'Git workflow automation: %s\n' "$(git_workflow_automation_level)"
+}
+
+menu_print_git_workflow_readiness() {
+  local item="$1"
+  local repo
+  local context
+  if ( menu_require_git_workflow_policy "$item" ) >/dev/null 2>&1; then
+    repo="$(menu_git_workflow_repo_for_item "$item")"
+    context="$(git_workflow_repository_context "$repo")"
+    printf 'Git workflow policy: ready\n'
+    printf 'Git branch permission: %s\n' "$(git_workflow_setting_value branch_allowed)"
+    printf 'Git worktree permission: %s\n' "$(git_workflow_setting_value worktree_allowed)"
+    printf 'Git direct-main permission: %s\n' "$(git_workflow_setting_value main_direct_work_allowed)"
+    printf 'Git workflow automation: %s\n' "$(git_workflow_automation_level)"
+    printf 'Git repository monitor: ready (%s)\n' "$context"
+  else
+    printf 'Git workflow policy: missing\n'
+  fi
 }
 
 menu_check_item() {
@@ -110,17 +174,21 @@ menu_check_item() {
       lesson_menu_require_settings "$(menu_item_name "$item")"
       "$LESSON_ROOT/tools/check_repository_boundary.sh" --product-required >/dev/null
       ;;
+    7)
+      :
+      ;;
     *)
-      printf 'menu item must be 1 through 6.\n' >&2
+      printf 'menu item must be 1 through 7.\n' >&2
       exit 1
       ;;
   esac
+  menu_require_git_workflow_policy "$item"
   printf 'Menu prerequisite check passed: %s\n' "$(menu_item_name "$item")"
 }
 
 menu_readiness() {
   local item
-  for item in 1 2 3 4 5 6; do
+  for item in 1 2 3 4 5 6 7; do
     printf '\n[%s] %s\n' "$item" "$(menu_item_name "$item")"
     case "$item" in
       1)
@@ -138,7 +206,11 @@ menu_readiness() {
         fi
         ;;
       *)
-        lesson_menu_print_readiness "$(menu_item_name "$item")"
+        if [[ "$item" == "7" ]]; then
+          printf 'Settings: not required before maintenance start\n'
+        else
+          lesson_menu_print_readiness "$(menu_item_name "$item")"
+        fi
         if [[ "$item" == "5" || "$item" == "6" ]]; then
           if "$LESSON_ROOT/tools/check_repository_boundary.sh" --product-required >/dev/null 2>&1; then
             printf 'Product repository boundary: ready\n'
@@ -150,6 +222,7 @@ menu_readiness() {
         fi
         ;;
     esac
+    menu_print_git_workflow_readiness "$item"
     printf 'Start command: ./tools/menu start %s --confirm\n' "$item"
   done
 }

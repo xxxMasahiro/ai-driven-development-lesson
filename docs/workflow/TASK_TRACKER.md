@@ -4,8 +4,8 @@
 
 The lesson repository includes mechanical enforcement, flexible lesson entry, Free Development Mode, Team Development and Docker advanced module, dialogue-centered learning, as-built synchronization checks, sub-agent review protocol, menu/dashboard/illustration entry points, 7-day and 14-day lesson language controls, and lesson-side aggregate testing.
 
-The latest implemented change adds user-configurable Git workflow policy settings for branch permission, `git worktree` permission, direct-main permission, automation level, Git monitoring, and non-destructive cleanup planning.
-The previous implemented change added the as-built sync contract that mechanically enforces synchronization across the three design/as-built documents and the two workflow-state documents.
+The latest implemented change promotes the Git workflow policy into a shared menu-level policy for menu items 1 through 7, including branch permission, `git worktree` permission, direct-main permission, automation level, Git monitoring, and non-destructive cleanup planning.
+The previous implemented change added user-configurable Git workflow policy settings and the as-built sync contract that mechanically enforces synchronization across the three design/as-built documents and the two workflow-state documents.
 Safe product repository cleanup remains implemented for the external product repository created by the 7-day or 14-day lessons.
 It also preserves the 7-day and 14-day learning-mode, workflow display language, product development language, and expanded language-list controls.
 The shared standard language list remains `ja`, `en`, `ko`, `zh-CN`, `zh-TW`, `es`, `pt-BR`, `fr`, `de`, `id`, `vi`, `th`, `hi`, and `ar`, while `zh` remains a `zh-CN` alias and `custom` remains available.
@@ -208,6 +208,11 @@ SYNC-ID: git_workflow_policy
 STATUS: implemented
 ARTIFACTS: docs/workflow/GIT_WORKFLOW_POLICY.tsv, learning/GIT_WORKFLOW_SETTINGS.tsv, tools/lib/git_workflow_policy.sh, tools/git-workflow, tools/test_git_workflow_policy.sh
 TESTS: tools/test_git_workflow_policy.sh
+
+SYNC-ID: menu_git_workflow_policy
+STATUS: implemented
+ARTIFACTS: tools/menu, tools/dashboard, tools/git-workflow, tools/test_menu_prerequisites.sh
+TESTS: tools/test_menu_prerequisites.sh
 ```
 
 ## Implemented Git Workflow Policy Synchronization
@@ -233,6 +238,26 @@ It is additive and does not trade away existing lesson progression, approvals, m
 - Reuse existing repository-boundary, Git sync, menu prerequisite, dashboard, and aggregate-test patterns.
 - Added `tools/test_git_workflow_policy.sh` for settings validation, permission decisions, automation-level decisions, dirty-state detection, local/remote sync monitoring, repository separation, and non-destructive cleanup planning.
 - Wired validation into structure checks, as-built checks, aggregate tests, CI, and pre-commit.
+
+## Implemented Menu-Wide Git Workflow Policy Synchronization
+
+The implemented improvement promotes Git workflow policy from an independent support setting to a shared menu-level policy.
+This is runtime behavior.
+It is additive and does not trade away existing lesson progression, approvals, menu behavior, dashboard behavior, Free Development, Product Improvement, External Integration, product-repository cleanup, CI, pre-commit, or as-built sync-contract behavior.
+
+- Keep `tools/git-workflow status|configure|set|allow|check|cleanup-plan` as the existing policy source.
+- Make menu categories reference the same Git policy:
+  - learning paths: 7-day, 14-day, and applied lesson,
+  - building/extending paths: Free Development Mode, Product Improvement, and External Integration,
+  - maintenance path: lesson repository improvement.
+- Show Git policy readiness in `tools/menu readiness` for menu items 1 through 7.
+- Added Git policy validation to `tools/menu check <1|2|3|4|5|6>` without weakening existing menu prerequisites.
+- Added `tools/menu check 7` and `tools/menu start 7 --confirm` as a safe lesson-maintenance path.
+- Keep `automation_level=manual` valid and non-blocking.
+- Interpret automation levels consistently as guidance-only, commit, PR/CI, and sync scopes.
+- Keep destructive Git operations behind explicit confirmation regardless of automation level.
+- Show menu-wide Git policy status in dashboard output.
+- Added tests for valid policy readiness, invalid policy values, item 1 through 7 checks, missing policy files, and no-tradeoff behavior.
 
 ## Implemented Menu Prerequisite Control
 

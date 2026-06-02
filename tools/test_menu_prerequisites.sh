@@ -56,14 +56,36 @@ printf '# selected_at\tcode\tlabel\n' > learning/PRODUCT_DEVELOPMENT_LANGUAGE_14
 ./tools/menu | grep '3\. 応用レッスン' >/dev/null
 ./tools/menu | grep '3\. 発展・応用レッスン' >/dev/null && exit 1 || true
 ./tools/menu | grep './tools/product-improvement status' >/dev/null
+./tools/menu | grep './tools/git-workflow status' >/dev/null
 
 for item in 1 2 3 4 5 6; do
   ./tools/menu start "$item" --confirm >/tmp/menu-missing-prerequisite-"$item".out 2>&1 && exit 1 || true
   grep 'missing menu prerequisite' /tmp/menu-missing-prerequisite-"$item".out >/dev/null
 done
 
+./tools/menu check 7 | grep 'Menu prerequisite check passed' >/dev/null
 ./tools/menu start 4 >/tmp/menu-approval-required.out 2>&1 && exit 1 || true
 grep 'learner approval is required before starting' /tmp/menu-approval-required.out >/dev/null
+./tools/menu start 7 >/tmp/menu-approval-required-7.out 2>&1 && exit 1 || true
+grep 'learner approval is required before starting' /tmp/menu-approval-required-7.out >/dev/null
+./tools/menu start 7 --confirm | grep 'Start entry: docs/memory/DEVELOPER_MEMORY.md and ./tools/dashboard all' >/dev/null
+
+mv docs/workflow/GIT_WORKFLOW_POLICY.tsv docs/workflow/GIT_WORKFLOW_POLICY.tsv.bak
+./tools/menu check 7 >/tmp/menu-git-policy-missing.out 2>&1 && exit 1 || true
+grep 'missing Git workflow policy file' /tmp/menu-git-policy-missing.out >/dev/null
+mv docs/workflow/GIT_WORKFLOW_POLICY.tsv.bak docs/workflow/GIT_WORKFLOW_POLICY.tsv
+
+cp learning/GIT_WORKFLOW_SETTINGS.tsv learning/GIT_WORKFLOW_SETTINGS.tsv.bak
+{
+  printf '# key\tvalue\n'
+  printf 'branch_allowed\ttrue\n'
+  printf 'worktree_allowed\tfalse\n'
+  printf 'main_direct_work_allowed\tfalse\n'
+  printf 'automation_level\tinvalid\n'
+} > learning/GIT_WORKFLOW_SETTINGS.tsv
+./tools/menu check 7 >/tmp/menu-git-policy-invalid.out 2>&1 && exit 1 || true
+grep 'Invalid value for automation_level' /tmp/menu-git-policy-invalid.out >/dev/null
+mv learning/GIT_WORKFLOW_SETTINGS.tsv.bak learning/GIT_WORKFLOW_SETTINGS.tsv
 
 ./tools/lesson 学習モード A >/dev/null
 ./tools/lesson 表示言語 ja >/dev/null
@@ -85,5 +107,10 @@ done
 
 ./tools/menu readiness | grep 'Menu prerequisite readiness: 自由開発' >/dev/null
 ./tools/menu readiness | grep 'Product repository boundary: ready' >/dev/null
+./tools/menu readiness | grep 'Git workflow policy: ready' >/dev/null
+./tools/menu readiness | grep 'Git branch permission: true' >/dev/null
+./tools/menu readiness | grep 'Git worktree permission: false' >/dev/null
+./tools/menu readiness | grep 'Git direct-main permission: false' >/dev/null
+./tools/menu readiness | grep '\[7\] 教材そのものを改善' >/dev/null
 
 printf 'Menu prerequisite tests passed.\n'

@@ -95,7 +95,7 @@ require_pattern "tools/menu" '【学ぶ】' "menu learning group"
 require_pattern "tools/menu" '【作る・発展させる】' "menu build and extend group"
 require_pattern "tools/menu" '3\. 応用レッスン' "renamed applied lesson menu item"
 require_pattern "tools/menu" '自由開発で作る → 成果物を改善する → 外部連携で発展させる' "menu progression"
-require_pattern "tools/menu" 'tools/menu check <1\|2\|3\|4\|5\|6>' "menu prerequisite check command"
+require_pattern "tools/menu" 'tools/menu check <1\|2\|3\|4\|5\|6\|7>' "menu prerequisite check command"
 require_pattern "tools/menu" 'lesson_menu_require_start_approval' "menu start approval enforcement"
 if grep -Eq '3\. 発展・応用レッスン' "$ROOT/tools/menu"; then
   printf 'old menu label remains in tools/menu\n' >&2
