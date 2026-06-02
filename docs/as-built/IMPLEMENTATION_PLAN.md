@@ -162,7 +162,7 @@ It preserves existing features without tradeoffs and follows the repository qual
 4. Add a shared settings and prerequisite layer.
    - Add shared reusable helper functions in `tools/lib/lesson_common.sh`.
    - Provide a shared settings view for applied-learning, Free Development Mode, product improvement, and external integration.
-   - Inherit the latest configured 7-day or 14-day settings when available.
+   - Inherit the most recently configured 7-day or 14-day settings when available.
    - Fail start/gate/check commands with learner-friendly guidance when required settings are missing.
 
 5. Preserve discoverability.
@@ -398,6 +398,11 @@ SYNC-ID: menu_git_workflow_policy
 STATUS: implemented
 ARTIFACTS: tools/menu, tools/dashboard, tools/git-workflow, tools/test_menu_prerequisites.sh
 TESTS: tools/test_menu_prerequisites.sh
+
+SYNC-ID: git_workflow_action_settings
+STATUS: implemented
+ARTIFACTS: docs/workflow/GIT_WORKFLOW_POLICY.tsv, learning/GIT_WORKFLOW_SETTINGS.tsv, learning/GIT_WORKFLOW_APPROVALS.tsv, tools/lib/git_workflow_policy.sh, tools/git-workflow, tools/menu, tools/dashboard, tools/test_git_workflow_policy.sh, tools/test_menu_prerequisites.sh
+TESTS: tools/test_git_workflow_policy.sh, tools/test_menu_prerequisites.sh
 ```
 
 ## Implemented Git Workflow Policy Implementation Plan
@@ -530,6 +535,80 @@ It is additive and does not trade away existing 7-day, 14-day, applied-learning,
    - Run aggregate lesson-repository tests.
    - Run pre-commit and GitHub Actions before declaring implementation complete.
 
+## Implemented Git Workflow Action Settings Implementation Plan
+
+This implemented work adds detailed manual/automatic controls for common Git workflow actions.
+It must preserve existing Git policy settings, menu checks, dashboard output, cleanup controls, CI checks, pre-commit, and the as-built sync contract.
+
+1. Preserve existing policy compatibility.
+   - Keep `branch_allowed`, `worktree_allowed`, `main_direct_work_allowed`, and `automation_level`.
+   - Keep `automation_level` available as a compatibility preset.
+   - Do not remove or rename existing `tools/git-workflow` commands.
+
+2. Extend the Git workflow policy definition.
+   - Add these detailed keys to the policy definition:
+     - `commit_automation`
+     - `push_automation`
+     - `pr_creation`
+     - `pr_ci_monitoring`
+     - `merge_execution`
+     - `developer_auto_merge_allowed`
+     - `main_ci_monitoring`
+     - `sync_monitoring`
+   - Allow only `manual|auto` for non-merge action keys.
+   - Allow only `manual|after_approval` for `merge_execution`.
+   - Allow only `false|true` for `developer_auto_merge_allowed`.
+   - Use these defaults:
+     - `commit_automation: auto`
+     - `push_automation: manual`
+     - `pr_creation: manual`
+     - `pr_ci_monitoring: auto`
+     - `merge_execution: after_approval`
+     - `developer_auto_merge_allowed: false`
+     - `main_ci_monitoring: auto`
+     - `sync_monitoring: auto`
+   - These detailed defaults are active after implementation; `automation_level` remains available as a compatibility preset when detailed action keys are absent.
+
+3. Add shared resolution helpers.
+   - Add `git_workflow_action_mode <action>` to `tools/lib/git_workflow_policy.sh`.
+   - Supported actions: `commit`, `push`, `pr`, `ci`, `pr_ci`, `merge`, `main_ci`, and `sync`.
+   - Keep `ci` as a compatibility alias for CI monitoring so existing `tools/git-workflow allow ci` behavior is not removed.
+   - Resolve merge as `manual`, `after_approval`, or `developer_auto`.
+   - Resolve `developer_auto` only when `developer_auto_merge_allowed=true` and all merge safety gates pass.
+   - Detailed settings take precedence only when the detailed setting key is present.
+   - Fall back to `automation_level` when a detailed setting key is absent.
+
+4. Update the learner-facing Git command output.
+   - Update `tools/git-workflow status` to show detailed action settings.
+   - Update `tools/git-workflow configure` with copyable `set` examples for all detailed settings.
+   - Keep `tools/git-workflow set <key> <value>` as the single write path.
+   - Add `tools/git-workflow approve <push|pr|merge> "memo"` as the explicit approval write path for high-impact detailed Git actions.
+
+5. Update menu and dashboard visibility.
+   - Show detailed action settings in `tools/menu readiness`.
+   - Show detailed action settings in `tools/dashboard menu`.
+   - Apply the same settings to menu items 1 through 7.
+
+6. Preserve manual confirmation for high-impact actions.
+   - For push and PR creation, `auto` means the agent may execute the operation only after explicit approval for that operation is recorded; it never means approval-free execution.
+   - For normal merge operation, `merge_execution: after_approval` means the agent may execute merge only after explicit merge approval is recorded.
+   - Require matching action, repository, and branch approval receipts from `learning/GIT_WORKFLOW_APPROVALS.tsv` before detailed push, PR creation, or normal merge execution is allowed.
+   - Added `developer_auto_merge_allowed: true` as the only implemented path for developer-responsibility approval-free merge.
+   - Require gate evidence plus actual repository checks before developer auto-merge: PR CI success, clear target PR and branch, verified merge base, clean working tree, checked local/remote state, and stop-on-failure behavior.
+   - Keep branch deletion, worktree deletion, remote deletion, and product repository deletion behind explicit user confirmation regardless of merge settings.
+   - Keep PR CI, main CI, and sync monitoring automatic by default.
+
+7. Add tests.
+   - Extend `tools/test_git_workflow_policy.sh` for defaults, changes, invalid values, detailed precedence, approval receipts, and helper resolution.
+   - Extend `tools/test_menu_prerequisites.sh` for detailed settings in menu readiness.
+   - Extend dashboard coverage so `tools/dashboard menu` exposes detailed settings.
+   - Keep aggregate lesson-repository, pre-commit, and CI wiring additive.
+
+8. Synchronize implemented documentation.
+   - Moved `git_workflow_action_settings` from `planned` to `implemented`.
+   - Replaced `ARTIFACTS: none` and `TESTS: none` with the implemented artifacts and tests.
+   - Updated these five synchronized documents and the sync contract together.
+
 ## Verification Plan
 
 Run:
@@ -562,7 +641,7 @@ Run `./tools/test_production_operations.sh` only when an external product reposi
 
 The verification sequence also includes document-organization, workflow-pair synchronization, strengthened as-built synchronization, external-integration, Playwright, CI/pre-commit, and failure-path tests introduced by this plan.
 
-Latest local verification for the 7-day parity change passed:
+Implemented local verification for the 7-day parity change passed:
 
 ```text
 7-day lesson CLI tests passed.

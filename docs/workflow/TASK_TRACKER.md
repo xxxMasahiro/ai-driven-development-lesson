@@ -4,8 +4,9 @@
 
 The lesson repository includes mechanical enforcement, flexible lesson entry, Free Development Mode, Team Development and Docker advanced module, dialogue-centered learning, as-built synchronization checks, sub-agent review protocol, menu/dashboard/illustration entry points, 7-day and 14-day lesson language controls, and lesson-side aggregate testing.
 
-The latest implemented change promotes the Git workflow policy into a shared menu-level policy for menu items 1 through 7, including branch permission, `git worktree` permission, direct-main permission, automation level, Git monitoring, and non-destructive cleanup planning.
+The previous implemented change promotes the Git workflow policy into a shared menu-level policy for menu items 1 through 7, including branch permission, `git worktree` permission, direct-main permission, automation level, Git monitoring, and non-destructive cleanup planning.
 The previous implemented change added user-configurable Git workflow policy settings and the as-built sync contract that mechanically enforces synchronization across the three design/as-built documents and the two workflow-state documents.
+The current implemented Git workflow action settings split Git workflow behavior into detailed settings for commit, push, PR creation, PR CI monitoring, merge execution, developer-responsibility auto-merge, main CI monitoring, and local/remote sync monitoring.
 Safe product repository cleanup remains implemented for the external product repository created by the 7-day or 14-day lessons.
 It also preserves the 7-day and 14-day learning-mode, workflow display language, product development language, and expanded language-list controls.
 The shared standard language list remains `ja`, `en`, `ko`, `zh-CN`, `zh-TW`, `es`, `pt-BR`, `fr`, `de`, `id`, `vi`, `th`, `hi`, and `ar`, while `zh` remains a `zh-CN` alias and `custom` remains available.
@@ -213,6 +214,11 @@ SYNC-ID: menu_git_workflow_policy
 STATUS: implemented
 ARTIFACTS: tools/menu, tools/dashboard, tools/git-workflow, tools/test_menu_prerequisites.sh
 TESTS: tools/test_menu_prerequisites.sh
+
+SYNC-ID: git_workflow_action_settings
+STATUS: implemented
+ARTIFACTS: docs/workflow/GIT_WORKFLOW_POLICY.tsv, learning/GIT_WORKFLOW_SETTINGS.tsv, learning/GIT_WORKFLOW_APPROVALS.tsv, tools/lib/git_workflow_policy.sh, tools/git-workflow, tools/menu, tools/dashboard, tools/test_git_workflow_policy.sh, tools/test_menu_prerequisites.sh
+TESTS: tools/test_git_workflow_policy.sh, tools/test_menu_prerequisites.sh
 ```
 
 ## Implemented Git Workflow Policy Synchronization
@@ -259,6 +265,51 @@ It is additive and does not trade away existing lesson progression, approvals, m
 - Show menu-wide Git policy status in dashboard output.
 - Added tests for valid policy readiness, invalid policy values, item 1 through 7 checks, missing policy files, and no-tradeoff behavior.
 
+## Implemented Git Workflow Action Settings Synchronization
+
+The implemented improvement splits Git workflow automation into action-by-action manual or automatic settings.
+It remains additive and must not trade away existing Git policy, menu, dashboard, cleanup, CI, pre-commit, or as-built sync-contract behavior.
+
+- Keep existing settings:
+  - `branch_allowed`
+  - `worktree_allowed`
+  - `main_direct_work_allowed`
+  - `automation_level`
+- Treat `automation_level` as a compatibility preset.
+- Detailed settings take precedence only when the detailed setting key is present.
+- Fall back to `automation_level` when a detailed setting key is absent so current implemented behavior is preserved.
+- Add detailed settings:
+  - `commit_automation: manual|auto`
+  - `push_automation: manual|auto`
+  - `pr_creation: manual|auto`
+  - `pr_ci_monitoring: manual|auto`
+  - `merge_execution: manual|after_approval`
+  - `developer_auto_merge_allowed: false|true`
+  - `main_ci_monitoring: manual|auto`
+  - `sync_monitoring: manual|auto`
+- Implemented defaults:
+  - `commit_automation: auto`
+  - `push_automation: manual`
+  - `pr_creation: manual`
+  - `pr_ci_monitoring: auto`
+  - `merge_execution: after_approval`
+  - `developer_auto_merge_allowed: false`
+  - `main_ci_monitoring: auto`
+  - `sync_monitoring: auto`
+- These detailed defaults are active after implementation; `automation_level` remains available as a compatibility preset when detailed action keys are absent.
+- Add shared action-mode resolution in `tools/lib/git_workflow_policy.sh` for `commit`, `push`, `pr`, `ci`, `pr_ci`, `merge`, `main_ci`, and `sync`.
+- Keep `ci` as a compatibility alias for CI monitoring so existing `tools/git-workflow allow ci` behavior is preserved.
+- Keep `tools/git-workflow status|configure|set` as the setting surface.
+- Show detailed settings in `tools/menu readiness` and `tools/dashboard menu`.
+- Apply the settings to menu items 1 through 7.
+- For push and PR creation, `auto` means the agent may execute the operation only after explicit approval for that operation is recorded; it never means approval-free execution.
+- `merge_execution: after_approval` means the agent may execute merge only after explicit merge approval is recorded.
+- `learning/GIT_WORKFLOW_APPROVALS.tsv` stores matching action, repository, and branch approval receipts for detailed push, PR creation, and normal merge execution.
+- `developer_auto_merge_allowed: true` is the only implemented path for developer-responsibility approval-free merge and requires PR CI success, clear target PR and branch, verified merge base, clean working tree, checked local/remote state, and stop-on-failure behavior.
+- Developer-responsibility auto-merge requires gate evidence plus actual repository checks; the setting alone does not permit approval-free merge.
+- Keep branch deletion, worktree deletion, remote deletion, and product repository deletion behind explicit user confirmation regardless of merge settings.
+- Add tests for defaults, valid changes, invalid values, detailed-setting precedence, menu display, dashboard display, and preservation of existing workflows.
+
 ## Implemented Menu Prerequisite Control
 
 Shared menu prerequisite control is implemented without replacing existing lesson or product workflows.
@@ -267,7 +318,7 @@ Shared menu prerequisite control is implemented without replacing existing lesso
 - Keep the Team Development and Docker path available through the renamed applied-learning item.
 - Require learning mode, workflow display language, product development language, repository context/boundary confirmation where relevant, and learner approval before starting menu items 1 through 6.
 - Reuse existing 7-day and 14-day settings where available.
-- For applied-learning, Free Development Mode, product improvement, and external integration, inherit the latest configured structured-lesson settings when possible; otherwise require missing settings before start or gate passage.
+- For applied-learning, Free Development Mode, product improvement, and external integration, inherit the most recently configured structured-lesson settings when possible; otherwise require missing settings before start or gate passage.
 - Keep product development language mandatory for product-side work.
 - Implement the prerequisite logic through shared reusable helpers rather than duplicated menu branches.
 - Keep `status` commands non-blocking for discovery; enforce prerequisites through start, gate, or explicit menu-check commands.
@@ -285,12 +336,12 @@ Lesson14 CLI tests passed.
 Lesson repository test passed.
 ```
 
-Latest local verification reached this target after synchronizing the 7-day parity implementation and the expanded language-list implementation.
-The latest verification target now also includes `Menu prerequisite tests passed.`
-The latest verification target now also includes `Product repository cleanup tests passed.`
-The latest verification target now also includes `As-built sync contract tests passed.`
-The latest verification target now also includes `Git workflow policy tests passed.`
-The latest verification sequence includes `./tools/check_as_built_sync_contract.sh`, `./tools/as-built-sync status`, `./tools/test_as_built_sync_contract.sh`, and `./tools/test_git_workflow_policy.sh`.
+Implemented local verification reached this target after synchronizing the 7-day parity implementation and the expanded language-list implementation.
+The implemented verification target also includes `Menu prerequisite tests passed.`
+The implemented verification target also includes `Product repository cleanup tests passed.`
+The implemented verification target also includes `As-built sync contract tests passed.`
+The implemented verification target also includes `Git workflow policy tests passed.`
+The implemented verification sequence includes `./tools/check_as_built_sync_contract.sh`, `./tools/as-built-sync status`, `./tools/test_as_built_sync_contract.sh`, and `./tools/test_git_workflow_policy.sh`.
 Real product operations testing remains available through `tools/test_production_operations.sh` when an external product repository is intentionally recreated.
 
 ## Remaining Work

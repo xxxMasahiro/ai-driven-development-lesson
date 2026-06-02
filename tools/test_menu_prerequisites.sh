@@ -111,6 +111,23 @@ done
 ./tools/menu readiness | grep 'Git branch permission: true' >/dev/null
 ./tools/menu readiness | grep 'Git worktree permission: false' >/dev/null
 ./tools/menu readiness | grep 'Git direct-main permission: false' >/dev/null
+./tools/menu readiness | grep 'Git commit automation: auto' >/dev/null
+./tools/menu readiness | grep 'Git push automation: manual' >/dev/null
+./tools/menu readiness | grep 'Git PR creation: manual' >/dev/null
+./tools/menu readiness | grep 'Git PR CI monitoring: auto' >/dev/null
+./tools/menu readiness | grep 'Git merge execution: after_approval' >/dev/null
+./tools/menu readiness | grep 'Git developer auto-merge allowed: false' >/dev/null
+./tools/menu readiness | grep 'Git main CI monitoring: auto' >/dev/null
+./tools/menu readiness | grep 'Git sync monitoring: auto' >/dev/null
 ./tools/menu readiness | grep '\[7\] 教材そのものを改善' >/dev/null
+dashboard_menu_output="$(./tools/dashboard menu)"
+grep 'Git commit automation: auto' <<<"$dashboard_menu_output" >/dev/null
+grep 'Git push automation: manual' <<<"$dashboard_menu_output" >/dev/null
+grep 'Git PR creation: manual' <<<"$dashboard_menu_output" >/dev/null
+grep 'Git PR CI monitoring: auto' <<<"$dashboard_menu_output" >/dev/null
+grep 'Git merge execution: after_approval' <<<"$dashboard_menu_output" >/dev/null
+grep 'Git developer auto-merge allowed: false' <<<"$dashboard_menu_output" >/dev/null
+grep 'Git main CI monitoring: auto' <<<"$dashboard_menu_output" >/dev/null
+grep 'Git sync monitoring: auto' <<<"$dashboard_menu_output" >/dev/null
 
 printf 'Menu prerequisite tests passed.\n'

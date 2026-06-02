@@ -152,6 +152,14 @@ menu_print_git_workflow_readiness() {
     printf 'Git worktree permission: %s\n' "$(git_workflow_setting_value worktree_allowed)"
     printf 'Git direct-main permission: %s\n' "$(git_workflow_setting_value main_direct_work_allowed)"
     printf 'Git workflow automation: %s\n' "$(git_workflow_automation_level)"
+    printf 'Git commit automation: %s\n' "$(git_workflow_action_mode commit "$repo")"
+    printf 'Git push automation: %s\n' "$(git_workflow_action_mode push "$repo")"
+    printf 'Git PR creation: %s\n' "$(git_workflow_action_mode pr "$repo")"
+    printf 'Git PR CI monitoring: %s\n' "$(git_workflow_action_mode pr_ci "$repo")"
+    printf 'Git merge execution: %s\n' "$(git_workflow_action_mode merge "$repo")"
+    printf 'Git developer auto-merge allowed: %s\n' "$(git_workflow_setting_value developer_auto_merge_allowed)"
+    printf 'Git main CI monitoring: %s\n' "$(git_workflow_action_mode main_ci "$repo")"
+    printf 'Git sync monitoring: %s\n' "$(git_workflow_action_mode sync "$repo")"
     printf 'Git repository monitor: ready (%s)\n' "$context"
   else
     printf 'Git workflow policy: missing\n'

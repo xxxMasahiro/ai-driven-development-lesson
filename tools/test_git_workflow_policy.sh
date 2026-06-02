@@ -8,6 +8,7 @@ trap 'rm -rf "$TMP_DIR"' EXIT
 unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_PREFIX
 
 export GIT_WORKFLOW_SETTINGS_FILE="$TMP_DIR/settings.tsv"
+export GIT_WORKFLOW_APPROVALS_FILE="$TMP_DIR/approvals.tsv"
 
 assert_contains() {
   local haystack="$1"
@@ -28,16 +29,86 @@ assert_fails() {
 
 status_output="$("$ROOT/tools/git-workflow" status --repo "$ROOT")"
 assert_contains "$status_output" "Git workflow policy status"
+assert_contains "$status_output" "Approval file: $TMP_DIR/approvals.tsv"
 assert_contains "$status_output" "branch_allowed: true"
 assert_contains "$status_output" "worktree_allowed: false"
 assert_contains "$status_output" "automation_level: manual"
+assert_contains "$status_output" "commit_automation: auto"
+assert_contains "$status_output" "push_automation: manual"
+assert_contains "$status_output" "pr_creation: manual"
+assert_contains "$status_output" "pr_ci_monitoring: auto"
+assert_contains "$status_output" "merge_execution: after_approval"
+assert_contains "$status_output" "developer_auto_merge_allowed: false"
+assert_contains "$status_output" "main_ci_monitoring: auto"
+assert_contains "$status_output" "sync_monitoring: auto"
+assert_contains "$status_output" "Action modes"
+assert_contains "$status_output" "commit: manual"
+assert_contains "$status_output" "push: manual"
+assert_contains "$status_output" "PR creation: manual"
+assert_contains "$status_output" "PR CI monitoring: manual"
+assert_contains "$status_output" "merge execution: manual"
+assert_contains "$status_output" "developer auto-merge allowed: false"
+assert_contains "$status_output" "main CI monitoring: manual"
+assert_contains "$status_output" "sync monitoring: manual"
 assert_contains "$status_output" "Repository context: lesson"
 
 "$ROOT/tools/git-workflow" set automation_level pr_ci >/dev/null
 assert_contains "$("$ROOT/tools/git-workflow" status --repo "$ROOT")" "automation_level: pr_ci"
 "$ROOT/tools/git-workflow" allow commit >/dev/null
+"$ROOT/tools/git-workflow" allow push >/dev/null
+"$ROOT/tools/git-workflow" allow pr >/dev/null
 "$ROOT/tools/git-workflow" allow ci >/dev/null
+"$ROOT/tools/git-workflow" allow pr-ci >/dev/null
+assert_fails "$ROOT/tools/git-workflow" allow main-ci
 assert_fails "$ROOT/tools/git-workflow" allow sync
+assert_fails "$ROOT/tools/git-workflow" allow developer-auto-merge
+
+"$ROOT/tools/git-workflow" set commit_automation manual >/dev/null
+assert_fails "$ROOT/tools/git-workflow" allow commit
+"$ROOT/tools/git-workflow" set commit_automation auto >/dev/null
+"$ROOT/tools/git-workflow" allow commit >/dev/null
+
+"$ROOT/tools/git-workflow" set push_automation manual >/dev/null
+assert_fails "$ROOT/tools/git-workflow" allow push
+"$ROOT/tools/git-workflow" set push_automation auto >/dev/null
+assert_fails "$ROOT/tools/git-workflow" allow push
+"$ROOT/tools/git-workflow" approve push "User approved push" >/dev/null
+"$ROOT/tools/git-workflow" allow push >/dev/null
+
+"$ROOT/tools/git-workflow" set pr_creation manual >/dev/null
+assert_fails "$ROOT/tools/git-workflow" allow pr
+"$ROOT/tools/git-workflow" set pr_creation auto >/dev/null
+assert_fails "$ROOT/tools/git-workflow" allow pr
+"$ROOT/tools/git-workflow" approve pr "User approved PR creation" >/dev/null
+"$ROOT/tools/git-workflow" allow pr >/dev/null
+
+"$ROOT/tools/git-workflow" set pr_ci_monitoring manual >/dev/null
+assert_fails "$ROOT/tools/git-workflow" allow pr-ci
+"$ROOT/tools/git-workflow" set pr_ci_monitoring auto >/dev/null
+"$ROOT/tools/git-workflow" allow pr-ci >/dev/null
+
+"$ROOT/tools/git-workflow" set main_ci_monitoring auto >/dev/null
+"$ROOT/tools/git-workflow" allow main-ci >/dev/null
+"$ROOT/tools/git-workflow" set sync_monitoring auto >/dev/null
+"$ROOT/tools/git-workflow" allow sync >/dev/null
+
+"$ROOT/tools/git-workflow" set merge_execution after_approval >/dev/null
+assert_fails "$ROOT/tools/git-workflow" allow merge
+"$ROOT/tools/git-workflow" approve merge "User approved merge" >/dev/null
+"$ROOT/tools/git-workflow" allow merge >/dev/null
+"$ROOT/tools/git-workflow" set merge_execution manual >/dev/null
+assert_fails "$ROOT/tools/git-workflow" allow merge
+"$ROOT/tools/git-workflow" set merge_execution after_approval >/dev/null
+"$ROOT/tools/git-workflow" allow merge >/dev/null
+"$ROOT/tools/git-workflow" set developer_auto_merge_allowed true >/dev/null
+assert_fails "$ROOT/tools/git-workflow" allow developer-auto-merge
+assert_contains "$("$ROOT/tools/git-workflow" status --repo "$ROOT")" "merge execution: after_approval"
+assert_fails "$ROOT/tools/git-workflow" set merge_execution auto
+assert_fails "$ROOT/tools/git-workflow" set developer_auto_merge_allowed maybe
+assert_fails "$ROOT/tools/git-workflow" approve sync "User approved sync"
+grep $'push\t' "$GIT_WORKFLOW_APPROVALS_FILE" >/dev/null
+grep $'pr\t' "$GIT_WORKFLOW_APPROVALS_FILE" >/dev/null
+grep $'merge\t' "$GIT_WORKFLOW_APPROVALS_FILE" >/dev/null
 
 "$ROOT/tools/git-workflow" set worktree_allowed true >/dev/null
 "$ROOT/tools/git-workflow" allow worktree >/dev/null
@@ -56,6 +127,34 @@ git -C "$REPO" commit -m "Initial commit" >/dev/null
 git -C "$REPO" branch -M main
 git -C "$REPO" remote add origin "$ORIGIN"
 git -C "$REPO" push -u origin main >/dev/null
+
+GATES="$TMP_DIR/developer-auto-merge-gates.tsv"
+{
+  printf '# key\tvalue\n'
+  printf 'pr_ci_success\ttrue\n'
+  printf 'target_pr_clear\ttrue\n'
+  printf 'target_branch_clear\ttrue\n'
+  printf 'merge_base_verified\ttrue\n'
+  printf 'local_remote_checked\ttrue\n'
+  printf 'failure_stop_enabled\ttrue\n'
+} >"$GATES"
+"$ROOT/tools/git-workflow" set merge_execution manual >/dev/null
+GIT_WORKFLOW_DEVELOPER_AUTO_MERGE_GATES_FILE="$GATES" \
+  "$ROOT/tools/git-workflow" status --repo "$REPO" | grep 'merge execution: developer_auto' >/dev/null
+(
+  cd "$REPO"
+  GIT_WORKFLOW_DEVELOPER_AUTO_MERGE_GATES_FILE="$GATES" "$ROOT/tools/git-workflow" allow developer-auto-merge >/dev/null
+  GIT_WORKFLOW_DEVELOPER_AUTO_MERGE_GATES_FILE="$GATES" "$ROOT/tools/git-workflow" allow merge >/dev/null
+)
+printf 'unsafe\n' >"$REPO/unsafe.txt"
+if (
+  cd "$REPO"
+  GIT_WORKFLOW_DEVELOPER_AUTO_MERGE_GATES_FILE="$GATES" "$ROOT/tools/git-workflow" allow developer-auto-merge >/dev/null 2>/tmp/git-workflow-policy-test.err
+); then
+  printf 'Developer auto-merge should fail when the working tree is dirty.\n' >&2
+  exit 1
+fi
+rm "$REPO/unsafe.txt"
 
 check_output="$("$ROOT/tools/git-workflow" check --repo "$REPO")"
 assert_contains "$check_output" "Repository context: custom"

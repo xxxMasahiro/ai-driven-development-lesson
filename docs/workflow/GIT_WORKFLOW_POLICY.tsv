@@ -3,3 +3,11 @@ branch_allowed	true|false	true	Working branches	Allows normal feature or task br
 worktree_allowed	true|false	false	Git worktree	Allows git worktree for parallel work when the user explicitly chooses it.
 main_direct_work_allowed	true|false	false	Direct main work	Allows direct edits on main only when the user explicitly chooses it.
 automation_level	manual|commit|pr_ci|sync	manual	Git automation	Controls the maximum Git automation level the agent may perform.
+commit_automation	manual|auto	auto	Commit automation	Controls whether the agent may create commits automatically after required checks pass.
+push_automation	manual|auto	manual	Push automation	Controls whether the agent may push after explicit approval for the push operation.
+pr_creation	manual|auto	manual	Pull request creation	Controls whether the agent may create pull requests after explicit approval for the PR operation.
+pr_ci_monitoring	manual|auto	auto	PR CI monitoring	Controls whether the agent may monitor pull request CI automatically.
+merge_execution	manual|after_approval	after_approval	Merge execution	Controls whether the agent may execute merge after explicit merge approval.
+developer_auto_merge_allowed	false|true	false	Developer auto-merge	Allows developer-responsibility approval-free merge only after required gates pass.
+main_ci_monitoring	manual|auto	auto	Main CI monitoring	Controls whether the agent may monitor main-branch CI automatically.
+sync_monitoring	manual|auto	auto	Sync monitoring	Controls whether the agent may monitor local and remote synchronization automatically.

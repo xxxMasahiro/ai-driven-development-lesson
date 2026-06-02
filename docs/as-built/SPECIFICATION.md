@@ -76,7 +76,7 @@ Menu-control prerequisites are implemented without replacing or weakening any ex
   - repository context and boundary confirmation where relevant,
   - learner approval before start.
 - 7-day and 14-day menu entries use their existing lesson setting files and setup gates.
-- Applied-learning, Free Development Mode, product improvement, and external integration read a shared settings view that can inherit the latest configured structured-lesson settings.
+- Applied-learning, Free Development Mode, product improvement, and external integration read a shared settings view that can inherit the most recently configured structured-lesson settings.
 - If the shared settings view cannot resolve learning mode, workflow display language, or product development language, start/gate/check commands instruct the learner to select the missing setting before proceeding.
 - `status` commands remain non-blocking and available for orientation even when prerequisites are missing.
 - Enforcement is implemented through reusable helper logic in `tools/lib/lesson_common.sh`, with composable menu prerequisite checks used by menu-specific tools.
@@ -209,6 +209,11 @@ SYNC-ID: menu_git_workflow_policy
 STATUS: implemented
 ARTIFACTS: tools/menu, tools/dashboard, tools/git-workflow, tools/test_menu_prerequisites.sh
 TESTS: tools/test_menu_prerequisites.sh
+
+SYNC-ID: git_workflow_action_settings
+STATUS: implemented
+ARTIFACTS: docs/workflow/GIT_WORKFLOW_POLICY.tsv, learning/GIT_WORKFLOW_SETTINGS.tsv, learning/GIT_WORKFLOW_APPROVALS.tsv, tools/lib/git_workflow_policy.sh, tools/git-workflow, tools/menu, tools/dashboard, tools/test_git_workflow_policy.sh, tools/test_menu_prerequisites.sh
+TESTS: tools/test_git_workflow_policy.sh, tools/test_menu_prerequisites.sh
 ```
 
 ### Implemented Git Workflow Policy
@@ -262,6 +267,58 @@ It is additive and preserves existing lesson progression, approval gates, menu p
 - High-impact Git operations remain outside automatic menu progression unless explicit user confirmation is given.
 - Runtime validation is added to menu prerequisite tests, aggregate tests, CI, and pre-commit.
 
+### Implemented Git Workflow Action Settings
+
+The implemented Git workflow action settings split broad Git automation from action-by-action behavior.
+The feature remains additive: existing settings, command names, menu checks, dashboard views, cleanup controls, CI checks, and sync-contract enforcement stay available.
+
+- Existing settings remain supported:
+  - `branch_allowed`
+  - `worktree_allowed`
+  - `main_direct_work_allowed`
+  - `automation_level`
+- `automation_level` remains a compatibility preset and broad write-automation setting.
+- When a detailed action setting key is present, the detailed setting takes precedence over the broad preset for its specific action.
+- When a detailed action setting key is absent, the resolver falls back to `automation_level` so current implemented behavior is preserved.
+- Supported detailed settings are:
+  - `commit_automation: manual|auto`
+  - `push_automation: manual|auto`
+  - `pr_creation: manual|auto`
+  - `pr_ci_monitoring: manual|auto`
+  - `merge_execution: manual|after_approval`
+  - `developer_auto_merge_allowed: false|true`
+  - `main_ci_monitoring: manual|auto`
+  - `sync_monitoring: manual|auto`
+- Default values are:
+  - `commit_automation: auto`
+  - `push_automation: manual`
+  - `pr_creation: manual`
+  - `pr_ci_monitoring: auto`
+  - `merge_execution: after_approval`
+  - `developer_auto_merge_allowed: false`
+  - `main_ci_monitoring: auto`
+  - `sync_monitoring: auto`
+- These detailed defaults are active after implementation; `automation_level` remains available as a compatibility preset when detailed action keys are absent.
+- Helper behavior:
+  - `git_workflow_action_mode commit` returns the resolved mode for commit.
+  - `git_workflow_action_mode push` returns the resolved mode for push.
+  - `git_workflow_action_mode pr` returns the resolved mode for PR creation.
+  - `git_workflow_action_mode ci` remains a compatibility alias for CI monitoring.
+  - `git_workflow_action_mode pr_ci` returns the resolved mode for PR CI monitoring.
+  - `git_workflow_action_mode merge` returns `manual`, `after_approval`, or `developer_auto` for merge execution.
+  - `git_workflow_action_mode main_ci` returns the resolved mode for main CI monitoring.
+  - `git_workflow_action_mode sync` returns the resolved mode for local/remote sync monitoring.
+- `tools/git-workflow status` and `tools/git-workflow configure` show the detailed action settings in learner-readable form.
+- `tools/git-workflow set <key> <value>` validates detailed keys and rejects unsupported values.
+- `tools/git-workflow approve <push|pr|merge> "memo"` records action, repository root, branch, timestamp, and memo in `learning/GIT_WORKFLOW_APPROVALS.tsv`.
+- `tools/git-workflow allow push|pr|merge` requires a matching approval receipt when the relevant detailed setting is present and permits the action.
+- `tools/menu readiness` and `tools/dashboard menu` display the detailed action settings for menu items 1 through 7.
+- For push and PR creation, `auto` means the agent may execute the operation only after explicit approval for that operation is recorded; it never means approval-free execution.
+- `merge_execution: after_approval` means merge execution is automated only after explicit merge approval is recorded.
+- `developer_auto_merge_allowed: true` may resolve merge to `developer_auto` only in developer-responsibility mode after required gates pass: PR CI success, clear target PR and branch, verified merge base, clean working tree, checked local/remote state, and stop-on-failure behavior.
+- Developer-responsibility auto-merge uses explicit gate evidence plus the actual repository monitor; the setting alone does not permit approval-free merge.
+- Branch deletion, worktree deletion, remote deletion, and product repository deletion remain behind explicit user confirmation regardless of merge settings.
+
 ### Design Quality Constraints
 
 - Additions must preserve existing 7-day and 14-day behavior.
@@ -292,8 +349,8 @@ It is additive and preserves existing lesson progression, approval gates, menu p
 - `tools/test_lesson14.sh` validates lesson14 CLI behavior.
 - `tools/test_lesson_repository.sh` runs the lesson-side validation suite without requiring `task-tracker-repository`.
 - `tools/test_production_operations.sh` validates the end-to-end production operations path when an external product repository exists.
-- Latest local verification for the 7-day parity change passed `./tools/test_lesson.sh` and `./tools/test_lesson_repository.sh`.
-- Latest local verification for the language-list expansion passed `./tools/test_lesson.sh`, `./tools/test_lesson14.sh`, and `./tools/test_lesson_repository.sh`.
+- Implemented local verification for the 7-day parity change passed `./tools/test_lesson.sh` and `./tools/test_lesson_repository.sh`.
+- Implemented local verification for the language-list expansion passed `./tools/test_lesson.sh`, `./tools/test_lesson14.sh`, and `./tools/test_lesson_repository.sh`.
 
 ## Implemented Remediation Specification
 

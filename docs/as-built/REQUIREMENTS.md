@@ -74,7 +74,7 @@ Menu prerequisite control is implemented additively and does not trade away any 
   - relevant repository context and boundary confirmation,
   - learner approval before starting.
 - Reuse the 7-day and 14-day language and learning-mode settings where they already exist.
-- For applied-learning, Free Development Mode, product improvement, and external integration, inherit the latest configured structured-lesson settings when available; otherwise require the learner to select them before start or gate passage.
+- For applied-learning, Free Development Mode, product improvement, and external integration, inherit the most recently configured structured-lesson settings when available; otherwise require the learner to select them before start or gate passage.
 - Keep product development language mandatory for any product-side work, including Free Development Mode, product improvement, and external integration.
 - Use shared prerequisite logic rather than duplicating menu-specific shell branches.
 - Preserve `status` commands as non-blocking discovery commands; enforce prerequisites through start, gate, or explicit menu-check commands.
@@ -194,6 +194,11 @@ SYNC-ID: menu_git_workflow_policy
 STATUS: implemented
 ARTIFACTS: tools/menu, tools/dashboard, tools/git-workflow, tools/test_menu_prerequisites.sh
 TESTS: tools/test_menu_prerequisites.sh
+
+SYNC-ID: git_workflow_action_settings
+STATUS: implemented
+ARTIFACTS: docs/workflow/GIT_WORKFLOW_POLICY.tsv, learning/GIT_WORKFLOW_SETTINGS.tsv, learning/GIT_WORKFLOW_APPROVALS.tsv, tools/lib/git_workflow_policy.sh, tools/git-workflow, tools/menu, tools/dashboard, tools/test_git_workflow_policy.sh, tools/test_menu_prerequisites.sh
+TESTS: tools/test_git_workflow_policy.sh, tools/test_menu_prerequisites.sh
 ```
 
 ## Implemented Git Workflow Policy Requirements
@@ -243,6 +248,50 @@ This implemented work is additive and does not trade away any existing 7-day les
 - Show menu-wide Git policy status in dashboard output.
 - Add tests so invalid Git policy values, missing policy files, menu readiness output, item 1 through 7 checks, and no-tradeoff behavior are mechanically verified.
 
+## Implemented Git Workflow Action Settings Requirements
+
+The lesson repository must let users configure the manual or automatic behavior of each common Git workflow action.
+This implemented work is additive and does not trade away existing `branch_allowed`, `worktree_allowed`, `main_direct_work_allowed`, `automation_level`, menu, dashboard, CI, cleanup, or as-built sync-contract behavior.
+
+- Keep the existing Git management settings:
+  - `branch_allowed`
+  - `worktree_allowed`
+  - `main_direct_work_allowed`
+  - `automation_level`
+- Treat `automation_level` as a compatibility preset for broad Git write automation.
+- Add detailed action settings that can override the broad preset when the detailed setting key is present:
+  - `commit_automation: manual|auto`
+  - `push_automation: manual|auto`
+  - `pr_creation: manual|auto`
+  - `pr_ci_monitoring: manual|auto`
+  - `merge_execution: manual|after_approval`
+  - `developer_auto_merge_allowed: false|true`
+  - `main_ci_monitoring: manual|auto`
+  - `sync_monitoring: manual|auto`
+- Detailed settings take precedence only when the detailed setting key is present.
+- Preserve current `automation_level` behavior when a detailed setting key is absent.
+- Use safety-oriented defaults:
+  - `commit_automation: auto`
+  - `push_automation: manual`
+  - `pr_creation: manual`
+  - `pr_ci_monitoring: auto`
+  - `merge_execution: after_approval`
+  - `developer_auto_merge_allowed: false`
+  - `main_ci_monitoring: auto`
+  - `sync_monitoring: auto`
+- These detailed defaults are active after implementation; `automation_level` remains available as a compatibility preset when detailed action keys are absent.
+- Preserve `ci` as a compatibility alias for CI monitoring so existing `tools/git-workflow allow ci` behavior is not removed.
+- For push and PR creation, `auto` means the agent may execute the operation only after explicit approval for that operation is recorded; it never means approval-free execution.
+- `merge_execution: after_approval` means the agent may execute merge only after explicit merge approval is recorded.
+- Store Git action approvals in `learning/GIT_WORKFLOW_APPROVALS.tsv` and require matching action, repository, and branch receipts for detailed push, PR creation, and normal merge execution.
+- `developer_auto_merge_allowed: true` is a developer-responsibility setting that may permit approval-free merge only when required gates pass: PR CI success, target PR and branch are clear, merge base is verified, the working tree is clean, local and remote state are checked, and failures stop the workflow.
+- Developer-responsibility auto-merge must require gate evidence plus the actual Git repository state; setting `developer_auto_merge_allowed: true` alone is not sufficient.
+- Keep branch deletion, worktree deletion, remote deletion, and product repository deletion behind explicit user confirmation regardless of merge settings.
+- Let users inspect and change these detailed settings from the same Git management command surface: `tools/git-workflow status|configure|set`.
+- Show the detailed settings in menu readiness and dashboard menu output.
+- Apply the same detailed settings to menu items 1 through 7.
+- Add tests for default values, valid changes, invalid value rejection, detailed-setting precedence, menu display, dashboard display, and preservation of existing lesson and product workflows.
+
 ## Mechanical Enforcement
 
 - 14-day progression requires approval receipts through `tools/lesson14 承認`.
@@ -286,8 +335,8 @@ This implemented work is additive and does not trade away any existing 7-day les
 - All lesson structure and sync checks pass.
 - Developer-memory requirements check passes.
 - Lesson repository aggregate test passes.
-- Latest 7-day parity verification passes `./tools/test_lesson.sh` and `./tools/test_lesson_repository.sh`.
-- Latest language-list expansion verification passes `./tools/test_lesson.sh`, `./tools/test_lesson14.sh`, and `./tools/test_lesson_repository.sh`.
+- Implemented 7-day parity verification passes `./tools/test_lesson.sh` and `./tools/test_lesson_repository.sh`.
+- Implemented language-list expansion verification passes `./tools/test_lesson.sh`, `./tools/test_lesson14.sh`, and `./tools/test_lesson_repository.sh`.
 - `docs/workflow/TASK_TRACKER.md`, `docs/workflow/HANDOFF.md`, `docs/as-built/REQUIREMENTS.md`, `docs/as-built/SPECIFICATION.md`, and `docs/as-built/IMPLEMENTATION_PLAN.md` reflect the same as-built state.
 - `task-tracker-repository` remains outside this repository and may remain deleted unless a real product operations test is explicitly requested.
 - The developer-memory audit remains cleared only while all remediation requirements in this document are implemented or mechanically enforced.
