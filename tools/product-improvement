@@ -1,0 +1,74 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=tools/lib/lesson_common.sh
+source "$SCRIPT_DIR/lib/lesson_common.sh"
+
+COMMAND="${1:-status}"
+
+usage() {
+  cat <<'USAGE'
+Usage:
+  tools/product-improvement status
+  tools/product-improvement start --confirm
+  tools/product-improvement gate
+
+Rules:
+  - This path improves an existing product after Free Development Mode or a structured lesson product.
+  - It does not replace Free Development Mode, external integration, or structured lessons.
+  - Product-facing changes require product development language, workflow documents, Git sync, tests, and CI.
+USAGE
+}
+
+check_scope_docs() {
+  local product_root missing file
+  product_root="$(lesson_product_repo_root)"
+  missing=0
+  for file in REQUIREMENTS.md SPECIFICATION.md IMPLEMENTATION_PLAN.md; do
+    if [[ ! -s "$product_root/$file" ]]; then
+      printf 'missing product-improvement scope document: %s\n' "$product_root/$file" >&2
+      missing=1
+    fi
+  done
+  [[ "$missing" -eq 0 ]] || exit 1
+}
+
+case "$COMMAND" in
+  status|現在地)
+    printf 'Product Improvement: optional improvement cycle\n'
+    printf 'Product repository: %s\n' "$(lesson_product_repo_root)"
+    printf 'Typical improvements: completion, deletion, persistence, screen copy, layout, accessibility, tests, and documentation.\n'
+    lesson_menu_print_readiness "Product Improvement"
+    ;;
+  start|開始)
+    lesson_menu_require_start_approval "Product Improvement" "${2:-}"
+    lesson_menu_require_settings "Product Improvement"
+    "$LESSON_ROOT/tools/check_repository_boundary.sh" --product-required >/dev/null
+    cat <<'PROMPT'
+Product Improvement start prompt:
+
+I want to improve the existing product.
+First inspect REQUIREMENTS.md, SPECIFICATION.md, IMPLEMENTATION_PLAN.md, TASK_TRACKER.md, and HANDOFF.md.
+Then ask me which improvement should be prioritized, what should stay out of scope, and how we will verify it.
+Do not implement until I approve the smallest useful improvement plan.
+PROMPT
+    ;;
+  gate|確認)
+    lesson_menu_require_settings "Product Improvement"
+    "$LESSON_ROOT/tools/check_repository_boundary.sh" --product-required >/dev/null
+    check_scope_docs
+    "$LESSON_ROOT/tools/check_workflow_pair_sync.sh" --product
+    "$LESSON_ROOT/tools/check_git_sync.sh" --product --required
+    "$LESSON_ROOT/tools/check_ci_status.sh" --product --required
+    printf 'Product Improvement gate passed.\n'
+    ;;
+  ""|-h|--help|help)
+    usage
+    ;;
+  *)
+    printf 'unknown command: %s\n' "$COMMAND" >&2
+    usage
+    exit 1
+    ;;
+esac

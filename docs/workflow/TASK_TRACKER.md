@@ -4,8 +4,9 @@
 
 The lesson repository includes mechanical enforcement, flexible lesson entry, Free Development Mode, Team Development and Docker advanced module, dialogue-centered learning, as-built synchronization checks, sub-agent review protocol, menu/dashboard/illustration entry points, 7-day and 14-day lesson language controls, and lesson-side aggregate testing.
 
-The current task implements the follow-up requirement that 7-day lessons must have the same learning-mode, workflow display language, and product development language controls that were added to the 14-day lesson.
-It also expands the shared language list for both lesson versions to `ja`, `en`, `ko`, `zh-CN`, `zh-TW`, `es`, `pt-BR`, `fr`, `de`, `id`, `vi`, `th`, `hi`, and `ar`, while keeping `zh` as a `zh-CN` alias and preserving `custom` language flexibility.
+The latest implemented change adds menu prerequisite control for menu items 1 through 6.
+It also preserves the 7-day and 14-day learning-mode, workflow display language, product development language, and expanded language-list controls.
+The shared standard language list remains `ja`, `en`, `ko`, `zh-CN`, `zh-TW`, `es`, `pt-BR`, `fr`, `de`, `id`, `vi`, `th`, `hi`, and `ar`, while `zh` remains a `zh-CN` alias and `custom` remains available.
 The implementation remains additive and keeps the existing 7-day lesson, 14-day lesson, free-development flow, advanced modules, existing checks, and repository-boundary behavior intact.
 
 ## Completed
@@ -36,6 +37,12 @@ The implementation remains additive and keeps the existing 7-day lesson, 14-day 
 - Added `tools/test_lesson.sh` for 7-day setup gating and settings regression coverage.
 - Added a non-English Markdown listing tool for translation follow-up.
 - Added learner-facing menu, dashboard, and illustration review entry points.
+- Renamed menu item 3 to `3. 応用レッスン`.
+- Added shared menu prerequisite helpers for learning mode, workflow display language, product development language, start approval, and menu readiness.
+- Added `tools/menu check <1|2|3|4|5|6>` and `tools/menu start <1|2|3|4|5|6> --confirm`.
+- Added `tools/product-improvement status|start|gate`.
+- Added dashboard readiness output for menu items 1 through 6.
+- Added menu prerequisite tests and wired them into aggregate tests, CI, and pre-commit.
 - Documented implementation quality constraints: refactorability, ecosystem fit, reusability, and generality.
 - Preserved the no-tradeoff rule for existing features.
 - Added as-built lesson-side documents:
@@ -66,17 +73,56 @@ The following developer-memory remediation items are implemented and mechanicall
 15. Wire strengthened checks, product-gate tests, Playwright checks, and aggregate tests into CI and pre-commit without removing existing checks.
 16. Add Free Development and Team Development gate failure-path tests.
 
-## Current Synchronization Task
+## Current Synchronized State
 
-- Synchronize the implemented 7-day parity change into the three design/as-built documents:
+- The implemented menu prerequisite control is synchronized into the three design/as-built documents:
   - `docs/as-built/REQUIREMENTS.md`
   - `docs/as-built/SPECIFICATION.md`
   - `docs/as-built/IMPLEMENTATION_PLAN.md`
-- Synchronize the same implemented state into the two workflow-state documents:
+- The same implemented state is synchronized into the two workflow-state documents:
   - `docs/workflow/TASK_TRACKER.md`
   - `docs/workflow/HANDOFF.md`
-- Treat the synchronization as passing only when the implemented content is present in all five documents.
+- The synchronization passes only when the implemented content is present in all five documents.
 - Preserve refactorability, ecosystem fit, reusable design, generality, and the no-existing-feature-tradeoff rule while maintaining the implemented remediation.
+
+## Planned Documentation Map Synchronization
+
+The next planned lesson improvement explains the repository's rule, routing, skill, design, workflow, and memory documents in a way that non-engineer learners can understand.
+This is a plan only; runtime implementation has not started.
+
+- Add `guides/DOCUMENT_MAP.md`.
+- Explain `AGENTS.MD` invariant rules, document root, routing table, and repo-local skills as the agent-facing rule and navigation layer.
+- Distinguish lesson-side `AGENTS.MD` from product-side `AGENT.md`.
+- Explain `docs/as-built/` as the requirements, specification, and implementation-plan area.
+- Explain `docs/workflow/` as the task-tracker and handoff area.
+- Explain `docs/memory/` as memory and decision records, including `docs/memory/DEVELOPER_MEMORY.md`.
+- Explain product-side `FAILURE_MEMORY.md` or failure-recovery records without claiming a lesson-side failure-memory file exists.
+- Add `tools/docs-tour` with `status`, `rules`, `design`, `workflow`, `memory`, `skills`, and `all` views.
+- Make `tools/docs-tour` adapt to learning modes A/B/C.
+- Add `./tools/dashboard docs` and include that view in `./tools/dashboard all`.
+- Add copy-paste prompt examples for asking an agent to explain `TASK_TRACKER`/`HANDOFF` and the as-built trio in learner-friendly language.
+- Add early 7-day and 14-day guidance so learners understand why the documents exist before they use them deeply.
+- Add `tools/test_docs_tour.sh` and wire it into structure/as-built/developer-memory checks, aggregate tests, CI, and pre-commit when implemented.
+- Preserve existing lesson progression, approvals, checks, menu behavior, dashboard behavior, skills, memory workflow, and repository-boundary behavior.
+- At this planning-synchronization stage, `guides/DOCUMENT_MAP.md`, `tools/docs-tour`, `tools/test_docs_tour.sh`, and `./tools/dashboard docs` are planned artifacts and are not yet expected to exist in runtime.
+- Implementation completion will require validation wiring through `tools/test_docs_tour.sh`, structure checks, as-built checks, developer-memory checks, dashboard or Playwright tests, aggregate tests, CI, and pre-commit.
+- The validation suite must preserve existing 7-day, 14-day, menu, dashboard, Free Development, Product Improvement, external-integration, product-gate, Playwright, CI, and pre-commit behavior.
+
+## Implemented Menu Prerequisite Control
+
+Shared menu prerequisite control is implemented without replacing existing lesson or product workflows.
+
+- Rename the learner-facing menu item to `3. 応用レッスン`.
+- Keep the Team Development and Docker path available through the renamed applied-learning item.
+- Require learning mode, workflow display language, product development language, repository context/boundary confirmation where relevant, and learner approval before starting menu items 1 through 6.
+- Reuse existing 7-day and 14-day settings where available.
+- For applied-learning, Free Development Mode, product improvement, and external integration, inherit the latest configured structured-lesson settings when possible; otherwise require missing settings before start or gate passage.
+- Keep product development language mandatory for product-side work.
+- Implement the prerequisite logic through shared reusable helpers rather than duplicated menu branches.
+- Keep `status` commands non-blocking for discovery; enforce prerequisites through start, gate, or explicit menu-check commands.
+- Add a mechanically checkable product-improvement entry point for menu item 5.
+- Expand dashboard readiness output for menu items 1 through 6.
+- Add tests for the renamed menu label, absence of the old learner-facing label, missing-prerequisite failure paths, unchanged existing 7-day/14-day behavior, and preservation of existing Free Development, Team Development, external-integration, dashboard, and product-gate checks.
 
 ## Verification Status
 
@@ -89,6 +135,7 @@ Lesson repository test passed.
 ```
 
 Latest local verification reached this target after synchronizing the 7-day parity implementation and the expanded language-list implementation.
+The latest verification target now also includes `Menu prerequisite tests passed.`
 Real product operations testing remains available through `tools/test_production_operations.sh` when an external product repository is intentionally recreated.
 
 ## Remaining Work

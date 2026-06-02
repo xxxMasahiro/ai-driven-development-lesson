@@ -39,8 +39,12 @@ case "$COMMAND" in
     printf 'External Integration: optional extension path\n'
     printf 'Product repository: %s\n' "$(lesson_product_repo_root)"
     printf 'Typical targets: calendar, task service, spreadsheet, documentation, API, or MCP-style resource.\n'
+    lesson_menu_print_readiness "External Integration"
     ;;
   start|開始)
+    lesson_menu_require_start_approval "External Integration" "${2:-}"
+    lesson_menu_require_settings "External Integration"
+    "$LESSON_ROOT/tools/check_repository_boundary.sh" --product-required >/dev/null
     cat <<'PROMPT'
 External Integration start prompt:
 
@@ -51,6 +55,7 @@ Do not implement until I approve the smallest useful integration plan.
 PROMPT
     ;;
   gate|確認)
+    lesson_menu_require_settings "External Integration"
     "$LESSON_ROOT/tools/check_repository_boundary.sh" --product-required >/dev/null
     check_scope_docs
     "$LESSON_ROOT/tools/check_workflow_pair_sync.sh" --product

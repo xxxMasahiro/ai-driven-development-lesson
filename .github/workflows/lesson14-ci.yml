@@ -31,9 +31,15 @@ jobs:
           bash -n tools/check_developer_memory_requirements.sh
           bash -n tools/test_lesson_playwright.sh
           bash -n tools/test_lesson.sh
+          bash -n tools/test_menu_prerequisites.sh
           bash -n tools/test_product_gate_tools.sh
           bash -n tools/test_lesson_repository.sh
           bash -n tools/test_lesson14.sh
+          bash -n tools/menu
+          bash -n tools/free-development
+          bash -n tools/team-development
+          bash -n tools/external-integration
+          bash -n tools/product-improvement
 
       - name: Existing lesson checks
         run: |
@@ -50,6 +56,9 @@ jobs:
 
       - name: Lesson14 CLI regression
         run: ./tools/test_lesson14.sh
+
+      - name: Menu prerequisite regression
+        run: ./tools/test_menu_prerequisites.sh
 
       - name: Install browser test dependencies
         run: |

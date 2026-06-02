@@ -2,10 +2,10 @@
 
 ## Current State
 
-The lesson repository is in a 7-day lesson parity remediation phase.
+The lesson repository is in an implemented menu prerequisite state.
 The current validation scope is lesson-side only; it must not recreate or depend on `task-tracker-repository`.
 Existing 7-day lessons, 14-step lessons, free-development flow, advanced modules, checks, and repository-boundary behavior must not be weakened or replaced.
-The implementation adds 7-day learning-mode, workflow display language, and product development language controls, then expands the shared standard language list for both lesson versions while preserving refactorability, ecosystem fit, reusable design, generality, and the no-existing-feature-tradeoff rule.
+The implementation adds shared menu prerequisite control for menu items 1 through 6 while preserving refactorability, ecosystem fit, reusable design, generality, and the no-existing-feature-tradeoff rule.
 
 ## Key Implemented Capabilities
 
@@ -23,6 +23,11 @@ The implementation adds 7-day learning-mode, workflow display language, and prod
 - MCP purpose-before-workflow guidance for Step 13/14.
 - Developer-memory requirement checks.
 - Learner-facing menu, dashboard, and illustration review entry points.
+- Menu item 3 is `3. 応用レッスン`.
+- Menu items 1 through 6 have shared prerequisite checks for learning mode, workflow display language, product development language, repository boundary where relevant, and learner approval before start.
+- `status` commands remain non-blocking; `start`, `gate`, and `check` enforce prerequisites.
+- `tools/product-improvement status|start|gate` provides the mechanical entry for product improvement.
+- Dashboard readiness output shows menu items 1 through 6.
 - As-built document checks.
 - Sub-agent review protocol.
 - Lesson repository aggregate test.
@@ -78,7 +83,39 @@ tools/test_production_operations.sh
 
 ## Next Step
 
-The implemented 7-day parity change is synchronized across the three design/as-built documents and two workflow-state documents.
+The synchronized menu prerequisite implementation is now represented across the three design/as-built documents and two workflow-state documents.
+
+Implemented scope:
+
+- Rename the learner-facing menu item to `3. 応用レッスン`.
+- Keep the Team Development and Docker path available through the renamed applied-learning item.
+- Require learning mode, workflow display language, product development language, repository context/boundary confirmation where relevant, and learner approval before starting menu items 1 through 6.
+- Reuse existing 7-day and 14-day settings where available.
+- For applied-learning, Free Development Mode, product improvement, and external integration, inherit the latest configured structured-lesson settings when possible; otherwise require missing settings before start or gate passage.
+- Keep product development language mandatory for product-side work.
+- Implement the prerequisite logic through shared reusable helpers rather than duplicated menu branches.
+- Keep `status` commands non-blocking for discovery; enforce prerequisites through start, gate, or explicit menu-check commands.
+- Add a mechanically checkable product-improvement entry point for menu item 5.
+- Expand dashboard readiness output for menu items 1 through 6.
+- Add tests for the renamed menu label, absence of the old learner-facing label, missing-prerequisite failure paths, unchanged existing 7-day/14-day behavior, and preservation of existing Free Development, Team Development, external-integration, dashboard, and product-gate checks.
+
+Next planned scope:
+
+- Add `guides/DOCUMENT_MAP.md` so learners can understand the repository's document system before document-heavy work.
+- Explain `AGENTS.MD` invariant rules, document root, routing table, and repo-local skills in non-engineer-friendly terms.
+- Distinguish lesson-side `AGENTS.MD` from product-side `AGENT.md`.
+- Explain `docs/as-built/`, `docs/workflow/`, and `docs/memory/` by role.
+- Explain `docs/memory/DEVELOPER_MEMORY.md` and product-side `FAILURE_MEMORY.md` or failure-recovery records without claiming a lesson-side failure-memory file exists.
+- Add `tools/docs-tour status|rules|design|workflow|memory|skills|all` with learning-mode-aware A/B/C explanation depth.
+- Add `./tools/dashboard docs` and include it in `./tools/dashboard all`.
+- Add copy-paste prompt examples for asking an agent to explain `TASK_TRACKER`/`HANDOFF` and the as-built trio in learner-friendly language.
+- Add early 7-day and 14-day guidance about why the documents exist.
+- Add `tools/test_docs_tour.sh` and wire it into the relevant structure, as-built, developer-memory, aggregate, CI, and pre-commit checks when implemented.
+- Preserve existing lesson progression, approvals, checks, menu behavior, dashboard behavior, skills, memory workflow, and repository-boundary behavior.
+- At this planning-synchronization stage, `guides/DOCUMENT_MAP.md`, `tools/docs-tour`, `tools/test_docs_tour.sh`, and `./tools/dashboard docs` are planned artifacts and are not yet expected to exist in runtime.
+- Implementation completion will require validation wiring through `tools/test_docs_tour.sh`, structure checks, as-built checks, developer-memory checks, dashboard or Playwright tests, aggregate tests, CI, and pre-commit.
+- The validation suite must preserve existing 7-day, 14-day, menu, dashboard, Free Development, Product Improvement, external-integration, product-gate, Playwright, CI, and pre-commit behavior.
+
 Latest local verification passed the lesson-side verification sequence:
 
 ```bash
@@ -89,6 +126,10 @@ Latest local verification passed the lesson-side verification sequence:
 ./tools/check_as_built_docs.sh
 ./tools/check_review_protocol.sh
 ./tools/check_developer_memory_requirements.sh
+./tools/menu
+./tools/dashboard all
+./tools/illustrations list
+./tools/test_menu_prerequisites.sh
 ./tools/test_lesson_start_position.sh
 ./tools/test_lesson.sh
 ./tools/test_lesson14.sh

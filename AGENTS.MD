@@ -84,6 +84,9 @@
 18. エージェントとの壁打ちを教材の中核として扱う。
     学習者の目的、利用者、制約、優先順位を質問で引き出し、要件、仕様、実装計画、検証方法へ整理します。サブエージェントを使う場合は、各担当の観点を統括役が目的に照らして採用、保留、却下します。
 
+19. メニュー1〜6は開始前提条件を共有する。
+    7日版、14日版、`3. 応用レッスン`、自由開発、成果物改善、外部連携を開始する前に、学習モード、表示言語、成果物開発言語、必要なリポジトリ境界、ユーザー承認を確認します。`status` は案内用として非ブロックのまま残し、`start`、`gate`、`check` で機械的に前提条件を検査します。`./tools/dashboard all` はメニュー1〜6の準備状態を表示します。
+
 ## ドキュメントルート
 
 | 用途 | 入口 |
@@ -124,9 +127,10 @@
 | サブエージェントで精査する | `playbooks/AGENT_PLAYBOOK_14_DAYS.md` Step 12/14 | `skills/lesson-sync-gate/SKILL.md` | レビュー、テスト、同期確認 |
 | スキル/MCPを体験する | `prompts/PROMPTS_14_DAYS.md` Step 13/14 | `skills/lesson14-facilitator/SKILL.md` | 最小構成で実施 |
 | 全レッスン後に自由開発したい | `free-development/FREE_DEVELOPMENT_MODE.md` | `skills/worklog-doc-sync/SKILL.md`、`skills/lesson-sync-gate/SKILL.md` | `./tools/free-development start`、`./tools/free-development gate` |
+| 成果物を改善したい | 成果物リポジトリの `REQUIREMENTS.md`、`SPECIFICATION.md`、`IMPLEMENTATION_PLAN.md`、`TASK_TRACKER.md`、`HANDOFF.md` | `skills/worklog-doc-sync/SKILL.md`、`skills/lesson-sync-gate/SKILL.md` | `./tools/product-improvement start --confirm`、`./tools/product-improvement gate` |
 | 外部連携へ発展させたい | `free-development/FREE_DEVELOPMENT_MODE.md`、`prompts/PROMPTS_14_DAYS.md` Step 13/14 | `skills/lesson14-facilitator/SKILL.md`、`skills/worklog-doc-sync/SKILL.md` | 自由開発または既存成果物の要件・仕様から連携設計 |
 | 教材そのものを改善したい | `docs/memory/DEVELOPER_MEMORY.md`、`docs/workflow/TASK_TRACKER.md`、`docs/workflow/HANDOFF.md` | `skills/lesson-sync-gate/SKILL.md` | `./tools/dashboard all`、各種チェック |
-| 発展的にチーム開発とDockerを学びたい | `advanced/TEAM_DEVELOPMENT_DOCKER.md` | `skills/lesson-sync-gate/SKILL.md`、`skills/worklog-doc-sync/SKILL.md` | `./tools/team-development start`、`./tools/team-development gate` |
+| `3. 応用レッスン` でチーム開発とDockerを学びたい | `advanced/TEAM_DEVELOPMENT_DOCKER.md` | `skills/lesson-sync-gate/SKILL.md`、`skills/worklog-doc-sync/SKILL.md` | `./tools/team-development start --confirm`、`./tools/team-development gate` |
 
 ## repo-local skills
 

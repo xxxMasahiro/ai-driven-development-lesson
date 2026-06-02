@@ -1,34 +1,45 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-cat <<'MENU'
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=tools/lib/lesson_common.sh
+source "$SCRIPT_DIR/lib/lesson_common.sh"
+
+show_menu() {
+  cat <<'MENU'
 メニュー
 
 【学ぶ】
 1. 7日間レッスン
    基礎を短く一周する
    入口: ./tools/lesson status
+   開始前確認: ./tools/menu check 1
 
 2. 14日間レッスン
    GitHub、CI、E2E、PR、サブエージェント、スキル、MCPまで学ぶ
    入口: ./tools/lesson14 status
+   開始前確認: ./tools/menu check 2
 
-3. 発展・応用レッスン
+3. 応用レッスン
    Docker、git worktree、チーム開発、より実務的な検証を学ぶ
    入口: ./tools/team-development status
+   開始前確認: ./tools/menu check 3
 
 【作る・発展させる】
 4. 自由開発
    自分で成果物を決め、この教材のワークフローで開発する
    入口: ./tools/free-development status
+   開始前確認: ./tools/menu check 4
 
 5. 成果物を改善
    完了、削除、保存、デザイン改善などを追加する
-   入口: 成果物リポジトリの TASK_TRACKER.md と HANDOFF.md を確認して改善サイクルを開始する
+   入口: ./tools/product-improvement status
+   開始前確認: ./tools/menu check 5
 
 6. 外部連携
    自由開発や既存成果物を、Googleカレンダーなど外部ツールと連携させる
    入口: ./tools/external-integration status
+   開始前確認: ./tools/menu check 6
 
 【整える】
 7. 教材そのものを改善
@@ -40,3 +51,125 @@ cat <<'MENU'
 
 外部連携は、既存成果物リポジトリがある場合は単独でも選べます。
 MENU
+}
+
+usage() {
+  cat <<'USAGE'
+Usage:
+  tools/menu
+  tools/menu status
+  tools/menu readiness
+  tools/menu check <1|2|3|4|5|6>
+  tools/menu start <1|2|3|4|5|6> --confirm
+USAGE
+}
+
+menu_item_name() {
+  case "$1" in
+    1) printf '7日間レッスン' ;;
+    2) printf '14日間レッスン' ;;
+    3) printf '応用レッスン' ;;
+    4) printf '自由開発' ;;
+    5) printf '成果物を改善' ;;
+    6) printf '外部連携' ;;
+    *) printf 'unknown menu item: %s\n' "$1" >&2; exit 1 ;;
+  esac
+}
+
+menu_item_entry() {
+  case "$1" in
+    1) printf './tools/lesson status' ;;
+    2) printf './tools/lesson14 status' ;;
+    3) printf './tools/team-development start --confirm' ;;
+    4) printf './tools/free-development start --confirm' ;;
+    5) printf './tools/product-improvement start --confirm' ;;
+    6) printf './tools/external-integration start --confirm' ;;
+    *) printf 'unknown menu item: %s\n' "$1" >&2; exit 1 ;;
+  esac
+}
+
+menu_check_item() {
+  local item="$1"
+  case "$item" in
+    1)
+      lesson_menu_require_config_settings "$(menu_item_name "$item")" "$LESSON_ROOT/lesson/LESSON_CONFIG.tsv"
+      ;;
+    2)
+      lesson_menu_require_config_settings "$(menu_item_name "$item")" "$LESSON_ROOT/lesson/LESSON_CONFIG_14_DAYS.tsv"
+      ;;
+    3|4)
+      lesson_menu_require_settings "$(menu_item_name "$item")"
+      ;;
+    5|6)
+      lesson_menu_require_settings "$(menu_item_name "$item")"
+      "$LESSON_ROOT/tools/check_repository_boundary.sh" --product-required >/dev/null
+      ;;
+    *)
+      printf 'menu item must be 1 through 6.\n' >&2
+      exit 1
+      ;;
+  esac
+  printf 'Menu prerequisite check passed: %s\n' "$(menu_item_name "$item")"
+}
+
+menu_readiness() {
+  local item
+  for item in 1 2 3 4 5 6; do
+    printf '\n[%s] %s\n' "$item" "$(menu_item_name "$item")"
+    case "$item" in
+      1)
+        if ( lesson_menu_require_config_settings "$(menu_item_name "$item")" "$LESSON_ROOT/lesson/LESSON_CONFIG.tsv" ) >/dev/null 2>&1; then
+          printf 'Settings: ready\n'
+        else
+          printf 'Settings: missing\n'
+        fi
+        ;;
+      2)
+        if ( lesson_menu_require_config_settings "$(menu_item_name "$item")" "$LESSON_ROOT/lesson/LESSON_CONFIG_14_DAYS.tsv" ) >/dev/null 2>&1; then
+          printf 'Settings: ready\n'
+        else
+          printf 'Settings: missing\n'
+        fi
+        ;;
+      *)
+        lesson_menu_print_readiness "$(menu_item_name "$item")"
+        if [[ "$item" == "5" || "$item" == "6" ]]; then
+          if "$LESSON_ROOT/tools/check_repository_boundary.sh" --product-required >/dev/null 2>&1; then
+            printf 'Product repository boundary: ready\n'
+          else
+            printf 'Product repository boundary: missing\n'
+          fi
+        else
+          printf 'Product repository boundary: not required before start\n'
+        fi
+        ;;
+    esac
+    printf 'Start command: ./tools/menu start %s --confirm\n' "$item"
+  done
+}
+
+case "${1:-status}" in
+  ""|status|現在地)
+    show_menu
+    ;;
+  readiness|準備)
+    menu_readiness
+    ;;
+  check|確認)
+    menu_check_item "${2:-}"
+    ;;
+  start|開始)
+    item="${2:-}"
+    lesson_menu_require_start_approval "$(menu_item_name "$item")" "${3:-}"
+    menu_check_item "$item"
+    printf 'Start entry: %s\n' "$(menu_item_entry "$item")"
+    ;;
+  -h|--help|help)
+    usage
+    ;;
+  *)
+    printf 'unknown command: %s\n' "$1" >&2
+    usage
+    exit 1
+    ;;
+esac

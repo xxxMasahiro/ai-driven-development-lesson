@@ -63,6 +63,58 @@
 - `tools/dashboard illustrations` shows illustration request and review records.
 - `tools/dashboard all` combines the lesson, development, and illustration views.
 
+### Menu Prerequisite Control
+
+Menu-control prerequisites are implemented without replacing or weakening any existing menu entry, lesson flow, dashboard view, product gate, or repository-boundary check.
+
+- The learner-facing menu label is `3. 応用レッスン`.
+- The renamed applied-learning item continues to route to the existing Team Development and Docker learning path.
+- Menu items 1 through 6 share one prerequisite model:
+  - learning mode,
+  - workflow display language,
+  - product development language,
+  - repository context and boundary confirmation where relevant,
+  - learner approval before start.
+- 7-day and 14-day menu entries use their existing lesson setting files and setup gates.
+- Applied-learning, Free Development Mode, product improvement, and external integration read a shared settings view that can inherit the latest configured structured-lesson settings.
+- If the shared settings view cannot resolve learning mode, workflow display language, or product development language, start/gate/check commands instruct the learner to select the missing setting before proceeding.
+- `status` commands remain non-blocking and available for orientation even when prerequisites are missing.
+- Enforcement is implemented through reusable helper logic in `tools/lib/lesson_common.sh`, with composable menu prerequisite checks used by menu-specific tools.
+- Product improvement has a mechanically checkable entry point: `tools/product-improvement status|start|gate`.
+- Dashboard output exposes readiness for menu items 1 through 6 and does not hide existing dashboard information.
+- Tests validate the renamed menu label, absence of the old label in learner-facing menu output, missing-prerequisite failure paths for missing settings, and unchanged 7-day/14-day behavior.
+
+### Planned Documentation Map And Tour
+
+The documentation-map improvement is planned and not yet implemented in the current runtime.
+It must be added without replacing or weakening existing lesson flow, menu behavior, dashboard behavior, checks, skills, memory documents, or as-built/workflow synchronization.
+
+- `guides/DOCUMENT_MAP.md` will explain the repository documents through learner-facing categories:
+  - rules and routing,
+  - design/as-built,
+  - workflow state,
+  - memory and decisions,
+  - skills and reusable agent procedures.
+- The guide will explain `AGENTS.MD` as the lesson-side agent rulebook and will separately explain product-side `AGENT.md` where relevant.
+- The guide will explain the `AGENTS.MD` invariant rules, document root table, routing table, and repo-local skills in non-engineer-friendly terms.
+- The guide will explain `docs/as-built/REQUIREMENTS.md`, `docs/as-built/SPECIFICATION.md`, and `docs/as-built/IMPLEMENTATION_PLAN.md` as the design/as-built trio.
+- The guide will explain `docs/workflow/TASK_TRACKER.md` and `docs/workflow/HANDOFF.md` as the paired progress and restart-context documents.
+- The guide will explain `docs/memory/DEVELOPER_MEMORY.md` as developer intent and stable preference memory.
+- The guide will explain failure memory as product-side `FAILURE_MEMORY.md` or failure-recovery records when used by the lesson, without inventing a lesson-side file that does not exist.
+- `tools/docs-tour` will provide `status`, `rules`, `design`, `workflow`, `memory`, `skills`, and `all` views.
+- `tools/docs-tour` output will use the current learning mode when available:
+  - A: fuller explanation with purpose, benefit, and examples,
+  - B: short supplemental explanation,
+  - C: file names and direct purposes only.
+- `tools/dashboard docs` will show document categories, key files, current workflow relevance, workflow-pair sync status, as-built sync status, and a next recommended document action.
+- `tools/dashboard all` will include the docs view without removing existing menu, lesson, development, or illustration views.
+- Prompt examples will be added so learners can ask an agent to explain `TASK_TRACKER` and `HANDOFF`, or the as-built trio, in plain language.
+- 7-day and 14-day guidance will introduce the documentation map before learners are expected to use the documents deeply.
+- `tools/test_docs_tour.sh` will cover guide presence, tour command behavior, dashboard docs output, prompt examples, structure integration, and as-built/workflow synchronization.
+- At this planning-synchronization stage, `guides/DOCUMENT_MAP.md`, `tools/docs-tour`, `tools/test_docs_tour.sh`, and `./tools/dashboard docs` are planned artifacts and are not yet part of the runtime dispatcher or aggregate checks.
+- Implementation completion will wire validation through `tools/test_docs_tour.sh`, structure checks, as-built checks, developer-memory checks, dashboard or Playwright tests, aggregate tests, CI, and pre-commit.
+- The new validation must preserve existing 7-day, 14-day, menu, dashboard, Free Development, Product Improvement, external-integration, product-gate, Playwright, CI, and pre-commit behavior.
+
 ### Illustration Review Support
 
 - `tools/illustrations list` shows illustration records.
@@ -96,6 +148,7 @@
 - `tools/check_review_protocol.sh` validates the review protocol.
 - `tools/check_developer_memory_requirements.sh` validates that developer-memory requirements are represented mechanically.
 - `tools/menu`, `tools/dashboard`, and `tools/illustrations` validate the menu, dashboard, and illustration entry points at runtime.
+- `tools/test_menu_prerequisites.sh` validates menu readiness, start approval, missing-prerequisite failure paths, the `3. 応用レッスン` label, and the absence of the old menu label.
 - `tools/test_lesson_start_position.sh` validates learner-selected start positions.
 - `tools/test_lesson.sh` validates 7-day CLI behavior, including learning mode, workflow display language, product development language, and setup gating.
 - `tools/test_lesson14.sh` validates lesson14 CLI behavior.

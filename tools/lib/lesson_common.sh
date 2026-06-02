@@ -251,3 +251,234 @@ lesson_show_language_file() {
 lesson_structure_check() {
   "$LESSON_ROOT/tools/check_lesson_structure.sh" >/dev/null
 }
+
+lesson_config_get_from_file() {
+  local config_file="$1"
+  local key="$2"
+  local default_value="${3:-}"
+
+  if [[ ! -f "$config_file" ]]; then
+    printf '%s' "$default_value"
+    return
+  fi
+
+  awk -F '\t' -v key="$key" -v default_value="$default_value" '
+    $1 !~ /^#/ && $1 == key {
+      print $2
+      found = 1
+      exit
+    }
+    END {
+      if (!found) print default_value
+    }
+  ' "$config_file"
+}
+
+lesson_abs_path_from_config_file() {
+  local config_file="$1"
+  local path="$2"
+  path="$(lesson_expand_path "$path")"
+  case "$path" in
+    /*) printf '%s' "$path" ;;
+    *) printf '%s/%s' "$LESSON_ROOT" "$path" ;;
+  esac
+}
+
+lesson_setting_file_from_config() {
+  local config_file="$1"
+  local setting="$2"
+  local key default_value
+  case "$setting" in
+    learning_mode)
+      key="learning_mode_file"
+      default_value="learning/LESSON_MODE.tsv"
+      ;;
+    workflow_language)
+      key="workflow_language_file"
+      default_value="learning/WORKFLOW_DISPLAY_LANGUAGE.tsv"
+      ;;
+    product_language)
+      key="product_language_file"
+      default_value="learning/PRODUCT_DEVELOPMENT_LANGUAGE.tsv"
+      ;;
+    *)
+      printf 'unknown setting: %s\n' "$setting" >&2
+      exit 1
+      ;;
+  esac
+  lesson_abs_path_from_config_file "$config_file" "$(lesson_config_get_from_file "$config_file" "$key" "$default_value")"
+}
+
+lesson_learning_mode_file_has_value() {
+  local file="$1"
+  [[ -f "$file" ]] || return 1
+  lesson_current_learning_mode_file "$file" >/dev/null 2>&1
+}
+
+lesson_setting_file_has_value() {
+  local setting="$1"
+  local file="$2"
+  case "$setting" in
+    learning_mode)
+      lesson_learning_mode_file_has_value "$file"
+      ;;
+    workflow_language|product_language)
+      lesson_language_file_has_value "$file"
+      ;;
+    *)
+      printf 'unknown setting: %s\n' "$setting" >&2
+      exit 1
+      ;;
+  esac
+}
+
+lesson_menu_candidate_configs() {
+  local active_config="${LESSON_CONFIG:-$LESSON_ROOT/lesson/LESSON_CONFIG.tsv}"
+  local config
+  local -a candidates=(
+    "$active_config"
+  )
+
+  if [[ "${LESSON_MENU_SETTINGS_STRICT_CONFIG:-0}" != "1" ]]; then
+    candidates+=(
+      "$LESSON_ROOT/lesson/LESSON_CONFIG_14_DAYS.tsv"
+      "$LESSON_ROOT/lesson/LESSON_CONFIG.tsv"
+    )
+  fi
+
+  local seen=""
+  for config in "${candidates[@]}"; do
+    [[ -n "$config" ]] || continue
+    case "$seen" in
+      *"|$config|"*) continue ;;
+    esac
+    seen="${seen}|${config}|"
+    printf '%s\n' "$config"
+  done
+}
+
+lesson_menu_latest_setting_file() {
+  local setting="$1"
+  local config file stamp best_file="" best_stamp=-1
+
+  while IFS= read -r config; do
+    file="$(lesson_setting_file_from_config "$config" "$setting")"
+    if lesson_setting_file_has_value "$setting" "$file"; then
+      stamp="$(stat -c '%Y' "$file" 2>/dev/null || printf '0')"
+      if [[ -z "$best_file" || "$stamp" -gt "$best_stamp" ]]; then
+        best_file="$file"
+        best_stamp="$stamp"
+      fi
+    fi
+  done < <(lesson_menu_candidate_configs)
+
+  [[ -n "$best_file" ]] || return 1
+  printf '%s' "$best_file"
+}
+
+lesson_setting_value_from_file() {
+  local setting="$1"
+  local file="$2"
+  case "$setting" in
+    learning_mode)
+      awk -F '\t' '$1 !~ /^#/ && $2 ~ /^[ABC]$/ { printf "%s (%s)", $2, $3; found=1; exit } END { exit found ? 0 : 1 }' "$file"
+      ;;
+    workflow_language|product_language)
+      awk -F '\t' '$1 !~ /^#/ && $2 != "" && $3 != "" { printf "%s (%s)", $2, $3; found=1; exit } END { exit found ? 0 : 1 }' "$file"
+      ;;
+    *)
+      printf 'unknown setting: %s\n' "$setting" >&2
+      exit 1
+      ;;
+  esac
+}
+
+lesson_menu_setting_label() {
+  case "$1" in
+    learning_mode) printf 'Learning mode' ;;
+    workflow_language) printf 'Workflow display language' ;;
+    product_language) printf 'Product development language' ;;
+    *) printf '%s' "$1" ;;
+  esac
+}
+
+lesson_menu_print_setting_status() {
+  local setting="$1"
+  local file value
+  if file="$(lesson_menu_latest_setting_file "$setting")"; then
+    value="$(lesson_setting_value_from_file "$setting" "$file")"
+    printf '%s: ready - %s\n' "$(lesson_menu_setting_label "$setting")" "$value"
+  else
+    printf '%s: missing\n' "$(lesson_menu_setting_label "$setting")"
+  fi
+}
+
+lesson_menu_require_settings() {
+  local context="$1"
+  local missing=0
+
+  if ! lesson_menu_latest_setting_file learning_mode >/dev/null; then
+    printf 'missing menu prerequisite for %s: learning mode\n' "$context" >&2
+    printf 'Run: ./tools/lesson 学習モード <A|B|C>\n' >&2
+    printf 'Or:  ./tools/lesson14 学習モード <A|B|C>\n' >&2
+    missing=1
+  fi
+  if ! lesson_menu_latest_setting_file workflow_language >/dev/null; then
+    printf 'missing menu prerequisite for %s: workflow display language\n' "$context" >&2
+    printf 'Run: ./tools/lesson 表示言語 <%s>\n' "$(lesson_supported_language_codes)" >&2
+    printf 'Or:  ./tools/lesson14 表示言語 <%s>\n' "$(lesson_supported_language_codes)" >&2
+    missing=1
+  fi
+  if ! lesson_menu_latest_setting_file product_language >/dev/null; then
+    printf 'missing menu prerequisite for %s: product development language\n' "$context" >&2
+    printf 'Run: ./tools/lesson 開発言語 <%s>\n' "$(lesson_supported_language_codes)" >&2
+    printf 'Or:  ./tools/lesson14 開発言語 <%s>\n' "$(lesson_supported_language_codes)" >&2
+    missing=1
+  fi
+
+  [[ "$missing" -eq 0 ]] || exit 1
+}
+
+lesson_menu_require_config_settings() {
+  local context="$1"
+  local config_file="$2"
+  local missing=0
+  local mode_file workflow_file product_file
+  mode_file="$(lesson_setting_file_from_config "$config_file" learning_mode)"
+  workflow_file="$(lesson_setting_file_from_config "$config_file" workflow_language)"
+  product_file="$(lesson_setting_file_from_config "$config_file" product_language)"
+
+  if ! lesson_learning_mode_file_has_value "$mode_file"; then
+    printf 'missing menu prerequisite for %s: learning mode\n' "$context" >&2
+    missing=1
+  fi
+  if ! lesson_language_file_has_value "$workflow_file"; then
+    printf 'missing menu prerequisite for %s: workflow display language\n' "$context" >&2
+    missing=1
+  fi
+  if ! lesson_language_file_has_value "$product_file"; then
+    printf 'missing menu prerequisite for %s: product development language\n' "$context" >&2
+    missing=1
+  fi
+
+  [[ "$missing" -eq 0 ]] || exit 1
+}
+
+lesson_menu_print_readiness() {
+  local context="$1"
+  printf 'Menu prerequisite readiness: %s\n' "$context"
+  lesson_menu_print_setting_status learning_mode
+  lesson_menu_print_setting_status workflow_language
+  lesson_menu_print_setting_status product_language
+  printf 'Learner approval: required before start\n'
+}
+
+lesson_menu_require_start_approval() {
+  local context="$1"
+  local confirm="${2:-}"
+  if [[ "$confirm" != "--confirm" ]]; then
+    printf 'learner approval is required before starting %s.\n' "$context" >&2
+    printf 'Run the start command again with --confirm after the learner approves.\n' >&2
+    exit 1
+  fi
+}

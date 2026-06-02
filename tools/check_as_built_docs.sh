@@ -65,6 +65,9 @@ if [[ $missing -eq 0 ]]; then
     'tradeoff|trade-off' \
     'lesson repository test|test_lesson_repository' \
     'product-gate|product gate|test_product_gate_tools' \
+    'menu prerequisite|Menu Prerequisite|menu items 1 through 6' \
+    'product-improvement|Product Improvement|product improvement' \
+    '応用レッスン' \
     'production operations test|test_production_operations'
   do
     if ! grep -Eiq "$topic" "$combined"; then
@@ -107,7 +110,10 @@ if [[ $missing -eq 0 ]]; then
     'external-integration|External Integration|external integration' \
     'Playwright' \
     'pre-commit|CI' \
-    'failure-path|failure path'
+    'failure-path|failure path' \
+    'menu prerequisite|Menu Prerequisite|menu items 1 through 6' \
+    'product-improvement|Product Improvement|product improvement' \
+    '応用レッスン'
   do
     for doc in "${required_docs[@]}"; do
       if ! grep -Eiq "$topic" "$doc"; then

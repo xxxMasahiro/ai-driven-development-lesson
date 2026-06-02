@@ -27,8 +27,14 @@ jobs:
           bash -n tools/check_developer_memory_requirements.sh
           bash -n tools/test_lesson_playwright.sh
           bash -n tools/test_lesson.sh
+          bash -n tools/test_menu_prerequisites.sh
           bash -n tools/test_product_gate_tools.sh
           bash -n tools/test_lesson_repository.sh
+          bash -n tools/menu
+          bash -n tools/free-development
+          bash -n tools/team-development
+          bash -n tools/external-integration
+          bash -n tools/product-improvement
           bash -n tools/lesson
           bash -n tools/learn
 
@@ -80,6 +86,9 @@ jobs:
 
       - name: 7-day lesson CLI regression
         run: ./tools/test_lesson.sh
+
+      - name: Menu prerequisite regression
+        run: ./tools/test_menu_prerequisites.sh
 
       - name: Lesson aggregate test
         run: ./tools/test_lesson_repository.sh

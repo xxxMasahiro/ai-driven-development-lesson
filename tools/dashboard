@@ -193,6 +193,9 @@ show_illustrations() {
 show_menu() {
   print_section 'Menu'
   "$ROOT/tools/menu"
+  printf '\nMenu Readiness\n'
+  printf '==============\n'
+  "$ROOT/tools/menu" readiness
 }
 
 case "${1:-all}" in

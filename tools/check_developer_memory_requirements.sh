@@ -93,7 +93,14 @@ require_pattern "prompts/PROMPTS_14_DAYS.md" 'Googleカレンダー|Google Calen
 require_file "tools/menu"
 require_pattern "tools/menu" '【学ぶ】' "menu learning group"
 require_pattern "tools/menu" '【作る・発展させる】' "menu build and extend group"
+require_pattern "tools/menu" '3\. 応用レッスン' "renamed applied lesson menu item"
 require_pattern "tools/menu" '自由開発で作る → 成果物を改善する → 外部連携で発展させる' "menu progression"
+require_pattern "tools/menu" 'tools/menu check <1\|2\|3\|4\|5\|6>' "menu prerequisite check command"
+require_pattern "tools/menu" 'lesson_menu_require_start_approval' "menu start approval enforcement"
+if grep -Eq '3\. 発展・応用レッスン' "$ROOT/tools/menu"; then
+  printf 'old menu label remains in tools/menu\n' >&2
+  missing=1
+fi
 require_pattern "README.md" './tools/menu' "README menu command"
 require_pattern "AGENTS.MD" 'メニュー' "AGENTS menu routing"
 
@@ -116,8 +123,12 @@ require_pattern "tools/test_lesson_repository.sh" 'Lesson repository test passed
 require_file "tools/test_product_gate_tools.sh"
 require_pattern "tools/test_product_gate_tools.sh" 'Product gate tool tests passed' "product gate tool tests"
 require_pattern "tools/test_product_gate_tools.sh" 'missing external-integration scope document' "external integration scope failure test"
+require_file "tools/test_menu_prerequisites.sh"
+require_pattern "tools/test_menu_prerequisites.sh" 'Menu prerequisite tests passed' "menu prerequisite tests"
+require_pattern "tools/test_menu_prerequisites.sh" '3\\. 応用レッスン' "menu label regression test"
 require_pattern ".githooks/pre-commit" 'test_lesson_repository\.sh' "pre-commit aggregate test"
 require_pattern ".githooks/pre-commit" 'test_product_gate_tools\.sh' "pre-commit product gate test"
+require_pattern ".githooks/pre-commit" 'test_menu_prerequisites\.sh' "pre-commit menu prerequisite test"
 require_pattern ".githooks/pre-commit" 'test_lesson_playwright\.sh' "pre-commit Playwright test"
 require_file "tools/check_as_built_docs.sh"
 require_pattern "tools/check_as_built_docs.sh" 'As-built docs check passed' "as-built docs check"
@@ -135,7 +146,12 @@ require_pattern "free-development/FREE_DEVELOPMENT_MODE.md" 'Programming languag
 require_pattern "free-development/FREE_DEVELOPMENT_MODE.md" 'Payment systems' "free development payment choice"
 require_pattern "free-development/FREE_DEVELOPMENT_MODE.md" 'Databases' "free development database choice"
 require_pattern "tools/free-development" 'Free Development Mode gate passed' "free development gate"
+require_pattern "tools/free-development" 'lesson_menu_require_settings' "free development prerequisite gate"
+require_file "tools/product-improvement"
+require_pattern "tools/product-improvement" 'Product Improvement gate passed' "product improvement gate"
+require_pattern "tools/product-improvement" 'lesson_menu_require_settings' "product improvement prerequisite gate"
 require_pattern "tools/external-integration" 'missing external-integration scope document' "external integration scope docs gate"
+require_pattern "tools/external-integration" 'lesson_menu_require_settings' "external integration prerequisite gate"
 require_file "advanced/TEAM_DEVELOPMENT_DOCKER.md"
 require_file "advanced/DOCKER_PATHS.md"
 require_pattern "advanced/TEAM_DEVELOPMENT_DOCKER.md" 'Team Development and Docker' "team Docker guide"
@@ -145,6 +161,7 @@ require_pattern "advanced/TEAM_DEVELOPMENT_DOCKER.md" 'Sub-Agent Roles' "team su
 require_pattern "advanced/DOCKER_PATHS.md" 'Docker Not Installed' "Docker no-install path"
 require_pattern "advanced/DOCKER_PATHS.md" 'Docker Installed' "Docker installed path"
 require_pattern "tools/team-development" 'Team Development and Docker gate passed' "team Docker gate"
+require_pattern "tools/team-development" 'lesson_menu_require_settings' "team development prerequisite gate"
 
 if [[ $missing -ne 0 ]]; then
   printf '\nDeveloper memory requirements check failed.\n' >&2

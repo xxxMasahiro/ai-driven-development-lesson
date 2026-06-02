@@ -32,6 +32,11 @@
 23. Expand supported standard language choices to `ja`, `en`, `ko`, `zh-CN`, `zh-TW`, `es`, `pt-BR`, `fr`, `de`, `id`, `vi`, `th`, `hi`, and `ar`, while preserving `zh` as a `zh-CN` alias and keeping `custom` values available.
 24. Add `tools/test_lesson.sh` for 7-day setup gating and setting regression coverage.
 25. Preserve existing behavior while keeping additions refactorable, reusable, ecosystem-friendly, and general.
+26. Implement menu prerequisite control for menu items 1 through 6.
+27. Rename learner-facing menu item 3 to `3. 応用レッスン`.
+28. Add `tools/product-improvement status|start|gate`.
+29. Add dashboard readiness output for menu items 1 through 6.
+30. Add `tools/test_menu_prerequisites.sh` and wire it into aggregate tests, CI, and pre-commit.
 
 ## Implemented Remediation Plan
 
@@ -127,6 +132,112 @@ It is additive and must not trade away existing 7-day lessons, 14-step lessons, 
     - Add Docker installed/not-installed path tests.
     - Add status/start output tests.
 
+## Implemented Menu Prerequisite Implementation
+
+This additive implementation is synchronized across `docs/as-built/REQUIREMENTS.md`, `docs/as-built/SPECIFICATION.md`, `docs/as-built/IMPLEMENTATION_PLAN.md`, `docs/workflow/TASK_TRACKER.md`, and `docs/workflow/HANDOFF.md`.
+It preserves existing features without tradeoffs and follows the repository quality constraints for refactorability, ecosystem fit, reusability, and generality.
+
+1. Rename the learner-facing menu item.
+   - Change `3. 発展・応用レッスン` to `3. 応用レッスン`.
+   - Keep the existing Team Development and Docker entry available through the renamed applied-learning item.
+   - Add a check that prevents the old learner-facing label from returning.
+
+2. Define one prerequisite model for menu items 1 through 6.
+   - Require learning mode.
+   - Require workflow display language.
+   - Require product development language.
+   - Require repository context and boundary confirmation where the item touches a product repository.
+   - Require learner approval before start.
+
+3. Reuse existing structured-lesson settings.
+   - Keep 7-day settings stored in the current 7-day state files.
+   - Keep 14-day settings stored in the current 14-day state files.
+   - Preserve the expanded standard language list, `zh` compatibility alias, and `custom` flexibility.
+
+4. Add a shared settings and prerequisite layer.
+   - Add shared reusable helper functions in `tools/lib/lesson_common.sh`.
+   - Provide a shared settings view for applied-learning, Free Development Mode, product improvement, and external integration.
+   - Inherit the latest configured 7-day or 14-day settings when available.
+   - Fail start/gate/check commands with learner-friendly guidance when required settings are missing.
+
+5. Preserve discoverability.
+   - Keep `status` commands non-blocking so learners can inspect menu items before configuring everything.
+   - Enforce prerequisites in start, gate, or explicit menu-check commands.
+
+6. Add or formalize product improvement control.
+   - Add `tools/product-improvement status|start|gate`, or an equivalent reusable product-improvement gate.
+   - Treat product improvement as the bridge between Free Development Mode and external integration.
+   - Require product development language for product-facing edits.
+
+7. Expand dashboard readiness.
+   - Show readiness for menu items 1 through 6.
+   - Include learning mode, workflow display language, product development language, repository context, approval status, and next recommended action.
+   - Preserve existing lesson, development, developer-memory, and illustration dashboard information.
+
+8. Synchronize documentation and checks.
+   - Update the five planning/workflow documents.
+   - Update developer memory, README/menu guidance, AGENTS routing, and related checks.
+   - Keep unrelated existing content unchanged.
+
+9. Verify with tests.
+   - Run existing lesson and repository checks.
+   - Add targeted tests for the renamed menu label and missing-prerequisite failure paths.
+   - Confirm existing 7-day and 14-day flows still pass.
+   - Confirm Free Development Mode, Team Development, external integration, dashboard, and product gates remain available.
+
+## Planned Documentation Map Implementation Plan
+
+This is the next additive implementation plan.
+It must be completed only after the plan is synchronized across `docs/as-built/REQUIREMENTS.md`, `docs/as-built/SPECIFICATION.md`, `docs/as-built/IMPLEMENTATION_PLAN.md`, `docs/workflow/TASK_TRACKER.md`, and `docs/workflow/HANDOFF.md`.
+It must preserve existing features without tradeoffs and must follow the repository quality constraints for refactorability, ecosystem fit, reusability, and generality.
+
+1. Add a learner-facing documentation map guide.
+   - Create `guides/DOCUMENT_MAP.md`.
+   - Explain rules/routing, design/as-built, workflow state, memory/decisions, and skills as separate categories.
+   - Use non-engineer-friendly explanations while keeping repository source text in English.
+
+2. Explain the agent rule and routing layer.
+   - Explain `AGENTS.MD` as the lesson-side rulebook for agents.
+   - Cover invariant rules, document root, routing table, and repo-local skills.
+   - Explicitly distinguish `AGENTS.MD` from product-side `AGENT.md`.
+
+3. Explain design, workflow, and memory documents.
+   - Explain `docs/as-built/REQUIREMENTS.md`, `docs/as-built/SPECIFICATION.md`, and `docs/as-built/IMPLEMENTATION_PLAN.md`.
+   - Explain `docs/workflow/TASK_TRACKER.md` and `docs/workflow/HANDOFF.md` as a synchronized pair.
+   - Explain `docs/memory/DEVELOPER_MEMORY.md`.
+   - Explain product-side `FAILURE_MEMORY.md` and failure-recovery records without implying a lesson-side `docs/memory/FAILURE_MEMORY.md` exists.
+
+4. Add a CLI tour command.
+   - Add `tools/docs-tour`.
+   - Support `status`, `rules`, `design`, `workflow`, `memory`, `skills`, and `all`.
+   - Adapt explanation depth to learning modes A/B/C.
+
+5. Add a dashboard docs view.
+   - Add `./tools/dashboard docs`.
+   - Include the docs view in `./tools/dashboard all`.
+   - Show categories, key files, current workflow relevance, workflow-pair sync, as-built sync, and next recommended document action.
+
+6. Add copy-paste prompt examples.
+   - Add document-understanding prompts to the appropriate prompt files or a dedicated prompt section.
+   - Include prompts for explaining `TASK_TRACKER`/`HANDOFF` and the as-built trio in learner-friendly language.
+
+7. Add early lesson guidance.
+   - Add non-disruptive guidance to 7-day and 14-day lesson materials so learners encounter the document map before document-heavy work.
+   - Preserve ordered lesson progression and approval gates.
+
+8. Add mechanical validation.
+   - Add `tools/test_docs_tour.sh`.
+   - Update structure checks, as-built checks, developer-memory checks, dashboard tests, aggregate tests, CI, and pre-commit as needed.
+   - Ensure checks fail if `guides/DOCUMENT_MAP.md`, `tools/docs-tour`, `dashboard docs`, prompt examples, or the synchronized planning/workflow entries are missing.
+   - At this planning-synchronization stage, `guides/DOCUMENT_MAP.md`, `tools/docs-tour`, `tools/test_docs_tour.sh`, and `./tools/dashboard docs` are planned artifacts and are not yet expected to exist in runtime.
+   - Implementation completion will require validation wiring through `tools/test_docs_tour.sh`, structure checks, as-built checks, developer-memory checks, dashboard or Playwright tests, aggregate tests, CI, and pre-commit.
+   - The validation suite must preserve existing 7-day, 14-day, menu, dashboard, Free Development, Product Improvement, external-integration, product-gate, Playwright, CI, and pre-commit behavior.
+
+9. Verify with existing and new tests.
+   - Run the existing lesson-side verification sequence.
+   - Run the new docs-tour test.
+   - Confirm existing 7-day, 14-day, menu, dashboard, free-development, product-improvement, external-integration, product-gate, Playwright, CI, and pre-commit behavior remains available.
+
 ## Verification Plan
 
 Run:
@@ -142,6 +253,7 @@ Run:
 ./tools/menu
 ./tools/dashboard all
 ./tools/illustrations list
+./tools/test_menu_prerequisites.sh
 ./tools/test_lesson_start_position.sh
 ./tools/test_lesson.sh
 ./tools/test_lesson14.sh

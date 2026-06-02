@@ -62,7 +62,7 @@ Approved menu structure:
 2. 14日間レッスン
    GitHub、CI、E2E、PR、サブエージェント、スキル、MCPまで学ぶ
 
-3. 発展・応用レッスン
+3. 応用レッスン
    Docker、git worktree、チーム開発、より実務的な検証を学ぶ
 
 【作る・発展させる】
@@ -677,7 +677,7 @@ Developer feedback:
 - Current candidate items are useful but need clearer organization:
   - `7日間レッスン`
   - `14日間レッスン`
-  - `発展・応用レッスン`
+  - `応用レッスン`
   - `自由開発`
   - `外部連携`
   - `成果物を改善`
@@ -697,6 +697,15 @@ Developer refinement:
   - `自由開発`: first build your own product.
   - `外部連携`: then extend the product by connecting it to external tools.
 - This relationship should not prevent learners from entering external integration directly when they already have an existing product repository.
+
+Implementation refinement:
+
+- Menu item 3 is named `応用レッスン`.
+- Menu items 1 through 6 share pre-start prerequisites: learning mode, workflow display language, product development language, relevant repository boundary, and learner approval.
+- `status` remains non-blocking for discovery, while `start`, `gate`, and `check` enforce prerequisites.
+- `成果物を改善` has a mechanical CLI entry through `tools/product-improvement status|start|gate`.
+- Dashboard output shows readiness for menu items 1 through 6.
+- `tools/test_menu_prerequisites.sh` covers the renamed label, old-label absence, missing prerequisites, start approval, and menu readiness.
 
 ### 2026-06-02: Operation Test Audit - Unfinished Developer Memory Requirements
 

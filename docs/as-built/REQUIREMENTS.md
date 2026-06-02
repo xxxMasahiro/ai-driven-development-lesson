@@ -61,6 +61,54 @@ The repository must keep the following remediation behavior active without tradi
 - Wire the strengthened checks, product-gate tests, Playwright checks, and aggregate tests into CI and pre-commit without removing existing checks.
 - Add failure-path tests for Free Development and Team Development gates.
 
+## Implemented Menu Prerequisite Requirements
+
+Menu prerequisite control is implemented additively and does not trade away any existing 7-day lesson, 14-day lesson, Free Development Mode, Team Development/Docker module, external-integration path, dashboard, checks, or repository-boundary behavior.
+
+- The learner-facing menu item is named `3. 応用レッスン`.
+- Keep the advanced/team-development/Docker behavior available under the renamed applied-learning menu item.
+- Require the same pre-start settings for menu items 1 through 6:
+  - learning mode,
+  - workflow display language,
+  - product development language,
+  - relevant repository context and boundary confirmation,
+  - learner approval before starting.
+- Reuse the 7-day and 14-day language and learning-mode settings where they already exist.
+- For applied-learning, Free Development Mode, product improvement, and external integration, inherit the latest configured structured-lesson settings when available; otherwise require the learner to select them before start or gate passage.
+- Keep product development language mandatory for any product-side work, including Free Development Mode, product improvement, and external integration.
+- Use shared prerequisite logic rather than duplicating menu-specific shell branches.
+- Preserve `status` commands as non-blocking discovery commands; enforce prerequisites through start, gate, or explicit menu-check commands.
+- Provide a mechanically checkable entry for `5. 成果物を改善` through `tools/product-improvement status|start|gate`.
+- Expand dashboard readiness output so menu items 1 through 6 show whether learning mode, workflow display language, product development language, repository context, and approval are ready.
+- Keep requirements, specification, implementation plan, task tracker, handoff, developer memory, README/menu guidance, and relevant checks synchronized with this runtime behavior.
+- Add tests that positively confirm the renamed menu label `3. 応用レッスン` appears.
+- Add tests that fail if the old menu label returns, if menu items 1 through 6 can start without required settings, if missing-prerequisite failure paths are not enforced, or if existing 7-day/14-day behavior regresses.
+
+## Planned Documentation Map Requirements
+
+The next lesson-improvement plan must explain the repository's many rule, routing, skill, design, workflow, and memory documents in language that non-engineer learners can understand.
+This planned work is additive and must not trade away any existing 7-day lesson, 14-day lesson, menu, dashboard, checks, document synchronization, skills, memory workflow, or repository-boundary behavior.
+
+- Add a learner-facing documentation map guide, planned as `guides/DOCUMENT_MAP.md`.
+- Explain `AGENTS.MD` as the lesson repository's agent rulebook, including invariant rules, document root, routing table, and repo-local skills.
+- Clearly distinguish lesson-side `AGENTS.MD` from product-side `AGENT.md`.
+- Explain `docs/as-built/` as the design/as-built area for requirements, specification, and implementation plan.
+- Explain `docs/workflow/` as the work-state area for task tracking and handoff.
+- Explain `docs/memory/` as the memory/decision area, currently including `docs/memory/DEVELOPER_MEMORY.md`.
+- Explain failure memory as product-side `FAILURE_MEMORY.md` or failure-recovery records where the lesson uses them, without falsely claiming that a lesson-side `docs/memory/FAILURE_MEMORY.md` file exists.
+- Explain `skills/*/SKILL.md` as reusable agent procedures, not learner homework.
+- Add a CLI tour command, planned as `tools/docs-tour`, with sections for rules, design, workflow, memory, skills, and all documents.
+- Make the tour adapt to learning modes A/B/C so detailed learners get context, moderate learners get concise explanations, and workflow-only learners get file names and purposes.
+- Add `./tools/dashboard docs` and include the docs view in `./tools/dashboard all`.
+- Show document categories, each document's purpose, relevant current workflow documents, `TASK_TRACKER`/`HANDOFF` pair status, and as-built synchronization status.
+- Add copy-paste prompt examples that ask an agent to explain current progress and next actions from `docs/workflow/TASK_TRACKER.md` and `docs/workflow/HANDOFF.md` in learner-friendly terms.
+- Add early-lesson guidance for both 7-day and 14-day flows so learners understand why the documents exist before being asked to use them.
+- Keep repository source documents in English while allowing lesson/runtime explanations to follow the selected workflow display language.
+- Add mechanical checks, planned as `tools/test_docs_tour.sh` and updates to existing structure/as-built/developer-memory checks, so the documentation-map guide, tour command, dashboard docs view, prompt examples, and synchronization are testable.
+- At this planning-synchronization stage, `guides/DOCUMENT_MAP.md`, `tools/docs-tour`, `tools/test_docs_tour.sh`, and `./tools/dashboard docs` are planned artifacts and are not yet required to exist.
+- Implementation completion will require validation wiring through `tools/test_docs_tour.sh`, structure checks, as-built checks, developer-memory checks, dashboard or Playwright tests, aggregate tests, CI, and pre-commit.
+- Implementation verification must preserve existing 7-day, 14-day, menu, dashboard, Free Development, Product Improvement, external-integration, product-gate, Playwright, CI, and pre-commit behavior.
+
 ## Mechanical Enforcement
 
 - 14-day progression requires approval receipts through `tools/lesson14 承認`.
@@ -76,6 +124,8 @@ The repository must keep the following remediation behavior active without tradi
 - Real product operations are checked by `tools/test_production_operations.sh` only when an external product repository exists.
 - Free Development Mode is gated by `tools/free-development gate`.
 - Team Development and Docker is gated by `tools/team-development gate`.
+- Product Improvement is gated by `tools/product-improvement gate`.
+- Menu prerequisites are checked by `tools/menu check <1|2|3|4|5|6>` and `tools/test_menu_prerequisites.sh`.
 - The learner-facing menu is checked by `tools/menu` and developer-memory requirement checks.
 - Dashboard and illustration entry points are checked by structure and developer-memory requirement checks.
 - Remediation remains complete only while the audit items above are implemented, synchronized into these as-built documents, and covered by mechanical checks that fail when the requirement is missing.
