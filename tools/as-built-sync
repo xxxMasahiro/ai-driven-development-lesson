@@ -1,0 +1,158 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=tools/lib/lesson_common.sh
+source "$SCRIPT_DIR/lib/lesson_common.sh"
+
+ROOT="${AS_BUILT_SYNC_ROOT:-$LESSON_ROOT}"
+CONTRACT_FILE="${AS_BUILT_SYNC_CONTRACT_FILE:-$ROOT/docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv}"
+
+wiring_relpaths=(
+  "tools/test_lesson_repository.sh"
+  ".githooks/pre-commit"
+  ".github/workflows/ci.yml"
+  ".github/workflows/lesson14-ci.yml"
+)
+
+usage() {
+  cat <<'EOF'
+Usage:
+  ./tools/as-built-sync status
+EOF
+}
+
+trim() {
+  local value="$1"
+  value="${value#"${value%%[![:space:]]*}"}"
+  value="${value%"${value##*[![:space:]]}"}"
+  printf '%s' "$value"
+}
+
+list_file_status() {
+  local list="$1"
+  local label="$2"
+  local item total present
+  total=0
+  present=0
+  IFS=',' read -r -a items <<<"$list"
+  for item in "${items[@]}"; do
+    item="$(trim "$item")"
+    [[ -n "$item" ]] || continue
+    total=$((total + 1))
+    if [[ -f "$ROOT/$item" ]]; then
+      present=$((present + 1))
+    fi
+  done
+  printf '%s: %s/%s present\n' "$label" "$present" "$total"
+}
+
+doc_block_status() {
+  local list="$1"
+  local sync_id="$2"
+  local item total present
+  total=0
+  present=0
+  IFS=',' read -r -a items <<<"$list"
+  for item in "${items[@]}"; do
+    item="$(trim "$item")"
+    [[ -n "$item" ]] || continue
+    total=$((total + 1))
+    if [[ -f "$ROOT/$item" ]] && [[ "$(grep -Ec "^SYNC-ID: ${sync_id}$" "$ROOT/$item" || true)" -eq 1 ]]; then
+      present=$((present + 1))
+    fi
+  done
+  printf 'Document blocks: %s/%s present\n' "$present" "$total"
+}
+
+active_command_reference() {
+  local file="$1"
+  local test_relpath="$2"
+  local line command
+
+  while IFS= read -r line; do
+    line="$(trim "$line")"
+    [[ -n "$line" ]] || continue
+    [[ "$line" != \#* ]] || continue
+
+    if [[ "$line" == run:* ]]; then
+      line="$(trim "${line#run:}")"
+    fi
+
+    while [[ "$line" =~ ^[A-Za-z_][A-Za-z0-9_]*=[^[:space:]]+[[:space:]]+ ]]; do
+      line="${line#* }"
+      line="$(trim "$line")"
+    done
+
+    command="${line%%[[:space:]]*}"
+    command="${command%\"}"
+    command="${command#\"}"
+
+    if [[ "$command" == "./$test_relpath" || "$command" == "\$ROOT/$test_relpath" || "$command" == "$ROOT/$test_relpath" ]]; then
+      return 0
+    fi
+  done <"$file"
+
+  return 1
+}
+
+test_wiring_status() {
+  local tests="$1"
+  local test_relpath wiring_relpath total present
+  total=0
+  present=0
+  IFS=',' read -r -a test_items <<<"$tests"
+  for test_relpath in "${test_items[@]}"; do
+    test_relpath="$(trim "$test_relpath")"
+    [[ -n "$test_relpath" && "$test_relpath" != "none" ]] || continue
+    for wiring_relpath in "${wiring_relpaths[@]}"; do
+      total=$((total + 1))
+      if [[ -f "$ROOT/$wiring_relpath" ]] && active_command_reference "$ROOT/$wiring_relpath" "$test_relpath"; then
+        present=$((present + 1))
+      fi
+    done
+  done
+  printf 'Active test wiring: %s/%s present\n' "$present" "$total"
+}
+
+show_status() {
+  if [[ ! -f "$CONTRACT_FILE" ]]; then
+    printf 'As-built sync contract missing: %s\n' "$CONTRACT_FILE" >&2
+    exit 1
+  fi
+
+  printf 'As-Built Sync Status\n'
+  printf 'Contract: %s\n\n' "$CONTRACT_FILE"
+
+  while IFS=$'\t' read -r sync_id status title artifacts tests docs runtime_evidence extra; do
+    if [[ -z "${sync_id:-}" || "$sync_id" == \#* ]]; then
+      continue
+    fi
+    printf 'SYNC-ID: %s\n' "$sync_id"
+    printf 'Status: %s\n' "$status"
+    printf 'Title: %s\n' "$title"
+    list_file_status "$docs" "Document files"
+    doc_block_status "$docs" "$sync_id"
+    list_file_status "$artifacts" "Artifacts"
+    list_file_status "$tests" "Tests"
+    test_wiring_status "$tests"
+    list_file_status "$runtime_evidence" "Runtime evidence"
+    printf '\n'
+  done <"$CONTRACT_FILE"
+
+  "$SCRIPT_DIR/check_as_built_sync_contract.sh"
+}
+
+case "${1:-status}" in
+  status|現在地)
+    show_status
+    ;;
+  -h|--help|help)
+    usage
+    ;;
+  *)
+    printf 'unknown command: %s\n' "$1" >&2
+    usage >&2
+    exit 1
+    ;;
+esac

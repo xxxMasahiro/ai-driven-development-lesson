@@ -22,7 +22,9 @@
 18. Add `tools/list_non_english_docs.sh` for translation audit support.
 19. Add `tools/test_lesson_repository.sh` as the lesson-side aggregate test.
 20. Add learner-facing menu, dashboard, and illustration review entry points.
-21. Synchronize as-built lesson documentation in:
+21. Add safe product repository cleanup for the external product repository created by the structured lessons.
+22. Add the as-built sync contract, validator, status command, and regression tests for the three design/as-built documents plus `TASK_TRACKER.md` and `HANDOFF.md`.
+23. Synchronize as-built lesson documentation in:
     - `docs/as-built/REQUIREMENTS.md`
     - `docs/as-built/SPECIFICATION.md`
     - `docs/as-built/IMPLEMENTATION_PLAN.md`
@@ -304,6 +306,89 @@ It preserves existing features without tradeoffs and follows the repository qual
    - Confirm `CI` and `Lesson14 CI` succeed for the pushed commit.
    - Confirm local HEAD, `origin/main`, and the CI target SHA match.
 
+## Implemented As-Built Sync Contract Implementation Plan
+
+This additive implementation strengthens mechanical enforcement across the three design/as-built documents and the two workflow-state documents.
+It preserves existing checks and does not trade away any current 7-day, 14-day, menu, dashboard, documentation-map, product-gate, product-repository cleanup, CI, pre-commit, or developer-memory behavior.
+
+1. Add a synchronization contract file.
+   - Added `docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv`.
+   - Record each synchronized improvement with `sync_id`, `status`, `title`, `required_artifacts`, `required_tests`, `required_docs`, and `runtime_evidence`.
+   - Keep the format simple enough for shell-based checks and future dashboard reuse.
+
+2. Add matching sync blocks to the five synchronized documents.
+   - Added `SYNC-ID`, `STATUS`, `ARTIFACTS`, and `TESTS` blocks to `docs/as-built/REQUIREMENTS.md`.
+   - Added the same blocks to `docs/as-built/SPECIFICATION.md`.
+   - Added the same blocks to `docs/as-built/IMPLEMENTATION_PLAN.md`.
+   - Added the same blocks to `docs/workflow/TASK_TRACKER.md`.
+   - Added the same blocks to `docs/workflow/HANDOFF.md`.
+   - Preserved existing headings and narrative content; added contract metadata without deleting unrelated content.
+
+3. Add a dedicated contract validator.
+   - Added `tools/check_as_built_sync_contract.sh`.
+   - Validate that every contract `sync_id` exists in all five documents.
+   - Validate that no synchronized document contains a `SYNC-ID` block missing from the contract.
+   - Validate that all five documents use the same `STATUS` for each `sync_id`.
+   - Validate that document `ARTIFACTS` and `TESTS` blocks exactly match the contract without extra or missing entries.
+   - Validate that required artifacts and required tests exist in the repository.
+   - Validate that runtime evidence files exist and reference the sync ID, one of its artifacts, or one of its tests.
+   - Validate that implemented sync IDs have their required tests actively wired into aggregate tests, CI, and pre-commit.
+   - Fail if a `planned` status and an `implemented` status are mixed for the same `sync_id`.
+
+4. Preserve and extend existing checks.
+   - Call the validator from `tools/check_as_built_docs.sh`.
+   - Keep the current topic-based as-built checks as compatibility checks.
+   - Keep `tools/check_workflow_pair_sync.sh` active for `TASK_TRACKER.md` and `HANDOFF.md`.
+   - Do not replace existing checks with the new contract; make the contract an additional gate.
+
+5. Add a status helper for learners and agents.
+   - Added `tools/as-built-sync status`.
+   - Show all sync IDs, current status, five-document coverage, artifact presence, and test-wiring status.
+   - Keep output useful for both CLI learners and future dashboard reuse.
+
+6. Add regression tests.
+   - Added `tools/test_as_built_sync_contract.sh`.
+   - Test a fully synchronized contract.
+   - Test failure when one of the five documents lacks a sync block.
+   - Test failure when a synchronized document contains an unknown sync ID.
+   - Test failure when statuses are mixed across documents.
+   - Test failure when a document contains extra artifacts or tests not listed in the contract.
+   - Test failure when a required artifact is missing.
+   - Test failure when an implemented required test is only mentioned as inert text or is not actively wired into aggregate tests, CI, or pre-commit.
+
+7. Wire verification into existing gates after implementation.
+   - Added the new test to `tools/test_lesson_repository.sh`.
+   - Added the validator and test to `.githooks/pre-commit`.
+   - Added shell syntax and regression steps to `.github/workflows/ci.yml`.
+   - Added shell syntax and regression steps to `.github/workflows/lesson14-ci.yml`.
+   - Added `AGENTS.MD` routing and standard-check references for the sync-contract status and validator.
+   - Updated runtime checks only where they became enforcement.
+   - Run targeted checks, aggregate tests, pre-commit, and GitHub Actions before declaring implementation complete.
+
+## As-Built Sync Contract Records
+
+```text
+SYNC-ID: documentation_map
+STATUS: implemented
+ARTIFACTS: guides/DOCUMENT_MAP.md, tools/docs-tour, tools/test_docs_tour.sh
+TESTS: tools/test_docs_tour.sh
+
+SYNC-ID: menu_prerequisite_control
+STATUS: implemented
+ARTIFACTS: tools/menu, tools/test_menu_prerequisites.sh
+TESTS: tools/test_menu_prerequisites.sh
+
+SYNC-ID: product_repository_cleanup
+STATUS: implemented
+ARTIFACTS: tools/product-repository-cleanup, tools/test_product_repository_cleanup.sh
+TESTS: tools/test_product_repository_cleanup.sh
+
+SYNC-ID: as_built_sync_contract
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv, tools/check_as_built_sync_contract.sh, tools/as-built-sync, tools/test_as_built_sync_contract.sh
+TESTS: tools/check_as_built_sync_contract.sh, tools/test_as_built_sync_contract.sh
+```
+
 ## Verification Plan
 
 Run:
@@ -314,11 +399,14 @@ Run:
 ./tools/check_lesson14_sync.sh
 ./tools/check_agents_skills.sh
 ./tools/check_as_built_docs.sh
+./tools/check_as_built_sync_contract.sh
+./tools/as-built-sync status
 ./tools/check_review_protocol.sh
 ./tools/check_developer_memory_requirements.sh
 ./tools/menu
 ./tools/dashboard all
 ./tools/illustrations list
+./tools/test_as_built_sync_contract.sh
 ./tools/test_menu_prerequisites.sh
 ./tools/test_lesson_start_position.sh
 ./tools/test_lesson.sh

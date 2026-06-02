@@ -26,11 +26,13 @@ jobs:
           bash -n tools/check_ci_status.sh
           bash -n tools/check_agents_skills.sh
           bash -n tools/check_as_built_docs.sh
+          bash -n tools/check_as_built_sync_contract.sh
           bash -n tools/check_workflow_pair_sync.sh
           bash -n tools/check_review_protocol.sh
           bash -n tools/check_developer_memory_requirements.sh
           bash -n tools/test_lesson_playwright.sh
           bash -n tools/test_docs_tour.sh
+          bash -n tools/test_as_built_sync_contract.sh
           bash -n tools/test_lesson.sh
           bash -n tools/test_menu_prerequisites.sh
           bash -n tools/test_product_gate_tools.sh
@@ -39,6 +41,7 @@ jobs:
           bash -n tools/test_lesson_repository.sh
           bash -n tools/test_lesson14.sh
           bash -n tools/menu
+          bash -n tools/as-built-sync
           bash -n tools/docs-tour
           bash -n tools/free-development
           bash -n tools/team-development
@@ -52,6 +55,8 @@ jobs:
           ./tools/check_learner_display.sh
           ./tools/check_repository_boundary.sh
           ./tools/check_agents_skills.sh
+          ./tools/check_as_built_docs.sh
+          ./tools/check_as_built_sync_contract.sh
 
       - name: Lesson14 structure and sync
         run: |
@@ -66,6 +71,9 @@ jobs:
 
       - name: Product repository cleanup regression
         run: ./tools/test_product_repository_cleanup.sh
+
+      - name: As-built sync contract regression
+        run: ./tools/test_as_built_sync_contract.sh
 
       - name: Documentation tour regression
         run: ./tools/test_docs_tour.sh

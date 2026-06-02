@@ -11,13 +11,16 @@ cd "$ROOT"
 ./tools/check_lesson14_sync.sh
 ./tools/check_agents_skills.sh
 ./tools/check_as_built_docs.sh
+./tools/check_as_built_sync_contract.sh
 WORKFLOW_PAIR_SINGLE_FILE_REASON="aggregate test may run while remediation documents are being edited together" ./tools/check_workflow_pair_sync.sh
 ./tools/check_review_protocol.sh
 ./tools/check_developer_memory_requirements.sh
 ./tools/menu >/dev/null
 ./tools/dashboard all >/dev/null
+./tools/as-built-sync status >/dev/null
 ./tools/illustrations list >/dev/null
 ./tools/test_docs_tour.sh
+./tools/test_as_built_sync_contract.sh
 ./tools/product-improvement status >/dev/null
 ./tools/external-integration status >/dev/null
 ./tools/product-repository-cleanup status >/dev/null

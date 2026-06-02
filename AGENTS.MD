@@ -125,6 +125,7 @@
 | Git/CI同期を確認したい | `lesson/SYNC_GATES_14_DAYS.tsv` | `skills/lesson-sync-gate/SKILL.md` | `./tools/check_git_sync.sh --required`、`./tools/check_ci_status.sh --required` |
 | 成果物文書を作りたい | `templates/TEMPLATES.md` | `skills/task-tracker-docs/SKILL.md` | 境界確認後に更新案を提示 |
 | TASK_TRACKER/HANDOFFを同期したい | `ai-driven-task-tracker-scenario.md`、`lesson/SYNC_GATES_14_DAYS.tsv` | `skills/worklog-doc-sync/SKILL.md`、`skills/lesson-sync-gate/SKILL.md` | 更新案、同期チェック、通過 |
+| 3文書とTASK_TRACKER/HANDOFFの同期契約を確認したい | `docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv`、`docs/as-built/REQUIREMENTS.md`、`docs/as-built/SPECIFICATION.md`、`docs/as-built/IMPLEMENTATION_PLAN.md`、`docs/workflow/TASK_TRACKER.md`、`docs/workflow/HANDOFF.md` | なし | `./tools/as-built-sync status`、`./tools/check_as_built_sync_contract.sh` |
 | Playwright E2Eを扱う | `prompts/PROMPTS_14_DAYS.md` Step 10/14からStep 11/14 | `skills/lesson-sync-gate/SKILL.md` | ローカルE2E、CI、失敗復旧 |
 | サブエージェントで精査する | `playbooks/AGENT_PLAYBOOK_14_DAYS.md` Step 12/14 | `skills/lesson-sync-gate/SKILL.md` | レビュー、テスト、同期確認 |
 | スキル/MCPを体験する | `prompts/PROMPTS_14_DAYS.md` Step 13/14 | `skills/lesson14-facilitator/SKILL.md` | 最小構成で実施 |
@@ -157,7 +158,11 @@ skills/worklog-doc-sync/SKILL.md
 ./tools/check_lesson14_structure.sh
 ./tools/check_lesson14_sync.sh
 ./tools/check_agents_skills.sh
+./tools/check_as_built_docs.sh
+./tools/check_as_built_sync_contract.sh
+./tools/as-built-sync status
 ./tools/test_docs_tour.sh
+./tools/test_as_built_sync_contract.sh
 ./tools/test_product_repository_cleanup.sh
 ./tools/test_lesson14.sh
 ```

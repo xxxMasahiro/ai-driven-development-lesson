@@ -134,6 +134,58 @@ This implemented work is additive and does not trade away any existing 7-day les
 - Validation is wired through `tools/test_product_repository_cleanup.sh`, structure checks, as-built checks, developer-memory checks, aggregate tests, CI, and pre-commit.
 - Implementation verification preserves existing 7-day, 14-day, menu, dashboard, Free Development, Product Improvement, external-integration, product-gate, Playwright, docs-tour, CI, and pre-commit behavior.
 
+## Implemented As-Built Sync Contract Requirements
+
+The lesson repository strengthens mechanical enforcement for synchronization across the three design/as-built documents and the two workflow-state documents.
+This implemented work is additive and does not trade away any existing `tools/check_as_built_docs.sh`, `tools/check_workflow_pair_sync.sh`, lesson flow, dashboard, CI, pre-commit, docs-tour, product-gate, product-repository cleanup, or developer-memory requirement behavior.
+
+- `docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv` records each synchronized improvement as a stable row.
+- Each contract row must include a stable sync ID, status, title, required runtime artifacts, required tests, required document coverage, and runtime evidence where applicable.
+- Require matching `SYNC-ID`, `STATUS`, `ARTIFACTS`, and `TESTS` blocks in all five synchronized documents:
+  - `docs/as-built/REQUIREMENTS.md`,
+  - `docs/as-built/SPECIFICATION.md`,
+  - `docs/as-built/IMPLEMENTATION_PLAN.md`,
+  - `docs/workflow/TASK_TRACKER.md`,
+  - `docs/workflow/HANDOFF.md`.
+- `tools/check_as_built_sync_contract.sh` fails when a contract sync ID is missing from any of the five documents.
+- The check must fail when any of the five documents contains a `SYNC-ID` block that is absent from the contract.
+- The check must fail when one document marks a sync ID as `planned` while another marks the same sync ID as `implemented`.
+- The check must fail when document `ARTIFACTS` or `TESTS` blocks contain extra or missing entries compared with the contract.
+- The check must fail when required artifacts or required tests listed in the contract are missing from the repository.
+- The check must fail when runtime evidence files are missing or do not reference the sync ID, one of its artifacts, or one of its tests.
+- The check must fail when required tests are not actively wired into aggregate tests, CI, and pre-commit after a sync ID is marked `implemented`; comments or inert text mentions are not enough.
+- Keep the existing topic-based as-built check as a supporting compatibility check; do not remove or weaken it.
+- Keep the existing `TASK_TRACKER.md` and `HANDOFF.md` workflow-pair check active; extend coverage rather than replacing the pair rule.
+- `tools/as-built-sync status` shows sync IDs, five-document coverage, artifact presence, and test wiring status.
+- `AGENTS.MD` routes sync-contract questions to the contract file, the five synchronized documents, and the new status/check commands.
+- `tools/test_as_built_sync_contract.sh` covers complete synchronization, missing document blocks, unknown sync IDs, mixed planned/implemented status, extra artifacts/tests, missing artifacts, inert wiring, and missing active test wiring.
+- The sync-contract check and regression test are wired into `tools/check_as_built_docs.sh`, `tools/test_lesson_repository.sh`, `.githooks/pre-commit`, `.github/workflows/ci.yml`, and `.github/workflows/lesson14-ci.yml`.
+- Implementation must preserve refactorability, ecosystem fit, reusability, generality, and the no-existing-feature-tradeoff rule.
+
+## As-Built Sync Contract Records
+
+```text
+SYNC-ID: documentation_map
+STATUS: implemented
+ARTIFACTS: guides/DOCUMENT_MAP.md, tools/docs-tour, tools/test_docs_tour.sh
+TESTS: tools/test_docs_tour.sh
+
+SYNC-ID: menu_prerequisite_control
+STATUS: implemented
+ARTIFACTS: tools/menu, tools/test_menu_prerequisites.sh
+TESTS: tools/test_menu_prerequisites.sh
+
+SYNC-ID: product_repository_cleanup
+STATUS: implemented
+ARTIFACTS: tools/product-repository-cleanup, tools/test_product_repository_cleanup.sh
+TESTS: tools/test_product_repository_cleanup.sh
+
+SYNC-ID: as_built_sync_contract
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv, tools/check_as_built_sync_contract.sh, tools/as-built-sync, tools/test_as_built_sync_contract.sh
+TESTS: tools/check_as_built_sync_contract.sh, tools/test_as_built_sync_contract.sh
+```
+
 ## Mechanical Enforcement
 
 - 14-day progression requires approval receipts through `tools/lesson14 承認`.

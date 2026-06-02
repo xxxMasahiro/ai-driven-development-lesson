@@ -4,8 +4,8 @@
 
 The lesson repository includes mechanical enforcement, flexible lesson entry, Free Development Mode, Team Development and Docker advanced module, dialogue-centered learning, as-built synchronization checks, sub-agent review protocol, menu/dashboard/illustration entry points, 7-day and 14-day lesson language controls, and lesson-side aggregate testing.
 
-The latest implemented change adds safe product repository cleanup for the external product repository created by the 7-day or 14-day lessons.
-The previous implemented change added menu prerequisite control for menu items 1 through 6.
+The latest implemented change adds the as-built sync contract that mechanically enforces synchronization across the three design/as-built documents and the two workflow-state documents.
+The previous implemented change added safe product repository cleanup for the external product repository created by the 7-day or 14-day lessons.
 It also preserves the 7-day and 14-day learning-mode, workflow display language, product development language, and expanded language-list controls.
 The shared standard language list remains `ja`, `en`, `ko`, `zh-CN`, `zh-TW`, `es`, `pt-BR`, `fr`, `de`, `id`, `vi`, `th`, `hi`, and `ar`, while `zh` remains a `zh-CN` alias and `custom` remains available.
 The implementation remains additive and keeps the existing 7-day lesson, 14-day lesson, free-development flow, advanced modules, existing checks, and repository-boundary behavior intact.
@@ -43,9 +43,15 @@ The implementation remains additive and keeps the existing 7-day lesson, 14-day 
 - Added `tools/menu check <1|2|3|4|5|6>` and `tools/menu start <1|2|3|4|5|6> --confirm`.
 - Added `tools/product-improvement status|start|gate`.
 - Added `tools/product-repository-cleanup status|plan|local|remote`.
+- Added `docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv`.
+- Added `tools/check_as_built_sync_contract.sh`.
+- Added `tools/as-built-sync status`.
+- Added `tools/test_as_built_sync_contract.sh`.
+- Added AGENTS routing and standard-check references for the sync-contract status and validator.
 - Added dashboard readiness output for menu items 1 through 6.
 - Added menu prerequisite tests and wired them into aggregate tests, CI, and pre-commit.
 - Added product repository cleanup tests and wired them into structure checks, as-built checks, developer-memory checks, aggregate tests, CI, and pre-commit.
+- Added as-built sync-contract enforcement and wired it into structure checks, as-built checks, aggregate tests, CI, and pre-commit.
 - Documented implementation quality constraints: refactorability, ecosystem fit, reusability, and generality.
 - Preserved the no-tradeoff rule for existing features.
 - Added as-built lesson-side documents:
@@ -78,13 +84,14 @@ The following developer-memory remediation items are implemented and mechanicall
 
 ## Current Synchronized State
 
-- The implemented product repository cleanup behavior is synchronized into the three design/as-built documents:
+- The implemented as-built sync-contract behavior is synchronized into the three design/as-built documents:
   - `docs/as-built/REQUIREMENTS.md`
   - `docs/as-built/SPECIFICATION.md`
   - `docs/as-built/IMPLEMENTATION_PLAN.md`
 - The same implemented state is synchronized into the two workflow-state documents:
   - `docs/workflow/TASK_TRACKER.md`
   - `docs/workflow/HANDOFF.md`
+- The implemented product repository cleanup behavior remains synchronized in the same five documents.
 - The implemented menu prerequisite control remains synchronized in the same five documents.
 - The synchronization passes only when the implemented content is present in all five documents.
 - Preserve refactorability, ecosystem fit, reusable design, generality, and the no-existing-feature-tradeoff rule while maintaining the implemented remediation.
@@ -92,7 +99,7 @@ The following developer-memory remediation items are implemented and mechanicall
 ## Implemented Documentation Map Synchronization
 
 The lesson now explains the repository's rule, routing, skill, design, workflow, and memory documents in a way that non-engineer learners can understand.
-Runtime implementation has started and the docs map artifacts are present.
+Runtime implementation is complete and the docs map artifacts are present.
 
 - Added `guides/DOCUMENT_MAP.md`.
 - Explain `AGENTS.MD` invariant rules, document root, routing table, and repo-local skills as the agent-facing rule and navigation layer.
@@ -135,6 +142,61 @@ Runtime implementation is complete.
 - Exposed runtime discovery through README, AGENTS routing, menu item 5, and the dashboard development view.
 - Preserve existing lesson progression, approvals, checks, menu behavior, dashboard behavior, Free Development, Product Improvement, external-integration, product-gate, Playwright, docs-tour, CI, and pre-commit behavior.
 
+## Implemented As-Built Sync Contract Synchronization
+
+The lesson now strengthens mechanical enforcement across the three design/as-built documents and the two workflow-state documents.
+Runtime implementation is complete.
+
+- Added `docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv` as the contract source for synchronized improvement IDs.
+- Record each synchronized improvement with `sync_id`, `status`, `title`, `required_artifacts`, `required_tests`, `required_docs`, and `runtime_evidence`.
+- Added matching `SYNC-ID`, `STATUS`, `ARTIFACTS`, and `TESTS` blocks to all five synchronized documents:
+  - `docs/as-built/REQUIREMENTS.md`,
+  - `docs/as-built/SPECIFICATION.md`,
+  - `docs/as-built/IMPLEMENTATION_PLAN.md`,
+  - `docs/workflow/TASK_TRACKER.md`,
+  - `docs/workflow/HANDOFF.md`.
+- Added `tools/check_as_built_sync_contract.sh`.
+- Fail when a contract sync ID is missing from any of the five documents.
+- Fail when any of the five documents contains a `SYNC-ID` block that is absent from the contract.
+- Fail when the same sync ID is marked `planned` in one document and `implemented` in another.
+- Fail when document `ARTIFACTS` or `TESTS` blocks contain extra or missing entries compared with the contract.
+- Fail when required artifacts or required tests are missing from the repository.
+- Fail when runtime evidence files are missing or do not reference the sync ID, one of its artifacts, or one of its tests.
+- Fail when an implemented sync ID's required tests are not actively wired into `tools/test_lesson_repository.sh`, `.githooks/pre-commit`, `.github/workflows/ci.yml`, and `.github/workflows/lesson14-ci.yml`.
+- Keep `tools/check_as_built_docs.sh` and its topic-based checks active.
+- Call `tools/check_as_built_sync_contract.sh` from `tools/check_as_built_docs.sh`.
+- Keep `tools/check_workflow_pair_sync.sh` active for the `TASK_TRACKER.md` and `HANDOFF.md` pair.
+- Added `tools/as-built-sync status` to show sync IDs, document coverage, artifact presence, and test wiring.
+- Added `tools/test_as_built_sync_contract.sh`.
+- Test complete synchronization, missing document block, unknown sync ID, mixed status, extra artifacts/tests, missing artifact, inert wiring, and missing active test-wiring failure paths.
+- Added `AGENTS.MD` routing and standard-check references for sync-contract status and validation.
+- Wired the validator and regression test into `tools/check_as_built_docs.sh`, `tools/test_lesson_repository.sh`, `.githooks/pre-commit`, `.github/workflows/ci.yml`, and `.github/workflows/lesson14-ci.yml`.
+- Preserve existing lesson progression, approvals, checks, menu behavior, dashboard behavior, docs-tour, Free Development, Product Improvement, external-integration, product-gate, product-repository cleanup, Playwright, CI, and pre-commit behavior.
+
+## As-Built Sync Contract Records
+
+```text
+SYNC-ID: documentation_map
+STATUS: implemented
+ARTIFACTS: guides/DOCUMENT_MAP.md, tools/docs-tour, tools/test_docs_tour.sh
+TESTS: tools/test_docs_tour.sh
+
+SYNC-ID: menu_prerequisite_control
+STATUS: implemented
+ARTIFACTS: tools/menu, tools/test_menu_prerequisites.sh
+TESTS: tools/test_menu_prerequisites.sh
+
+SYNC-ID: product_repository_cleanup
+STATUS: implemented
+ARTIFACTS: tools/product-repository-cleanup, tools/test_product_repository_cleanup.sh
+TESTS: tools/test_product_repository_cleanup.sh
+
+SYNC-ID: as_built_sync_contract
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv, tools/check_as_built_sync_contract.sh, tools/as-built-sync, tools/test_as_built_sync_contract.sh
+TESTS: tools/check_as_built_sync_contract.sh, tools/test_as_built_sync_contract.sh
+```
+
 ## Implemented Menu Prerequisite Control
 
 Shared menu prerequisite control is implemented without replacing existing lesson or product workflows.
@@ -164,6 +226,8 @@ Lesson repository test passed.
 Latest local verification reached this target after synchronizing the 7-day parity implementation and the expanded language-list implementation.
 The latest verification target now also includes `Menu prerequisite tests passed.`
 The latest verification target now also includes `Product repository cleanup tests passed.`
+The latest verification target now also includes `As-built sync contract tests passed.`
+The latest verification sequence includes `./tools/check_as_built_sync_contract.sh`, `./tools/as-built-sync status`, and `./tools/test_as_built_sync_contract.sh`.
 Real product operations testing remains available through `tools/test_production_operations.sh` when an external product repository is intentionally recreated.
 
 ## Remaining Work

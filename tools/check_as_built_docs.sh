@@ -40,6 +40,11 @@ for file in "${required_docs[@]}"; do
   require_file "$file"
 done
 
+require_file "$ROOT/docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv"
+require_file "$ROOT/tools/check_as_built_sync_contract.sh"
+require_file "$ROOT/tools/as-built-sync"
+require_file "$ROOT/tools/test_as_built_sync_contract.sh"
+
 if [[ $missing -eq 0 ]]; then
   combined="$(mktemp)"
   trap 'rm -f "$combined"' EXIT
@@ -131,6 +136,12 @@ if [[ $missing -eq 0 ]]; then
       fi
     done
   done
+fi
+
+if [[ $missing -eq 0 ]]; then
+  if ! "$ROOT/tools/check_as_built_sync_contract.sh"; then
+    missing=1
+  fi
 fi
 
 if [[ $missing -ne 0 ]]; then

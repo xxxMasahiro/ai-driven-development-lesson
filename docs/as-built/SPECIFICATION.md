@@ -149,6 +149,58 @@ It was added without replacing or weakening existing lesson flow, menu behavior,
 - `reviews/SUBAGENT_REVIEW_PROTOCOL.md` defines the multi-perspective review process.
 - `tools/list_non_english_docs.sh` lists Markdown files that still contain Japanese text so translation work can be scoped explicitly.
 
+### Implemented As-Built Sync Contract
+
+The as-built sync-contract improvement is implemented in runtime.
+It was added without replacing or weakening existing lesson flow, document-path support, as-built checks, workflow-pair checks, developer-memory checks, dashboard behavior, CI, pre-commit, docs-tour behavior, product-gate behavior, or product-repository cleanup behavior.
+
+- `docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv` is the contract source for synchronized improvement IDs.
+- Contract rows record sync ID, status, title, required artifacts, required tests, required document coverage, and runtime evidence where applicable.
+- Each of the five synchronized documents includes matching sync blocks for each contract row:
+  - `SYNC-ID`,
+  - `STATUS`,
+  - `ARTIFACTS`,
+  - `TESTS`.
+- `tools/check_as_built_sync_contract.sh` validates the contract against all five documents.
+- The validator fails when any sync ID is missing from any synchronized document.
+- The validator fails when a synchronized document contains a `SYNC-ID` block that is absent from the contract.
+- The validator fails when planned and implemented statuses are mixed for the same sync ID.
+- The validator fails when document `ARTIFACTS` or `TESTS` blocks contain extra or missing entries compared with the contract.
+- The validator fails when required artifacts or required tests listed by the contract are missing from the repository.
+- The validator fails when runtime evidence files are missing or do not reference the sync ID, one of its artifacts, or one of its tests.
+- For implemented sync IDs, the validator fails when required tests are not actively wired into aggregate tests, CI, and pre-commit; comments or inert text mentions do not satisfy wiring.
+- `tools/check_as_built_docs.sh` calls the sync-contract check while preserving the existing topic-based checks.
+- `tools/check_workflow_pair_sync.sh` remains active for the `TASK_TRACKER.md` and `HANDOFF.md` pair; the contract check adds five-document coverage instead of replacing pair synchronization.
+- `tools/as-built-sync status` shows sync IDs, document coverage, artifact existence, and test-wiring status for learners and agents.
+- `AGENTS.MD` exposes a routing-table entry and standard checks for the sync-contract status and validator.
+- `tools/test_as_built_sync_contract.sh` tests complete synchronization, a missing sync block, an unknown sync ID, mixed planned/implemented status, extra artifacts/tests, missing artifacts, inert wiring, and missing active test wiring.
+- CI, pre-commit, and aggregate test wiring now include the runtime validator and regression test.
+- The implementation remains refactorable, ecosystem-friendly, reusable, general, and additive.
+
+### As-Built Sync Contract Records
+
+```text
+SYNC-ID: documentation_map
+STATUS: implemented
+ARTIFACTS: guides/DOCUMENT_MAP.md, tools/docs-tour, tools/test_docs_tour.sh
+TESTS: tools/test_docs_tour.sh
+
+SYNC-ID: menu_prerequisite_control
+STATUS: implemented
+ARTIFACTS: tools/menu, tools/test_menu_prerequisites.sh
+TESTS: tools/test_menu_prerequisites.sh
+
+SYNC-ID: product_repository_cleanup
+STATUS: implemented
+ARTIFACTS: tools/product-repository-cleanup, tools/test_product_repository_cleanup.sh
+TESTS: tools/test_product_repository_cleanup.sh
+
+SYNC-ID: as_built_sync_contract
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv, tools/check_as_built_sync_contract.sh, tools/as-built-sync, tools/test_as_built_sync_contract.sh
+TESTS: tools/check_as_built_sync_contract.sh, tools/test_as_built_sync_contract.sh
+```
+
 ### Design Quality Constraints
 
 - Additions must preserve existing 7-day and 14-day behavior.
@@ -165,11 +217,14 @@ It was added without replacing or weakening existing lesson flow, menu behavior,
 - `tools/check_lesson14_sync.sh` validates 14-day document synchronization.
 - `tools/check_agents_skills.sh` validates AGENTS and skills integration.
 - `tools/check_as_built_docs.sh` validates the five role-organized as-built/workflow documents.
+- `tools/check_as_built_sync_contract.sh` validates the five-document sync contract.
+- `tools/as-built-sync status` validates learner/agent-facing sync-contract status output.
 - `tools/check_review_protocol.sh` validates the review protocol.
 - `tools/check_developer_memory_requirements.sh` validates that developer-memory requirements are represented mechanically.
 - `tools/menu`, `tools/dashboard`, and `tools/illustrations` validate the menu, dashboard, and illustration entry points at runtime.
 - `tools/test_menu_prerequisites.sh` validates menu readiness, start approval, missing-prerequisite failure paths, the `3. 応用レッスン` label, and the absence of the old menu label.
 - `tools/test_product_repository_cleanup.sh` validates product repository cleanup status, plan, confirmation gates, boundary rejection, non-Git rejection, temporary local deletion, and fake-`gh` remote deletion behavior.
+- `tools/test_as_built_sync_contract.sh` validates complete synchronization, unknown sync IDs, mixed statuses, extra artifacts/tests, missing artifacts, inert wiring, and missing active test wiring.
 - `tools/test_lesson_start_position.sh` validates learner-selected start positions.
 - `tools/test_lesson.sh` validates 7-day CLI behavior, including learning mode, workflow display language, product development language, and setup gating.
 - `tools/test_lesson14.sh` validates lesson14 CLI behavior.
