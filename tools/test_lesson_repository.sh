@@ -20,9 +20,11 @@ WORKFLOW_PAIR_SINGLE_FILE_REASON="aggregate test may run while remediation docum
 ./tools/test_docs_tour.sh
 ./tools/product-improvement status >/dev/null
 ./tools/external-integration status >/dev/null
+./tools/product-repository-cleanup status >/dev/null
 ./tools/test_lesson_playwright.sh
 ./tools/test_menu_prerequisites.sh
 ./tools/test_product_gate_tools.sh
+./tools/test_product_repository_cleanup.sh
 ./tools/test_lesson_start_position.sh
 ./tools/test_lesson.sh
 ./tools/test_lesson14.sh

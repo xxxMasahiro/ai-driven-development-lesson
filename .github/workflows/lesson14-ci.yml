@@ -34,6 +34,8 @@ jobs:
           bash -n tools/test_lesson.sh
           bash -n tools/test_menu_prerequisites.sh
           bash -n tools/test_product_gate_tools.sh
+          bash -n tools/product-repository-cleanup
+          bash -n tools/test_product_repository_cleanup.sh
           bash -n tools/test_lesson_repository.sh
           bash -n tools/test_lesson14.sh
           bash -n tools/menu
@@ -61,6 +63,9 @@ jobs:
 
       - name: Menu prerequisite regression
         run: ./tools/test_menu_prerequisites.sh
+
+      - name: Product repository cleanup regression
+        run: ./tools/test_product_repository_cleanup.sh
 
       - name: Documentation tour regression
         run: ./tools/test_docs_tour.sh

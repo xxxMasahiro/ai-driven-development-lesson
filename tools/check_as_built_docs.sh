@@ -65,6 +65,7 @@ if [[ $missing -eq 0 ]]; then
     'tradeoff|trade-off' \
     'lesson repository test|test_lesson_repository' \
     'product-gate|product gate|test_product_gate_tools' \
+    'product repository cleanup|product-repository-cleanup|test_product_repository_cleanup' \
     'menu prerequisite|Menu Prerequisite|menu items 1 through 6' \
     'product-improvement|Product Improvement|product improvement' \
     '応用レッスン' \
@@ -116,6 +117,7 @@ if [[ $missing -eq 0 ]]; then
     'failure-path|failure path' \
     'menu prerequisite|Menu Prerequisite|menu items 1 through 6' \
     'product-improvement|Product Improvement|product improvement' \
+    'product repository cleanup|product-repository-cleanup|test_product_repository_cleanup' \
     '応用レッスン' \
     'DOCUMENT_MAP|Documentation Map' \
     'docs-tour|Documentation tour' \

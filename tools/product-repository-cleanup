@@ -1,0 +1,332 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=tools/lib/lesson_common.sh
+source "$SCRIPT_DIR/lib/lesson_common.sh"
+
+usage() {
+  cat <<'EOF'
+Usage:
+  ./tools/product-repository-cleanup status
+  ./tools/product-repository-cleanup plan
+  ./tools/product-repository-cleanup local --confirm <product-repository-name>
+  ./tools/product-repository-cleanup remote --confirm <owner/repository>
+
+This tool deletes only the lesson product repository target after exact
+confirmation. Local and remote deletion are separate operations.
+EOF
+}
+
+fail() {
+  printf 'Error: %s\n' "$1" >&2
+  exit 1
+}
+
+canonical_path() {
+  local path="$1"
+  local dir base
+
+  if [[ -d "$path" ]]; then
+    (cd "$path" && pwd -P)
+    return
+  fi
+
+  dir="$(dirname "$path")"
+  base="$(basename "$path")"
+  if [[ -d "$dir" ]]; then
+    (cd "$dir" && printf '%s/%s\n' "$(pwd -P)" "$base")
+  else
+    printf '%s\n' "$path"
+  fi
+}
+
+github_slug_from_url() {
+  local url="$1"
+  local slug=""
+
+  case "$url" in
+    https://github.com/*/*)
+      slug="${url#https://github.com/}"
+      ;;
+    git@github.com:*)
+      slug="${url#git@github.com:}"
+      ;;
+    ssh://git@github.com/*/*)
+      slug="${url#ssh://git@github.com/}"
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+
+  slug="${slug%.git}"
+  slug="${slug%%/*/*}"
+  if [[ "$slug" == */* ]]; then
+    printf '%s\n' "$slug"
+    return 0
+  fi
+
+  return 1
+}
+
+product_remote_slug() {
+  local product_root="$1"
+  local product_name="$2"
+  local url slug remote_name
+
+  if [[ -d "$product_root" ]] && git -C "$product_root" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    url="$(git -C "$product_root" config --get remote.origin.url || true)"
+    if [[ -n "$url" ]]; then
+      slug="$(github_slug_from_url "$url" || true)"
+      remote_name="${slug##*/}"
+      if [[ -n "$slug" && "$remote_name" == "$product_name" ]]; then
+        printf '%s\n' "$slug"
+        return 0
+      fi
+    fi
+  fi
+
+  return 1
+}
+
+lesson_owner_slug() {
+  local product_name="$1"
+  local url owner_repo owner
+
+  url="$(git -C "$LESSON_ROOT" config --get remote.origin.url || true)"
+  if [[ -z "$url" ]]; then
+    return 1
+  fi
+
+  owner_repo="$(github_slug_from_url "$url" || true)"
+  if [[ -z "$owner_repo" ]]; then
+    return 1
+  fi
+
+  owner="${owner_repo%%/*}"
+  if [[ -z "$owner" || "$owner" == "$owner_repo" ]]; then
+    return 1
+  fi
+
+  printf '%s/%s\n' "$owner" "$product_name"
+}
+
+expected_remote_slug() {
+  local product_root="$1"
+  local product_name="$2"
+
+  product_remote_slug "$product_root" "$product_name" && return 0
+  lesson_owner_slug "$product_name" && return 0
+  return 1
+}
+
+confirm_value() {
+  local flag="${1:-}"
+  local value="${2:-}"
+
+  [[ "$flag" == "--confirm" ]] || fail 'confirmation is required: --confirm <exact-target>'
+  [[ -n "$value" ]] || fail 'confirmation value cannot be empty'
+  printf '%s\n' "$value"
+}
+
+print_status() {
+  local product_root="$1"
+  local product_name="$2"
+  local root_path product_path expected_slug remote_url
+
+  root_path="$(canonical_path "$LESSON_ROOT")"
+  product_path="$(canonical_path "$product_root")"
+
+  printf 'Product repository cleanup status\n'
+  printf 'Lesson repository: %s\n' "$root_path"
+  printf 'Configured product repository name: %s\n' "$product_name"
+  printf 'Configured product repository path: %s\n' "$product_path"
+
+  if [[ -d "$product_root" ]]; then
+    printf 'Local product repository: exists\n'
+    if git -C "$product_root" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+      printf 'Local Git repository: yes\n'
+      printf 'Local top level: %s\n' "$(git -C "$product_root" rev-parse --show-toplevel)"
+      printf 'Local origin: %s\n' "$(git -C "$product_root" config --get remote.origin.url || printf 'not configured')"
+    else
+      printf 'Local Git repository: no\n'
+    fi
+  else
+    printf 'Local product repository: missing\n'
+  fi
+
+  if [[ "$product_path/" == "$root_path/"* ]]; then
+    printf 'Boundary check: rejected because the target is inside the lesson repository\n'
+  elif [[ "$root_path/" == "$product_path/"* ]]; then
+    printf 'Boundary check: rejected because the target contains the lesson repository\n'
+  else
+    printf 'Boundary check: target is outside the lesson repository\n'
+  fi
+
+  expected_slug="$(expected_remote_slug "$product_root" "$product_name" || true)"
+  if [[ -z "$expected_slug" ]]; then
+    printf 'Expected GitHub repository: unknown\n'
+    return
+  fi
+
+  printf 'Expected GitHub repository: %s\n' "$expected_slug"
+  if ! command -v gh >/dev/null 2>&1; then
+    printf 'Remote status: gh is not available\n'
+    return
+  fi
+
+  remote_url="$(gh repo view "$expected_slug" --json url --jq .url 2>/dev/null || true)"
+  if [[ -n "$remote_url" ]]; then
+    printf 'Remote status: exists (%s)\n' "$remote_url"
+  else
+    printf 'Remote status: missing or inaccessible\n'
+  fi
+}
+
+print_plan() {
+  local product_root="$1"
+  local product_name="$2"
+  local expected_slug
+
+  printf 'Product repository cleanup plan\n'
+  printf 'This command separates local deletion from GitHub remote deletion.\n'
+  printf 'Nothing is deleted by the plan command.\n'
+  printf '\n'
+  printf '1. Review the current target:\n'
+  printf '   ./tools/product-repository-cleanup status\n'
+  printf '\n'
+  printf '2. Delete the local product repository only after exact name confirmation:\n'
+  printf '   ./tools/product-repository-cleanup local --confirm %s\n' "$product_name"
+  printf '\n'
+
+  expected_slug="$(expected_remote_slug "$product_root" "$product_name" || true)"
+  if [[ -n "$expected_slug" ]]; then
+    printf '3. Delete the GitHub remote repository only after exact owner/repository confirmation:\n'
+    printf '   ./tools/product-repository-cleanup remote --confirm %s\n' "$expected_slug"
+  else
+    printf '3. Remote deletion requires a known GitHub owner/repository target.\n'
+  fi
+}
+
+verify_local_target() {
+  local product_root="$1"
+  local product_name="$2"
+  local root_path product_path top_level
+
+  root_path="$(canonical_path "$LESSON_ROOT")"
+  product_path="$(canonical_path "$product_root")"
+
+  [[ "$(basename "$product_path")" == "$product_name" ]] ||
+    fail "configured product repository path does not end with $product_name"
+
+  [[ "$product_path/" != "$root_path/"* ]] ||
+    fail 'refusing to delete a target inside the lesson repository'
+
+  [[ "$root_path/" != "$product_path/"* ]] ||
+    fail 'refusing to delete a target that contains the lesson repository'
+
+  [[ -d "$product_root" ]] ||
+    fail "local product repository does not exist: $product_path"
+
+  [[ -e "$product_root/.git" ]] ||
+    fail "local product repository is not a Git repository: $product_path"
+
+  git -C "$product_root" rev-parse --is-inside-work-tree >/dev/null 2>&1 ||
+    fail "local product repository is not a Git work tree: $product_path"
+
+  top_level="$(git -C "$product_root" rev-parse --show-toplevel)"
+  top_level="$(canonical_path "$top_level")"
+  [[ "$top_level" == "$product_path" ]] ||
+    fail "refusing to delete because Git top level differs from target: $top_level"
+}
+
+delete_local() {
+  local product_root="$1"
+  local product_name="$2"
+  local confirmation="$3"
+  local product_path
+
+  [[ "$confirmation" == "$product_name" ]] ||
+    fail "local cleanup confirmation must match the product repository name: $product_name"
+
+  verify_local_target "$product_root" "$product_name"
+  product_path="$(canonical_path "$product_root")"
+
+  printf 'Product repository local cleanup\n'
+  printf 'Target path: %s\n' "$product_path"
+  printf 'Confirmation matched: %s\n' "$confirmation"
+  printf 'Safety checks: passed\n'
+  printf 'Deleting local product repository...\n'
+  rm -rf -- "$product_root"
+  printf 'Local product repository deleted: %s\n' "$product_path"
+}
+
+delete_remote() {
+  local product_root="$1"
+  local product_name="$2"
+  local confirmation="$3"
+  local expected_slug remote_url
+
+  expected_slug="$(expected_remote_slug "$product_root" "$product_name" || true)"
+  [[ -n "$expected_slug" ]] ||
+    fail 'could not determine the expected GitHub owner/repository target'
+
+  [[ "$confirmation" == "$expected_slug" ]] ||
+    fail "remote cleanup confirmation must match the GitHub repository: $expected_slug"
+
+  command -v gh >/dev/null 2>&1 ||
+    fail 'gh is required for remote repository deletion'
+
+  gh auth status -h github.com >/dev/null 2>&1 ||
+    fail 'GitHub authentication is required before remote repository deletion'
+
+  remote_url="$(gh repo view "$expected_slug" --json url --jq .url 2>/dev/null || true)"
+  [[ -n "$remote_url" ]] ||
+    fail "GitHub repository is missing or inaccessible: $expected_slug"
+
+  printf 'Product repository remote cleanup\n'
+  printf 'Target repository: %s\n' "$expected_slug"
+  printf 'Target URL: %s\n' "$remote_url"
+  printf 'Confirmation matched: %s\n' "$confirmation"
+  printf 'Safety checks: passed\n'
+  printf 'Deleting GitHub remote product repository...\n'
+  gh repo delete "$expected_slug" --yes
+  printf 'Remote product repository deleted: %s\n' "$expected_slug"
+}
+
+main() {
+  local command="${1:-status}"
+  local product_root product_name confirmation
+
+  product_root="$(lesson_product_repo_root)"
+  product_name="$(lesson_product_repo_name)"
+
+  case "$command" in
+    status)
+      print_status "$product_root" "$product_name"
+      ;;
+    plan)
+      print_plan "$product_root" "$product_name"
+      ;;
+    local)
+      shift || true
+      confirmation="$(confirm_value "${1:-}" "${2:-}")"
+      delete_local "$product_root" "$product_name" "$confirmation"
+      ;;
+    remote)
+      shift || true
+      confirmation="$(confirm_value "${1:-}" "${2:-}")"
+      delete_remote "$product_root" "$product_name" "$confirmation"
+      ;;
+    -h|--help|help)
+      usage
+      ;;
+    *)
+      usage >&2
+      fail "unknown command: $command"
+      ;;
+  esac
+}
+
+main "$@"

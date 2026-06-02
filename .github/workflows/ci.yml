@@ -30,6 +30,8 @@ jobs:
           bash -n tools/test_lesson.sh
           bash -n tools/test_menu_prerequisites.sh
           bash -n tools/test_product_gate_tools.sh
+          bash -n tools/product-repository-cleanup
+          bash -n tools/test_product_repository_cleanup.sh
           bash -n tools/test_lesson_repository.sh
           bash -n tools/menu
           bash -n tools/docs-tour
@@ -51,6 +53,7 @@ jobs:
           ./tools/check_review_protocol.sh
           ./tools/check_developer_memory_requirements.sh
           ./tools/test_docs_tour.sh
+          ./tools/test_product_repository_cleanup.sh
 
       - name: Repository boundary
         run: ./tools/check_repository_boundary.sh
@@ -77,6 +80,7 @@ jobs:
           ./tools/lesson 現在地 | grep './tools/lesson 開始 setup.github-login'
           ./tools/lesson 通過 setup.github-login "github-loginでGitHub接続を確認した"
           ./tools/lesson 現在地 | grep './tools/lesson 開始 day1.mode'
+          ./tools/product-repository-cleanup plan | grep 'Nothing is deleted by the plan command.'
 
           cd "$work/lesson"
           mkdir "$(awk -F '\t' '$1 == "product_repo_name" { print $2 }' lesson/LESSON_CONFIG.tsv)"

@@ -37,6 +37,8 @@
 28. Add `tools/product-improvement status|start|gate`.
 29. Add dashboard readiness output for menu items 1 through 6.
 30. Add `tools/test_menu_prerequisites.sh` and wire it into aggregate tests, CI, and pre-commit.
+31. Add `tools/product-repository-cleanup` for safe external product repository cleanup.
+32. Add `tools/test_product_repository_cleanup.sh` and wire it into structure checks, as-built checks, developer-memory checks, aggregate tests, CI, and pre-commit.
 
 ## Implemented Remediation Plan
 
@@ -237,14 +239,13 @@ It preserves existing features without tradeoffs and follows the repository qual
    - Run the new docs-tour test.
    - Confirm existing 7-day, 14-day, menu, dashboard, free-development, product-improvement, external-integration, product-gate, Playwright, CI, and pre-commit behavior remains available.
 
-## Planned Product Repository Cleanup Implementation Plan
+## Implemented Product Repository Cleanup Implementation Plan
 
-This is the next additive implementation plan.
-It must be completed only after the plan is synchronized across `docs/as-built/REQUIREMENTS.md`, `docs/as-built/SPECIFICATION.md`, `docs/as-built/IMPLEMENTATION_PLAN.md`, `docs/workflow/TASK_TRACKER.md`, and `docs/workflow/HANDOFF.md`.
-It must preserve existing features without tradeoffs and must follow the repository quality constraints for refactorability, ecosystem fit, reusability, and generality.
+This additive implementation is complete and synchronized across `docs/as-built/REQUIREMENTS.md`, `docs/as-built/SPECIFICATION.md`, `docs/as-built/IMPLEMENTATION_PLAN.md`, `docs/workflow/TASK_TRACKER.md`, and `docs/workflow/HANDOFF.md`.
+It preserves existing features without tradeoffs and follows the repository quality constraints for refactorability, ecosystem fit, reusability, and generality.
 
 1. Add a dedicated cleanup command.
-   - Add `tools/product-repository-cleanup`.
+   - Added `tools/product-repository-cleanup`.
    - Support `status`, `plan`, `local`, and `remote` subcommands.
    - Keep the command focused on the external product repository configured by the lesson settings.
 
@@ -257,8 +258,8 @@ It must preserve existing features without tradeoffs and must follow the reposit
    - Require a command shape such as `tools/product-repository-cleanup local --confirm task-tracker-repository`.
    - Reject deletion when confirmation is missing or does not match the configured product repository name.
    - Reject deletion when the target path is inside the lesson repository.
-   - Reject deletion when the target path does not equal the configured external product repository path.
-   - Reject deletion when the target is not a Git repository or cannot be identified safely.
+   - Reject deletion when the target path is not the configured external product repository path.
+   - Reject deletion when the target is not a Git repository, lacks `.git`, is not the Git top level, or cannot be identified safely.
    - Print a clear operation log before and after local deletion.
 
 4. Implement remote cleanup safety gates.
@@ -274,26 +275,26 @@ It must preserve existing features without tradeoffs and must follow the reposit
    - Do not infer deletion targets from loose user text.
 
 6. Add mechanical validation.
-   - Add `tools/test_product_repository_cleanup.sh`.
+   - Added `tools/test_product_repository_cleanup.sh`.
    - Test status and plan behavior.
    - Test missing-confirmation and wrong-confirmation failures.
    - Test nested repository rejection.
    - Test non-Git target rejection.
    - Test local cleanup using temporary repositories only.
-   - Test remote paths with non-destructive or mocked failure behavior, never by deleting a real GitHub repository.
-   - At this planning-synchronization stage, `tools/product-repository-cleanup` and `tools/test_product_repository_cleanup.sh` are planned artifacts and are not yet expected to exist in runtime.
+   - Test remote paths with fake `gh` behavior, never by deleting a real GitHub repository.
+   - `tools/product-repository-cleanup` and `tools/test_product_repository_cleanup.sh` are required runtime artifacts.
 
 7. Wire validation into existing checks.
-   - Update structure checks.
-   - Update as-built checks.
-   - Update developer-memory checks when implementation is complete.
-   - Add the new test to aggregate tests, CI, and pre-commit.
-   - Preserve existing 7-day, 14-day, menu, dashboard, Free Development, Product Improvement, external-integration, product-gate, Playwright, docs-tour, CI, and pre-commit behavior.
+   - Updated structure checks.
+   - Updated as-built checks.
+   - Updated developer-memory checks.
+   - Added the new test to aggregate tests, CI, and pre-commit.
+   - Preserved existing 7-day, 14-day, menu, dashboard, Free Development, Product Improvement, external-integration, product-gate, Playwright, docs-tour, CI, and pre-commit behavior.
 
 8. Synchronize related guidance after implementation.
-   - Update the five planning/workflow documents from planned to implemented state.
-   - Update `AGENTS.MD`, README/menu/dashboard guidance, and developer memory only where the cleanup command becomes part of runtime behavior.
-   - Keep unrelated existing content unchanged.
+   - Updated the five planning/workflow documents from planned to implemented state.
+   - Updated `AGENTS.MD`, README/menu guidance, and dashboard output only where the cleanup command is part of runtime behavior.
+   - Kept unrelated existing content unchanged.
 
 9. Verify local, remote, and CI consistency.
    - Run the new cleanup test.
@@ -323,6 +324,7 @@ Run:
 ./tools/test_lesson.sh
 ./tools/test_lesson14.sh
 ./tools/test_product_gate_tools.sh
+./tools/test_product_repository_cleanup.sh
 ./tools/test_lesson_repository.sh
 ```
 

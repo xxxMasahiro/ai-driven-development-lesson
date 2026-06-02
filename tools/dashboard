@@ -178,9 +178,13 @@ show_development() {
     printf '\nCI status:\n'
     optional_ci_status
     printf 'Required CI command: ./tools/check_ci_status.sh --repo "%s" --required\n' "$PRODUCT_ROOT"
+    printf '\nCleanup readiness:\n'
+    "$ROOT/tools/product-repository-cleanup" status || true
+    printf 'Cleanup plan command: ./tools/product-repository-cleanup plan\n'
   else
     printf 'Product repository not found: %s\n' "$PRODUCT_ROOT"
     printf 'Use Free Development Mode or a lesson-created product repository when development work starts.\n'
+    printf 'Cleanup status command: ./tools/product-repository-cleanup status\n'
   fi
 }
 

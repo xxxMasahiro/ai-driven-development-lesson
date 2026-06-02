@@ -130,6 +130,7 @@
 | スキル/MCPを体験する | `prompts/PROMPTS_14_DAYS.md` Step 13/14 | `skills/lesson14-facilitator/SKILL.md` | 最小構成で実施 |
 | 全レッスン後に自由開発したい | `free-development/FREE_DEVELOPMENT_MODE.md` | `skills/worklog-doc-sync/SKILL.md`、`skills/lesson-sync-gate/SKILL.md` | `./tools/free-development start`、`./tools/free-development gate` |
 | 成果物を改善したい | 成果物リポジトリの `REQUIREMENTS.md`、`SPECIFICATION.md`、`IMPLEMENTATION_PLAN.md`、`TASK_TRACKER.md`、`HANDOFF.md` | `skills/worklog-doc-sync/SKILL.md`、`skills/lesson-sync-gate/SKILL.md` | `./tools/product-improvement start --confirm`、`./tools/product-improvement gate` |
+| 成果物リポジトリを削除したい | `docs/as-built/SPECIFICATION.md` の product repository cleanup、`docs/workflow/HANDOFF.md` | なし | `./tools/product-repository-cleanup status`、`./tools/product-repository-cleanup plan`、必要時のみ `local --confirm` または `remote --confirm` |
 | 外部連携へ発展させたい | `free-development/FREE_DEVELOPMENT_MODE.md`、`prompts/PROMPTS_14_DAYS.md` Step 13/14 | `skills/lesson14-facilitator/SKILL.md`、`skills/worklog-doc-sync/SKILL.md` | 自由開発または既存成果物の要件・仕様から連携設計 |
 | 教材そのものを改善したい | `docs/memory/DEVELOPER_MEMORY.md`、`docs/workflow/TASK_TRACKER.md`、`docs/workflow/HANDOFF.md` | `skills/lesson-sync-gate/SKILL.md` | `./tools/dashboard all`、各種チェック |
 | `3. 応用レッスン` でチーム開発とDockerを学びたい | `advanced/TEAM_DEVELOPMENT_DOCKER.md` | `skills/lesson-sync-gate/SKILL.md`、`skills/worklog-doc-sync/SKILL.md` | `./tools/team-development start --confirm`、`./tools/team-development gate` |
@@ -157,5 +158,6 @@ skills/worklog-doc-sync/SKILL.md
 ./tools/check_lesson14_sync.sh
 ./tools/check_agents_skills.sh
 ./tools/test_docs_tour.sh
+./tools/test_product_repository_cleanup.sh
 ./tools/test_lesson14.sh
 ```

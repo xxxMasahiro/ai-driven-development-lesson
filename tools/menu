@@ -34,6 +34,7 @@ show_menu() {
 5. 成果物を改善
    完了、削除、保存、デザイン改善などを追加する
    入口: ./tools/product-improvement status
+   削除前確認: ./tools/product-repository-cleanup status
    開始前確認: ./tools/menu check 5
 
 6. 外部連携

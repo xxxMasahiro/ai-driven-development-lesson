@@ -2,10 +2,10 @@
 
 ## Current State
 
-The lesson repository is in an implemented menu prerequisite state.
+The lesson repository is in an implemented safe product repository cleanup state.
 The current validation scope is lesson-side only; it must not recreate or depend on `task-tracker-repository`.
 Existing 7-day lessons, 14-step lessons, free-development flow, advanced modules, checks, and repository-boundary behavior must not be weakened or replaced.
-The implementation adds shared menu prerequisite control for menu items 1 through 6 while preserving refactorability, ecosystem fit, reusable design, generality, and the no-existing-feature-tradeoff rule.
+The implementation adds `tools/product-repository-cleanup` while preserving shared menu prerequisite control for menu items 1 through 6, refactorability, ecosystem fit, reusable design, generality, and the no-existing-feature-tradeoff rule.
 
 ## Key Implemented Capabilities
 
@@ -27,6 +27,7 @@ The implementation adds shared menu prerequisite control for menu items 1 throug
 - Menu items 1 through 6 have shared prerequisite checks for learning mode, workflow display language, product development language, repository boundary where relevant, and learner approval before start.
 - `status` commands remain non-blocking; `start`, `gate`, and `check` enforce prerequisites.
 - `tools/product-improvement status|start|gate` provides the mechanical entry for product improvement.
+- `tools/product-repository-cleanup status|plan|local|remote` provides the mechanical entry for safe product repository cleanup.
 - Dashboard readiness output shows menu items 1 through 6.
 - As-built document checks.
 - Sub-agent review protocol.
@@ -78,12 +79,35 @@ tools/illustrations
 tools/test_lesson.sh
 tools/test_lesson_repository.sh
 tools/test_product_gate_tools.sh
+tools/test_product_repository_cleanup.sh
 tools/test_production_operations.sh
 ```
 
 ## Next Step
 
-The synchronized menu prerequisite implementation is now represented across the three design/as-built documents and two workflow-state documents.
+The synchronized product repository cleanup implementation is now represented across the three design/as-built documents and two workflow-state documents.
+
+Implemented product repository cleanup scope:
+
+- Added `tools/product-repository-cleanup` so learners and agents can safely remove the external product repository created by the 7-day or 14-day lessons.
+- Support `status`, `plan`, `local`, and `remote` subcommands.
+- Keep `status` and `plan` non-destructive.
+- Require explicit confirmation for local cleanup with the configured product repository name, such as `task-tracker-repository`.
+- Require explicit confirmation for remote cleanup with the full GitHub owner/repository name, such as `xxxMasahiro/task-tracker-repository`.
+- Keep local deletion and remote deletion separate; do not add `all` or automatic chained deletion.
+- Reject local deletion unless the target is the configured external product repository path, normally `$HOME/projects/task-tracker-repository`.
+- Reject local deletion when the target is inside the lesson repository, does not match the configured product repository name, is not a Git repository, lacks `.git`, is not the Git top level, or cannot be identified safely.
+- Require GitHub authentication and a successful remote repository lookup before any remote deletion attempt.
+- Show the remote URL and owner/repository name before any remote deletion.
+- Print a clear operation log for status, plan, local cleanup, and remote cleanup paths.
+- Added `tools/test_product_repository_cleanup.sh`.
+- Test status, plan, missing confirmation, wrong confirmation, nested repository rejection, non-Git target rejection, temporary local cleanup behavior, and fake-`gh` remote deletion behavior.
+- Do not delete a real GitHub repository in lesson-repository tests.
+- Wired the cleanup test into structure checks, as-built checks, developer-memory checks, aggregate tests, CI, and pre-commit.
+- Exposed runtime discovery through README, AGENTS routing, menu item 5, and the dashboard development view.
+- Preserve existing lesson progression, approvals, checks, menu behavior, dashboard behavior, Free Development, Product Improvement, external-integration, product-gate, Playwright, docs-tour, CI, and pre-commit behavior.
+
+The synchronized menu prerequisite implementation remains represented across the same documents.
 
 Implemented scope:
 
@@ -116,27 +140,6 @@ Current implemented docs-map scope:
 - Validation is wired through `tools/test_docs_tour.sh`, structure checks, as-built checks, developer-memory checks, dashboard or Playwright tests, aggregate tests, CI, and pre-commit.
 - The validation suite must preserve existing 7-day, 14-day, menu, dashboard, Free Development, Product Improvement, external-integration, product-gate, Playwright, CI, and pre-commit behavior.
 
-Next planned product-repository cleanup scope:
-
-- Add `tools/product-repository-cleanup` so learners and agents can safely remove the external product repository created by the 7-day or 14-day lessons.
-- Support `status`, `plan`, `local`, and `remote` subcommands.
-- Keep `status` and `plan` non-destructive.
-- Require explicit confirmation for local cleanup with the configured product repository name, such as `task-tracker-repository`.
-- Require explicit confirmation for remote cleanup with the full GitHub owner/repository name, such as `xxxMasahiro/task-tracker-repository`.
-- Keep local deletion and remote deletion separate; do not add `all` or automatic chained deletion.
-- Reject local deletion unless the target is the configured external product repository path, normally `$HOME/projects/task-tracker-repository`.
-- Reject local deletion when the target is inside the lesson repository, does not match the configured product repository name, is not a Git repository, or cannot be identified safely.
-- Require GitHub authentication and a successful remote repository lookup before any remote deletion attempt.
-- Show the remote URL and owner/repository name before any remote deletion.
-- Print a clear operation log for status, plan, local cleanup, and remote cleanup paths.
-- Add `tools/test_product_repository_cleanup.sh`.
-- Test status, plan, missing confirmation, wrong confirmation, nested repository rejection, non-Git target rejection, temporary local cleanup behavior, and non-destructive remote failure paths.
-- Do not delete a real GitHub repository in lesson-repository tests.
-- Wire the cleanup test into structure checks, as-built checks, developer-memory checks, aggregate tests, CI, and pre-commit when implemented.
-- Preserve existing lesson progression, approvals, checks, menu behavior, dashboard behavior, Free Development, Product Improvement, external-integration, product-gate, Playwright, docs-tour, CI, and pre-commit behavior.
-- At this planning-synchronization stage, `tools/product-repository-cleanup` and `tools/test_product_repository_cleanup.sh` are planned artifacts and are not yet expected to exist in runtime.
-- Implementation completion will require validation wiring through `tools/test_product_repository_cleanup.sh`, structure checks, as-built checks, developer-memory checks, aggregate tests, CI, and pre-commit.
-
 Latest local verification passed the lesson-side verification sequence:
 
 ```bash
@@ -155,6 +158,7 @@ Latest local verification passed the lesson-side verification sequence:
 ./tools/test_lesson.sh
 ./tools/test_lesson14.sh
 ./tools/test_product_gate_tools.sh
+./tools/test_product_repository_cleanup.sh
 ./tools/test_lesson_repository.sh
 ```
 

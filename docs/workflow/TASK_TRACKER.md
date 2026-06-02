@@ -4,7 +4,8 @@
 
 The lesson repository includes mechanical enforcement, flexible lesson entry, Free Development Mode, Team Development and Docker advanced module, dialogue-centered learning, as-built synchronization checks, sub-agent review protocol, menu/dashboard/illustration entry points, 7-day and 14-day lesson language controls, and lesson-side aggregate testing.
 
-The latest implemented change adds menu prerequisite control for menu items 1 through 6.
+The latest implemented change adds safe product repository cleanup for the external product repository created by the 7-day or 14-day lessons.
+The previous implemented change added menu prerequisite control for menu items 1 through 6.
 It also preserves the 7-day and 14-day learning-mode, workflow display language, product development language, and expanded language-list controls.
 The shared standard language list remains `ja`, `en`, `ko`, `zh-CN`, `zh-TW`, `es`, `pt-BR`, `fr`, `de`, `id`, `vi`, `th`, `hi`, and `ar`, while `zh` remains a `zh-CN` alias and `custom` remains available.
 The implementation remains additive and keeps the existing 7-day lesson, 14-day lesson, free-development flow, advanced modules, existing checks, and repository-boundary behavior intact.
@@ -41,8 +42,10 @@ The implementation remains additive and keeps the existing 7-day lesson, 14-day 
 - Added shared menu prerequisite helpers for learning mode, workflow display language, product development language, start approval, and menu readiness.
 - Added `tools/menu check <1|2|3|4|5|6>` and `tools/menu start <1|2|3|4|5|6> --confirm`.
 - Added `tools/product-improvement status|start|gate`.
+- Added `tools/product-repository-cleanup status|plan|local|remote`.
 - Added dashboard readiness output for menu items 1 through 6.
 - Added menu prerequisite tests and wired them into aggregate tests, CI, and pre-commit.
+- Added product repository cleanup tests and wired them into structure checks, as-built checks, developer-memory checks, aggregate tests, CI, and pre-commit.
 - Documented implementation quality constraints: refactorability, ecosystem fit, reusability, and generality.
 - Preserved the no-tradeoff rule for existing features.
 - Added as-built lesson-side documents:
@@ -75,13 +78,14 @@ The following developer-memory remediation items are implemented and mechanicall
 
 ## Current Synchronized State
 
-- The implemented menu prerequisite control is synchronized into the three design/as-built documents:
+- The implemented product repository cleanup behavior is synchronized into the three design/as-built documents:
   - `docs/as-built/REQUIREMENTS.md`
   - `docs/as-built/SPECIFICATION.md`
   - `docs/as-built/IMPLEMENTATION_PLAN.md`
 - The same implemented state is synchronized into the two workflow-state documents:
   - `docs/workflow/TASK_TRACKER.md`
   - `docs/workflow/HANDOFF.md`
+- The implemented menu prerequisite control remains synchronized in the same five documents.
 - The synchronization passes only when the implemented content is present in all five documents.
 - Preserve refactorability, ecosystem fit, reusable design, generality, and the no-existing-feature-tradeoff rule while maintaining the implemented remediation.
 
@@ -108,29 +112,28 @@ Runtime implementation has started and the docs map artifacts are present.
 - Validation is wired through `tools/test_docs_tour.sh`, structure checks, as-built checks, developer-memory checks, dashboard or Playwright tests, aggregate tests, CI, and pre-commit.
 - The validation suite must preserve existing 7-day, 14-day, menu, dashboard, Free Development, Product Improvement, external-integration, product-gate, Playwright, CI, and pre-commit behavior.
 
-## Planned Product Repository Cleanup Synchronization
+## Implemented Product Repository Cleanup Synchronization
 
-The next planned lesson improvement provides a safe, explicit cleanup path for the external product repository created by the 7-day or 14-day lessons.
-This is a plan only; runtime implementation has not started.
+The lesson now provides a safe, explicit cleanup path for the external product repository created by the 7-day or 14-day lessons.
+Runtime implementation is complete.
 
-- Add `tools/product-repository-cleanup`.
+- Added `tools/product-repository-cleanup`.
 - Support `status`, `plan`, `local`, and `remote` subcommands.
 - Keep `status` and `plan` non-destructive.
 - Require explicit confirmation for local cleanup with the configured product repository name, such as `task-tracker-repository`.
 - Require explicit confirmation for remote cleanup with the full GitHub owner/repository name, such as `xxxMasahiro/task-tracker-repository`.
 - Keep local deletion and remote deletion separate; do not add `all` or automatic chained deletion.
 - Reject local deletion unless the target is the configured external product repository path, normally `$HOME/projects/task-tracker-repository`.
-- Reject local deletion when the target is inside the lesson repository, does not match the configured product repository name, is not a Git repository, or cannot be identified safely.
+- Reject local deletion when the target is inside the lesson repository, does not match the configured product repository name, is not a Git repository, lacks `.git`, is not the Git top level, or cannot be identified safely.
 - Require GitHub authentication and a successful remote repository lookup before any remote deletion attempt.
 - Show the remote URL and owner/repository name before any remote deletion.
 - Print a clear operation log for status, plan, local cleanup, and remote cleanup paths.
-- Add `tools/test_product_repository_cleanup.sh`.
-- Test status, plan, missing confirmation, wrong confirmation, nested repository rejection, non-Git target rejection, temporary local cleanup behavior, and non-destructive remote failure paths.
+- Added `tools/test_product_repository_cleanup.sh`.
+- Test status, plan, missing confirmation, wrong confirmation, nested repository rejection, non-Git target rejection, temporary local cleanup behavior, and fake-`gh` remote deletion behavior.
 - Do not delete a real GitHub repository in lesson-repository tests.
-- Wire the cleanup test into structure checks, as-built checks, developer-memory checks, aggregate tests, CI, and pre-commit when implemented.
+- Wired the cleanup test into structure checks, as-built checks, developer-memory checks, aggregate tests, CI, and pre-commit.
+- Exposed runtime discovery through README, AGENTS routing, menu item 5, and the dashboard development view.
 - Preserve existing lesson progression, approvals, checks, menu behavior, dashboard behavior, Free Development, Product Improvement, external-integration, product-gate, Playwright, docs-tour, CI, and pre-commit behavior.
-- At this planning-synchronization stage, `tools/product-repository-cleanup` and `tools/test_product_repository_cleanup.sh` are planned artifacts and are not yet expected to exist in runtime.
-- Implementation completion will require validation wiring through `tools/test_product_repository_cleanup.sh`, structure checks, as-built checks, developer-memory checks, aggregate tests, CI, and pre-commit.
 
 ## Implemented Menu Prerequisite Control
 
@@ -160,6 +163,7 @@ Lesson repository test passed.
 
 Latest local verification reached this target after synchronizing the 7-day parity implementation and the expanded language-list implementation.
 The latest verification target now also includes `Menu prerequisite tests passed.`
+The latest verification target now also includes `Product repository cleanup tests passed.`
 Real product operations testing remains available through `tools/test_production_operations.sh` when an external product repository is intentionally recreated.
 
 ## Remaining Work
