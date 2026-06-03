@@ -25,8 +25,13 @@ WORKFLOW_PAIR_SINGLE_FILE_REASON="aggregate test may run while remediation docum
 ./tools/git-hooks status >/dev/null
 ./tools/test_git_hooks.sh
 ./tools/resource-guard status >/dev/null
+./tools/resource-guard summary >/dev/null
+./tools/resource-guard summary --short >/dev/null
 ./tools/test_resource_guard.sh
+./tools/test_resource_guard_summary.sh
 ./tools/test_resource_cleanup.sh
+./tools/test_git_hooks_parallel.sh
+./tools/check_ci_workflow_structure.sh
 ./tools/product-improvement status >/dev/null
 ./tools/external-integration status >/dev/null
 ./tools/product-repository-cleanup status >/dev/null

@@ -9,7 +9,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  lesson-checks:
+  syntax-checks:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -33,13 +33,16 @@ jobs:
           bash -n tools/check_workflow_pair_sync.sh
           bash -n tools/check_review_protocol.sh
           bash -n tools/check_developer_memory_requirements.sh
+          bash -n tools/check_ci_workflow_structure.sh
           bash -n tools/test_lesson_playwright.sh
           bash -n tools/test_docs_tour.sh
           bash -n tools/test_as_built_sync_contract.sh
           bash -n tools/test_git_workflow_policy.sh
           bash -n tools/test_git_hooks.sh
           bash -n tools/test_resource_guard.sh
+          bash -n tools/test_resource_guard_summary.sh
           bash -n tools/test_resource_cleanup.sh
+          bash -n tools/test_git_hooks_parallel.sh
           bash -n tools/test_lesson.sh
           bash -n tools/test_menu_prerequisites.sh
           bash -n tools/test_product_gate_tools.sh
@@ -59,7 +62,13 @@ jobs:
           bash -n tools/lesson
           bash -n tools/learn
 
-      - name: Lesson structure
+  structure-docs-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Lesson and document structure
         run: |
           ./tools/check_lesson_structure.sh
           ./tools/check_document_organization.sh
@@ -70,13 +79,6 @@ jobs:
           ./tools/check_workflow_pair_sync.sh
           ./tools/check_review_protocol.sh
           ./tools/check_developer_memory_requirements.sh
-          ./tools/test_docs_tour.sh
-          ./tools/test_as_built_sync_contract.sh
-          ./tools/test_git_workflow_policy.sh
-          ./tools/test_git_hooks.sh
-          ./tools/test_resource_guard.sh
-          ./tools/test_resource_cleanup.sh
-          ./tools/test_product_repository_cleanup.sh
 
       - name: Repository boundary
         run: ./tools/check_repository_boundary.sh
@@ -109,31 +111,66 @@ jobs:
           mkdir "$(awk -F '\t' '$1 == "product_repo_name" { print $2 }' lesson/LESSON_CONFIG.tsv)"
           ./tools/check_lesson_structure.sh >/tmp/nested.out 2>&1 && exit 1 || true
 
+  policy-regression-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Policy and workflow regressions
+        run: |
+          ./tools/test_docs_tour.sh
+          ./tools/test_as_built_sync_contract.sh
+          ./tools/test_git_workflow_policy.sh
+          ./tools/test_git_hooks.sh
+          ./tools/test_resource_guard.sh
+          ./tools/test_resource_guard_summary.sh
+          ./tools/test_resource_cleanup.sh
+          ./tools/test_git_hooks_parallel.sh
+          ./tools/test_menu_prerequisites.sh
+          ./tools/test_product_gate_tools.sh
+          ./tools/test_product_repository_cleanup.sh
+          ./tools/check_ci_workflow_structure.sh
+
+  lesson-cli-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: 7-day lesson CLI regression
+        run: ./tools/test_lesson.sh
+
+  playwright-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
       - name: Install browser test dependencies
         run: |
           npm install
           npx playwright install chromium
 
-      - name: 7-day lesson CLI regression
-        run: ./tools/test_lesson.sh
+      - name: Lesson Playwright dashboard checks
+        run: ./tools/test_lesson_playwright.sh
 
-      - name: Menu prerequisite regression
-        run: ./tools/test_menu_prerequisites.sh
+  aggregate-and-full-hooks:
+    runs-on: ubuntu-latest
+    needs:
+      - syntax-checks
+      - structure-docs-checks
+      - policy-regression-tests
+      - lesson-cli-tests
+      - playwright-tests
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
 
-      - name: Documentation tour regression
-        run: ./tools/test_docs_tour.sh
-
-      - name: Git workflow policy regression
-        run: ./tools/test_git_workflow_policy.sh
-
-      - name: Git hooks policy regression
-        run: ./tools/test_git_hooks.sh
-
-      - name: Resource guard regression
-        run: ./tools/test_resource_guard.sh
-
-      - name: Resource cleanup regression
-        run: ./tools/test_resource_cleanup.sh
+      - name: Install browser test dependencies
+        run: |
+          npm install
+          npx playwright install chromium
 
       - name: Lesson aggregate test
         run: ./tools/test_lesson_repository.sh

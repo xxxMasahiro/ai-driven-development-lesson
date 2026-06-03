@@ -62,6 +62,7 @@ case "$cmd" in
   run)
     mode="$(git_hooks_mode)" || exit 1
     no_cache="false"
+    worker_count="1"
     while [[ $# -gt 0 ]]; do
       case "$1" in
         --mode)
@@ -88,10 +89,11 @@ case "$cmd" in
           printf 'Resource guard pre-check skipped for this environment.\n'
         elif [[ -f "$(resource_guard_policy_file)" && -f "$(resource_guard_settings_file)" ]]; then
           resource_guard_check_profile git-hooks-full
+          worker_count="$(resource_guard_recommended_jobs git-hooks-full)"
         fi
         ;;
     esac
-    git_hooks_run_checks "$mode" "$no_cache"
+    git_hooks_run_checks_parallel "$mode" "$no_cache" "$worker_count"
     ;;
   help|--help|-h)
     usage

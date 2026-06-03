@@ -1,0 +1,135 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+workflow_block() {
+  local file="$1"
+  local job="$2"
+  awk -v job="$job" '
+    $0 == "  " job ":" {
+      in_job = 1
+      print
+      next
+    }
+    in_job && $0 ~ /^  [A-Za-z0-9_-]+:$/ {
+      exit
+    }
+    in_job {
+      print
+    }
+  ' "$file"
+}
+
+require_file_contains() {
+  local file="$1"
+  local pattern="$2"
+  if ! grep -Fq -- "$pattern" "$file"; then
+    printf 'Missing required workflow text in %s: %s\n' "$file" "$pattern" >&2
+    return 1
+  fi
+}
+
+require_job() {
+  local file="$1"
+  local job="$2"
+  if [[ -z "$(workflow_block "$file" "$job")" ]]; then
+    printf 'Missing required job in %s: %s\n' "$file" "$job" >&2
+    return 1
+  fi
+}
+
+require_job_contains() {
+  local file="$1"
+  local job="$2"
+  local pattern="$3"
+  if ! workflow_block "$file" "$job" | grep -Fq -- "$pattern"; then
+    printf 'Missing required text in %s job %s: %s\n' "$file" "$job" "$pattern" >&2
+    return 1
+  fi
+}
+
+check_main_ci() {
+  local file="$ROOT/.github/workflows/ci.yml"
+  local job
+  local required_jobs=(
+    syntax-checks
+    structure-docs-checks
+    policy-regression-tests
+    lesson-cli-tests
+    playwright-tests
+    aggregate-and-full-hooks
+  )
+
+  for job in "${required_jobs[@]}"; do
+    require_job "$file" "$job"
+  done
+
+  require_job_contains "$file" syntax-checks "bash -n tools/check_ci_workflow_structure.sh"
+  require_job_contains "$file" structure-docs-checks "./tools/check_lesson_structure.sh"
+  require_job_contains "$file" structure-docs-checks "./tools/check_as_built_docs.sh"
+  require_job_contains "$file" policy-regression-tests "./tools/test_resource_guard_summary.sh"
+  require_job_contains "$file" policy-regression-tests "./tools/test_git_hooks_parallel.sh"
+  require_job_contains "$file" policy-regression-tests "./tools/check_ci_workflow_structure.sh"
+  require_job_contains "$file" lesson-cli-tests "./tools/test_lesson.sh"
+  require_job_contains "$file" playwright-tests "npm install"
+  require_job_contains "$file" playwright-tests "npx playwright install chromium"
+  require_job_contains "$file" playwright-tests "./tools/test_lesson_playwright.sh"
+  require_job_contains "$file" aggregate-and-full-hooks "needs:"
+  require_job_contains "$file" aggregate-and-full-hooks "- syntax-checks"
+  require_job_contains "$file" aggregate-and-full-hooks "- structure-docs-checks"
+  require_job_contains "$file" aggregate-and-full-hooks "- policy-regression-tests"
+  require_job_contains "$file" aggregate-and-full-hooks "- lesson-cli-tests"
+  require_job_contains "$file" aggregate-and-full-hooks "- playwright-tests"
+  require_job_contains "$file" aggregate-and-full-hooks "npm install"
+  require_job_contains "$file" aggregate-and-full-hooks "npx playwright install chromium"
+  require_job_contains "$file" aggregate-and-full-hooks "RESOURCE_GUARD_SKIP_LOCAL_CHECK: \"1\""
+  require_job_contains "$file" aggregate-and-full-hooks "./tools/test_lesson_repository.sh"
+  require_job_contains "$file" aggregate-and-full-hooks "./tools/git-hooks run --mode full --no-cache"
+}
+
+check_lesson14_ci() {
+  local file="$ROOT/.github/workflows/lesson14-ci.yml"
+  local job
+  local required_jobs=(
+    syntax-checks
+    lesson14-structure-sync
+    policy-regression-tests
+    lesson14-cli-tests
+    playwright-tests
+    aggregate-and-full-hooks
+  )
+
+  for job in "${required_jobs[@]}"; do
+    require_job "$file" "$job"
+  done
+
+  require_job_contains "$file" syntax-checks "bash -n tools/check_ci_workflow_structure.sh"
+  require_job_contains "$file" lesson14-structure-sync "./tools/check_lesson14_structure.sh"
+  require_job_contains "$file" lesson14-structure-sync "./tools/check_lesson14_sync.sh"
+  require_job_contains "$file" policy-regression-tests "./tools/test_resource_guard_summary.sh"
+  require_job_contains "$file" policy-regression-tests "./tools/test_git_hooks_parallel.sh"
+  require_job_contains "$file" policy-regression-tests "./tools/check_ci_workflow_structure.sh"
+  require_job_contains "$file" lesson14-cli-tests "./tools/test_lesson14.sh"
+  require_job_contains "$file" playwright-tests "npm install"
+  require_job_contains "$file" playwright-tests "npx playwright install chromium"
+  require_job_contains "$file" playwright-tests "./tools/test_lesson_playwright.sh"
+  require_job_contains "$file" aggregate-and-full-hooks "needs:"
+  require_job_contains "$file" aggregate-and-full-hooks "- syntax-checks"
+  require_job_contains "$file" aggregate-and-full-hooks "- lesson14-structure-sync"
+  require_job_contains "$file" aggregate-and-full-hooks "- policy-regression-tests"
+  require_job_contains "$file" aggregate-and-full-hooks "- lesson14-cli-tests"
+  require_job_contains "$file" aggregate-and-full-hooks "- playwright-tests"
+  require_job_contains "$file" aggregate-and-full-hooks "npm install"
+  require_job_contains "$file" aggregate-and-full-hooks "npx playwright install chromium"
+  require_job_contains "$file" aggregate-and-full-hooks "RESOURCE_GUARD_SKIP_LOCAL_CHECK: \"1\""
+  require_job_contains "$file" aggregate-and-full-hooks "./tools/test_lesson_repository.sh"
+  require_job_contains "$file" aggregate-and-full-hooks "./tools/git-hooks run --mode full --no-cache"
+}
+
+require_file_contains "$ROOT/.github/workflows/ci.yml" "concurrency:"
+require_file_contains "$ROOT/.github/workflows/lesson14-ci.yml" "concurrency:"
+check_main_ci
+check_lesson14_ci
+
+printf 'CI workflow structure check passed.\n'

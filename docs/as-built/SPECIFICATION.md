@@ -247,27 +247,27 @@ Safe cleanup is implemented as a `tools/resource-guard cleanup` action that reus
 - Recent targets are reported as `cleanup-kept-recent` when an age filter is active.
 - The implementation does not clean global caches, OS caches, swap, Docker resources, running processes, product repositories, or files outside the lesson repository.
 
-### Planned Resource Guard Summary And Parallel CI
+### Implemented Resource Guard Summary And Parallel CI
 
-The planned resource guard summary and parallel verification work extends the existing resource-budgeted guard without changing its current safety model.
-The feature remains planned until command, local runner, CI, and tests are implemented.
+The resource guard summary and parallel verification implementation extends the existing resource-budgeted guard without changing its current safety model.
+The feature is implemented through the resource guard command, local Git hooks runner, CI job split, structure check, and regression tests.
 
-- `tools/resource-guard summary` will show a learner-friendly operational summary.
-  - It will include memory budget percent, memory budget MiB, available memory MiB, effective swap budget, repository swap-budget usage percent, usage stage, current decision, local profile-specific recommended jobs, and a short explanation that profile weights produce different parallel counts.
-  - It will explain that local `memory_budget_percent` controls local execution only.
-  - It will explain that GitHub Actions uses CI job structure rather than the local PC memory setting.
-- `tools/resource-guard summary --short` will show the compact form of the same information without extended explanatory paragraphs.
-- Profile names and job recommendations will be derived from `docs/workflow/RESOURCE_POLICY.tsv` and existing `resource_guard_recommended_jobs` behavior.
-- The implementation will not add `target_parallel_jobs`; `max_parallel_jobs` remains an upper bound and `auto` remains calculation-driven.
-- Local Git hooks full or fast execution will obtain the `git-hooks-full` recommendation and use it as the maximum worker count for parallel-safe checks.
+- `tools/resource-guard summary` shows a learner-friendly operational summary.
+  - It includes memory budget percent, memory budget MiB, available memory MiB, effective swap budget, repository swap-budget usage percent, usage stage, current decision, local profile-specific recommended jobs, and a short explanation that profile weights produce different parallel counts.
+  - It explains that local `memory_budget_percent` controls local execution only.
+  - It explains that GitHub Actions uses CI job structure rather than the local PC memory setting.
+- `tools/resource-guard summary --short` shows the compact form of the same information without extended explanatory paragraphs.
+- Profile names and job recommendations are derived from `docs/workflow/RESOURCE_POLICY.tsv` and existing `resource_guard_recommended_jobs` behavior.
+- The implementation does not add `target_parallel_jobs`; `max_parallel_jobs` remains an upper bound and `auto` remains calculation-driven.
+- Local Git hooks full or fast execution obtains the `git-hooks-full` recommendation and uses it as the maximum worker count for parallel-safe checks.
 - Minimal Git hooks execution remains conservative and can stay serial.
-- A new parallel group configuration will classify checks as parallel-safe, serial, heavy, or final-gate behavior without changing the existing `docs/workflow/GIT_HOOK_CHECKS.tsv` four-column contract.
-- Checks missing from the parallel group configuration will be treated as serial by default.
-- Parallel check output will be captured per check and replayed in check definition order.
+- `docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv` classifies checks as parallel-safe, serial, heavy, or final-gate behavior without changing the existing `docs/workflow/GIT_HOOK_CHECKS.tsv` four-column contract.
+- Checks missing from the parallel group configuration are treated as serial by default.
+- Parallel check output is captured per check and replayed in check definition order.
 - Any failed parallel check makes the whole run fail and reports the failing check id.
 - Resource guard `safe-stop` prevents new parallel verification work.
 - Resource guard serial or fallback states reduce local execution to serial behavior.
-- GitHub Actions CI will be split into runner-oriented jobs:
+- GitHub Actions CI is split into runner-oriented jobs:
   - `syntax-checks`,
   - `structure-docs-checks`,
   - `policy-regression-tests`,
@@ -275,11 +275,11 @@ The feature remains planned until command, local runner, CI, and tests are imple
   - `playwright-tests`,
   - final `aggregate-and-full-hooks`.
 - CI job splitting must preserve existing check coverage and may only optimize execution structure.
-- A required CI workflow structure check will verify the split workflow's required job names, `needs` relationships, and required command coverage.
-- The final `aggregate-and-full-hooks` job will install npm dependencies and Playwright dependencies before running aggregate repository tests or full hooks, because GitHub Actions jobs do not share dependency setup from prior jobs.
-- CI full-hooks execution will keep the CI-safe local-resource bypass behavior such as `RESOURCE_GUARD_SKIP_LOCAL_CHECK=1` or an equivalent documented mechanism.
+- A required CI workflow structure check verifies the split workflow's required job names, `needs` relationships, and required command coverage.
+- The final `aggregate-and-full-hooks` job installs npm dependencies and Playwright dependencies before running aggregate repository tests or full hooks, because GitHub Actions jobs do not share dependency setup from prior jobs.
+- CI full-hooks execution keeps the CI-safe local-resource bypass behavior `RESOURCE_GUARD_SKIP_LOCAL_CHECK=1`.
 - Local Playwright and Git hooks can use resource guard recommendations, but GitHub Actions job splitting is runner-oriented and will not apply local WSL memory settings directly.
-- The `resource_guard_summary_parallel_ci` sync contract remains planning-only until implementation updates the contract with actual runtime artifacts, runtime tests, and runtime evidence.
+- The `resource_guard_summary_parallel_ci` sync contract is implemented with actual runtime artifacts, runtime tests, and runtime evidence.
 
 ### As-Built Sync Contract Records
 
@@ -335,9 +335,9 @@ ARTIFACTS: docs/workflow/RESOURCE_POLICY.tsv, learning/RESOURCE_SETTINGS.tsv, to
 TESTS: tools/test_resource_cleanup.sh
 
 SYNC-ID: resource_guard_summary_parallel_ci
-STATUS: planned
-ARTIFACTS: docs/memory/DEVELOPER_MEMORY.md, docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv
-TESTS: tools/check_as_built_sync_contract.sh
+STATUS: implemented
+ARTIFACTS: docs/workflow/RESOURCE_POLICY.tsv, learning/RESOURCE_SETTINGS.tsv, tools/lib/resource_guard.sh, tools/resource-guard, docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv, tools/lib/git_hooks_policy.sh, tools/git-hooks, tools/test_resource_guard_summary.sh, tools/test_git_hooks_parallel.sh, tools/check_ci_workflow_structure.sh, .github/workflows/ci.yml, .github/workflows/lesson14-ci.yml, tools/test_lesson_repository.sh
+TESTS: tools/test_resource_guard_summary.sh, tools/test_git_hooks_parallel.sh, tools/check_ci_workflow_structure.sh
 
 SYNC-ID: learner_context_foundation
 STATUS: planned

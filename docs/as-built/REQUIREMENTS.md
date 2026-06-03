@@ -206,17 +206,17 @@ The goal is to prevent Playwright reports, test result directories, marked Git h
 - Do not perform OS cache cleanup, `drop_caches`, swap mutation, `.wslconfig` mutation, Docker cleanup, process killing, or product repository deletion.
 - Preserve existing `resource-guard status`, `check`, `recommend-jobs`, and `monitor` behavior.
 
-## Planned Resource Guard Summary And Parallel CI Requirements
+## Implemented Resource Guard Summary And Parallel CI Requirements
 
 The lesson repository must make resource guard behavior easier to understand and must use the existing resource guard decisions to improve verification speed without trading away safety, existing checks, or existing lesson behavior.
-This is planned implementation work synchronized from `docs/memory/DEVELOPER_MEMORY.md`; it is not runtime behavior until the implementation artifacts and tests are added.
+This implementation is synchronized from `docs/memory/DEVELOPER_MEMORY.md` and is present as runtime command, Git hooks runner, CI workflow, and regression-test behavior.
 
-- Add a user-facing `./tools/resource-guard summary` command that explains memory budget, swap budget, current state, local profile-specific recommended jobs, and the distinction between local and CI parallelism.
-- Add `./tools/resource-guard summary --short` for a compact operational view.
+- Provide a user-facing `./tools/resource-guard summary` command that explains memory budget, swap budget, current state, local profile-specific recommended jobs, and the distinction between local and CI parallelism.
+- Provide `./tools/resource-guard summary --short` for a compact operational view.
 - Keep `status`, `monitor`, `recommend-jobs`, `check`, and `cleanup` unchanged as existing detailed or operational commands.
 - Use existing `docs/workflow/RESOURCE_POLICY.tsv` profiles and existing `resource_guard_recommended_jobs` calculations instead of adding a `target_parallel_jobs` setting.
 - Preserve the safety model where recommended jobs vary by workload profile; `git-hooks-full` may recommend four workers while Playwright and aggregate checks recommend fewer workers.
-- Implement local Git hooks parallel execution only for checks explicitly classified as safe to run in parallel.
+- Implement local Git hooks parallel execution only for checks explicitly classified as safe to run in parallel in `docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv`.
 - Keep serial execution available for checks that modify shared state, require ordered output, or are not classified as parallel-safe.
 - Fall back to serial execution or stop safely when resource guard returns `serial`, `serial-fallback`, or `safe-stop`.
 - Keep logs separated per check and display them in deterministic check order.
@@ -225,8 +225,8 @@ This is planned implementation work synchronized from `docs/memory/DEVELOPER_MEM
 - Require a CI workflow structure check so the split workflow mechanically verifies required job names, `needs` relationships, and required commands.
 - Ensure the final CI aggregate and full-hooks gate installs npm dependencies and Playwright dependencies before running aggregate repository tests or full hooks.
 - Preserve explicit local/CI separation: local Git hooks and Playwright may use resource guard recommendations, while CI full hooks must keep the CI-safe local-resource bypass behavior such as `RESOURCE_GUARD_SKIP_LOCAL_CHECK=1` or an equivalent documented mechanism.
-- Add standalone tests for summary output and Git hooks parallel execution, and wire them into aggregate, pre-commit, and CI verification.
-- Keep the `resource_guard_summary_parallel_ci` sync contract `planned` until actual runtime artifacts, runtime tests, and runtime evidence are added to the contract.
+- Provide standalone tests for summary output and Git hooks parallel execution, and wire them into aggregate, pre-commit, and CI verification.
+- Keep the `resource_guard_summary_parallel_ci` sync contract implemented with actual runtime artifacts, runtime tests, and runtime evidence.
 - Keep the design configuration-driven, reusable, and independent of a specific product stack or single learner-facing phrase.
 
 ## As-Built Sync Contract Records
@@ -283,9 +283,9 @@ ARTIFACTS: docs/workflow/RESOURCE_POLICY.tsv, learning/RESOURCE_SETTINGS.tsv, to
 TESTS: tools/test_resource_cleanup.sh
 
 SYNC-ID: resource_guard_summary_parallel_ci
-STATUS: planned
-ARTIFACTS: docs/memory/DEVELOPER_MEMORY.md, docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv
-TESTS: tools/check_as_built_sync_contract.sh
+STATUS: implemented
+ARTIFACTS: docs/workflow/RESOURCE_POLICY.tsv, learning/RESOURCE_SETTINGS.tsv, tools/lib/resource_guard.sh, tools/resource-guard, docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv, tools/lib/git_hooks_policy.sh, tools/git-hooks, tools/test_resource_guard_summary.sh, tools/test_git_hooks_parallel.sh, tools/check_ci_workflow_structure.sh, .github/workflows/ci.yml, .github/workflows/lesson14-ci.yml, tools/test_lesson_repository.sh
+TESTS: tools/test_resource_guard_summary.sh, tools/test_git_hooks_parallel.sh, tools/check_ci_workflow_structure.sh
 
 SYNC-ID: learner_context_foundation
 STATUS: planned

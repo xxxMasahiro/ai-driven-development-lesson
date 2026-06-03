@@ -421,9 +421,9 @@ ARTIFACTS: docs/workflow/RESOURCE_POLICY.tsv, learning/RESOURCE_SETTINGS.tsv, to
 TESTS: tools/test_resource_cleanup.sh
 
 SYNC-ID: resource_guard_summary_parallel_ci
-STATUS: planned
-ARTIFACTS: docs/memory/DEVELOPER_MEMORY.md, docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv
-TESTS: tools/check_as_built_sync_contract.sh
+STATUS: implemented
+ARTIFACTS: docs/workflow/RESOURCE_POLICY.tsv, learning/RESOURCE_SETTINGS.tsv, tools/lib/resource_guard.sh, tools/resource-guard, docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv, tools/lib/git_hooks_policy.sh, tools/git-hooks, tools/test_resource_guard_summary.sh, tools/test_git_hooks_parallel.sh, tools/check_ci_workflow_structure.sh, .github/workflows/ci.yml, .github/workflows/lesson14-ci.yml, tools/test_lesson_repository.sh
+TESTS: tools/test_resource_guard_summary.sh, tools/test_git_hooks_parallel.sh, tools/check_ci_workflow_structure.sh
 
 SYNC-ID: learner_context_foundation
 STATUS: planned
@@ -1055,13 +1055,13 @@ It is a follow-up capability to `resource_budget_parallel_guard`, not a replacem
 - If Playwright reports are needed for debugging, use dry-run or age filtering rather than deleting them immediately.
 - If CI diverges from local behavior, keep CI cleanup checks fixture-based and non-destructive outside temporary test directories.
 
-## Planned Resource Guard Summary And Parallel CI Implementation Plan
+## Implemented Resource Guard Summary And Parallel CI Implementation Plan
 
-This planned implementation was synchronized from `docs/memory/DEVELOPER_MEMORY.md` as `resource_guard_summary_parallel_ci`.
+This implementation was synchronized from `docs/memory/DEVELOPER_MEMORY.md` as `resource_guard_summary_parallel_ci`.
 It is a follow-up to the implemented resource guard, Git hooks policy, and safe cleanup work.
 It must not replace existing `status`, `monitor`, `recommend-jobs`, `check`, `cleanup`, Git hooks modes, CI checks, pre-commit behavior, or lesson flows.
 
-### Planned Change Targets
+### Implemented Change Targets
 
 - `tools/resource-guard`
 - `tools/lib/resource_guard.sh`
@@ -1075,28 +1075,28 @@ It must not replace existing `status`, `monitor`, `recommend-jobs`, `check`, `cl
 - `tools/check_ci_workflow_structure.sh`
 - Existing aggregate and hook wiring in `tools/test_lesson_repository.sh`, `.githooks/pre-commit`, and CI workflows.
 
-### Planned Order
+### Implemented Order
 
-1. Synchronize the plan into the five as-built/workflow documents and add the planned sync contract row.
-2. Add resource guard summary helpers that read profiles from `docs/workflow/RESOURCE_POLICY.tsv` and reuse `resource_guard_recommended_jobs`.
-3. Add `tools/resource-guard summary` and `tools/resource-guard summary --short`.
-4. Add standalone summary regression tests with fixture policy/settings files.
-5. Add `docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv` for parallel-safe, serial, heavy, and final-gate classification without changing the existing `GIT_HOOK_CHECKS.tsv` contract.
-6. Add local Git hooks parallel runner support that uses the `git-hooks-full` recommendation as the maximum worker count for parallel-safe checks.
-7. Keep minimal mode conservative and serial unless a later approved change explicitly extends it.
-8. Add isolated per-check logging and deterministic replay in check definition order.
-9. Add Git hooks parallel regression tests for worker limits, serial fallback, failure reporting, and output order.
+1. Synchronized the plan into the five as-built/workflow documents and added the sync contract row.
+2. Added resource guard summary helpers that read profiles from `docs/workflow/RESOURCE_POLICY.tsv` and reuse `resource_guard_recommended_jobs`.
+3. Added `tools/resource-guard summary` and `tools/resource-guard summary --short`.
+4. Added standalone summary regression tests with fixture policy/settings files.
+5. Added `docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv` for parallel-safe, serial, heavy, and final-gate classification without changing the existing `GIT_HOOK_CHECKS.tsv` contract.
+6. Added local Git hooks parallel runner support that uses the `git-hooks-full` recommendation as the maximum worker count for parallel-safe checks.
+7. Kept minimal mode conservative and serial.
+8. Added isolated per-check logging and deterministic replay in check definition order.
+9. Added Git hooks parallel regression tests for worker limits, serial fallback, failure reporting, output order, and unclassified serial fallback.
 10. Split GitHub Actions workflows into runner-oriented jobs while preserving all existing checks.
-11. Add required CI workflow structure checks to verify required job names, `needs`, and required commands.
-12. Ensure the final CI `aggregate-and-full-hooks` job installs npm dependencies and Playwright dependencies before running aggregate repository tests or full hooks.
-13. Preserve explicit local/CI separation, including CI-safe local-resource bypass behavior such as `RESOURCE_GUARD_SKIP_LOCAL_CHECK=1` or an equivalent documented mechanism for CI full hooks.
-14. Wire new tests into aggregate, pre-commit, and CI.
-15. Update `docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv` from planning-only artifacts and tests to actual runtime artifacts, runtime tests, and runtime evidence before changing the sync ID to `implemented`.
-16. Move the sync ID from `planned` to `implemented` only after runtime artifacts and tests exist and pass.
+11. Added required CI workflow structure checks to verify required job names, `needs`, and required commands.
+12. Ensured the final CI `aggregate-and-full-hooks` job installs npm dependencies and Playwright dependencies before running aggregate repository tests or full hooks.
+13. Preserved explicit local/CI separation, including CI-safe local-resource bypass behavior with `RESOURCE_GUARD_SKIP_LOCAL_CHECK=1` for CI full hooks.
+14. Wired new tests into aggregate, pre-commit, and CI.
+15. Updated `docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv` from planning-only artifacts and tests to actual runtime artifacts, runtime tests, and runtime evidence.
+16. Moved the sync ID from `planned` to `implemented` after runtime artifacts and tests existed locally.
 
 ### Verification Plan
 
-Planned verification commands:
+Verification commands:
 
 ```bash
 bash -n tools/resource-guard tools/lib/resource_guard.sh tools/lib/git_hooks_policy.sh tools/git-hooks

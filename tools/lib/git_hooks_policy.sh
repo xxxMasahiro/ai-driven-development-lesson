@@ -18,6 +18,10 @@ git_hooks_recommendation_paths_file() {
   printf '%s\n' "${GIT_HOOKS_RECOMMENDATION_PATHS_FILE:-$LESSON_ROOT/docs/workflow/GIT_HOOK_RECOMMENDATION_PATHS.tsv}"
 }
 
+git_hooks_parallel_groups_file() {
+  printf '%s\n' "${GIT_HOOKS_PARALLEL_GROUPS_FILE:-$LESSON_ROOT/docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv}"
+}
+
 git_hooks_settings_file() {
   printf '%s\n' "${GIT_HOOKS_SETTINGS_FILE:-$LESSON_ROOT/learning/GIT_HOOK_SETTINGS.tsv}"
 }
@@ -321,6 +325,7 @@ git_hooks_print_status() {
   printf 'Mode: %s\n' "$mode"
   printf 'Policy file: %s\n' "$(git_hooks_policy_file)"
   printf 'Checks file: %s\n' "$(git_hooks_checks_file)"
+  printf 'Parallel groups file: %s\n' "$(git_hooks_parallel_groups_file)"
   printf 'Recommendation paths file: %s\n' "$(git_hooks_recommendation_paths_file)"
   printf 'Settings file: %s\n' "$(git_hooks_settings_file)"
   printf 'Cache directory: %s\n' "$(git_hooks_cache_dir)"
@@ -333,6 +338,50 @@ git_hooks_print_status() {
     printf 'Cache status: available for fast mode\n'
   fi
   git_hooks_print_recommendation
+}
+
+git_hooks_parallel_kind_for() {
+  local check_id="$1"
+  local groups_file
+  groups_file="$(git_hooks_parallel_groups_file)"
+  if [[ ! -f "$groups_file" ]]; then
+    printf 'serial\n'
+    return 0
+  fi
+  awk -F '\t' -v check_id="$check_id" '
+    $1 !~ /^#/ && $1 == check_id {
+      print $3
+      found = 1
+      exit
+    }
+    END { if (!found) print "serial" }
+  ' "$groups_file"
+}
+
+git_hooks_validate_parallel_groups() {
+  local groups_file
+  local invalid=0
+  groups_file="$(git_hooks_parallel_groups_file)"
+  [[ -f "$groups_file" ]] || return 0
+
+  while IFS=$'\t' read -r check_id parallel_group execution_kind description extra; do
+    [[ -n "${check_id:-}" ]] || continue
+    [[ "$check_id" != \#* ]] || continue
+    if [[ -n "${extra:-}" || -z "${parallel_group:-}" || -z "${execution_kind:-}" || -z "${description:-}" ]]; then
+      printf 'Malformed Git hook parallel group row for check: %s\n' "${check_id:-unknown}" >&2
+      invalid=1
+      continue
+    fi
+    case "$execution_kind" in
+      parallel|serial|heavy|final-gate) ;;
+      *)
+        printf 'Invalid Git hook execution kind for %s: %s\n' "$check_id" "$execution_kind" >&2
+        invalid=1
+        ;;
+    esac
+  done <"$groups_file"
+
+  [[ "$invalid" -eq 0 ]]
 }
 
 git_hooks_cache_file_for() {
@@ -414,6 +463,154 @@ git_hooks_run_checks() {
       break
     fi
   done <<<"$rows"
+
+  if [[ "$count" -eq 0 ]]; then
+    printf 'No Git hook checks are configured for mode: %s\n' "$mode" >&2
+    return 1
+  fi
+
+  if [[ "$failed" -ne 0 ]]; then
+    return 1
+  fi
+
+  printf 'Git hooks checks passed: %s mode (%s checks).\n' "$mode" "$count"
+}
+
+git_hooks_safe_id() {
+  printf '%s' "$1" | tr -c 'A-Za-z0-9_.-' '_'
+}
+
+git_hooks_run_parallel_batch() {
+  local root="$1"
+  local mode="$2"
+  local no_cache="$3"
+  local cache_allowed="$4"
+  local max_jobs="$5"
+  local row_separator="$6"
+  shift 6
+  local batch_rows=("$@")
+  local tmp_dir
+  local index=0
+  local running=0
+  local failed=0
+  local check_id modes command description log_file status_file safe_id
+
+  [[ "${#batch_rows[@]}" -gt 0 ]] || return 0
+  tmp_dir="$(mktemp -d)"
+
+  for row in "${batch_rows[@]}"; do
+    IFS="$row_separator" read -r check_id modes command description <<<"$row"
+    safe_id="$(git_hooks_safe_id "$check_id")"
+    log_file="$tmp_dir/$(printf '%04d' "$index")-$safe_id.log"
+    status_file="$tmp_dir/$(printf '%04d' "$index")-$safe_id.status"
+    {
+      if git_hooks_run_one "$root" "$mode" "$no_cache" "$cache_allowed" "$check_id" "$command"; then
+        printf '0\n' >"$status_file"
+      else
+        printf '1\n' >"$status_file"
+      fi
+    } >"$log_file" 2>&1 &
+    running=$((running + 1))
+    index=$((index + 1))
+    if (( running >= max_jobs )); then
+      wait || true
+      running=0
+    fi
+  done
+  wait || true
+
+  for row in "${batch_rows[@]}"; do
+    IFS="$row_separator" read -r check_id modes command description <<<"$row"
+    safe_id="$(git_hooks_safe_id "$check_id")"
+    log_file="$(find "$tmp_dir" -maxdepth 1 -type f -name "*-$safe_id.log" | sort | sed -n '1p')"
+    status_file="${log_file%.log}.status"
+    [[ -n "$log_file" && -f "$log_file" ]] && cat "$log_file"
+    if [[ ! -f "$status_file" || "$(sed -n '1p' "$status_file")" != "0" ]]; then
+      failed=1
+    fi
+  done
+
+  rm -rf "$tmp_dir"
+  [[ "$failed" -eq 0 ]]
+}
+
+git_hooks_run_checks_parallel() {
+  local mode="$1"
+  local no_cache="${2:-false}"
+  local max_jobs="${3:-1}"
+  local root
+  local cache_allowed="true"
+  local count=0
+  local failed=0
+  local rows
+  local row_separator
+  local check_id modes command description kind
+  local -a parallel_batch=()
+  row_separator=$'\034'
+
+  git_hooks_validate_mode "$mode" || return 1
+  git_hooks_validate_parallel_groups || return 1
+  if ! [[ "$max_jobs" =~ ^[1-9][0-9]*$ ]]; then
+    printf 'Invalid Git hooks parallel worker count: %s\n' "$max_jobs" >&2
+    return 1
+  fi
+  if (( max_jobs <= 1 )); then
+    git_hooks_run_checks "$mode" "$no_cache"
+    return
+  fi
+
+  root="$(git_hooks_git_root)"
+
+  if git_hooks_has_untracked_files "$root"; then
+    cache_allowed="false"
+    if [[ "$mode" == "fast" && "$no_cache" == "false" ]]; then
+      printf 'Git hooks cache disabled because untracked files are present.\n'
+    fi
+  fi
+  if [[ "$mode" == "fast" && "$no_cache" == "false" && "$cache_allowed" == "true" ]]; then
+    git_hooks_prepare_cache_dir || return 1
+  fi
+
+  flush_parallel_batch() {
+    if [[ "${#parallel_batch[@]}" -eq 0 ]]; then
+      return 0
+    fi
+    if ! git_hooks_run_parallel_batch "$root" "$mode" "$no_cache" "$cache_allowed" "$max_jobs" "$row_separator" "${parallel_batch[@]}"; then
+      parallel_batch=()
+      return 1
+    fi
+    parallel_batch=()
+  }
+
+  rows="$(git_hooks_rows_for_mode "$mode")" || return 1
+  while IFS="$row_separator" read -r check_id modes command description; do
+    [[ -n "$check_id" ]] || continue
+    if ! git_hooks_mode_contains "$modes" "$mode"; then
+      continue
+    fi
+    if [[ -z "$command" ]]; then
+      printf 'Git hook check has no command: %s\n' "$check_id" >&2
+      return 1
+    fi
+    count=$((count + 1))
+    kind="$(git_hooks_parallel_kind_for "$check_id")"
+    if [[ "$kind" == "parallel" ]]; then
+      parallel_batch+=("$check_id$row_separator$modes$row_separator$command$row_separator$description")
+      continue
+    fi
+    if ! flush_parallel_batch; then
+      failed=1
+      break
+    fi
+    if ! git_hooks_run_one "$root" "$mode" "$no_cache" "$cache_allowed" "$check_id" "$command"; then
+      failed=1
+      break
+    fi
+  done <<<"$rows"
+
+  if [[ "$failed" -eq 0 ]]; then
+    flush_parallel_batch || failed=1
+  fi
 
   if [[ "$count" -eq 0 ]]; then
     printf 'No Git hook checks are configured for mode: %s\n' "$mode" >&2

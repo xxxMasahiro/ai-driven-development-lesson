@@ -165,28 +165,28 @@ The implementation is additive to the existing resource guard and does not chang
 - [x] Wire cleanup regression into Git hooks policy and both GitHub Actions workflows.
 - [x] Move `resource_guard_safe_cleanup` to implemented after runtime artifacts and tests exist.
 
-## Planned Resource Guard Summary And Parallel CI Work
+## Implemented Resource Guard Summary And Parallel CI Work
 
-Status: planned.
+Status: implemented.
 The developer-approved proposal and implementation plan are recorded in `docs/memory/DEVELOPER_MEMORY.md`.
-Runtime implementation has not started yet.
+Runtime implementation is present for summary output, local Git hooks parallel execution, CI job splitting, CI structure checks, and regression wiring.
 
 - [x] Record the proposal and implementation plan in developer memory.
-- [x] Synchronize this planned work into the five as-built/workflow documents.
-- [ ] Add `tools/resource-guard summary`.
-- [ ] Add `tools/resource-guard summary --short`.
-- [ ] Add summary helpers to `tools/lib/resource_guard.sh`.
-- [ ] Add `tools/test_resource_guard_summary.sh`.
-- [ ] Add `docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv`.
-- [ ] Add local Git hooks parallel runner support while preserving existing serial fallback behavior.
-- [ ] Add `tools/test_git_hooks_parallel.sh`.
-- [ ] Split GitHub Actions workflows into CI-runner-oriented jobs without removing existing checks.
-- [ ] Add required CI workflow structure checks for split workflow job names, `needs`, and required commands.
-- [ ] Ensure the final CI aggregate and full-hooks gate installs npm dependencies and Playwright dependencies before running aggregate repository tests or full hooks.
-- [ ] Preserve explicit local/CI separation, including CI-safe local-resource bypass behavior for CI full hooks.
-- [ ] Wire new tests into aggregate, pre-commit, and CI.
-- [ ] Update sync contract artifacts, tests, and runtime evidence from planning-only entries to actual runtime entries.
-- [ ] Move `resource_guard_summary_parallel_ci` to implemented only after runtime artifacts and tests pass.
+- [x] Synchronize this implemented work into the five as-built/workflow documents.
+- [x] Add `tools/resource-guard summary`.
+- [x] Add `tools/resource-guard summary --short`.
+- [x] Add summary helpers to `tools/lib/resource_guard.sh`.
+- [x] Add `tools/test_resource_guard_summary.sh`.
+- [x] Add `docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv`.
+- [x] Add local Git hooks parallel runner support while preserving existing serial fallback behavior.
+- [x] Add `tools/test_git_hooks_parallel.sh`.
+- [x] Split GitHub Actions workflows into CI-runner-oriented jobs without removing existing checks.
+- [x] Add required CI workflow structure checks for split workflow job names, `needs`, and required commands.
+- [x] Ensure the final CI aggregate and full-hooks gate installs npm dependencies and Playwright dependencies before running aggregate repository tests or full hooks.
+- [x] Preserve explicit local/CI separation, including CI-safe local-resource bypass behavior for CI full hooks.
+- [x] Wire new tests into aggregate, pre-commit, and CI.
+- [x] Update sync contract artifacts, tests, and runtime evidence from planning-only entries to actual runtime entries.
+- [x] Move `resource_guard_summary_parallel_ci` to implemented after runtime artifacts and tests pass locally.
 
 ## Implemented Documentation Map Synchronization
 
@@ -320,9 +320,9 @@ ARTIFACTS: docs/workflow/RESOURCE_POLICY.tsv, learning/RESOURCE_SETTINGS.tsv, to
 TESTS: tools/test_resource_cleanup.sh
 
 SYNC-ID: resource_guard_summary_parallel_ci
-STATUS: planned
-ARTIFACTS: docs/memory/DEVELOPER_MEMORY.md, docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv
-TESTS: tools/check_as_built_sync_contract.sh
+STATUS: implemented
+ARTIFACTS: docs/workflow/RESOURCE_POLICY.tsv, learning/RESOURCE_SETTINGS.tsv, tools/lib/resource_guard.sh, tools/resource-guard, docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv, tools/lib/git_hooks_policy.sh, tools/git-hooks, tools/test_resource_guard_summary.sh, tools/test_git_hooks_parallel.sh, tools/check_ci_workflow_structure.sh, .github/workflows/ci.yml, .github/workflows/lesson14-ci.yml, tools/test_lesson_repository.sh
+TESTS: tools/test_resource_guard_summary.sh, tools/test_git_hooks_parallel.sh, tools/check_ci_workflow_structure.sh
 
 SYNC-ID: learner_context_foundation
 STATUS: planned

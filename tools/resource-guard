@@ -11,6 +11,7 @@ usage() {
   cat <<'USAGE'
 Usage:
   ./tools/resource-guard status [--profile <profile>]
+  ./tools/resource-guard summary [--short]
   ./tools/resource-guard check --profile <profile>
   ./tools/resource-guard recommend-jobs --profile <profile> [--value-only]
   ./tools/resource-guard monitor --profile <profile>
@@ -20,6 +21,7 @@ USAGE
 
 profile="default"
 value_only="false"
+summary_format="default"
 
 parse_profile_args() {
   while [[ $# -gt 0 ]]; do
@@ -34,6 +36,21 @@ parse_profile_args() {
         ;;
       --value-only)
         value_only="true"
+        shift
+        ;;
+      *)
+        usage >&2
+        exit 1
+        ;;
+    esac
+  done
+}
+
+parse_summary_args() {
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --short)
+        summary_format="short"
         shift
         ;;
       *)
@@ -95,6 +112,10 @@ case "$cmd" in
     resource_guard_validate_settings
     resource_guard_require_profile "$profile"
     resource_guard_status_report "$profile"
+    ;;
+  summary)
+    parse_summary_args "$@"
+    resource_guard_summary_report "$summary_format"
     ;;
   check)
     parse_profile_args "$@"

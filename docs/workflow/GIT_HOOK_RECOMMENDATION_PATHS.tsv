@@ -3,6 +3,7 @@
 .github/workflows/	full-no-cache	GitHub Actions changes need CI-equivalent local verification before push.
 docs/workflow/GIT_HOOKS_POLICY.tsv	full-no-cache	Git hooks policy changes affect local verification behavior.
 docs/workflow/GIT_HOOK_CHECKS.tsv	full-no-cache	Git hooks check-list changes affect local verification behavior.
+docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv	full-no-cache	Git hooks parallel grouping changes affect local verification behavior.
 docs/workflow/GIT_HOOK_RECOMMENDATION_PATHS.tsv	full-no-cache	Git hooks recommendation-policy changes affect local verification guidance.
 docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv	full-no-cache	As-built sync-contract changes affect mechanical document synchronization.
 docs/workflow/RESOURCE_POLICY.tsv	full-no-cache	Resource policy changes affect local verification behavior.

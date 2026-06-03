@@ -78,6 +78,20 @@ resource_guard_profile_job_mib() {
   }
 }
 
+resource_guard_profile_rows() {
+  local policy_file
+  policy_file="$(resource_guard_policy_file)"
+  awk -F '\t' '
+    $1 !~ /^#/ && $1 == "profile" {
+      printf "%s\t%s\t%s\n", $2, $3, $4
+    }
+  ' "$policy_file"
+}
+
+resource_guard_profiles() {
+  resource_guard_profile_rows | awk -F '\t' '{ print $1 }'
+}
+
 resource_guard_require_profile() {
   resource_guard_profile_job_mib "$1" >/dev/null
 }
@@ -516,6 +530,74 @@ resource_guard_status_report() {
   printf 'Usage stage: %s\n' "$(resource_guard_usage_stage "$usage_percent")"
   printf 'Decision: %s\n' "$decision"
   printf 'Recommended jobs: %s\n' "$recommended_jobs"
+}
+
+resource_guard_recommended_jobs_or_status() {
+  local profile="$1"
+  local jobs
+  if jobs="$(resource_guard_recommended_jobs "$profile" 2>/dev/null)"; then
+    printf '%s\n' "$jobs"
+  else
+    printf 'not-available-safe-stop\n'
+  fi
+}
+
+resource_guard_summary_report() {
+  local format="${1:-default}"
+  local usage_percent stage decision profile label job_mib recommended
+
+  resource_guard_validate_policy || return 1
+  resource_guard_validate_settings || return 1
+
+  usage_percent="$(resource_guard_swap_budget_usage_percent)"
+  stage="$(resource_guard_usage_stage "$usage_percent")"
+  decision="$(resource_guard_decision default)"
+
+  if [[ "$format" == "short" ]]; then
+    printf 'Resource guard summary (short)\n'
+    printf 'memory_budget_percent=%s\n' "$(resource_guard_setting_value memory_budget_percent)"
+    printf 'memory_budget_mib=%s\n' "$(resource_guard_memory_budget_mib)"
+    printf 'memory_available_mib=%s\n' "$(resource_guard_mem_available_mib)"
+    printf 'swap_budget_mib=%s\n' "$(resource_guard_effective_swap_budget_mib)"
+    printf 'swap_usage_percent=%s\n' "$usage_percent"
+    printf 'usage_stage=%s\n' "$stage"
+    printf 'decision=%s\n' "$decision"
+    printf 'max_parallel_jobs=%s\n' "$(resource_guard_setting_value max_parallel_jobs)"
+    while IFS=$'\t' read -r profile job_mib label; do
+      [[ -n "${profile:-}" ]] || continue
+      recommended="$(resource_guard_recommended_jobs_or_status "$profile")"
+      printf 'profile=%s recommended_jobs=%s job_mib=%s label=%s\n' "$profile" "$recommended" "$job_mib" "$label"
+    done < <(resource_guard_profile_rows)
+    printf 'ci_parallelism=workflow-job-splitting\n'
+    return 0
+  fi
+
+  printf 'Resource guard summary\n'
+  printf '\n'
+  printf 'Current local resource budget:\n'
+  printf -- '- Memory budget percent: %s%%\n' "$(resource_guard_setting_value memory_budget_percent)"
+  printf -- '- Memory total MiB: %s\n' "$(resource_guard_mem_total_mib)"
+  printf -- '- Memory available MiB: %s\n' "$(resource_guard_mem_available_mib)"
+  printf -- '- Memory budget MiB: %s\n' "$(resource_guard_memory_budget_mib)"
+  printf -- '- Swap storage percent: %s%%\n' "$(resource_guard_setting_value swap_storage_percent)"
+  printf -- '- Swap GiB limit: %sGiB\n' "$(resource_guard_setting_value swap_gib_limit)"
+  printf -- '- Effective swap budget MiB: %s\n' "$(resource_guard_effective_swap_budget_mib)"
+  printf -- '- Repository swap-budget usage percent: %s%%\n' "$usage_percent"
+  printf -- '- Usage stage: %s\n' "$stage"
+  printf -- '- Decision: %s\n' "$decision"
+  printf -- '- Maximum parallel jobs setting: %s\n' "$(resource_guard_setting_value max_parallel_jobs)"
+  printf '\n'
+  printf 'Local profile recommendations:\n'
+  while IFS=$'\t' read -r profile job_mib label; do
+    [[ -n "${profile:-}" ]] || continue
+    recommended="$(resource_guard_recommended_jobs_or_status "$profile")"
+    printf -- '- %s: %s recommended job(s), %s MiB/job (%s)\n' "$profile" "$recommended" "$job_mib" "$label"
+  done < <(resource_guard_profile_rows)
+  printf '\n'
+  printf 'CI parallelism:\n'
+  printf -- '- Local memory settings control local execution only.\n'
+  printf -- '- GitHub Actions uses workflow job splitting for CI parallelism.\n'
+  printf -- '- A higher Git hooks recommendation does not force Playwright or aggregate checks to use the same worker count.\n'
 }
 
 resource_guard_check_profile() {
