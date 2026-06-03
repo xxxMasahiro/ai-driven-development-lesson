@@ -10,6 +10,7 @@ The implemented Git workflow policy now applies at menu level for items 1 throug
 The current implemented Git workflow action settings separate Git workflow actions into detailed controls for commit, push, PR creation, PR CI monitoring, merge execution, developer-responsibility auto-merge, main CI monitoring, and local/remote sync monitoring while preserving existing broad Git settings and menu-wide Git policy behavior.
 The current implemented Git hooks policy provides faster safe serial pre-commit behavior with `full`, `fast`, and `minimal` modes plus conservative Git-local caching.
 The current planned learner context foundation adds source documents under `learning/context/` for the next lesson-content implementation cycle; it does not yet change runtime lesson output.
+The current planned learner context runtime integration separates learning context from workflow context; Free Development Mode must remain a workflow and must not be implemented as a lesson.
 
 ## Key Implemented Capabilities
 
@@ -108,9 +109,11 @@ learning/context/LESSON_CONTEXT_MAP.tsv
 
 ## Next Step
 
-Review the planned learner context foundation and then prepare the next implementation plan.
-The next plan should connect `learning/context/LESSON_CONTEXT_MAP.tsv` to 7-day lesson output, 14-day lesson output, applied lesson guidance, final recaps, prompt display, security guidance, and dashboard review surfaces.
-Do not treat runtime lesson rendering as complete until that follow-up implementation and its tests are added.
+Implement the planned learner context runtime integration after reviewing the synchronized plan.
+Connect `learning/context/LESSON_CONTEXT_MAP.tsv` to 7-day lesson output, 14-day lesson output, applied lesson guidance, final recaps, prompt display, security guidance, and dashboard review surfaces.
+Add a separate workflow context map for Free Development Mode, Product Improvement, External Integration, and lesson repository maintenance.
+Do not treat Free Development Mode as a lesson.
+Do not treat runtime rendering as complete until the follow-up implementation and its tests are added.
 
 Implemented Git workflow policy scope:
 
@@ -213,6 +216,11 @@ SYNC-ID: learner_context_foundation
 STATUS: planned
 ARTIFACTS: learning/context/README.md,learning/context/AI_DRIVEN_DEVELOPMENT_FOUNDATION.md,learning/context/SECURITY_FOUNDATION.md,learning/context/LESSON_CONTEXT_MAP.tsv
 TESTS: tools/test_lesson_repository.sh
+
+SYNC-ID: learner_context_runtime_integration
+STATUS: planned
+ARTIFACTS: learning/context/README.md,learning/context/LESSON_CONTEXT_MAP.tsv
+TESTS: tools/test_lesson_repository.sh
 ```
 
 Planned learner context foundation scope:
@@ -224,6 +232,17 @@ Planned learner context foundation scope:
 - Updated `guides/DOCUMENT_MAP.md` so learners and agents can find the context source documents.
 - Synchronized the planned state through `docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv` and the five synchronized documents.
 - Runtime integration remains the next step and must not be assumed complete.
+
+Planned learner context runtime integration scope:
+
+- Sync ID: `learner_context_runtime_integration`.
+- Status: `planned`.
+- Keep 7-day lesson, 14-day lesson, and applied modules as learning contexts.
+- Keep Free Development Mode, Product Improvement, External Integration, and lesson repository maintenance as workflow contexts.
+- Planned future files include `learning/context/WORKFLOW_CONTEXT_MAP.tsv`, `tools/lib/lesson_context.sh`, `tools/lesson-context`, and `tools/test_lesson_context.sh`.
+- Planned future integration points include `tools/lesson`, `tools/lesson14`, `tools/team-development`, `tools/free-development`, `tools/product-improvement`, `tools/external-integration`, `tools/menu`, and `tools/dashboard`.
+- Future implementation must preserve existing approval gates, ordered progression, learner-selected start positions, menu prerequisites, Git workflow settings, Git hooks settings, dashboard views, CI, pre-commit, and repository-boundary behavior.
+- Future implementation must add standalone and aggregate test coverage before moving the sync ID to `implemented`.
 
 The previously synchronized menu-wide implementation is `menu_git_workflow_policy`.
 It promotes the existing Git workflow policy into a shared menu-level policy without weakening any existing lesson, menu, dashboard, cleanup, CI, pre-commit, or as-built synchronization behavior.

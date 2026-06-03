@@ -225,6 +225,11 @@ SYNC-ID: learner_context_foundation
 STATUS: planned
 ARTIFACTS: learning/context/README.md,learning/context/AI_DRIVEN_DEVELOPMENT_FOUNDATION.md,learning/context/SECURITY_FOUNDATION.md,learning/context/LESSON_CONTEXT_MAP.tsv
 TESTS: tools/test_lesson_repository.sh
+
+SYNC-ID: learner_context_runtime_integration
+STATUS: planned
+ARTIFACTS: learning/context/README.md,learning/context/LESSON_CONTEXT_MAP.tsv
+TESTS: tools/test_lesson_repository.sh
 ```
 
 ### Planned Learner Context Foundation
@@ -238,6 +243,37 @@ It is planned material for the next lesson-content implementation cycle and is n
 - `learning/context/LESSON_CONTEXT_MAP.tsv` maps context topics to lesson openings, per-topic deepening, final recaps, security coverage, prompt examples, and dashboard candidates.
 - `guides/DOCUMENT_MAP.md` links to the context directory so learners and agents can find it.
 - Runtime integration must be specified separately before lesson commands, lesson flows, prompts, dashboards, or browser views render this material.
+
+### Planned Learner Context Runtime Integration
+
+The runtime integration is planned, not implemented.
+It must render learner context through existing lesson and workflow controls while preserving the distinction between learning paths and work-producing workflows.
+
+- Learning context targets:
+  - `lesson-7` for the 7-day structured lesson.
+  - `lesson-14` for the 14-day structured lesson.
+  - `applied` for applied learning modules such as Team Development and Docker.
+- Workflow context targets:
+  - `free-development` for post-lesson or trained-user product development.
+  - `product-improvement` for improving an existing product repository.
+  - `external-integration` for connecting a product to external services or APIs.
+  - `lesson-maintenance` for improving this lesson repository itself.
+- Free Development Mode is not a lesson target; it is a workflow target that uses the learned process to build user-selected products.
+- Planned command surface:
+  - `tools/lesson-context status`
+  - `tools/lesson-context opening lesson-7|lesson-14|applied`
+  - `tools/lesson-context step lesson-7|lesson-14 <step_id>`
+  - `tools/lesson-context recap lesson-7|lesson-14|applied`
+  - `tools/lesson-context workflow free-development|product-improvement|external-integration|lesson-maintenance`
+- Planned shared implementation:
+  - `tools/lib/lesson_context.sh` loads context maps and reuses existing lesson-common settings.
+  - `learning/context/LESSON_CONTEXT_MAP.tsv` remains the learning-context source.
+  - A future `learning/context/WORKFLOW_CONTEXT_MAP.tsv` separates workflow contexts from lesson contexts.
+- Runtime output must respect the selected learning mode where applicable.
+- Runtime output must preserve workflow display language and product development language separation.
+- Dashboard integration must show learning context and workflow context in separate areas.
+- Menu integration must continue to group learning, building/extending, and lesson-maintenance actions without reclassifying Free Development Mode as a lesson.
+- Planned validation must be available through `tools/test_lesson_context.sh` and aggregate repository checks after implementation.
 
 ### Implemented Git Workflow Policy
 

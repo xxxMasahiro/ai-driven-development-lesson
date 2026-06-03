@@ -9,6 +9,7 @@ The previous implemented change added user-configurable Git workflow policy sett
 The current implemented Git workflow action settings split Git workflow behavior into detailed settings for commit, push, PR creation, PR CI monitoring, merge execution, developer-responsibility auto-merge, main CI monitoring, and local/remote sync monitoring.
 The current implemented Git hooks policy provides faster safe serial pre-commit operation through `full`, `fast`, and `minimal` modes plus conservative Git-local caching.
 The current planned learner context foundation prepares source documents under `learning/context/` for the next lesson-content implementation cycle; runtime lesson output has not been changed by that foundation step.
+The current planned learner context runtime integration separates learning context from workflow context; Free Development Mode remains a workflow, not a lesson.
 Safe product repository cleanup remains implemented for the external product repository created by the 7-day or 14-day lessons.
 It also preserves the 7-day and 14-day learning-mode, workflow display language, product development language, and expanded language-list controls.
 The shared standard language list remains `ja`, `en`, `ko`, `zh-CN`, `zh-TW`, `es`, `pt-BR`, `fr`, `de`, `id`, `vi`, `th`, `hi`, and `ar`, while `zh` remains a `zh-CN` alias and `custom` remains available.
@@ -117,6 +118,7 @@ The following developer-memory remediation items are implemented and mechanicall
 - The implemented Git workflow policy behavior is synchronized in the same five documents.
 - The implemented Git hooks policy behavior is synchronized in the same five documents.
 - The planned learner context foundation is synchronized in the same five documents as documentation foundation work for the next implementation plan.
+- The planned learner context runtime integration is synchronized in the same five documents as the next runtime implementation plan.
 - The synchronization passes only when the implemented content is present in all five documents.
 - Preserve refactorability, ecosystem fit, reusable design, generality, and the no-existing-feature-tradeoff rule while maintaining the implemented remediation.
 
@@ -245,6 +247,11 @@ SYNC-ID: learner_context_foundation
 STATUS: planned
 ARTIFACTS: learning/context/README.md,learning/context/AI_DRIVEN_DEVELOPMENT_FOUNDATION.md,learning/context/SECURITY_FOUNDATION.md,learning/context/LESSON_CONTEXT_MAP.tsv
 TESTS: tools/test_lesson_repository.sh
+
+SYNC-ID: learner_context_runtime_integration
+STATUS: planned
+ARTIFACTS: learning/context/README.md,learning/context/LESSON_CONTEXT_MAP.tsv
+TESTS: tools/test_lesson_repository.sh
 ```
 
 ## Planned Learner Context Foundation Synchronization
@@ -261,6 +268,18 @@ This is documentation foundation work only; lesson runtime output is not yet cha
 - Added matching planned sync blocks to the three as-built documents and the two workflow-state documents.
 - Preserved existing 7-day, 14-day, menu, dashboard, Git workflow, Git hooks, docs-tour, product-repository cleanup, sync-contract, CI, and pre-commit behavior.
 - Next implementation work should connect the context map to lesson openings, per-topic explanations, final recaps, prompt display, security guidance, and dashboard review surfaces.
+
+## Planned Learner Context Runtime Integration Synchronization
+
+The next planned implementation connects learner context to runtime output while preserving the distinction between lessons and workflows.
+
+- Learning context targets are 7-day lesson, 14-day lesson, and applied lesson.
+- Workflow context targets are Free Development Mode, Product Improvement, External Integration, and lesson repository maintenance.
+- Free Development Mode remains a workflow that applies the learned AI-driven development process to user-selected products.
+- Planned runtime artifacts include `tools/lib/lesson_context.sh`, `tools/lesson-context`, `learning/context/WORKFLOW_CONTEXT_MAP.tsv`, and `tools/test_lesson_context.sh`.
+- Planned integration points include `tools/lesson`, `tools/lesson14`, `tools/team-development`, `tools/free-development`, `tools/product-improvement`, `tools/external-integration`, `tools/menu`, and `tools/dashboard`.
+- Planned tests must run standalone and through aggregate checks, CI, and pre-commit.
+- Current work is synchronization only; runtime output is not yet changed.
 
 ## Implemented Git Workflow Policy Synchronization
 

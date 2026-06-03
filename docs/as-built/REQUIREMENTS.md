@@ -213,6 +213,11 @@ SYNC-ID: learner_context_foundation
 STATUS: planned
 ARTIFACTS: learning/context/README.md,learning/context/AI_DRIVEN_DEVELOPMENT_FOUNDATION.md,learning/context/SECURITY_FOUNDATION.md,learning/context/LESSON_CONTEXT_MAP.tsv
 TESTS: tools/test_lesson_repository.sh
+
+SYNC-ID: learner_context_runtime_integration
+STATUS: planned
+ARTIFACTS: learning/context/README.md,learning/context/LESSON_CONTEXT_MAP.tsv
+TESTS: tools/test_lesson_repository.sh
 ```
 
 ## Planned Learner Context Foundation Requirements
@@ -227,6 +232,23 @@ This is a documentation foundation only; runtime lesson output is not considered
 - Provide a machine-readable context map that future implementation can use to connect topics to lesson openings, per-topic explanations, recaps, and dashboard candidates.
 - Preserve the existing 7-day lesson, 14-day lesson, menu, dashboard, Git workflow, Git hooks, as-built sync, docs-tour, and product-repository cleanup behavior.
 - Do not mark runtime integration as complete until the next implementation plan adds tests and connects the context to lesson output.
+
+## Planned Learner Context Runtime Integration Requirements
+
+The lesson repository must connect the learner-context foundation to runtime guidance without treating all menu items as lessons.
+This planned work is additive and must not trade away the existing 7-day lesson, 14-day lesson, applied lesson, Free Development Mode, Product Improvement, External Integration, lesson-maintenance behavior, menu behavior, dashboard behavior, Git workflow policy, Git hooks policy, CI, pre-commit, docs-tour, or as-built sync behavior.
+
+- Treat 7-day, 14-day, and applied modules as learning contexts.
+- Treat Free Development Mode, Product Improvement, External Integration, and lesson repository improvement as workflow contexts, not lessons.
+- Keep Free Development Mode as a post-lesson or already-trained-user workflow that applies the repository's recommended AI-driven development process to user-selected products.
+- Provide runtime guidance that can show opening context, per-topic context, and recap context for structured learning paths.
+- Provide workflow guidance that can show purpose, required documents, safety checks, and copy-paste prompts for product-facing workflows.
+- Use the existing learning mode, workflow display language, product development language, menu prerequisite, Git workflow, dashboard, and repository-boundary systems.
+- Add or extend machine-readable context maps instead of hard-coding one-off branches or fixed phrases.
+- Keep repository source context in English while allowing runtime facilitation to follow the selected workflow display language.
+- Add a standalone context command and regression test that can also be called from aggregate tests, CI, and pre-commit.
+- Keep new checks independent of a specific product stack, specific learner-facing phrase, or single narrow example.
+- Do not mark this runtime integration as implemented until the command surface, lesson/workflow integration, dashboard integration, documentation synchronization, and tests are complete.
 
 ## Implemented Git Workflow Policy Requirements
 

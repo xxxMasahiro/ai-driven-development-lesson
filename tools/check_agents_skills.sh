@@ -47,8 +47,8 @@ require_pre_commit_check() {
       END { exit found ? 0 : 1 }
     ' "$ROOT/.githooks/pre-commit" \
     && [[ -f "$ROOT/docs/workflow/GIT_HOOK_CHECKS.tsv" ]]; then
-    hook_mode="$(git_hooks_mode)" || true
-    if [[ -n "$hook_mode" ]]; then
+    hook_mode="full"
+    if git_hooks_validate_mode "$hook_mode" >/dev/null 2>&1; then
       row_separator=$'\034'
       rows="$(git_hooks_rows_for_mode "$hook_mode")" || rows=""
       while IFS="$row_separator" read -r _ _ row_command _; do

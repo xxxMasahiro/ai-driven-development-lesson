@@ -414,6 +414,11 @@ SYNC-ID: learner_context_foundation
 STATUS: planned
 ARTIFACTS: learning/context/README.md,learning/context/AI_DRIVEN_DEVELOPMENT_FOUNDATION.md,learning/context/SECURITY_FOUNDATION.md,learning/context/LESSON_CONTEXT_MAP.tsv
 TESTS: tools/test_lesson_repository.sh
+
+SYNC-ID: learner_context_runtime_integration
+STATUS: planned
+ARTIFACTS: learning/context/README.md,learning/context/LESSON_CONTEXT_MAP.tsv
+TESTS: tools/test_lesson_repository.sh
 ```
 
 ## Planned Learner Context Foundation Plan
@@ -446,6 +451,117 @@ The next implementation plan should connect these files to lesson output, dashbo
 5. Synchronize document discovery.
    - Update `guides/DOCUMENT_MAP.md` so learners and agents can find `learning/context/`.
    - Synchronize the planned context foundation through the as-built sync contract and the five synchronized documents.
+
+## Planned Learner Context Runtime Integration Plan
+
+This plan connects the existing learner-context foundation to runtime guidance.
+It is not implemented yet.
+The implementation must keep Free Development Mode as a workflow, not as a lesson.
+
+### Planned Change Targets
+
+- `learning/context/LESSON_CONTEXT_MAP.tsv`
+- planned new `learning/context/WORKFLOW_CONTEXT_MAP.tsv`
+- planned new `tools/lib/lesson_context.sh`
+- planned new `tools/lesson-context`
+- `tools/lesson`
+- `tools/lesson14`
+- `tools/team-development`
+- `tools/free-development`
+- `tools/product-improvement`
+- `tools/external-integration`
+- `tools/menu`
+- `tools/dashboard`
+- `guides/DOCUMENT_MAP.md`
+- `docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv`
+- the three design/as-built documents and the two workflow-state documents
+
+### Planned Implementation Order
+
+1. Refine the learning context map.
+   - Keep `LESSON_CONTEXT_MAP.tsv` focused on learning contexts: 7-day lesson, 14-day lesson, and applied lesson.
+   - Map opening context, per-step context, recap context, prompt examples, security markers, and dashboard candidates without relying on one hard-coded phrase.
+
+2. Add a workflow context map.
+   - Add `WORKFLOW_CONTEXT_MAP.tsv` for Free Development Mode, Product Improvement, External Integration, and lesson repository maintenance.
+   - Keep workflow targets separate from lesson targets.
+   - Make Free Development Mode a product-development workflow that applies the learned process.
+
+3. Add a shared context library.
+   - Add `tools/lib/lesson_context.sh`.
+   - Reuse `tools/lib/lesson_common.sh` for learning mode, workflow display language, product development language, and common path handling.
+   - Load maps generically so future topics can be added without one-off shell branches.
+
+4. Add a standalone context CLI.
+   - Add `tools/lesson-context status`.
+   - Add `tools/lesson-context opening lesson-7|lesson-14|applied`.
+   - Add `tools/lesson-context step lesson-7|lesson-14 <step_id>`.
+   - Add `tools/lesson-context recap lesson-7|lesson-14|applied`.
+   - Add `tools/lesson-context workflow free-development|product-improvement|external-integration|lesson-maintenance`.
+
+5. Connect structured and applied learning.
+   - Integrate context display into `tools/lesson`, `tools/lesson14`, and `tools/team-development`.
+   - Preserve approval gates, ordered progression, learner-selected start positions, and current lesson state files.
+
+6. Connect product-facing workflows.
+   - Integrate workflow context into `tools/free-development`, `tools/product-improvement`, and `tools/external-integration`.
+   - Show purpose, required documents, safety checks, and copy-paste prompts before product-facing work starts.
+   - Preserve product repository boundary checks and Git workflow settings.
+
+7. Connect menu and dashboard views.
+   - Keep menu categories distinct: learning, building/extending, and lesson maintenance.
+   - Show learning context and workflow context separately in dashboard output.
+
+8. Add validation.
+   - Add `tools/test_lesson_context.sh`.
+   - Wire the new test into `tools/test_lesson_repository.sh`, `.githooks/pre-commit`, `.github/workflows/ci.yml`, and `.github/workflows/lesson14-ci.yml`.
+   - Keep the test runnable standalone and through aggregate checks.
+
+9. Synchronize from planned to implemented only after runtime integration passes.
+   - Update the sync-contract row artifacts and tests to the implemented runtime files.
+   - Update all five synchronized documents from `planned` to `implemented`.
+   - Keep unrelated content unchanged.
+
+### Planned Verification
+
+Run, after implementation:
+
+```bash
+./tools/lesson-context status
+./tools/lesson-context opening lesson-7
+./tools/lesson-context opening lesson-14
+./tools/lesson-context opening applied
+./tools/lesson-context workflow free-development
+./tools/lesson-context workflow product-improvement
+./tools/lesson-context workflow external-integration
+./tools/test_lesson_context.sh
+./tools/test_lesson.sh
+./tools/test_lesson14.sh
+./tools/test_menu_prerequisites.sh
+./tools/check_as_built_sync_contract.sh
+./tools/check_as_built_docs.sh
+./tools/test_lesson_repository.sh
+./tools/git-hooks run --mode full --no-cache
+```
+
+CI and Lesson14 CI must also pass after push.
+
+### Planned Failure Recovery
+
+- If context map parsing fails, fix `tools/lesson-context` and `tools/lib/lesson_context.sh` before touching lesson commands.
+- If lesson progression regresses, temporarily disconnect lesson command integration and keep the standalone context CLI stable.
+- If Free Development Mode is displayed as a lesson, move that mapping to workflow context and correct menu/dashboard labels.
+- If output is too verbose, adjust learning-mode display policy without rewriting the source context.
+- If CI-only failures occur, compare CI logs with local full/no-cache verification and isolate environment-specific behavior.
+
+### Developer Approval Points
+
+- Whether to add columns to `LESSON_CONTEXT_MAP.tsv` or keep additional binding data in separate TSV files.
+- How broad `WORKFLOW_CONTEXT_MAP.tsv` should be in its first implementation.
+- How much context Free Development Mode should show before product work starts.
+- Which workflow targets must always show security guidance.
+- How much context should appear in CLI dashboard output before browser dashboard work begins.
+- Whether runtime translation remains an agent facilitation instruction or a future translation dictionary is introduced.
 
 ## Implemented Git Workflow Policy Implementation Plan
 
