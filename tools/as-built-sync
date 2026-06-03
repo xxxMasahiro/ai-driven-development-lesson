@@ -101,19 +101,12 @@ git_hooks_runner_reference() {
   local pre_commit="$ROOT/.githooks/pre-commit"
   local checks_file="$ROOT/docs/workflow/GIT_HOOK_CHECKS.tsv"
   local policy_file="$ROOT/docs/workflow/GIT_HOOKS_POLICY.tsv"
-  local settings_file="$ROOT/learning/GIT_HOOK_SETTINGS.tsv"
   local allowed_modes
-  local hook_mode
+  local hook_mode="full"
 
   [[ -f "$pre_commit" && -f "$checks_file" && -f "$policy_file" ]] || return 1
   active_command_reference "$pre_commit" "tools/git-hooks" || return 1
   allowed_modes="$(awk -F '\t' '$1 == "hook_mode" { print $2; found = 1 } END { if (!found) exit 1 }' "$policy_file")" || return 1
-  if [[ -f "$settings_file" ]]; then
-    hook_mode="$(awk -F '\t' '$1 == "hook_mode" { print $2; found = 1 } END { if (!found) exit 1 }' "$settings_file" 2>/dev/null || true)"
-  fi
-  if [[ -z "${hook_mode:-}" ]]; then
-    hook_mode="$(awk -F '\t' '$1 == "hook_mode" { print $3; found = 1 } END { if (!found) exit 1 }' "$policy_file")" || return 1
-  fi
   case "|$allowed_modes|" in
     *"|$hook_mode|"*) ;;
     *) return 1 ;;

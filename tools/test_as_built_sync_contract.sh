@@ -130,9 +130,9 @@ cat >"$RUNNER_FULL_ONLY/docs/workflow/GIT_HOOK_CHECKS.tsv" <<'EOF'
 # check_id	modes	command	description
 sample_test	full	./tools/sample_test.sh	Full-only sample test.
 EOF
-assert_fails_with "missing active test wiring for tools/sample_test.sh in .githooks/pre-commit" run_check "$RUNNER_FULL_ONLY"
-full_only_status_output="$(AS_BUILT_SYNC_ROOT="$RUNNER_FULL_ONLY" AS_BUILT_SYNC_CONTRACT_FILE="$RUNNER_FULL_ONLY/docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv" "$ROOT/tools/as-built-sync" status 2>&1 || true)"
-assert_contains "$full_only_status_output" "Active test wiring: 3/4 present"
+run_check "$RUNNER_FULL_ONLY" >/dev/null
+full_only_status_output="$(AS_BUILT_SYNC_ROOT="$RUNNER_FULL_ONLY" AS_BUILT_SYNC_CONTRACT_FILE="$RUNNER_FULL_ONLY/docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv" "$ROOT/tools/as-built-sync" status)"
+assert_contains "$full_only_status_output" "Active test wiring: 4/4 present"
 
 RUNNER_POLICY_DEFAULT="$TMP_DIR/runner-policy-default"
 copy_fixture "$RUNNER_FULL_ONLY" "$RUNNER_POLICY_DEFAULT"
