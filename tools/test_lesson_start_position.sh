@@ -2,10 +2,12 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck source=tools/lib/fixture_copy.sh
+source "$ROOT/tools/lib/fixture_copy.sh"
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 
-cp -a "$ROOT" "$work/lesson"
+fixture_copy_repo "$ROOT" "$work/lesson"
 cd "$work/lesson"
 
 reset_state_from_flow() {

@@ -296,6 +296,21 @@ SYNC-ID: learner_context_runtime_integration
 STATUS: planned
 ARTIFACTS: learning/context/README.md,learning/context/LESSON_CONTEXT_MAP.tsv
 TESTS: tools/test_lesson_repository.sh
+
+SYNC-ID: safeflow_security_backfill
+STATUS: implemented
+ARTIFACTS: AGENTS.MD,docs/workflow/SAFEFLOW_SECURITY_BACKFILL.tsv,tools/lib/security_invariants.sh,tools/check_security_invariants.sh,tools/test_security_invariants.sh,docs/workflow/GIT_HOOK_CHECKS.tsv,.github/workflows/ci.yml,.github/workflows/lesson14-ci.yml,tools/test_lesson_repository.sh
+TESTS: tools/check_security_invariants.sh,tools/test_security_invariants.sh
+
+SYNC-ID: product_security_workflow_gate
+STATUS: implemented
+ARTIFACTS: docs/workflow/PRODUCT_SECURITY_POLICY.tsv,learning/context/WORKFLOW_CONTEXT_MAP.tsv,tools/lib/product_security.sh,tools/product-security,tools/test_product_security.sh,tools/free-development,tools/product-improvement,tools/external-integration,tools/menu,tools/dashboard,docs/workflow/GIT_HOOK_CHECKS.tsv,.github/workflows/ci.yml,.github/workflows/lesson14-ci.yml,tools/test_lesson_repository.sh
+TESTS: tools/test_product_security.sh,tools/test_product_gate_tools.sh
+
+SYNC-ID: test_ci_safe_time_optimization_plan
+STATUS: implemented
+ARTIFACTS: docs/workflow/TEST_PLAN_MANIFEST.tsv,tools/lib/test_plan.sh,tools/test-plan,tools/check_test_plan_coverage.sh,tools/test_test_plan.sh,tools/lib/fixture_copy.sh,tools/fixture-copy,tools/test_fixture_copy.sh,docs/workflow/GIT_HOOK_CHECKS.tsv,docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv,docs/workflow/GIT_HOOK_RECOMMENDATION_PATHS.tsv,tools/git-hooks,tools/test_git_hooks_parallel.sh,tools/check_ci_workflow_structure.sh,tools/test_lesson_repository.sh,.github/workflows/ci.yml,.github/workflows/lesson14-ci.yml
+TESTS: tools/check_test_plan_coverage.sh,tools/test_test_plan.sh,tools/test_fixture_copy.sh,tools/test_git_hooks_parallel.sh,tools/check_ci_workflow_structure.sh
 ```
 
 ## Planned Learner Context Foundation Requirements
@@ -450,6 +465,54 @@ This implemented work is additive and does not trade away any existing 7-day les
 - Full/no-cache coverage, aggregate-test wiring, CI wiring, and preservation of existing pre-commit behavior must be verified through `tools/git-hooks run --mode full --no-cache`, `.githooks/pre-commit`, `tools/test_lesson_repository.sh`, and the CI workflow definitions.
 - Require developer approval before changing the minimal-mode required check list or skipping Playwright-related checks through cache beyond the implemented fail-closed cache behavior.
 
+## Implemented SafeFlow Security Backfill Requirements
+
+The lesson repository must provide an implemented SafeFlow security backfill with runtime artifacts, standalone checks, aggregate-test wiring, Git hooks wiring, CI wiring, and pre-commit wiring.
+This implemented work is additive and must not trade away the existing 7-day lesson, 14-day lesson, applied lesson, Free Development Mode, Product Improvement, External Integration, lesson-maintenance behavior, menu behavior, dashboard behavior, Git workflow policy, Git hooks policy, CI, pre-commit, docs-tour, resource guard, or as-built sync-contract behavior.
+
+- Add security invariants to the lesson repository's agent rules so agent work treats untrusted text as data, resists prompt injection, protects secrets, requires least privilege for external APIs, and rejects UI-only, prompt-only, or keyword-filter-only security fixes as sufficient primary security controls.
+- Keep `learner_context_foundation` and `learner_context_runtime_integration` as planned context work until runtime lesson behavior is actually implemented.
+- Track SafeFlow security backfill as its own sync scope instead of merging it into learner-context work.
+- Require the SafeFlow security backfill policy to cover prompt injection, secrets, destructive operations, dependency changes, Git/CI safety, and external service permissions.
+- Require mechanical checks for security invariants to be runnable standalone and from aggregate tests.
+- Keep the first implementation scoped to repository-local policy, documentation synchronization, and non-network checks; do not introduce SafeFlow control-plane migration, OS/WSL mutation, Docker/cgroups enforcement, swap mutation, process killing, or destructive cleanup.
+- Require high-risk security findings to fail closed only when the check is high-confidence; warnings must remain distinct from blocking failures to avoid stopping safe existing workflows.
+
+## Implemented Product Security Workflow Gate Requirements
+
+The lesson repository must provide an implemented product-security workflow gate for menu items 4, 5, and 6 without replacing their existing gates.
+The product-security gate must make Free Development, Product Improvement, and External Integration safer while preserving their current document, repository-boundary, Git sync, CI, and approval behavior.
+
+- Provide a `product-security` command surface for product-side work, including status, preflight, advice, check, and gate behavior.
+- Reuse existing repository-boundary checks and product repository configuration; do not scan unrelated directories or the user's full home directory.
+- Add an advice layer that explains the relevant security concern without blocking progress.
+- Add a non-destructive check layer that can inspect configured product-repository state for secrets, environment-file hygiene, external API/OAuth risk, dependency changes, log exposure, CI readiness, and product-repository boundary issues.
+- Add a fail-closed gate layer for high-confidence unsafe states such as secret exposure, missing required external-integration approval, product-boundary violation, or failed required CI for the relevant product commit.
+- Require menu item 6, External Integration, to collect explicit pre-implementation confirmation for connected service, sent data, received data, write behavior, OAuth scopes, token storage, redirect URI, token refresh and revoke behavior, webhook signature handling, rate limits, sandbox or test-account behavior, prohibited log output, and rollback or recovery approach.
+- Require product security behavior to remain stack-agnostic so it can support user-selected languages, frameworks, databases, payment systems, APIs, and deployment tools.
+- Require product security checks to avoid printing secret values; safe output may include categories, filenames, and safe location references only.
+- Require dashboard and menu readiness output to show short learner-facing safety guidance before raw policy detail where appropriate.
+
+## Implemented Test And CI Safe Time Optimization Requirements
+
+The lesson repository should make local tests and remote CI faster without weakening safety, correctness, auditability, existing checks, or existing lesson behavior.
+The implemented first phase adds observe-only planning, fail-closed coverage validation, result attestation, CI-safe Git hooks parallelism, and lightweight fixture copying while preserving all existing required verification.
+
+- Preserve the existing 7-day lesson, 14-day lesson, menu, dashboard, Git workflow, Git hooks, product-security, SafeFlow security, as-built sync, pre-commit, Playwright, and CI guarantees.
+- Treat speed improvements as removal of duplicate work, redundant waiting, repeated setup, and repeated validation within the same verification path.
+- Do not remove required safety gates, do not make security or as-built checks optional, and do not let changed-only test selection become authoritative in CI until observe-only evidence proves it is safe.
+- Provide a Test Plan Manifest that can show which checks are required, which changes force full verification, and why each decision was made.
+- Provide a Coverage Guard that fails closed when the Test Plan policy is malformed, references unknown Git hook checks, omits required dangerous-change patterns, weakens required dangerous-change full/CI escalation, or emits a force decision without full escalation.
+- Provide Result Attestation that records policy hash, check-catalog hash, repository-state hash, manifest hash, generated run/force decisions, and final observe-only authority.
+- Keep dangerous changes full/no-cache by default, including `AGENTS.MD`, `.github/workflows/`, `.githooks/`, `tools/git-hooks`, `tools/as-built-sync`, security/product-security logic, dependency lockfiles, Playwright configuration/tests, contract TSV files, and unknown paths.
+- Keep local `minimal` and `fast` modes useful for feedback while preserving full/no-cache completion and CI verification.
+- Prefer observe-only changed-only planning before using any changed-only decision to skip CI checks.
+- Allow CI full-hooks execution to request an explicit runner-oriented worker count while local execution remains capped by resource guard recommendations.
+- Provide a shared fixture-copy helper that excludes `.git`, `node_modules`, Playwright reports, test results, and cache directories from temporary repository copies.
+- Keep gap-only final gates, strict-command single-pass reuse, Playwright evidence reuse, and authoritative changed-only CI selection as future work requiring additional mechanical proof and developer approval.
+- Allow CI runner-oriented parallelism and dependency caching, but do not cache CI verification results.
+- Require developer approval before changing required CI check names, making changed-only authoritative in CI, introducing quarantine, reducing full/no-cache scope, or merging workflow files in a way that affects required branch protection contexts.
+
 ## Mechanical Enforcement
 
 - 14-day progression requires approval receipts through `tools/lesson14 承認`.
@@ -461,7 +524,9 @@ This implemented work is additive and does not trade away any existing 7-day les
 - 14-day CLI behavior is checked by `tools/test_lesson14.sh`.
 - Free/Team product gates are regression-tested with a temporary product repository through `tools/test_product_gate_tools.sh`.
 - Product repository cleanup is regression-tested with temporary local repositories and a fake `gh` command through `tools/test_product_repository_cleanup.sh`.
+- Product security workflow gates are regression-tested through `tools/test_product_security.sh` and existing product gate tests.
 - As-built document consistency is checked by `tools/check_as_built_docs.sh`.
+- SafeFlow security invariants are checked by `tools/check_security_invariants.sh` and `tools/test_security_invariants.sh`.
 - Sub-agent review protocol presence is checked by `tools/check_review_protocol.sh`.
 - Real product operations are checked by `tools/test_production_operations.sh` only when an external product repository exists.
 - Free Development Mode is gated by `tools/free-development gate`.

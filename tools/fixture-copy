@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck source=tools/lib/fixture_copy.sh
+source "$ROOT/tools/lib/fixture_copy.sh"
+
+usage() {
+  cat <<'USAGE'
+Usage:
+  ./tools/fixture-copy <source-dir> <target-dir>
+USAGE
+}
+
+if [[ $# -ne 2 ]]; then
+  usage >&2
+  exit 1
+fi
+
+fixture_copy_repo "$1" "$2"
+printf 'Fixture copied: %s -> %s\n' "$1" "$2"

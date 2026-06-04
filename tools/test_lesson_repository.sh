@@ -12,6 +12,8 @@ cd "$ROOT"
 ./tools/check_agents_skills.sh
 ./tools/check_as_built_docs.sh
 ./tools/check_as_built_sync_contract.sh
+./tools/check_test_plan_coverage.sh
+./tools/check_security_invariants.sh
 WORKFLOW_PAIR_SINGLE_FILE_REASON="aggregate test may run while remediation documents are being edited together" ./tools/check_workflow_pair_sync.sh
 ./tools/check_review_protocol.sh
 ./tools/check_developer_memory_requirements.sh
@@ -21,6 +23,8 @@ WORKFLOW_PAIR_SINGLE_FILE_REASON="aggregate test may run while remediation docum
 ./tools/illustrations list >/dev/null
 ./tools/test_docs_tour.sh
 ./tools/test_as_built_sync_contract.sh
+./tools/test_test_plan.sh
+./tools/test_security_invariants.sh
 ./tools/test_git_workflow_policy.sh
 ./tools/git-hooks status >/dev/null
 ./tools/test_git_hooks.sh
@@ -31,6 +35,7 @@ WORKFLOW_PAIR_SINGLE_FILE_REASON="aggregate test may run while remediation docum
 ./tools/test_resource_guard_summary.sh
 ./tools/test_resource_cleanup.sh
 ./tools/test_git_hooks_parallel.sh
+./tools/test_fixture_copy.sh
 ./tools/check_ci_workflow_structure.sh
 ./tools/product-improvement status >/dev/null
 ./tools/external-integration status >/dev/null
@@ -41,6 +46,7 @@ WORKFLOW_PAIR_SINGLE_FILE_REASON="aggregate test may run while remediation docum
 ./tools/test_menu_prerequisites.sh
 ./tools/test_product_gate_tools.sh
 ./tools/test_product_repository_cleanup.sh
+./tools/test_product_security.sh
 ./tools/test_lesson_start_position.sh
 ./tools/test_lesson.sh
 ./tools/test_lesson14.sh

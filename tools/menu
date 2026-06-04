@@ -54,6 +54,11 @@ Git管理設定
    入口: ./tools/git-workflow status
    設定案内: ./tools/git-workflow configure
 
+Security確認
+   自由開発、成果物改善、外部連携の安全確認をする
+   入口: ./tools/product-security status
+   確認: ./tools/product-security check --context <free-development|product-improvement|external-integration>
+
 流れの目安:
   自由開発で作る → 成果物を改善する → 外部連携で発展させる
 
@@ -191,6 +196,10 @@ menu_check_item() {
       ;;
   esac
   menu_require_git_workflow_policy "$item"
+  if [[ "$item" == "4" || "$item" == "5" || "$item" == "6" ]]; then
+    "$LESSON_ROOT/tools/product-security" status --context "$(case "$item" in 4) printf 'free-development' ;; 5) printf 'product-improvement' ;; 6) printf 'external-integration' ;; esac)" >/dev/null
+    printf 'Product security policy: ready\n'
+  fi
   printf 'Menu prerequisite check passed: %s\n' "$(menu_item_name "$item")"
 }
 
@@ -231,6 +240,14 @@ menu_readiness() {
         ;;
     esac
     menu_print_git_workflow_readiness "$item"
+    if [[ "$item" == "4" || "$item" == "5" || "$item" == "6" ]]; then
+      printf 'Product security: '
+      if "$LESSON_ROOT/tools/product-security" status --context "$(case "$item" in 4) printf 'free-development' ;; 5) printf 'product-improvement' ;; 6) printf 'external-integration' ;; esac)" >/dev/null 2>&1; then
+        printf 'policy ready\n'
+      else
+        printf 'policy missing\n'
+      fi
+    fi
     printf 'Start command: ./tools/menu start %s --confirm\n' "$item"
   done
 }

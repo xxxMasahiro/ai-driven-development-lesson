@@ -348,6 +348,21 @@ SYNC-ID: learner_context_runtime_integration
 STATUS: planned
 ARTIFACTS: learning/context/README.md,learning/context/LESSON_CONTEXT_MAP.tsv
 TESTS: tools/test_lesson_repository.sh
+
+SYNC-ID: safeflow_security_backfill
+STATUS: implemented
+ARTIFACTS: AGENTS.MD,docs/workflow/SAFEFLOW_SECURITY_BACKFILL.tsv,tools/lib/security_invariants.sh,tools/check_security_invariants.sh,tools/test_security_invariants.sh,docs/workflow/GIT_HOOK_CHECKS.tsv,.github/workflows/ci.yml,.github/workflows/lesson14-ci.yml,tools/test_lesson_repository.sh
+TESTS: tools/check_security_invariants.sh,tools/test_security_invariants.sh
+
+SYNC-ID: product_security_workflow_gate
+STATUS: implemented
+ARTIFACTS: docs/workflow/PRODUCT_SECURITY_POLICY.tsv,learning/context/WORKFLOW_CONTEXT_MAP.tsv,tools/lib/product_security.sh,tools/product-security,tools/test_product_security.sh,tools/free-development,tools/product-improvement,tools/external-integration,tools/menu,tools/dashboard,docs/workflow/GIT_HOOK_CHECKS.tsv,.github/workflows/ci.yml,.github/workflows/lesson14-ci.yml,tools/test_lesson_repository.sh
+TESTS: tools/test_product_security.sh,tools/test_product_gate_tools.sh
+
+SYNC-ID: test_ci_safe_time_optimization_plan
+STATUS: implemented
+ARTIFACTS: docs/workflow/TEST_PLAN_MANIFEST.tsv,tools/lib/test_plan.sh,tools/test-plan,tools/check_test_plan_coverage.sh,tools/test_test_plan.sh,tools/lib/fixture_copy.sh,tools/fixture-copy,tools/test_fixture_copy.sh,docs/workflow/GIT_HOOK_CHECKS.tsv,docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv,docs/workflow/GIT_HOOK_RECOMMENDATION_PATHS.tsv,tools/git-hooks,tools/test_git_hooks_parallel.sh,tools/check_ci_workflow_structure.sh,tools/test_lesson_repository.sh,.github/workflows/ci.yml,.github/workflows/lesson14-ci.yml
+TESTS: tools/check_test_plan_coverage.sh,tools/test_test_plan.sh,tools/test_fixture_copy.sh,tools/test_git_hooks_parallel.sh,tools/check_ci_workflow_structure.sh
 ```
 
 ### Planned Learner Context Foundation
@@ -665,6 +680,58 @@ They are additive to the current as-built components and must not weaken or repl
 
 - Strengthened checks, product-gate tests, Playwright checks, and the aggregate lesson test are wired into CI and pre-commit without removing existing checks.
 - Free Development and Team Development tests cover success and failure paths, including missing product repository, dirty Git state, CI failure, Docker installed/not-installed paths, and status/start output.
+
+### Implemented SafeFlow Security Backfill
+
+SafeFlow security backfill is implemented as a repository-security invariant layer, not as a replacement for the existing lesson-context foundation.
+
+- `AGENTS.MD` contains explicit security invariants for untrusted text as data, prompt injection, secrets, least privilege, owner-layer fixes, destructive operations, dependency changes, Git/CI, and rejection of prompt-only security fixes.
+- `docs/workflow/SAFEFLOW_SECURITY_BACKFILL.tsv` defines security surfaces and required evidence for prompt injection, secrets, destructive actions, dependency changes, Git/CI safety, and external service permissions.
+- `tools/check_security_invariants.sh` validates policy shape, required invariant IDs, evidence files, and evidence patterns.
+- `tools/test_security_invariants.sh` verifies success and failure paths for missing invariants and missing evidence.
+- The implementation is repo-local and non-networked. It does not mutate OS/WSL settings, create or delete swap, kill processes, enforce Docker/cgroups policy, or migrate to a SafeFlow control plane.
+
+### Implemented Product Security Workflow Gate
+
+Product security workflow gating is implemented as an additive gate for menu items 4, 5, and 6.
+It must not replace existing Free Development, Product Improvement, External Integration, repository-boundary, Git sync, CI, or document-sync gates.
+
+- `tools/product-security` exposes discovery and gate behavior through `status`, `preflight`, `advise`, `check`, and `gate`.
+- `status` and `advise` are non-blocking.
+- `check` runs non-destructive inspection against only the configured product repository.
+- `gate` fails closed only on high-confidence unsafe states or missing required approvals.
+- `docs/workflow/PRODUCT_SECURITY_POLICY.tsv` distinguishes warning conditions from blocking conditions.
+- `learning/context/WORKFLOW_CONTEXT_MAP.tsv` maps menu 4, 5, and 6 workflow contexts to product-security safety summaries and approval requirements.
+- Product-side secret detection will not print secret values; it will report safe metadata such as category and file reference.
+- External Integration requires explicit confirmation of service, sent and received data, write behavior, OAuth scopes, token storage, redirect URI, token refresh and revoke behavior, webhook signature handling, rate limits, sandbox or test-account usage, prohibited log output, and rollback or recovery approach before implementation proceeds.
+- Product Improvement presents security review prompts for dependencies, authentication, API settings, storage, deletion, and logging behavior changes.
+- Free Development presents security assumptions once a product stack and product repository are selected.
+- Product security behavior uses existing product repository configuration and repository-boundary semantics instead of scanning unrelated directories.
+- Dashboard and menu readiness output present product-security status and short safety guidance before detailed raw settings where security status is relevant.
+
+### Implemented Test And CI Safe Time Optimization
+
+The test and CI optimization layer is implemented as an additive verification-planning and safe-execution layer.
+It explains, records, and validates test selection while keeping existing full/no-cache verification intact.
+
+- `docs/workflow/TEST_PLAN_MANIFEST.tsv` is the machine-readable policy source for risk classes, required checks, full/no-cache escalation, CI requirements, cache scope, quarantine permission, and learner-readable reasons.
+- `tools/test-plan status|manifest|coverage|attest` provides the command surface for observing planned verification.
+- The generated manifest distinguishes `run`, `force`, and safe fallback decisions without making changed-only selection authoritative.
+- Every generated decision includes a reason that can be shown to a learner and inspected by a maintainer.
+- `tools/check_test_plan_coverage.sh` compares the manifest policy against the configured check catalog and fails closed when required checks are missing, dangerous path coverage is missing, or an unknown check is referenced.
+- `tools/test_test_plan.sh` covers normal manifest output, full-escalation paths, attestation output, unknown-check failure, and missing-dangerous-pattern failure.
+- `tools/test-plan attest` records policy hash, check-catalog hash, repository-state hash, manifest hash, generated decisions, and final observe-only status.
+- CI full-hooks execution keeps `--mode full --no-cache` and uses `--jobs 4` with `RESOURCE_GUARD_SKIP_LOCAL_CHECK=1`, while local Git hooks remain capped by resource guard recommendations.
+- `tools/fixture-copy` and `tools/lib/fixture_copy.sh` provide lightweight temporary repository copies that exclude `.git`, `node_modules`, `playwright-report`, `test-results`, and cache directories.
+- `tools/test_fixture_copy.sh` validates fixture-copy exclusions and failure paths.
+- Future same-run cache should be ephemeral and scoped to a single command or CI run; it must not reuse persistent local hook cache semantics for CI verification.
+- Future same-run cache may reuse only results whose input hashes, command identities, policy hashes, and relevant repository state match within the same run.
+- Standalone commands remain strict by default. Internal skip or no-validate options, if added later, must be opt-in and used only by verified aggregate/hook callers that already ran the strict check.
+- `test_lesson_repository.sh` should remain available as a standalone exhaustive command.
+- A future hook-specific gap-only final gate should replace duplicate aggregate work only after a mechanical coverage check proves the hook catalog plus gap gate covers the standalone aggregate requirements.
+- Future CI aggregation may verify required job results and attestation artifacts instead of rerunning expensive checks only after mechanical coverage proof and developer approval.
+- CI dependency caching may cover npm dependencies and Playwright browser downloads; CI must not cache full verification results.
+- Flaky quarantine is out of scope until a policy file, owner, expiry, issue reference, separate lane, and degraded-coverage reporting exist.
 
 ## Product Repository Boundary
 

@@ -148,7 +148,7 @@ run_git_hooks() {
   RESOURCE_GUARD_DISK_FREE_MIB="102400" \
   RESOURCE_GUARD_CPU_COUNT="8" \
   RESOURCE_GUARD_ACTIVE_HEAVY_COUNT="${TEST_ACTIVE_HEAVY_COUNT:-0}" \
-  RESOURCE_GUARD_SKIP_LOCAL_CHECK=0 \
+  RESOURCE_GUARD_SKIP_LOCAL_CHECK="${TEST_RESOURCE_GUARD_SKIP_LOCAL_CHECK:-0}" \
   "$ROOT/tools/git-hooks" "$@"
 }
 
@@ -184,6 +184,16 @@ a_line="$(printf '%s\n' "$parallel_output" | awk '/A finished/ { print NR; exit 
 b_line="$(printf '%s\n' "$parallel_output" | awk '/B finished/ { print NR; exit }')"
 if (( a_line >= b_line )); then
   printf 'parallel logs were not replayed in check order\n' >&2
+  exit 1
+fi
+
+reset_active_counter
+ci_parallel_output="$(TEST_RESOURCE_GUARD_SKIP_LOCAL_CHECK=1 run_git_hooks run --mode full --no-cache --jobs 2)"
+[[ "$ci_parallel_output" == *"Resource guard pre-check skipped for this environment."* ]]
+[[ "$ci_parallel_output" == *"Git hooks parallel jobs requested: 2."* ]]
+[[ "$ci_parallel_output" == *"Git hooks checks passed: full mode (3 checks)."* ]]
+if (( $(max_active_count) < 2 )); then
+  printf 'CI requested Git hooks jobs did not overlap checks\n' >&2
   exit 1
 fi
 

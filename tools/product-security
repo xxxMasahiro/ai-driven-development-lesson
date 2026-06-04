@@ -1,0 +1,103 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=tools/lib/lesson_common.sh
+source "$SCRIPT_DIR/lib/lesson_common.sh"
+# shellcheck source=tools/lib/product_security.sh
+source "$SCRIPT_DIR/lib/product_security.sh"
+
+COMMAND="${1:-status}"
+shift || true
+CONTEXT="free-development"
+REPO=""
+
+usage() {
+  cat <<'USAGE'
+Usage:
+  tools/product-security status [--context <context>] [--repo <path>]
+  tools/product-security preflight [--context <context>] [--repo <path>]
+  tools/product-security advise [--context <context>] [--repo <path>]
+  tools/product-security check [--context <context>] [--repo <path>]
+  tools/product-security gate [--context <context>] [--repo <path>]
+
+Contexts:
+  free-development
+  product-improvement
+  external-integration
+  lesson-maintenance
+USAGE
+}
+
+while [[ "$#" -gt 0 ]]; do
+  case "$1" in
+    --context)
+      CONTEXT="${2:-}"
+      shift 2
+      ;;
+    --repo)
+      REPO="${2:-}"
+      shift 2
+      ;;
+    -h|--help|help)
+      usage
+      exit 0
+      ;;
+    *)
+      printf 'unknown option: %s\n' "$1" >&2
+      usage
+      exit 1
+      ;;
+  esac
+done
+
+PRODUCT_REPO="$(product_security_resolve_repo "$REPO")"
+
+case "$COMMAND" in
+  status|現在地)
+    product_security_validate_policy
+    printf 'Product Security Status\n'
+    printf 'Policy: %s\n' "$(product_security_policy_file)"
+    printf 'Workflow context map: %s\n' "$(product_security_context_map_file)"
+    printf 'Context: %s\n' "$CONTEXT"
+    printf 'Product repository: %s\n' "$PRODUCT_REPO"
+    if [[ -d "$PRODUCT_REPO/.git" ]]; then
+      printf 'Product repository status: present\n'
+    else
+      printf 'Product repository status: not ready\n'
+    fi
+    product_security_print_safety_summary "$CONTEXT"
+    ;;
+  advise|助言)
+    product_security_validate_policy
+    product_security_print_safety_summary "$CONTEXT"
+    ;;
+  preflight|事前確認)
+    product_security_validate_policy
+    product_security_context_exists "$CONTEXT" || { printf 'unknown product security context: %s\n' "$CONTEXT" >&2; exit 1; }
+    product_security_check_repository "$PRODUCT_REPO"
+    printf 'Product security preflight passed: %s\n' "$CONTEXT"
+    ;;
+  check|確認)
+    if product_security_check_context "$CONTEXT" "$PRODUCT_REPO"; then
+      printf 'Product security check passed: %s\n' "$CONTEXT"
+    else
+      exit 1
+    fi
+    ;;
+  gate|通過)
+    if product_security_check_context "$CONTEXT" "$PRODUCT_REPO"; then
+      printf 'Product security gate passed: %s\n' "$CONTEXT"
+    else
+      exit 1
+    fi
+    ;;
+  ""|-h|--help|help)
+    usage
+    ;;
+  *)
+    printf 'unknown command: %s\n' "$COMMAND" >&2
+    usage
+    exit 1
+    ;;
+esac

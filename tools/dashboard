@@ -160,6 +160,8 @@ show_development() {
     "$ROOT/tools/check_git_sync.sh" --repo "$PRODUCT_ROOT" --required || true
     printf '\nGit workflow policy:\n'
     "$ROOT/tools/git-workflow" status --repo "$PRODUCT_ROOT" || true
+    printf '\nProduct security:\n'
+    "$ROOT/tools/product-security" status --context product-improvement --repo "$PRODUCT_ROOT" || true
     printf '\nWorkflow documents:\n'
     for file in REQUIREMENTS.md SPECIFICATION.md IMPLEMENTATION_PLAN.md TASK_TRACKER.md HANDOFF.md README.md RETROSPECTIVE.md; do
       file_status "$PRODUCT_ROOT" "$file"
@@ -189,6 +191,8 @@ show_development() {
     printf 'Cleanup status command: ./tools/product-repository-cleanup status\n'
     printf '\nGit workflow policy:\n'
     "$ROOT/tools/git-workflow" status --repo "$ROOT" || true
+    printf '\nProduct security:\n'
+    "$ROOT/tools/product-security" status --context free-development || true
   fi
 }
 

@@ -39,6 +39,7 @@ case "$COMMAND" in
     printf 'Product Improvement: optional improvement cycle\n'
     printf 'Product repository: %s\n' "$(lesson_product_repo_root)"
     printf 'Typical improvements: completion, deletion, persistence, screen copy, layout, accessibility, tests, and documentation.\n'
+    "$LESSON_ROOT/tools/product-security" advise --context product-improvement || true
     lesson_menu_print_readiness "Product Improvement"
     ;;
   start|開始)
@@ -51,13 +52,17 @@ Product Improvement start prompt:
 I want to improve the existing product.
 First inspect REQUIREMENTS.md, SPECIFICATION.md, IMPLEMENTATION_PLAN.md, TASK_TRACKER.md, and HANDOFF.md.
 Then ask me which improvement should be prioritized, what should stay out of scope, and how we will verify it.
+Before implementation, also ask what security-sensitive behavior changes: dependencies, authentication, APIs, storage, deletion, logging, secrets, or external data.
 Do not implement until I approve the smallest useful improvement plan.
 PROMPT
+    printf '\nProduct security guidance:\n'
+    "$LESSON_ROOT/tools/product-security" advise --context product-improvement || true
     ;;
   gate|確認)
     lesson_menu_require_settings "Product Improvement"
     "$LESSON_ROOT/tools/check_repository_boundary.sh" --product-required >/dev/null
     check_scope_docs
+    "$LESSON_ROOT/tools/product-security" gate --context product-improvement
     "$LESSON_ROOT/tools/check_workflow_pair_sync.sh" --product
     "$LESSON_ROOT/tools/check_git_sync.sh" --product --required
     "$LESSON_ROOT/tools/check_ci_status.sh" --product --required

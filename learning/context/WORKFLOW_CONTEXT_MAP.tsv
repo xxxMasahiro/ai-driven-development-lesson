@@ -1,0 +1,5 @@
+# context_id	menu_item	workflow_kind	product_repo_required	external_approval_required	safety_summary
+free-development	4	workflow	true	false	Choose the product stack, write the core documents, and record security assumptions before implementation.
+product-improvement	5	workflow	true	false	Check changed dependencies, authentication, APIs, storage, deletion, and logging before improving the product.
+external-integration	6	workflow	true	true	Confirm service, data movement, OAuth/API permissions, token storage, logging, rate limits, sandbox use, and rollback before implementation.
+lesson-maintenance	7	maintenance	false	false	Keep lesson-repository changes inside the documented as-built and workflow synchronization contracts.

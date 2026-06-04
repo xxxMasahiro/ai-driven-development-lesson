@@ -17,8 +17,27 @@ Usage:
   ./tools/git-hooks mode
   ./tools/git-hooks mode <full|fast|minimal>
   ./tools/git-hooks cache clear
-  ./tools/git-hooks run [--mode <full|fast|minimal>] [--no-cache]
+  ./tools/git-hooks run [--mode <full|fast|minimal>] [--no-cache] [--jobs <count>]
 USAGE
+}
+
+validate_positive_integer() {
+  local value="$1"
+  local label="$2"
+  if ! [[ "$value" =~ ^[1-9][0-9]*$ ]]; then
+    printf '%s must be a positive integer: %s\n' "$label" "$value" >&2
+    return 1
+  fi
+}
+
+min_positive_integer() {
+  local left="$1"
+  local right="$2"
+  if (( left < right )); then
+    printf '%s\n' "$left"
+  else
+    printf '%s\n' "$right"
+  fi
 }
 
 cmd="${1:-status}"
@@ -63,6 +82,10 @@ case "$cmd" in
     mode="$(git_hooks_mode)" || exit 1
     no_cache="false"
     worker_count="1"
+    requested_worker_count="${GIT_HOOKS_JOBS:-}"
+    if [[ -n "$requested_worker_count" ]]; then
+      validate_positive_integer "$requested_worker_count" "GIT_HOOKS_JOBS" || exit 1
+    fi
     while [[ $# -gt 0 ]]; do
       case "$1" in
         --mode)
@@ -77,6 +100,15 @@ case "$cmd" in
           no_cache="true"
           shift
           ;;
+        --jobs)
+          [[ $# -ge 2 ]] || {
+            printf -- '--jobs requires a value.\n' >&2
+            exit 1
+          }
+          validate_positive_integer "$2" "--jobs" || exit 1
+          requested_worker_count="$2"
+          shift 2
+          ;;
         *)
           usage >&2
           exit 1
@@ -87,9 +119,25 @@ case "$cmd" in
       full|fast)
         if [[ "${RESOURCE_GUARD_SKIP_LOCAL_CHECK:-0}" == "1" ]]; then
           printf 'Resource guard pre-check skipped for this environment.\n'
+          if [[ -n "$requested_worker_count" ]]; then
+            worker_count="$requested_worker_count"
+            printf 'Git hooks parallel jobs requested: %s.\n' "$worker_count"
+          fi
         elif [[ -f "$(resource_guard_policy_file)" && -f "$(resource_guard_settings_file)" ]]; then
           resource_guard_check_profile git-hooks-full
-          worker_count="$(resource_guard_recommended_jobs git-hooks-full)"
+          recommended_worker_count="$(resource_guard_recommended_jobs git-hooks-full)"
+          worker_count="$recommended_worker_count"
+          if [[ -n "$requested_worker_count" ]]; then
+            worker_count="$(min_positive_integer "$requested_worker_count" "$recommended_worker_count")"
+            if [[ "$worker_count" != "$requested_worker_count" ]]; then
+              printf 'Git hooks parallel jobs capped by resource guard: requested %s, using %s.\n' "$requested_worker_count" "$worker_count"
+            else
+              printf 'Git hooks parallel jobs requested: %s.\n' "$worker_count"
+            fi
+          fi
+        elif [[ -n "$requested_worker_count" ]]; then
+          worker_count="$requested_worker_count"
+          printf 'Git hooks parallel jobs requested without resource guard policy: %s.\n' "$worker_count"
         fi
         ;;
     esac

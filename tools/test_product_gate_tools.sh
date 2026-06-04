@@ -89,8 +89,26 @@ Sample product is ready for gate testing.
 
 - Continue the sample workflow.
 DOC
+cat > "$product_repo/EXTERNAL_INTEGRATION_SECURITY.md" <<'DOC'
+# EXTERNAL_INTEGRATION_SECURITY.md
+
+- Connected service: test calendar
+- Data sent: task title only
+- Data received: event identifier
+- Write behavior: create test event only
+- OAuth scopes: calendar.events
+- Token storage: local environment variable
+- Redirect URI: local test redirect
+- Token refresh: documented
+- Token revoke: documented
+- Webhook signature: not used
+- Rate limits: documented
+- Sandbox: test account
+- Prohibited log output: tokens and private event details
+- Rollback: disable integration and revoke token
+DOC
 git -C "$product_repo" add README.md REQUIREMENTS.md SPECIFICATION.md IMPLEMENTATION_PLAN.md
-git -C "$product_repo" add TASK_TRACKER.md HANDOFF.md
+git -C "$product_repo" add TASK_TRACKER.md HANDOFF.md EXTERNAL_INTEGRATION_SECURITY.md
 git -C "$product_repo" commit -m "Initial sample product" >/dev/null
 git -C "$product_repo" remote add origin "$origin"
 git -C "$product_repo" push -u origin main >/dev/null

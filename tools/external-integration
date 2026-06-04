@@ -39,6 +39,7 @@ case "$COMMAND" in
     printf 'External Integration: optional extension path\n'
     printf 'Product repository: %s\n' "$(lesson_product_repo_root)"
     printf 'Typical targets: calendar, task service, spreadsheet, documentation, API, or MCP-style resource.\n'
+    "$LESSON_ROOT/tools/product-security" advise --context external-integration || true
     lesson_menu_print_readiness "External Integration"
     ;;
   start|開始)
@@ -51,13 +52,18 @@ External Integration start prompt:
 I want to extend my product by connecting it to an external tool.
 First inspect the product requirements, specification, implementation plan, TASK_TRACKER, and HANDOFF.
 Then ask me which external tool I want to connect, what information should move, and what should stay out of scope.
+Before implementation, collect and record the connected service, data sent, data received, write behavior, OAuth scopes, token storage, redirect URI, token refresh and revoke behavior, webhook signature handling, rate limits, sandbox or test-account usage, prohibited log output, and rollback or recovery approach.
+Record that approval in EXTERNAL_INTEGRATION_SECURITY.md before the gate is passed.
 Do not implement until I approve the smallest useful integration plan.
 PROMPT
+    printf '\nProduct security guidance:\n'
+    "$LESSON_ROOT/tools/product-security" advise --context external-integration || true
     ;;
   gate|確認)
     lesson_menu_require_settings "External Integration"
     "$LESSON_ROOT/tools/check_repository_boundary.sh" --product-required >/dev/null
     check_scope_docs
+    "$LESSON_ROOT/tools/product-security" gate --context external-integration
     "$LESSON_ROOT/tools/check_workflow_pair_sync.sh" --product
     "$LESSON_ROOT/tools/check_git_sync.sh" --product --required
     "$LESSON_ROOT/tools/check_ci_status.sh" --product --required

@@ -2,12 +2,14 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck source=tools/lib/fixture_copy.sh
+source "$ROOT/tools/lib/fixture_copy.sh"
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 export HOME="$work/home"
 mkdir -p "$HOME/projects"
 
-cp -a "$ROOT" "$work/lesson"
+fixture_copy_repo "$ROOT" "$work/lesson"
 cd "$work/lesson"
 
 ./tools/lesson14 初期化 --confirm | grep '最初のセットアップ項目へ戻しました'
@@ -23,13 +25,13 @@ cd "$work/lesson"
 ./tools/roadmap Step 14/14 | grep 'Step 14/14.*14日版レッスンを完了する'
 
 bad_duplicate="$work/bad-duplicate"
-cp -a "$work/lesson" "$bad_duplicate"
+fixture_copy_repo "$work/lesson" "$bad_duplicate"
 awk -F '\t' '$1 !~ /^#/ && $2 == "setup.index" { print; exit }' "$bad_duplicate/lesson/LESSON_FLOW_14_DAYS.tsv" >> "$bad_duplicate/lesson/LESSON_FLOW_14_DAYS.tsv"
 (cd "$bad_duplicate" && ./tools/check_lesson14_structure.sh >/tmp/lesson14-duplicate.out 2>&1 && exit 1 || true)
 grep 'duplicate flow' /tmp/lesson14-duplicate.out >/dev/null
 
 bad_empty="$work/bad-empty-required-output"
-cp -a "$work/lesson" "$bad_empty"
+fixture_copy_repo "$work/lesson" "$bad_empty"
 tmp_flow="$(mktemp)"
 awk -F '\t' -v OFS='\t' '$1 !~ /^#/ && $2 == "day1.roadmap" { $5 = "" } { print }' "$bad_empty/lesson/LESSON_FLOW_14_DAYS.tsv" > "$tmp_flow"
 mv "$tmp_flow" "$bad_empty/lesson/LESSON_FLOW_14_DAYS.tsv"
@@ -37,7 +39,7 @@ mv "$tmp_flow" "$bad_empty/lesson/LESSON_FLOW_14_DAYS.tsv"
 grep 'empty flow field' /tmp/lesson14-empty-required.out >/dev/null
 
 bad_entry="$work/bad-entry"
-cp -a "$work/lesson" "$bad_entry"
+fixture_copy_repo "$work/lesson" "$bad_entry"
 tmp_flow="$(mktemp)"
 awk -F '\t' -v OFS='\t' '$1 !~ /^#/ && $2 == "setup.index" { $4 = "index.mdでレッスン全体と14日版の入口を確認する" } { print }' "$bad_entry/lesson/LESSON_FLOW_14_DAYS.tsv" > "$tmp_flow"
 mv "$tmp_flow" "$bad_entry/lesson/LESSON_FLOW_14_DAYS.tsv"
@@ -45,7 +47,7 @@ mv "$tmp_flow" "$bad_entry/lesson/LESSON_FLOW_14_DAYS.tsv"
 grep '14-day setup index entry' /tmp/lesson14-bad-entry.out >/dev/null
 
 bad_learning_files="$work/bad-learning-files"
-cp -a "$work/lesson" "$bad_learning_files"
+fixture_copy_repo "$work/lesson" "$bad_learning_files"
 tmp_gates="$(mktemp)"
 awk -F '\t' -v OFS='\t' '$1 !~ /^#/ && $1 == "Step 1/14" { $2 = "LEARNING_TASK_TRACKER.md,LEARNING_HANDOFF.md" } { print }' "$bad_learning_files/lesson/SYNC_GATES_14_DAYS.tsv" > "$tmp_gates"
 mv "$tmp_gates" "$bad_learning_files/lesson/SYNC_GATES_14_DAYS.tsv"
@@ -53,7 +55,7 @@ mv "$tmp_gates" "$bad_learning_files/lesson/SYNC_GATES_14_DAYS.tsv"
 grep 'sync gates must use 14-day learning files only' /tmp/lesson14-bad-learning-files.out >/dev/null
 
 bad_day14_gate="$work/bad-day14-gate"
-cp -a "$work/lesson" "$bad_day14_gate"
+fixture_copy_repo "$work/lesson" "$bad_day14_gate"
 tmp_gates="$(mktemp)"
 awk -F '\t' -v OFS='\t' '$1 !~ /^#/ && $1 == "Step 14/14" { $6 = "tools/check_ci_status.sh --required" } { print }' "$bad_day14_gate/lesson/SYNC_GATES_14_DAYS.tsv" > "$tmp_gates"
 mv "$tmp_gates" "$bad_day14_gate/lesson/SYNC_GATES_14_DAYS.tsv"
@@ -109,7 +111,7 @@ grep 'Product development language is required' /tmp/lesson14-language-required.
 ./tools/check_lesson14_structure.sh
 
 gate_product_missing="$work/gate-product-missing"
-cp -a "$work/lesson" "$gate_product_missing"
+fixture_copy_repo "$work/lesson" "$gate_product_missing"
 rm -rf "$gate_product_missing/.git"
 cd "$gate_product_missing"
 git init -b main >/dev/null
@@ -213,7 +215,7 @@ git add README.md
 git -c user.name=Test -c user.email=test@example.com commit -m initial-product >/dev/null
 
 gate_required="$work/gate-required"
-cp -a "$work/lesson" "$gate_required"
+fixture_copy_repo "$work/lesson" "$gate_required"
 rm -rf "$gate_required/.git"
 cd "$gate_required"
 git init -b main >/dev/null

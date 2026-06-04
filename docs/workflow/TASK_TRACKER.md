@@ -9,8 +9,11 @@ The previous implemented change added user-configurable Git workflow policy sett
 The current implemented Git workflow action settings split Git workflow behavior into detailed settings for commit, push, PR creation, PR CI monitoring, merge execution, developer-responsibility auto-merge, main CI monitoring, and local/remote sync monitoring.
 The current implemented Git hooks policy provides faster safe serial pre-commit operation through `full`, `fast`, and `minimal` modes, conservative Git-local caching, and a path-based local full/no-cache recommendation command.
 The current implemented resource-budgeted parallel guard provides safe optional parallel execution decisions for Git hooks, Playwright, CI, and aggregate checks through user-configured memory and swap budgets.
+The current implemented test and CI safe time optimization first phase adds observe-only Test Plan Manifest behavior, Coverage Guard, Result Attestation, CI-safe Git hooks parallelism, and lightweight fixture-copy optimization while preserving full/no-cache verification.
 The current planned learner context foundation prepares source documents under `learning/context/` for the next lesson-content implementation cycle; runtime lesson output has not been changed by that foundation step.
 The current planned learner context runtime integration separates learning context from workflow context; Free Development Mode remains a workflow, not a lesson.
+The current implemented SafeFlow security backfill adds repository-level security invariants, a policy table, a reusable checker, standalone tests, aggregate-test wiring, Git hooks wiring, CI wiring, and pre-commit wiring.
+The current implemented product security workflow gate adds `tools/product-security status|preflight|advise|check|gate` for menu items 4, 5, and 6 while preserving their existing document, repository-boundary, Git sync, CI, and approval gates.
 Safe product repository cleanup remains implemented for the external product repository created by the 7-day or 14-day lessons.
 It also preserves the 7-day and 14-day learning-mode, workflow display language, product development language, and expanded language-list controls.
 The shared standard language list remains `ja`, `en`, `ko`, `zh-CN`, `zh-TW`, `es`, `pt-BR`, `fr`, `de`, `id`, `vi`, `th`, `hi`, and `ar`, while `zh` remains a `zh-CN` alias and `custom` remains available.
@@ -82,6 +85,8 @@ The implementation remains additive and keeps the existing 7-day lesson, 14-day 
 - Added as-built sync-contract enforcement and wired it into structure checks, as-built checks, aggregate tests, CI, and pre-commit.
 - Added Git workflow policy tests and wired them into structure checks, as-built checks, aggregate tests, CI, and pre-commit.
 - Added Git hooks policy tests and wired them into structure checks, aggregate tests, CI, and pre-commit.
+- Added SafeFlow security invariants, policy, checker, and tests.
+- Added product-security policy, context map, command surface, gates, dashboard/menu visibility, and tests.
 - Documented implementation quality constraints: refactorability, ecosystem fit, reusability, and generality.
 - Preserved the no-tradeoff rule for existing features.
 - Added as-built lesson-side documents:
@@ -128,6 +133,8 @@ The following developer-memory remediation items are implemented and mechanicall
 - The implemented resource-budgeted parallel guard is synchronized in the same five documents as verification-performance safety behavior.
 - The planned learner context foundation is synchronized in the same five documents as documentation foundation work for the next implementation plan.
 - The planned learner context runtime integration is synchronized in the same five documents as the next runtime implementation plan.
+- The implemented SafeFlow security backfill is synchronized in the same five documents as repository-security invariant enforcement.
+- The implemented product security workflow gate is synchronized in the same five documents as menu 4/5/6 runtime security gate enforcement.
 - The synchronization passes only when the implemented content is present in all five documents.
 - Preserve refactorability, ecosystem fit, reusable design, generality, and the no-existing-feature-tradeoff rule while maintaining the implemented remediation.
 
@@ -187,6 +194,58 @@ Runtime implementation is present for summary output, local Git hooks parallel e
 - [x] Wire new tests into aggregate, pre-commit, and CI.
 - [x] Update sync contract artifacts, tests, and runtime evidence from planning-only entries to actual runtime entries.
 - [x] Move `resource_guard_summary_parallel_ci` to implemented after runtime artifacts and tests pass locally.
+
+## Implemented SafeFlow Security Backfill Work
+
+Status: implemented.
+Repository-level security invariants, policy, checker, tests, aggregate wiring, Git hooks wiring, CI wiring, and pre-commit wiring are present.
+
+- [x] Record the final proposal and implementation plan in developer memory.
+- [x] Add `safeflow_security_backfill` as an implemented sync contract row using runtime artifacts and runtime evidence.
+- [x] Synchronize the implemented work into the five as-built/workflow documents.
+- [x] Add additive AGENTS.MD security-invariant wording.
+- [x] Add `docs/workflow/SAFEFLOW_SECURITY_BACKFILL.tsv`.
+- [x] Add reusable security-invariant library and checks.
+- [x] Add standalone and aggregate regression tests.
+- [x] Wire the checks into Git hooks, CI, and pre-commit.
+- [x] Move `safeflow_security_backfill` to implemented after runtime artifacts and tests pass.
+
+## Implemented Product Security Workflow Gate Work
+
+Status: implemented.
+Product-security policy, workflow-context metadata, command surface, gate integration, tests, aggregate wiring, Git hooks wiring, CI wiring, and pre-commit wiring are present.
+
+- [x] Record the final proposal and implementation plan in developer memory.
+- [x] Add `product_security_workflow_gate` as an implemented sync contract row using runtime artifacts and runtime evidence.
+- [x] Synchronize the implemented work into the five as-built/workflow documents.
+- [x] Add product security policy and workflow-context risk metadata.
+- [x] Add a reusable product-security library.
+- [x] Add `tools/product-security status|preflight|advise|check|gate`.
+- [x] Add fixture-based product security tests.
+- [x] Connect product-security checks to Free Development, Product Improvement, and External Integration without replacing existing gates.
+- [x] Add External Integration OAuth/API and logging preflight confirmation.
+- [x] Add dashboard and menu safety summaries.
+- [x] Wire the checks into Git hooks, CI, pre-commit, and aggregate tests.
+- [x] Move `product_security_workflow_gate` to implemented after runtime artifacts and tests pass.
+
+## Implemented Test And CI Safe Time Optimization Work
+
+Status: implemented safe first phase.
+This runtime implementation preserves full/no-cache completion verification, existing CI guarantees, existing pre-commit behavior, existing Git hooks mode meanings, and all 7-day/14-day lesson checks.
+
+- [x] Record the plan as `test_ci_safe_time_optimization_plan` in the as-built sync contract.
+- [x] Synchronize the plan into the three as-built documents and the two workflow-state documents.
+- [x] Add Test Plan Manifest support in observe-only mode.
+- [x] Add learner-readable reasons for run/force decisions.
+- [x] Add Coverage Guard that fails closed on malformed policy rows, unknown Git hook check references, missing dangerous-change patterns, weakened full/CI escalation for required dangerous patterns, force decisions without full escalation, and unsafe changed-only decisions.
+- [x] Add Result Attestation for policy hashes, check hashes, repository-state hash, manifest hash, generated run/force decisions, and final observe-only status.
+- [x] Add CI-safe full-hooks parallel worker control while preserving `--mode full --no-cache`.
+- [x] Add a shared fixture-copy helper that excludes `.git`, `node_modules`, reports, test results, and cache directories.
+- [x] Wire the new checks into Git hooks, aggregate tests, CI, pre-commit, and CI workflow structure validation.
+- [ ] Add a hook-specific gap-only final gate after mechanical coverage proof exists and developer approval is granted.
+- [ ] Add safe as-built single-pass internal options while keeping strict standalone defaults.
+- [ ] Remove duplicate Playwright execution within a single verification path without removing Playwright coverage.
+- [ ] Keep changed-only behavior observe-only until Coverage Guard and Result Attestation have proven safe against full CI and developer approval is granted.
 
 ## Implemented Documentation Map Synchronization
 
@@ -333,6 +392,21 @@ SYNC-ID: learner_context_runtime_integration
 STATUS: planned
 ARTIFACTS: learning/context/README.md,learning/context/LESSON_CONTEXT_MAP.tsv
 TESTS: tools/test_lesson_repository.sh
+
+SYNC-ID: safeflow_security_backfill
+STATUS: implemented
+ARTIFACTS: AGENTS.MD,docs/workflow/SAFEFLOW_SECURITY_BACKFILL.tsv,tools/lib/security_invariants.sh,tools/check_security_invariants.sh,tools/test_security_invariants.sh,docs/workflow/GIT_HOOK_CHECKS.tsv,.github/workflows/ci.yml,.github/workflows/lesson14-ci.yml,tools/test_lesson_repository.sh
+TESTS: tools/check_security_invariants.sh,tools/test_security_invariants.sh
+
+SYNC-ID: product_security_workflow_gate
+STATUS: implemented
+ARTIFACTS: docs/workflow/PRODUCT_SECURITY_POLICY.tsv,learning/context/WORKFLOW_CONTEXT_MAP.tsv,tools/lib/product_security.sh,tools/product-security,tools/test_product_security.sh,tools/free-development,tools/product-improvement,tools/external-integration,tools/menu,tools/dashboard,docs/workflow/GIT_HOOK_CHECKS.tsv,.github/workflows/ci.yml,.github/workflows/lesson14-ci.yml,tools/test_lesson_repository.sh
+TESTS: tools/test_product_security.sh,tools/test_product_gate_tools.sh
+
+SYNC-ID: test_ci_safe_time_optimization_plan
+STATUS: implemented
+ARTIFACTS: docs/workflow/TEST_PLAN_MANIFEST.tsv,tools/lib/test_plan.sh,tools/test-plan,tools/check_test_plan_coverage.sh,tools/test_test_plan.sh,tools/lib/fixture_copy.sh,tools/fixture-copy,tools/test_fixture_copy.sh,docs/workflow/GIT_HOOK_CHECKS.tsv,docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv,docs/workflow/GIT_HOOK_RECOMMENDATION_PATHS.tsv,tools/git-hooks,tools/test_git_hooks_parallel.sh,tools/check_ci_workflow_structure.sh,tools/test_lesson_repository.sh,.github/workflows/ci.yml,.github/workflows/lesson14-ci.yml
+TESTS: tools/check_test_plan_coverage.sh,tools/test_test_plan.sh,tools/test_fixture_copy.sh,tools/test_git_hooks_parallel.sh,tools/check_ci_workflow_structure.sh
 ```
 
 ## Planned Learner Context Foundation Synchronization

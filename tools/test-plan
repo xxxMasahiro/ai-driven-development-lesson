@@ -1,0 +1,74 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck source=tools/lib/lesson_common.sh
+source "$ROOT/tools/lib/lesson_common.sh"
+# shellcheck source=tools/lib/test_plan.sh
+source "$ROOT/tools/lib/test_plan.sh"
+
+usage() {
+  cat <<'USAGE'
+Usage:
+  ./tools/test-plan status
+  ./tools/test-plan manifest [--paths <path>...]
+  ./tools/test-plan coverage [--paths <path>...]
+  ./tools/test-plan attest [--paths <path>...]
+USAGE
+}
+
+collect_paths() {
+  local -n out_ref="$1"
+  shift
+  out_ref=()
+  if [[ $# -eq 0 ]]; then
+    return 0
+  fi
+  if [[ "${1:-}" != "--paths" || $# -lt 2 ]]; then
+    usage >&2
+    exit 1
+  fi
+  shift
+  while [[ $# -gt 0 ]]; do
+    out_ref+=("$1")
+    shift
+  done
+}
+
+cmd="${1:-status}"
+shift || true
+paths=()
+
+case "$cmd" in
+  status)
+    printf 'Test Plan\n'
+    printf 'Mode: observe-only\n'
+    printf 'Policy file: %s\n' "$(test_plan_policy_file)"
+    printf 'Policy hash: %s\n' "$(test_plan_file_hash "$(test_plan_policy_file)")"
+    printf 'Checks file: %s\n' "$(test_plan_checks_file)"
+    printf 'Checks hash: %s\n' "$(test_plan_file_hash "$(test_plan_checks_file)")"
+    test_plan_validate_policy
+    printf 'Coverage guard: passed\n'
+    printf 'Decision authority: full/no-cache, CI, pre-commit, Playwright, security, product-security, and as-built gates remain authoritative.\n'
+    ;;
+  manifest)
+    collect_paths paths "$@"
+    test_plan_manifest "${paths[@]}"
+    ;;
+  coverage)
+    collect_paths paths "$@"
+    test_plan_coverage "${paths[@]}"
+    printf 'Test plan coverage guard passed.\n'
+    ;;
+  attest)
+    collect_paths paths "$@"
+    test_plan_attestation "${paths[@]}"
+    ;;
+  help|--help|-h)
+    usage
+    ;;
+  *)
+    usage >&2
+    exit 1
+    ;;
+esac

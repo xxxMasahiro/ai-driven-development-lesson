@@ -66,10 +66,23 @@ check_main_ci() {
   done
 
   require_job_contains "$file" syntax-checks "bash -n tools/check_ci_workflow_structure.sh"
+  require_job_contains "$file" syntax-checks "bash -n tools/test-plan"
+  require_job_contains "$file" syntax-checks "bash -n tools/check_test_plan_coverage.sh"
+  require_job_contains "$file" syntax-checks "bash -n tools/fixture-copy"
+  require_job_contains "$file" syntax-checks "bash -n tools/test_fixture_copy.sh"
+  require_job_contains "$file" syntax-checks "bash -n tools/check_security_invariants.sh"
+  require_job_contains "$file" syntax-checks "bash -n tools/product-security"
   require_job_contains "$file" structure-docs-checks "./tools/check_lesson_structure.sh"
   require_job_contains "$file" structure-docs-checks "./tools/check_as_built_docs.sh"
+  require_job_contains "$file" structure-docs-checks "./tools/check_test_plan_coverage.sh"
+  require_job_contains "$file" structure-docs-checks "./tools/check_security_invariants.sh"
   require_job_contains "$file" policy-regression-tests "./tools/test_resource_guard_summary.sh"
+  require_job_contains "$file" policy-regression-tests "./tools/test_test_plan.sh"
   require_job_contains "$file" policy-regression-tests "./tools/test_git_hooks_parallel.sh"
+  require_job_contains "$file" policy-regression-tests "./tools/test_fixture_copy.sh"
+  require_job_contains "$file" policy-regression-tests "./tools/test_security_invariants.sh"
+  require_job_contains "$file" policy-regression-tests "./tools/test_product_gate_tools.sh"
+  require_job_contains "$file" policy-regression-tests "./tools/test_product_security.sh"
   require_job_contains "$file" policy-regression-tests "./tools/check_ci_workflow_structure.sh"
   require_job_contains "$file" lesson-cli-tests "./tools/test_lesson.sh"
   require_job_contains "$file" playwright-tests "npm install"
@@ -85,7 +98,7 @@ check_main_ci() {
   require_job_contains "$file" aggregate-and-full-hooks "npx playwright install chromium"
   require_job_contains "$file" aggregate-and-full-hooks "RESOURCE_GUARD_SKIP_LOCAL_CHECK: \"1\""
   require_job_contains "$file" aggregate-and-full-hooks "./tools/test_lesson_repository.sh"
-  require_job_contains "$file" aggregate-and-full-hooks "./tools/git-hooks run --mode full --no-cache"
+  require_job_contains "$file" aggregate-and-full-hooks "./tools/git-hooks run --mode full --no-cache --jobs 4"
 }
 
 check_lesson14_ci() {
@@ -105,10 +118,23 @@ check_lesson14_ci() {
   done
 
   require_job_contains "$file" syntax-checks "bash -n tools/check_ci_workflow_structure.sh"
+  require_job_contains "$file" syntax-checks "bash -n tools/test-plan"
+  require_job_contains "$file" syntax-checks "bash -n tools/check_test_plan_coverage.sh"
+  require_job_contains "$file" syntax-checks "bash -n tools/fixture-copy"
+  require_job_contains "$file" syntax-checks "bash -n tools/test_fixture_copy.sh"
+  require_job_contains "$file" syntax-checks "bash -n tools/check_security_invariants.sh"
+  require_job_contains "$file" syntax-checks "bash -n tools/product-security"
   require_job_contains "$file" lesson14-structure-sync "./tools/check_lesson14_structure.sh"
   require_job_contains "$file" lesson14-structure-sync "./tools/check_lesson14_sync.sh"
+  require_job_contains "$file" lesson14-structure-sync "./tools/check_test_plan_coverage.sh"
+  require_job_contains "$file" lesson14-structure-sync "./tools/check_security_invariants.sh"
   require_job_contains "$file" policy-regression-tests "./tools/test_resource_guard_summary.sh"
+  require_job_contains "$file" policy-regression-tests "./tools/test_test_plan.sh"
   require_job_contains "$file" policy-regression-tests "./tools/test_git_hooks_parallel.sh"
+  require_job_contains "$file" policy-regression-tests "./tools/test_fixture_copy.sh"
+  require_job_contains "$file" policy-regression-tests "./tools/test_security_invariants.sh"
+  require_job_contains "$file" policy-regression-tests "./tools/test_product_gate_tools.sh"
+  require_job_contains "$file" policy-regression-tests "./tools/test_product_security.sh"
   require_job_contains "$file" policy-regression-tests "./tools/check_ci_workflow_structure.sh"
   require_job_contains "$file" lesson14-cli-tests "./tools/test_lesson14.sh"
   require_job_contains "$file" playwright-tests "npm install"
@@ -124,7 +150,7 @@ check_lesson14_ci() {
   require_job_contains "$file" aggregate-and-full-hooks "npx playwright install chromium"
   require_job_contains "$file" aggregate-and-full-hooks "RESOURCE_GUARD_SKIP_LOCAL_CHECK: \"1\""
   require_job_contains "$file" aggregate-and-full-hooks "./tools/test_lesson_repository.sh"
-  require_job_contains "$file" aggregate-and-full-hooks "./tools/git-hooks run --mode full --no-cache"
+  require_job_contains "$file" aggregate-and-full-hooks "./tools/git-hooks run --mode full --no-cache --jobs 4"
 }
 
 require_file_contains "$ROOT/.github/workflows/ci.yml" "concurrency:"

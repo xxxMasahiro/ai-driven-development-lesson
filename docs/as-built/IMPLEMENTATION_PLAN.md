@@ -434,6 +434,21 @@ SYNC-ID: learner_context_runtime_integration
 STATUS: planned
 ARTIFACTS: learning/context/README.md,learning/context/LESSON_CONTEXT_MAP.tsv
 TESTS: tools/test_lesson_repository.sh
+
+SYNC-ID: safeflow_security_backfill
+STATUS: implemented
+ARTIFACTS: AGENTS.MD,docs/workflow/SAFEFLOW_SECURITY_BACKFILL.tsv,tools/lib/security_invariants.sh,tools/check_security_invariants.sh,tools/test_security_invariants.sh,docs/workflow/GIT_HOOK_CHECKS.tsv,.github/workflows/ci.yml,.github/workflows/lesson14-ci.yml,tools/test_lesson_repository.sh
+TESTS: tools/check_security_invariants.sh,tools/test_security_invariants.sh
+
+SYNC-ID: product_security_workflow_gate
+STATUS: implemented
+ARTIFACTS: docs/workflow/PRODUCT_SECURITY_POLICY.tsv,learning/context/WORKFLOW_CONTEXT_MAP.tsv,tools/lib/product_security.sh,tools/product-security,tools/test_product_security.sh,tools/free-development,tools/product-improvement,tools/external-integration,tools/menu,tools/dashboard,docs/workflow/GIT_HOOK_CHECKS.tsv,.github/workflows/ci.yml,.github/workflows/lesson14-ci.yml,tools/test_lesson_repository.sh
+TESTS: tools/test_product_security.sh,tools/test_product_gate_tools.sh
+
+SYNC-ID: test_ci_safe_time_optimization_plan
+STATUS: implemented
+ARTIFACTS: docs/workflow/TEST_PLAN_MANIFEST.tsv,tools/lib/test_plan.sh,tools/test-plan,tools/check_test_plan_coverage.sh,tools/test_test_plan.sh,tools/lib/fixture_copy.sh,tools/fixture-copy,tools/test_fixture_copy.sh,docs/workflow/GIT_HOOK_CHECKS.tsv,docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv,docs/workflow/GIT_HOOK_RECOMMENDATION_PATHS.tsv,tools/git-hooks,tools/test_git_hooks_parallel.sh,tools/check_ci_workflow_structure.sh,tools/test_lesson_repository.sh,.github/workflows/ci.yml,.github/workflows/lesson14-ci.yml
+TESTS: tools/check_test_plan_coverage.sh,tools/test_test_plan.sh,tools/test_fixture_copy.sh,tools/test_git_hooks_parallel.sh,tools/check_ci_workflow_structure.sh
 ```
 
 ## Implemented Resource-Budgeted Parallel Guard Implementation Plan
@@ -1142,6 +1157,210 @@ Remote CI verification should use GitHub Actions run status or PR checks after t
 - Approval is required before reducing duplicate CI coverage for speed.
 - Approval is required before adding a CI-specific settings file if the workflow structure alone is insufficient.
 
+## Implemented SafeFlow Security Backfill Implementation Plan
+
+This implementation is synchronized from `docs/memory/DEVELOPER_MEMORY.md`.
+The sync ID is implemented because runtime artifacts, tests, Git hooks wiring, CI wiring, and pre-commit wiring are present.
+
+### Implemented Scope
+
+- Added a SafeFlow security backfill sync scope that is separate from learner-context runtime integration.
+- Added repository-level security invariants to the agent rule layer.
+- Added `docs/workflow/SAFEFLOW_SECURITY_BACKFILL.tsv` as a policy table for security surfaces, invariants, evidence, required checks, and status.
+- Added `tools/lib/security_invariants.sh`, `tools/check_security_invariants.sh`, and `tools/test_security_invariants.sh`.
+- Wired the checker into aggregate tests, Git hooks, CI, and pre-commit.
+
+### Implemented Order
+
+1. Added the policy table with a small schema rather than overbuilding severity or owner routing.
+2. Added the reusable security-invariant checker and regression test.
+3. Added Git hooks recommendation paths and hook checks after the checker existed.
+4. Wired standalone, sync, aggregate, Git hooks, pre-commit, and CI verification.
+5. Moved `safeflow_security_backfill` from planned to implemented after runtime artifacts and tests passed locally.
+
+### Verification
+
+```bash
+./tools/check_security_invariants.sh
+./tools/test_security_invariants.sh
+./tools/as-built-sync status
+./tools/check_as_built_sync_contract.sh
+./tools/check_workflow_pair_sync.sh
+./tools/test_lesson_repository.sh
+./tools/git-hooks run --mode minimal --no-cache
+./tools/git-hooks run --mode full --no-cache
+.githooks/pre-commit
+```
+
+### Recovery
+
+- If the checker creates false positives, adjust policy categories or allowlists instead of adding one-off bypasses.
+- If a proposed invariant conflicts with existing behavior, stop and ask for developer approval.
+- If a security check requires network access, separate it from pre-commit and local non-network verification.
+
+## Implemented Product Security Workflow Gate Implementation Plan
+
+This implementation is synchronized from `docs/memory/DEVELOPER_MEMORY.md`.
+The sync ID is implemented because product-security runtime commands, policy, tests, and menu/workflow wiring exist.
+
+### Implemented Scope
+
+- Added product-security advice, check, and gate behavior for menu items 4, 5, and 6.
+- Keep existing Free Development, Product Improvement, External Integration, repository-boundary, Git sync, CI, and document-sync gates.
+- Added product security policy configuration instead of hard-coded stack-specific branches.
+- Added workflow-context risk metadata for Free Development, Product Improvement, External Integration, and lesson maintenance.
+- Added dashboard and menu safety summaries that explain next safe action, what not to touch, and what requires approval.
+
+### Implemented Order
+
+1. Added `docs/workflow/PRODUCT_SECURITY_POLICY.tsv` and `learning/context/WORKFLOW_CONTEXT_MAP.tsv`.
+2. Added `tools/lib/product_security.sh` as the reusable product-security library.
+3. Added `tools/product-security status|preflight|advise|check|gate`.
+4. Added `tools/test_product_security.sh` using temporary product repositories and fixture policies.
+5. Connected the product-security gate to menu items 4, 5, and 6 without replacing existing gates.
+6. Strengthened External Integration start/preflight prompts to require explicit OAuth/API and logging confirmation.
+7. Added product-repository context handling after the product repository is known.
+8. Wired tests into aggregate tests, Git hooks, CI, and pre-commit.
+9. Moved `product_security_workflow_gate` from planned to implemented after runtime artifacts and tests passed locally.
+
+### Verification
+
+```bash
+./tools/product-security status
+./tools/product-security preflight
+./tools/product-security check
+./tools/test_product_security.sh
+./tools/test_product_gate_tools.sh
+./tools/as-built-sync status
+./tools/check_as_built_sync_contract.sh
+./tools/check_workflow_pair_sync.sh
+./tools/test_lesson_repository.sh
+./tools/git-hooks run --mode minimal --no-cache
+./tools/git-hooks run --mode full --no-cache
+.githooks/pre-commit
+```
+
+### Recovery
+
+- If the gate blocks too much, split high-confidence blocks from warnings instead of weakening all security checks.
+- If a stack-specific check is needed, put the detection and command mapping in policy or reusable library code.
+- If product repository context is ambiguous, stop and require user confirmation instead of scanning outside the configured repository.
+
+### Developer Approval Gates
+
+- Future approval is required before expanding AGENTS.MD security-invariant wording beyond the implemented additive rule.
+- Future approval is required before adding new product-security blocking conditions.
+- Future approval is required before making External Integration approvals mandatory beyond the implemented OAuth/API and logging scope.
+- Approval is required before enabling network-dependent audits such as `npm audit` in CI.
+- Approval is required before adding product repository cleanup strengthening to this implementation instead of a later sync scope.
+
+## Implemented Test And CI Safe Time Optimization Implementation
+
+This plan is synchronized as `test_ci_safe_time_optimization_plan`.
+The implemented first phase keeps runtime test selection, CI required behavior, pre-commit behavior, and Git hook mode semantics intact while adding observe-only planning, fail-closed coverage checks, result attestation, CI-safe Git hooks parallelism, and lightweight fixture copying.
+
+### Implemented Change Targets
+
+- `docs/workflow/TEST_PLAN_MANIFEST.tsv` stores machine-readable observe-only test-plan policy.
+- `tools/lib/test_plan.sh` and `tools/test-plan` implement changed-path classification, manifest generation, coverage validation, and result attestation.
+- `tools/check_test_plan_coverage.sh` and `tools/test_test_plan.sh` provide standalone and aggregate-callable checks.
+- `tools/git-hooks` accepts `--jobs <count>` and `GIT_HOOKS_JOBS` while local execution remains capped by resource guard recommendations.
+- `.github/workflows/ci.yml` and `.github/workflows/lesson14-ci.yml` keep full/no-cache verification and request CI-safe full-hooks parallelism with `--jobs 4`.
+- `tools/lib/fixture_copy.sh`, `tools/fixture-copy`, and `tools/test_fixture_copy.sh` implement and validate lightweight fixture copying.
+- `docs/workflow/GIT_HOOK_CHECKS.tsv`, `docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv`, `docs/workflow/GIT_HOOK_RECOMMENDATION_PATHS.tsv`, `tools/test_lesson_repository.sh`, and `tools/check_ci_workflow_structure.sh` wire the new checks into existing local, aggregate, Git hooks, and CI gates.
+
+### Implemented Order And Preserved Future Work
+
+1. Added a Test Plan Manifest in observe-only mode.
+   - Generate `run` and `force` decisions without changing actual CI enforcement.
+   - Print learner-readable decision and full-escalation reasons.
+   - Treat unknown paths and dangerous paths as full/no-cache until classified.
+
+2. Added Coverage Guard.
+   - Fail closed when policy rows are malformed, reference unknown Git hook checks, omit required dangerous-change patterns, weaken required dangerous-change full/CI escalation, or emit a force decision without full escalation.
+   - Keep CI/pre-commit wiring verification in the CI workflow structure checker.
+   - Add tests that prove unsafe changed-only decisions fail before any CI skipping is allowed.
+
+3. Added Result Attestation.
+   - Record policy hash, check-catalog hash, repository-state hash, manifest hash, generated run/force decisions, and final observe-only authority.
+   - Keep attestation as evidence, not as approval or proof of delivery.
+
+4. Connected observe-only checks to local hooks, aggregate tests, and CI.
+   - Local `minimal`, `fast`, and `full` run the coverage guard through the configured hook catalog.
+   - CI runs the coverage guard and test-plan regression while still running the existing required full verification.
+
+5. Kept the hook-specific gap-only final gate as future work.
+   - Keep `tools/test_lesson_repository.sh` as the standalone exhaustive aggregate command.
+   - In full hooks, replace duplicate aggregate reruns only after a mechanical coverage check proves that individual hook rows plus the gap gate cover the standalone aggregate expectations.
+
+6. Kept as-built validation single-pass behavior as future work.
+   - Keep strict standalone defaults.
+   - Add internal-only options only after tests prove callers already ran `tools/check_as_built_sync_contract.sh` once in the same path.
+
+7. Kept Playwright duplicate-execution removal as future work.
+   - Keep Playwright as required local/CI verification where relevant.
+   - Ensure CI final aggregation checks Playwright evidence rather than rerunning the browser suite.
+
+8. Added CI-safe hook parallelism.
+   - Keep `--mode full --no-cache`.
+   - Add an explicit CI worker setting through `--jobs` or `GIT_HOOKS_JOBS`.
+   - Do not use local WSL resource settings as CI truth.
+
+9. Reduced fixture-copy cost.
+   - Add a shared fixture-copy helper that excludes `.git`, `node_modules`, `playwright-report`, `test-results`, and cache directories.
+   - Require any test fixture that depends on untracked files to declare those files explicitly.
+
+10. Kept changed-only selection observe-only.
+    - Compare planned changed-only output against full CI results.
+    - Do not let changed-only skip CI checks until Coverage Guard and Result Attestation are implemented and have sufficient passing evidence.
+
+### Document Synchronization Policy
+
+- `docs/as-built/REQUIREMENTS.md` describes the guarantees and non-goals.
+- `docs/as-built/SPECIFICATION.md` describes manifest, guard, attestation, cache, CI, and quarantine behavior.
+- `docs/as-built/IMPLEMENTATION_PLAN.md` describes implementation order, recovery, and approval gates.
+- `docs/workflow/TASK_TRACKER.md` records implemented task state and preserved future work.
+- `docs/workflow/HANDOFF.md` records restart context, risks, future approval gates, and next steps.
+- The sync ID is implemented because runtime artifacts, standalone tests, aggregate wiring, CI wiring, and pre-commit behavior are present and verified for the safe first phase.
+
+### Verification Plan
+
+Implemented verification:
+
+```bash
+bash -n tools/test-plan tools/lib/test_plan*.sh tools/lib/fixture_copy.sh tools/fixture-copy tools/check_test_plan_coverage.sh tools/test_test_plan.sh tools/test_fixture_copy.sh
+./tools/test_test_plan.sh
+./tools/check_test_plan_coverage.sh
+./tools/test_fixture_copy.sh
+./tools/test_git_hooks_parallel.sh
+./tools/check_ci_workflow_structure.sh
+./tools/check_as_built_sync_contract.sh
+./tools/check_as_built_docs.sh
+./tools/as-built-sync status
+./tools/test_lesson_repository.sh
+./tools/git-hooks run --mode minimal --no-cache
+./tools/git-hooks run --mode full --no-cache
+.githooks/pre-commit
+```
+
+### Recovery Plan
+
+- If Test Plan Manifest output is wrong, keep it observe-only and fix policy classification before changing execution behavior.
+- If Coverage Guard blocks valid work, fix the manifest or impact map; do not bypass the guard with ad hoc path exceptions.
+- If attestation is incomplete, keep full CI authoritative and repair evidence generation.
+- If same-run cache creates stale reuse, disable reuse and keep full/no-cache execution until hash inputs are corrected.
+- If gap-only final gate misses aggregate coverage, restore the standalone aggregate in full hooks and repair the mechanical coverage check.
+- If CI workflow consolidation changes required check names, pause for developer approval and branch-protection migration planning.
+
+### Developer Approval Gates
+
+- Approval is required before making changed-only selection authoritative in CI.
+- Approval is required before changing required CI check names or consolidating `ci.yml` and `lesson14-ci.yml` in a way that affects branch protection.
+- Approval is required before reducing full/no-cache scope.
+- Approval is required before adding flaky quarantine.
+- Approval is required before changing the meaning of `full`, `fast`, or `minimal`.
+- Approval is required before using persistent verification-result cache in CI.
+
 ## Acceptance Criteria
 
 - Existing 7-day and 14-day flows still pass structure checks.
@@ -1152,4 +1371,5 @@ Remote CI verification should use GitHub Actions run status or PR checks after t
 - Product repository boundary, Git sync, and CI checks remain available for explicit real product operations testing.
 - All as-built documents describe the same implemented state.
 - Lesson repository test prints `Lesson repository test passed.`
-- Every developer-memory audit item is implemented, synchronized into the five planning/workflow documents, and backed by a mechanical check.
+- Every implemented developer-memory audit item is synchronized into the five planning/workflow documents and backed by a mechanical check.
+- Planned developer-memory audit items are synchronized into the five planning/workflow documents without being described as runtime-implemented work.

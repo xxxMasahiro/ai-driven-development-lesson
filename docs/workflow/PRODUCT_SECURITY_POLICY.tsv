@@ -1,0 +1,10 @@
+# sync_id	product_security_workflow_gate
+# check_id	context	severity	gate_effect	approval_required	description
+repository_boundary	all	block	block	false	Product security checks must inspect only the configured product repository and must not scan unrelated directories.
+secret_exposure	all	block	block	false	Secret-like values, private keys, credentials, tokens, or private messages must not be committed, printed, or logged.
+env_file_hygiene	all	warning	warn	false	Environment files should be ignored or documented; warnings must not hide high-confidence secret exposure.
+external_integration_approval	external-integration	block	block	true	External integrations require explicit service, data, OAuth, token, webhook, logging, rate-limit, sandbox, and rollback confirmation before implementation.
+dependency_change_awareness	product-improvement	warning	warn	false	Dependency, authentication, API, storage, deletion, or logging changes require security-oriented review.
+git_ci_sync_awareness	all	block	block	false	Product work must preserve existing Git sync, CI, workflow-pair, and repository-boundary gates.
+warning_block_separation	all	block	block	false	Product security must keep advisory warnings separate from high-confidence blocking failures.
+safe_output_metadata	all	block	block	false	Product security output may show categories and file references, but must not print secret values.

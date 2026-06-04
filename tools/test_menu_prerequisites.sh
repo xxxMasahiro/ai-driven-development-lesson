@@ -2,11 +2,18 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck source=tools/lib/fixture_copy.sh
+source "$ROOT/tools/lib/fixture_copy.sh"
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 
-cp -a "$ROOT" "$work/lesson"
+fixture_copy_repo "$ROOT" "$work/lesson"
 cd "$work/lesson"
+git init -b main >/dev/null
+git config user.name "Menu Test"
+git config user.email "menu-test@example.com"
+git add .
+git commit -m "Initial lesson fixture" >/dev/null
 
 project_root="$work/projects"
 product_name="menu-product"

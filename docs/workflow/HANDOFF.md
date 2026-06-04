@@ -12,6 +12,9 @@ The current implemented Git hooks policy provides faster safe serial pre-commit 
 The current implemented resource-budgeted parallel guard captures the developer-approved implementation proposal for safe optional parallel execution based on user-configured memory and swap budgets; runtime policy, settings, CLI, Git hooks integration, Playwright worker recommendation, CI wiring, and tests are present.
 The current planned learner context foundation adds source documents under `learning/context/` for the next lesson-content implementation cycle; it does not yet change runtime lesson output.
 The current planned learner context runtime integration separates learning context from workflow context; Free Development Mode must remain a workflow and must not be implemented as a lesson.
+The current implemented SafeFlow security backfill adds repository-level security invariants, `docs/workflow/SAFEFLOW_SECURITY_BACKFILL.tsv`, `tools/check_security_invariants.sh`, and `tools/test_security_invariants.sh`.
+The current implemented product security workflow gate adds `docs/workflow/PRODUCT_SECURITY_POLICY.tsv`, `learning/context/WORKFLOW_CONTEXT_MAP.tsv`, `tools/product-security`, `tools/test_product_security.sh`, and gate wiring for menu items 4, 5, and 6.
+The current implemented test and CI safe time optimization first phase is documented as `test_ci_safe_time_optimization_plan`; it provides observe-only planning, fail-closed coverage validation, result attestation, CI-safe Git hooks parallelism, and lightweight fixture copying while preserving full/no-cache verification.
 
 ## Key Implemented Capabilities
 
@@ -34,6 +37,8 @@ The current planned learner context runtime integration separates learning conte
 - `status` commands remain non-blocking; `start`, `gate`, and `check` enforce prerequisites.
 - `tools/product-improvement status|start|gate` provides the mechanical entry for product improvement.
 - `tools/product-repository-cleanup status|plan|local|remote` provides the mechanical entry for safe product repository cleanup.
+- `tools/check_security_invariants.sh` provides mechanical SafeFlow security invariant validation.
+- `tools/product-security status|preflight|advise|check|gate` provides the mechanical product-security command surface for menu items 4, 5, and 6.
 - `tools/check_as_built_sync_contract.sh` provides the mechanical five-document synchronization contract check.
 - `tools/as-built-sync status` provides the learner/agent-facing sync-contract status view.
 - `tools/test_as_built_sync_contract.sh` covers sync-contract success and failure paths.
@@ -87,6 +92,7 @@ reviews/SUBAGENT_REVIEW_PROTOCOL.md
 docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv
 tools/check_as_built_docs.sh
 tools/check_as_built_sync_contract.sh
+tools/check_security_invariants.sh
 tools/check_developer_memory_requirements.sh
 tools/check_review_protocol.sh
 tools/menu
@@ -96,7 +102,9 @@ tools/test_lesson.sh
 tools/test_lesson_repository.sh
 tools/test_product_gate_tools.sh
 tools/test_product_repository_cleanup.sh
+tools/test_product_security.sh
 tools/test_as_built_sync_contract.sh
+tools/test_security_invariants.sh
 tools/git-workflow
 tools/test_git_workflow_policy.sh
 tools/git-hooks
@@ -106,6 +114,7 @@ learning/context/README.md
 learning/context/AI_DRIVEN_DEVELOPMENT_FOUNDATION.md
 learning/context/SECURITY_FOUNDATION.md
 learning/context/LESSON_CONTEXT_MAP.tsv
+learning/context/WORKFLOW_CONTEXT_MAP.tsv
 ```
 
 ## Next Step
@@ -113,7 +122,10 @@ learning/context/LESSON_CONTEXT_MAP.tsv
 The resource-budgeted parallel guard is implemented.
 The resource guard safe cleanup follow-up is implemented.
 The resource guard summary and local/CI parallelization improvement is implemented as `resource_guard_summary_parallel_ci`.
-The next implementation cycle should choose explicitly between follow-up tuning for `resource_guard_summary_parallel_ci` and the remaining learner context runtime integration work.
+The SafeFlow security backfill is implemented as `safeflow_security_backfill`.
+The product security workflow gate is implemented as `product_security_workflow_gate`.
+The test and CI safe time optimization first phase is implemented as `test_ci_safe_time_optimization_plan`.
+The next implementation cycle should choose explicitly between follow-up tuning for `test_ci_safe_time_optimization_plan`, follow-up tuning for `resource_guard_summary_parallel_ci`, remaining learner context runtime integration work, or future product-security refinements that require developer approval.
 Do not perform `.wslconfig` writes, swap creation/deletion, privileged cleanup, arbitrary process killing, CI weakening, pre-commit weakening, or Git hooks mode semantic changes without developer approval.
 If resource guard behavior is changed later, preserve policy/settings-driven implementation, user-configurable available-memory floor, active-heavy-process fallback, explicit parallel-mode safe-stop, unknown-profile rejection, safe-stop failure for checks and job recommendations, standalone and aggregate tests, CI/pre-commit wiring, Playwright wrapper wiring, and existing Git hooks mode semantics.
 If cleanup behavior is changed later, preserve dry-run by default, explicit `--safe` deletion, repo-local path validation, symlink escape rejection, marked Git hooks cache validation, fixture-based tests, CI/pre-commit wiring, and the prohibition on OS cache, swap, Docker, process, product repository, and global cache cleanup without developer approval.
@@ -126,6 +138,9 @@ The final CI `aggregate-and-full-hooks` job must install npm dependencies and Pl
 CI full-hooks execution must keep the CI-safe local-resource bypass behavior such as `RESOURCE_GUARD_SKIP_LOCAL_CHECK=1` or an equivalent documented mechanism, while local Playwright and Git hooks may use resource guard recommendations.
 The `resource_guard_summary_parallel_ci` sync contract is implemented with actual runtime artifacts, runtime tests, and runtime evidence.
 Developer approval is required before changing `GIT_HOOK_CHECKS.tsv` columns, changing the meaning of `full`, `fast`, or `minimal`, making Playwright or aggregate checks more aggressive than resource guard recommends, reducing CI coverage for speed, or adding a CI-specific settings file.
+For future SafeFlow/product-security refinement, developer approval is required before expanding `AGENTS.MD` invariant wording, expanding blocking conditions that stop learner or workflow progress, adding network-dependent audits, changing external-integration approval prompts, or adding destructive cleanup behavior.
+The `safeflow_security_backfill` and `product_security_workflow_gate` sync contracts are implemented with actual runtime artifacts, runtime tests, and runtime evidence.
+For future `test_ci_safe_time_optimization_plan` refinement, keep changed-only selection observe-only until Coverage Guard and Result Attestation have enough full-CI evidence and developer approval. Do not reduce full/no-cache coverage, required CI checks, Playwright coverage, as-built sync enforcement, security checks, product-security checks, pre-commit behavior, or Git hooks mode semantics without developer approval.
 
 Implemented Git workflow policy scope:
 
@@ -248,6 +263,21 @@ SYNC-ID: learner_context_runtime_integration
 STATUS: planned
 ARTIFACTS: learning/context/README.md,learning/context/LESSON_CONTEXT_MAP.tsv
 TESTS: tools/test_lesson_repository.sh
+
+SYNC-ID: safeflow_security_backfill
+STATUS: implemented
+ARTIFACTS: AGENTS.MD,docs/workflow/SAFEFLOW_SECURITY_BACKFILL.tsv,tools/lib/security_invariants.sh,tools/check_security_invariants.sh,tools/test_security_invariants.sh,docs/workflow/GIT_HOOK_CHECKS.tsv,.github/workflows/ci.yml,.github/workflows/lesson14-ci.yml,tools/test_lesson_repository.sh
+TESTS: tools/check_security_invariants.sh,tools/test_security_invariants.sh
+
+SYNC-ID: product_security_workflow_gate
+STATUS: implemented
+ARTIFACTS: docs/workflow/PRODUCT_SECURITY_POLICY.tsv,learning/context/WORKFLOW_CONTEXT_MAP.tsv,tools/lib/product_security.sh,tools/product-security,tools/test_product_security.sh,tools/free-development,tools/product-improvement,tools/external-integration,tools/menu,tools/dashboard,docs/workflow/GIT_HOOK_CHECKS.tsv,.github/workflows/ci.yml,.github/workflows/lesson14-ci.yml,tools/test_lesson_repository.sh
+TESTS: tools/test_product_security.sh,tools/test_product_gate_tools.sh
+
+SYNC-ID: test_ci_safe_time_optimization_plan
+STATUS: implemented
+ARTIFACTS: docs/workflow/TEST_PLAN_MANIFEST.tsv,tools/lib/test_plan.sh,tools/test-plan,tools/check_test_plan_coverage.sh,tools/test_test_plan.sh,tools/lib/fixture_copy.sh,tools/fixture-copy,tools/test_fixture_copy.sh,docs/workflow/GIT_HOOK_CHECKS.tsv,docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv,docs/workflow/GIT_HOOK_RECOMMENDATION_PATHS.tsv,tools/git-hooks,tools/test_git_hooks_parallel.sh,tools/check_ci_workflow_structure.sh,tools/test_lesson_repository.sh,.github/workflows/ci.yml,.github/workflows/lesson14-ci.yml
+TESTS: tools/check_test_plan_coverage.sh,tools/test_test_plan.sh,tools/test_fixture_copy.sh,tools/test_git_hooks_parallel.sh,tools/check_ci_workflow_structure.sh
 ```
 
 Planned learner context foundation scope:
@@ -270,6 +300,37 @@ Planned learner context runtime integration scope:
 - Planned future integration points include `tools/lesson`, `tools/lesson14`, `tools/team-development`, `tools/free-development`, `tools/product-improvement`, `tools/external-integration`, `tools/menu`, and `tools/dashboard`.
 - Future implementation must preserve existing approval gates, ordered progression, learner-selected start positions, menu prerequisites, Git workflow settings, Git hooks settings, dashboard views, CI, pre-commit, and repository-boundary behavior.
 - Future implementation must add standalone and aggregate test coverage before moving the sync ID to `implemented`.
+
+Implemented SafeFlow security backfill scope:
+
+- Sync ID: `safeflow_security_backfill`.
+- Status: `implemented`.
+- Runtime artifacts include `AGENTS.MD`, `docs/workflow/SAFEFLOW_SECURITY_BACKFILL.tsv`, `tools/lib/security_invariants.sh`, `tools/check_security_invariants.sh`, and `tools/test_security_invariants.sh`.
+- The implementation adds mechanical security invariants without replacing existing learner context, 7-day lessons, 14-day lessons, CI, pre-commit, Git hooks, resource guard, as-built sync, or document-route behavior.
+- The implementation does not mutate OS, WSL, Docker, cgroups, swap, or processes.
+
+Implemented product security workflow gate scope:
+
+- Sync ID: `product_security_workflow_gate`.
+- Status: `implemented`.
+- Runtime artifacts include `docs/workflow/PRODUCT_SECURITY_POLICY.tsv`, `learning/context/WORKFLOW_CONTEXT_MAP.tsv`, `tools/lib/product_security.sh`, `tools/product-security`, and `tools/test_product_security.sh`.
+- The implementation supports menu items 4, 5, and 6 as workflow contexts, not lessons.
+- The implementation adds a stack-agnostic product-security command surface that can advise, check, and gate work without scanning outside the configured product repository.
+- The implementation distinguishes advisory warnings from high-confidence blocking conditions and avoids exposing secret values in output or test fixtures.
+- The implementation preserves explicit approval for external API/OAuth/webhook/secrets work and does not weaken existing product-repository boundaries, Git workflow policy, or cleanup behavior.
+
+Implemented test and CI safe time optimization first-phase scope:
+
+- Sync ID: `test_ci_safe_time_optimization_plan`.
+- Status: `implemented`.
+- Purpose: reduce local and remote verification time by first adding the controls needed to remove duplicate work safely, then applying proven reductions without reducing safety or correctness.
+- The first implementation adds Test Plan Manifest, learner-readable decision reasons, Coverage Guard, Result Attestation, CI-safe full-hooks parallelism, and lightweight fixture copying before any changed-only CI skipping or same-run evidence reuse is allowed.
+- Keep `tools/test_lesson_repository.sh` as a standalone exhaustive command.
+- Repeated as-built validation, duplicate Playwright execution, and duplicate final CI verification remain future optimization targets.
+- A future full-hooks path may use a gap-only final gate only after a mechanical coverage check proves that individual hook rows plus the gap gate cover the standalone aggregate requirements.
+- CI keeps full/no-cache verification authoritative while observe-only planning gathers evidence.
+- CI may cache npm and Playwright dependencies, but not verification results.
+- Developer approval is required before changed-only becomes authoritative in CI, required CI check names change, full/no-cache scope is reduced, flaky quarantine is introduced, or `full`, `fast`, and `minimal` semantics change.
 
 The previously synchronized menu-wide implementation is `menu_git_workflow_policy`.
 It promotes the existing Git workflow policy into a shared menu-level policy without weakening any existing lesson, menu, dashboard, cleanup, CI, pre-commit, or as-built synchronization behavior.

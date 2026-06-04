@@ -27,6 +27,7 @@ case "$COMMAND" in
     printf 'Free Development Mode: optional\n'
     printf 'Guide: %s\n' "$LESSON_ROOT/free-development/FREE_DEVELOPMENT_MODE.md"
     printf 'Product repository: %s\n' "$(lesson_product_repo_root)"
+    "$LESSON_ROOT/tools/product-security" advise --context free-development || true
     lesson_menu_print_readiness "Free Development Mode"
     ;;
   start|開始)
@@ -34,10 +35,13 @@ case "$COMMAND" in
     lesson_menu_require_settings "Free Development Mode"
     printf 'Free Development Mode start prompt:\n\n'
     sed -n '/^## Product Setup Prompt$/,/^## Completion Gate$/p' "$LESSON_ROOT/free-development/FREE_DEVELOPMENT_MODE.md" | sed '$d'
+    printf '\nProduct security guidance:\n'
+    "$LESSON_ROOT/tools/product-security" advise --context free-development || true
     ;;
   gate|確認)
     lesson_menu_require_settings "Free Development Mode"
     "$LESSON_ROOT/tools/check_repository_boundary.sh" --product-required >/dev/null
+    "$LESSON_ROOT/tools/product-security" gate --context free-development
     "$LESSON_ROOT/tools/check_workflow_pair_sync.sh" --product
     "$LESSON_ROOT/tools/check_git_sync.sh" --product --required
     "$LESSON_ROOT/tools/check_ci_status.sh" --product --required
