@@ -1,0 +1,260 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck source=tools/lib/lesson_common.sh
+source "$ROOT/tools/lib/lesson_common.sh"
+# shellcheck source=tools/lib/git_hooks_policy.sh
+source "$ROOT/tools/lib/git_hooks_policy.sh"
+# shellcheck source=tools/lib/ci_evidence.sh
+source "$ROOT/tools/lib/ci_evidence.sh"
+
+usage() {
+  cat <<'USAGE'
+Usage:
+  ./tools/ci-final-gate [--gap-only]
+
+The default mode verifies same-run Git hook evidence. If evidence is missing
+and strict evidence is not required, it falls back to the aggregate repository
+test. With valid evidence, it runs only the configured final-gap commands.
+USAGE
+}
+
+gap_commands_file() {
+  printf '%s\n' "${CI_FINAL_GATE_GAP_COMMANDS_FILE:-$LESSON_ROOT/docs/workflow/FINAL_GATE_GAP_COMMANDS.tsv}"
+}
+
+coverage_file() {
+  printf '%s\n' "${CI_FINAL_GATE_COVERAGE_FILE:-$LESSON_ROOT/docs/workflow/FINAL_GATE_COVERAGE.tsv}"
+}
+
+aggregate_file() {
+  printf '%s\n' "${CI_FINAL_GATE_AGGREGATE_FILE:-$LESSON_ROOT/tools/test_lesson_repository.sh}"
+}
+
+validate_gap_commands() {
+  local file
+  local invalid=0
+  file="$(gap_commands_file)"
+  [[ -f "$file" ]] || {
+    printf 'Final-gate gap command file is missing: %s\n' "$file" >&2
+    return 1
+  }
+  while IFS=$'\t' read -r command_id command description extra; do
+    [[ -n "${command_id:-}" ]] || continue
+    [[ "$command_id" != \#* ]] || continue
+    if [[ -n "${extra:-}" || -z "${command:-}" || -z "${description:-}" ]]; then
+      printf 'Malformed final-gate gap command row for command: %s\n' "${command_id:-unknown}" >&2
+      invalid=1
+      continue
+    fi
+  done <"$file"
+  [[ "$invalid" -eq 0 ]]
+}
+
+aggregate_requirements() {
+  local file
+  file="$(aggregate_file)"
+  [[ -f "$file" ]] || {
+    printf 'Final-gate aggregate file is missing: %s\n' "$file" >&2
+    return 1
+  }
+  awk '
+    /^[[:space:]]*$/ { next }
+    /^[[:space:]]*#/ { next }
+    {
+      line = $0
+      sub(/[[:space:]]+#.*/, "", line)
+      if (line ~ /^[[:space:]]*as_built_evidence_run_docs_check([[:space:]]|$)/) {
+        print "as_built_evidence_run_docs_check"
+        next
+      }
+      if (line ~ /^[[:space:]]*as_built_evidence_run_sync_contract_check([[:space:]]|$)/) {
+        print "as_built_evidence_run_sync_contract_check"
+        next
+      }
+      if (match(line, /\.\/tools\/[A-Za-z0-9_.-]+/)) {
+        command = substr(line, RSTART, RLENGTH)
+        rest = substr(line, RSTART + RLENGTH)
+        if (command !~ /\.sh$/) {
+          sub(/^[[:space:]]+/, "", rest)
+          token_count = split(rest, parts, /[[:space:]]+/)
+          for (i = 1; i <= token_count; i++) {
+            token = parts[i]
+            if (token == "" || token ~ /^(>|<|2>|&>|\||&&|\|\||;)/ || token ~ /^[A-Za-z_][A-Za-z0-9_]*=/) {
+              break
+            }
+            command = command " " token
+          }
+        }
+        print command
+      }
+    }
+  ' "$file" | sort -u
+}
+
+hook_check_exists() {
+  local check_id="$1"
+  local checks_file
+  checks_file="$(git_hooks_checks_file)"
+  awk -F '\t' -v check_id="$check_id" '
+    $1 !~ /^#/ && $1 == check_id { found = 1 }
+    END { exit found ? 0 : 1 }
+  ' "$checks_file"
+}
+
+gap_command_exists() {
+  local command_id="$1"
+  local file
+  file="$(gap_commands_file)"
+  awk -F '\t' -v command_id="$command_id" '
+    $1 !~ /^#/ && $1 == command_id { found = 1 }
+    END { exit found ? 0 : 1 }
+  ' "$file"
+}
+
+validate_aggregate_coverage() {
+  local file
+  local requirements_file
+  local covered_file
+  local invalid=0
+  local requirement coverage_kind coverage_id description extra kind
+  file="$(coverage_file)"
+  [[ -f "$file" ]] || {
+    printf 'Final-gate coverage file is missing: %s\n' "$file" >&2
+    return 1
+  }
+  validate_gap_commands || return 1
+  requirements_file="$(mktemp)"
+  covered_file="$(mktemp)"
+  aggregate_requirements >"$requirements_file"
+
+  while IFS=$'\t' read -r requirement coverage_kind coverage_id description extra; do
+    [[ -n "${requirement:-}" ]] || continue
+    [[ "$requirement" != \#* ]] || continue
+    if [[ -n "${extra:-}" || -z "${coverage_kind:-}" || -z "${coverage_id:-}" || -z "${description:-}" ]]; then
+      printf 'Malformed final-gate coverage row for requirement: %s\n' "${requirement:-unknown}" >&2
+      invalid=1
+      continue
+    fi
+    if ! grep -Fxq "$requirement" "$requirements_file"; then
+      printf 'stale final-gate coverage row for non-aggregate requirement: %s\n' "$requirement" >&2
+      invalid=1
+    fi
+    case "$coverage_kind" in
+      hook)
+        if ! hook_check_exists "$coverage_id"; then
+          printf 'final-gate coverage references missing hook: %s\n' "$coverage_id" >&2
+          invalid=1
+        fi
+        kind="$(git_hooks_parallel_kind_for "$coverage_id")"
+        if [[ "$kind" == "final-gate" ]]; then
+          printf 'final-gate coverage cannot be satisfied by the final-gate hook itself: %s\n' "$coverage_id" >&2
+          invalid=1
+        fi
+        ;;
+      gap)
+        if ! gap_command_exists "$coverage_id"; then
+          printf 'final-gate coverage references missing gap command: %s\n' "$coverage_id" >&2
+          invalid=1
+        fi
+        ;;
+      *)
+        printf 'Invalid final-gate coverage kind for %s: %s\n' "$requirement" "$coverage_kind" >&2
+        invalid=1
+        ;;
+    esac
+    printf '%s\n' "$requirement" >>"$covered_file"
+  done <"$file"
+
+  while IFS= read -r requirement; do
+    [[ -n "$requirement" ]] || continue
+    if ! grep -Fxq "$requirement" "$covered_file"; then
+      printf 'missing final-gate coverage for aggregate requirement: %s\n' "$requirement" >&2
+      invalid=1
+    fi
+  done <"$requirements_file"
+
+  rm -f "$requirements_file" "$covered_file"
+  [[ "$invalid" -eq 0 ]]
+}
+
+run_gap_commands() {
+  local file command_id command description
+  validate_gap_commands || return 1
+  file="$(gap_commands_file)"
+  while IFS=$'\t' read -r command_id command description _extra; do
+    [[ -n "${command_id:-}" ]] || continue
+    [[ "$command_id" != \#* ]] || continue
+    printf 'final-gate gap run: %s\n' "$command_id"
+    (cd "$LESSON_ROOT" && bash -c "$command")
+  done <"$file"
+}
+
+verify_git_hook_evidence() {
+  local mode="full"
+  local rows row_separator check_id modes command description kind
+  local missing=0
+  row_separator=$'\034'
+  rows="$(git_hooks_rows_for_mode "$mode")" || return 1
+  while IFS="$row_separator" read -r check_id modes command description; do
+    [[ -n "$check_id" ]] || continue
+    kind="$(git_hooks_parallel_kind_for "$check_id")"
+    [[ "$kind" != "final-gate" ]] || continue
+    if ! git_hooks_mode_contains "$modes" "$mode"; then
+      continue
+    fi
+    if ! ci_evidence_verify_git_hook "$check_id" "$command" >/dev/null 2>&1; then
+      printf 'missing or stale Git hook evidence: %s\n' "$check_id" >&2
+      missing=1
+    fi
+  done <<<"$rows"
+  [[ "$missing" -eq 0 ]]
+}
+
+fallback_aggregate() {
+  local fallback_command
+  fallback_command="${CI_FINAL_GATE_FALLBACK_COMMAND:-./tools/test_lesson_repository.sh --use-evidence --write-evidence}"
+  printf 'final-gate fallback: %s\n' "$fallback_command"
+  (cd "$LESSON_ROOT" && bash -c "$fallback_command")
+}
+
+gap_only="false"
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --gap-only)
+      gap_only="true"
+      shift
+      ;;
+    help|--help|-h)
+      usage
+      exit 0
+      ;;
+    *)
+      usage >&2
+      exit 1
+      ;;
+  esac
+done
+
+if [[ "$gap_only" == "true" ]]; then
+  run_gap_commands
+  printf 'CI final gate gap commands passed.\n'
+  exit 0
+fi
+
+validate_aggregate_coverage
+
+if verify_git_hook_evidence; then
+  run_gap_commands
+  printf 'CI final gate passed with same-run Git hook evidence.\n'
+  exit 0
+fi
+
+if [[ "${CI_FINAL_GATE_REQUIRE_HOOK_EVIDENCE:-0}" == "1" ]]; then
+  printf 'CI final gate requires valid same-run Git hook evidence.\n' >&2
+  exit 1
+fi
+
+fallback_aggregate
+printf 'CI final gate passed with aggregate fallback.\n'

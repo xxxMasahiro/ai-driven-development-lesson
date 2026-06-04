@@ -363,6 +363,11 @@ SYNC-ID: test_ci_safe_time_optimization_plan
 STATUS: implemented
 ARTIFACTS: docs/workflow/TEST_PLAN_MANIFEST.tsv,tools/lib/test_plan.sh,tools/test-plan,tools/check_test_plan_coverage.sh,tools/test_test_plan.sh,tools/lib/fixture_copy.sh,tools/fixture-copy,tools/test_fixture_copy.sh,docs/workflow/GIT_HOOK_CHECKS.tsv,docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv,docs/workflow/GIT_HOOK_RECOMMENDATION_PATHS.tsv,tools/git-hooks,tools/test_git_hooks_parallel.sh,tools/check_ci_workflow_structure.sh,tools/test_lesson_repository.sh,.github/workflows/ci.yml,.github/workflows/lesson14-ci.yml
 TESTS: tools/check_test_plan_coverage.sh,tools/test_test_plan.sh,tools/test_fixture_copy.sh,tools/test_git_hooks_parallel.sh,tools/check_ci_workflow_structure.sh
+
+SYNC-ID: test_ci_final_gate_optimization_plan
+STATUS: implemented
+ARTIFACTS: docs/workflow/TEST_PLAN_MANIFEST.tsv,docs/workflow/GIT_HOOK_CHECKS.tsv,docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv,docs/workflow/GIT_HOOK_RECOMMENDATION_PATHS.tsv,docs/workflow/FINAL_GATE_GAP_COMMANDS.tsv,docs/workflow/FINAL_GATE_COVERAGE.tsv,docs/workflow/RESOURCE_POLICY.tsv,tools/lib/ci_evidence.sh,tools/lib/as_built_evidence.sh,tools/ci-evidence,tools/ci-final-gate,tools/git-hooks,tools/lib/git_hooks_policy.sh,tools/lib/resource_guard.sh,tools/check_as_built_sync_contract.sh,tools/as-built-sync,tools/docs-tour,tools/check_ci_workflow_structure.sh,tools/test_lesson_playwright.sh,tools/test_lesson_start_position.sh,tools/test_lesson14.sh,tools/test_lesson_repository.sh,tools/test_ci_evidence.sh,tools/test_ci_final_gate.sh,tools/test_resource_cleanup.sh,.github/workflows/ci.yml,.github/workflows/lesson14-ci.yml
+TESTS: tools/test_ci_evidence.sh,tools/test_ci_final_gate.sh,tools/check_ci_workflow_structure.sh,tools/test_git_hooks_parallel.sh,tools/test_resource_cleanup.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_test_plan_coverage.sh,tools/test_docs_tour.sh,tools/test_as_built_sync_contract.sh,tools/test_lesson_start_position.sh,tools/test_lesson14.sh
 ```
 
 ### Planned Learner Context Foundation
@@ -732,6 +737,28 @@ It explains, records, and validates test selection while keeping existing full/n
 - Future CI aggregation may verify required job results and attestation artifacts instead of rerunning expensive checks only after mechanical coverage proof and developer approval.
 - CI dependency caching may cover npm dependencies and Playwright browser downloads; CI must not cache full verification results.
 - Flaky quarantine is out of scope until a policy file, owner, expiry, issue reference, separate lane, and degraded-coverage reporting exist.
+
+### Implemented Test And CI Final Gate Optimization Specification
+
+The final-gate optimization converts the duplicate heavy verification into evidence-based same-run verification.
+It does not make changed-only CI authoritative and does not remove standalone aggregate or full/no-cache commands.
+
+- `tools/test_lesson_repository.sh` remains the exhaustive aggregate command for local diagnosis and explicit full validation.
+- `tools/git-hooks run --mode full --no-cache` uses a hook-specific gap-only final gate instead of rerunning `tools/test_lesson_repository.sh` in full after every individual hook row has already run.
+- The gap-only gate must compare the Git hook check catalog and `docs/workflow/FINAL_GATE_COVERAGE.tsv` with the aggregate command's required checks and fail closed when any aggregate requirement is not covered by an individual hook row, same-run evidence, or an explicit final-gap command.
+- The gap-only gate must be testable as a standalone command and callable from the aggregate suite.
+- Playwright evidence reuse is valid only within the same workflow run and only when commit SHA, workflow run ID, job identity, Playwright config hash, Playwright test file hashes, package lockfile hash, command identity, and result status match.
+- As-built and sync evidence reuse is valid only within the same command or workflow run and only when synchronized document hashes, `AS_BUILT_SYNC_CONTRACT.tsv` hash, checker hashes, command identity, repository-state hash, and result status match.
+- Evidence files must be repo-local or workflow-local and must not contain secrets, tokens, private messages, environment dumps, or raw external service payloads.
+- Evidence files must include enough metadata for a later gate to reject stale or unrelated evidence without reading logs.
+- CI dependency cache may use GitHub Actions dependency caching for npm and Playwright dependencies; verification-result cache must not be restored from a previous commit or previous workflow run.
+- `CI` should keep common gates such as syntax, structure, policy regressions, Playwright, and final common verification.
+- `Lesson14 CI` should keep Lesson14-specific gates and should avoid duplicating the same common final aggregate/full-hooks gate.
+- `Lesson14 CI` should preserve the legacy `playwright-tests` and `aggregate-and-full-hooks` job contexts as lightweight compatibility gates; these compatibility gates must not rerun browser tests, `tools/test_lesson_repository.sh`, or `tools/git-hooks run --mode full --no-cache`.
+- The Git hooks recommendation policy should recommend local `full --no-cache` verification for final-gate coverage, final-gate command, same-run evidence, and as-built evidence implementation changes.
+- If required check names or branch-protection expectations prevent workflow consolidation, the implementation must preserve the names and reduce internal duplicate work instead.
+- Cache or evidence mismatch, absence, parse failure, untrusted metadata, or changed input must rerun the relevant check or fail closed.
+- Cleanup coverage should include Playwright reports, test results, temporary fixtures, same-run evidence, and repo-local cache directories; it must not clean OS, global dependency, Docker, swap, process, product repository, or user-home caches without explicit approval.
 
 ## Product Repository Boundary
 

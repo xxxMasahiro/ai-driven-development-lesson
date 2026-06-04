@@ -1,0 +1,87 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck source=tools/lib/lesson_common.sh
+source "$ROOT/tools/lib/lesson_common.sh"
+# shellcheck source=tools/lib/ci_evidence.sh
+source "$ROOT/tools/lib/ci_evidence.sh"
+
+usage() {
+  cat <<'USAGE'
+Usage:
+  ./tools/ci-evidence status
+  ./tools/ci-evidence record <id> --command <identity> [--inputs <path>...]
+  ./tools/ci-evidence verify <id> --command <identity> [--inputs <path>...]
+USAGE
+}
+
+cmd="${1:-status}"
+shift || true
+
+case "$cmd" in
+  status)
+    printf 'CI evidence\n'
+    printf 'Directory: %s\n' "$(ci_evidence_dir)"
+    printf 'Marker: %s\n' "$(ci_evidence_marker_file)"
+    printf 'Workflow: %s\n' "$(ci_evidence_workflow_id)"
+    printf 'Run ID: %s\n' "$(ci_evidence_run_id)"
+    if ci_evidence_marker_valid; then
+      printf 'Status: available\n'
+      find "$(ci_evidence_dir)" -maxdepth 1 -type f -name '*.evidence' -printf '%f\n' 2>/dev/null | sort
+    else
+      printf 'Status: not-initialized\n'
+    fi
+    ;;
+  record|verify)
+    [[ $# -ge 1 ]] || {
+      usage >&2
+      exit 1
+    }
+    evidence_id="$1"
+    shift
+    command_identity=""
+    inputs=()
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --command)
+          [[ $# -ge 2 ]] || {
+            printf -- '--command requires a value.\n' >&2
+            exit 1
+          }
+          command_identity="$2"
+          shift 2
+          ;;
+        --inputs)
+          shift
+          while [[ $# -gt 0 ]]; do
+            inputs+=("$1")
+            shift
+          done
+          ;;
+        *)
+          usage >&2
+          exit 1
+          ;;
+      esac
+    done
+    [[ -n "$command_identity" ]] || {
+      printf 'Evidence command identity is required.\n' >&2
+      exit 1
+    }
+    if [[ "$cmd" == "record" ]]; then
+      ci_evidence_record_success "$evidence_id" "$command_identity" "${inputs[@]}"
+      printf 'same-run evidence recorded: %s\n' "$evidence_id"
+    else
+      ci_evidence_verify_success "$evidence_id" "$command_identity" "${inputs[@]}"
+      printf 'same-run evidence verified: %s\n' "$evidence_id"
+    fi
+    ;;
+  help|--help|-h)
+    usage
+    ;;
+  *)
+    usage >&2
+    exit 1
+    ;;
+esac

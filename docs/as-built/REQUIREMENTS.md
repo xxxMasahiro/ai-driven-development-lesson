@@ -311,6 +311,11 @@ SYNC-ID: test_ci_safe_time_optimization_plan
 STATUS: implemented
 ARTIFACTS: docs/workflow/TEST_PLAN_MANIFEST.tsv,tools/lib/test_plan.sh,tools/test-plan,tools/check_test_plan_coverage.sh,tools/test_test_plan.sh,tools/lib/fixture_copy.sh,tools/fixture-copy,tools/test_fixture_copy.sh,docs/workflow/GIT_HOOK_CHECKS.tsv,docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv,docs/workflow/GIT_HOOK_RECOMMENDATION_PATHS.tsv,tools/git-hooks,tools/test_git_hooks_parallel.sh,tools/check_ci_workflow_structure.sh,tools/test_lesson_repository.sh,.github/workflows/ci.yml,.github/workflows/lesson14-ci.yml
 TESTS: tools/check_test_plan_coverage.sh,tools/test_test_plan.sh,tools/test_fixture_copy.sh,tools/test_git_hooks_parallel.sh,tools/check_ci_workflow_structure.sh
+
+SYNC-ID: test_ci_final_gate_optimization_plan
+STATUS: implemented
+ARTIFACTS: docs/workflow/TEST_PLAN_MANIFEST.tsv,docs/workflow/GIT_HOOK_CHECKS.tsv,docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv,docs/workflow/GIT_HOOK_RECOMMENDATION_PATHS.tsv,docs/workflow/FINAL_GATE_GAP_COMMANDS.tsv,docs/workflow/FINAL_GATE_COVERAGE.tsv,docs/workflow/RESOURCE_POLICY.tsv,tools/lib/ci_evidence.sh,tools/lib/as_built_evidence.sh,tools/ci-evidence,tools/ci-final-gate,tools/git-hooks,tools/lib/git_hooks_policy.sh,tools/lib/resource_guard.sh,tools/check_as_built_sync_contract.sh,tools/as-built-sync,tools/docs-tour,tools/check_ci_workflow_structure.sh,tools/test_lesson_playwright.sh,tools/test_lesson_start_position.sh,tools/test_lesson14.sh,tools/test_lesson_repository.sh,tools/test_ci_evidence.sh,tools/test_ci_final_gate.sh,tools/test_resource_cleanup.sh,.github/workflows/ci.yml,.github/workflows/lesson14-ci.yml
+TESTS: tools/test_ci_evidence.sh,tools/test_ci_final_gate.sh,tools/check_ci_workflow_structure.sh,tools/test_git_hooks_parallel.sh,tools/test_resource_cleanup.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_test_plan_coverage.sh,tools/test_docs_tour.sh,tools/test_as_built_sync_contract.sh,tools/test_lesson_start_position.sh,tools/test_lesson14.sh
 ```
 
 ## Planned Learner Context Foundation Requirements
@@ -512,6 +517,28 @@ The implemented first phase adds observe-only planning, fail-closed coverage val
 - Keep gap-only final gates, strict-command single-pass reuse, Playwright evidence reuse, and authoritative changed-only CI selection as future work requiring additional mechanical proof and developer approval.
 - Allow CI runner-oriented parallelism and dependency caching, but do not cache CI verification results.
 - Require developer approval before changing required CI check names, making changed-only authoritative in CI, introducing quarantine, reducing full/no-cache scope, or merging workflow files in a way that affects required branch protection contexts.
+
+## Implemented Test And CI Final Gate Optimization Requirements
+
+The implemented test and CI final-gate optimization removes duplicate final-gate execution while preserving safety, correctness, auditability, and existing lesson behavior.
+The implementation targets the current `aggregate-and-full-hooks` bottleneck without weakening the 7-day lesson, 14-day lesson, existing CI, existing checks, pre-commit behavior, as-built synchronization, security checks, product-security checks, or document routes.
+
+- Replace the full hook's duplicate `test_lesson_repository.sh` execution with a hook-specific gap-only final gate that proves the hook catalog plus final gate still covers the standalone aggregate requirements.
+- Keep `tools/test_lesson_repository.sh` available as the standalone exhaustive aggregate command.
+- Reuse same-run Playwright success evidence in final aggregation when the commit SHA, workflow run, source job identity, Playwright configuration hash, test file hashes, dependency lockfile hash, and command identity match.
+- Reuse same-run as-built and sync success evidence only when the relevant document hashes, sync-contract hash, checker hashes, command identity, and repository state hash match.
+- Separate common final-gate behavior from Lesson14-specific final-gate behavior so `CI` keeps the common aggregate/full-hooks gate and `Lesson14 CI` keeps a Lesson14-specific final gate instead of duplicating the same heavy common final verification.
+- Preserve existing `Lesson14 CI` `playwright-tests` and `aggregate-and-full-hooks` job contexts as compatibility gates unless developer approval is granted to change required check names.
+- Recommend local `full --no-cache` verification when final-gate coverage, final-gate commands, CI evidence helpers, or as-built evidence helpers change.
+- Add CI dependency caching for npm and Playwright browser dependencies where it is safe and supported by GitHub Actions.
+- Do not persistently cache verification results across commits, branches, workflow runs, or repositories.
+- Store same-run evidence as ephemeral CI artifacts or workspace files only for the current workflow run.
+- Fail closed by rerunning or failing the relevant gate when evidence is missing, stale, corrupted, mismatched, or produced by a different command identity.
+- Include evidence metadata for commit SHA, workflow name, job name, command ID, policy hash, check catalog hash, relevant input hashes, generated result hash, and creation time.
+- Keep dangerous changes full/no-cache by default, including CI workflow changes, Git hook changes, as-built/sync changes, security/product-security changes, Playwright configuration changes, dependency changes, and unknown paths.
+- Add cleanup and monitoring coverage for same-run evidence, Playwright reports, test results, temporary fixtures, and repo-local caches while preserving the prohibition on OS cache, global cache, Docker, swap, process, or product-repository cleanup without explicit approval.
+- Require mechanical tests that prove the gap-only gate cannot drop aggregate coverage, Playwright evidence reuse cannot hide changed browser-test inputs, and as-built evidence reuse cannot hide changed synchronized documents.
+- Require developer approval before changing required CI check names, reducing full/no-cache scope, making changed-only CI authoritative, sharing verification-result cache across runs, or accepting any existing-feature tradeoff.
 
 ## Mechanical Enforcement
 

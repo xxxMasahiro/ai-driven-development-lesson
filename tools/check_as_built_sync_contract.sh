@@ -156,6 +156,13 @@ active_command_reference() {
     [[ -n "$line" ]] || continue
     [[ "$line" != \#* ]] || continue
 
+    if [[ "$test_relpath" == "tools/check_as_built_docs.sh" && "$line" == *"as_built_evidence_run_docs_check"* ]]; then
+      return 0
+    fi
+    if [[ "$test_relpath" == "tools/check_as_built_sync_contract.sh" && "$line" == *"as_built_evidence_run_sync_contract_check"* ]]; then
+      return 0
+    fi
+
     if [[ "$line" == run:* ]]; then
       line="$(trim "${line#run:}")"
     fi
@@ -178,16 +185,15 @@ active_command_reference() {
 }
 
 git_hooks_runner_reference() {
-  local test_relpath="$1"
-  local pre_commit="$ROOT/.githooks/pre-commit"
+  local wiring_file="$1"
+  local test_relpath="$2"
   local checks_file="$ROOT/docs/workflow/GIT_HOOK_CHECKS.tsv"
   local policy_file="$ROOT/docs/workflow/GIT_HOOKS_POLICY.tsv"
-  local settings_file="$ROOT/learning/GIT_HOOK_SETTINGS.tsv"
   local allowed_modes
   local hook_mode="full"
 
-  [[ -f "$pre_commit" && -f "$checks_file" && -f "$policy_file" ]] || return 1
-  active_command_reference "$pre_commit" "tools/git-hooks" || return 1
+  [[ -f "$wiring_file" && -f "$checks_file" && -f "$policy_file" ]] || return 1
+  active_command_reference "$wiring_file" "tools/git-hooks" || return 1
   allowed_modes="$(awk -F '\t' '$1 == "hook_mode" { print $2; found = 1 } END { if (!found) exit 1 }' "$policy_file")" || return 1
   case "|$allowed_modes|" in
     *"|$hook_mode|"*) ;;
@@ -209,6 +215,8 @@ git_hooks_runner_reference() {
       check_id = trim($1)
       modes_field = trim($2)
       command = trim($3)
+      split(command, command_parts, /[[:space:]]+/)
+      command_name = command_parts[1]
       if (check_id == "" || modes_field == "" || command == "") {
         invalid = 1
         next
@@ -225,7 +233,7 @@ git_hooks_runner_reference() {
           selected = 1
         }
       }
-      if (!row_invalid && selected && (command == rel || command == abs)) {
+      if (!row_invalid && selected && (command_name == rel || command_name == abs)) {
         found = 1
       }
     }
@@ -247,7 +255,7 @@ require_test_wiring() {
     if active_command_reference "$ROOT/$wiring_relpath" "$test_relpath"; then
       continue
     fi
-    if [[ "$wiring_relpath" == ".githooks/pre-commit" ]] && git_hooks_runner_reference "$test_relpath"; then
+    if git_hooks_runner_reference "$ROOT/$wiring_relpath" "$test_relpath"; then
       continue
     fi
     if ! active_command_reference "$ROOT/$wiring_relpath" "$test_relpath"; then
@@ -297,7 +305,7 @@ require_runtime_evidence_reference() {
     if grep -F "$item" "$ROOT/$evidence_relpath" >/dev/null; then
       return
     fi
-    if [[ "$evidence_relpath" == ".githooks/pre-commit" ]] && git_hooks_runner_reference "$item"; then
+    if git_hooks_runner_reference "$ROOT/$evidence_relpath" "$item"; then
       return
     fi
   done

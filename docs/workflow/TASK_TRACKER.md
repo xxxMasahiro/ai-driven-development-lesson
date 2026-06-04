@@ -247,6 +247,34 @@ This runtime implementation preserves full/no-cache completion verification, exi
 - [ ] Remove duplicate Playwright execution within a single verification path without removing Playwright coverage.
 - [ ] Keep changed-only behavior observe-only until Coverage Guard and Result Attestation have proven safe against full CI and developer approval is granted.
 
+## Implemented Test And CI Final Gate Optimization Work
+
+Status: implemented; local verification passed, and remote `CI` / `Lesson14 CI` remain the external completion gates for the pushed commit.
+This implementation completes the test and CI runtime optimization work.
+It targets the current `aggregate-and-full-hooks` bottleneck while preserving existing CI, pre-commit, full/no-cache safety, 7-day lesson behavior, 14-day lesson behavior, security checks, product-security checks, and as-built synchronization.
+
+- [x] Record the next implementation plan as `test_ci_final_gate_optimization_plan` in the as-built sync contract.
+- [x] Synchronize the plan into the three as-built documents and the two workflow-state documents.
+- [x] Add same-run evidence primitives with commit SHA, workflow/job identity, command ID, policy hash, check catalog hash, input hashes, repository-state hash, and timestamp.
+- [x] Add as-built and sync evidence reuse for identical same-run inputs while keeping strict standalone commands unchanged.
+- [x] Add Playwright evidence generation and reuse so final aggregation does not rerun Playwright when same-run evidence is valid.
+- [x] Add a hook-specific gap-only final gate so full hooks do not rerun `tools/test_lesson_repository.sh` after equivalent hook coverage has already run.
+- [x] Add `docs/workflow/FINAL_GATE_COVERAGE.tsv` so aggregate requirements must be covered by hook evidence or explicit final-gap commands.
+- [x] Keep `test_lesson_start_position` and `test_lesson14` covered by dedicated full/fast hook rows before the final gate.
+- [x] Split `Lesson14 CI` to use a Lesson14-specific final gate instead of duplicating the common aggregate/full-hooks final gate.
+- [x] Preserve the legacy `Lesson14 CI` `playwright-tests` and `aggregate-and-full-hooks` job contexts as lightweight compatibility gates.
+- [x] Add a mechanical final-gate test proving missing or stale same-run evidence fails closed and valid evidence runs only final-gap commands.
+- [x] Reduce duplicate common final-gate work between `CI` and `Lesson14 CI` internally while preserving required workflow names.
+- [x] Extend full/no-cache recommendation paths for final-gate coverage, final-gate commands, CI evidence, and as-built evidence implementation changes.
+- [x] Add GitHub Actions npm dependency caching.
+- [x] Add safe Playwright browser dependency caching where supported by hosted runners.
+- [x] Keep verification-result cache limited to same-run evidence only; do not restore verification results across commits, branches, workflow runs, or repositories.
+- [x] Add cleanup coverage for same-run evidence, Playwright reports, test results, temporary fixtures, and repo-local caches.
+- [x] Extend `tools/check_ci_workflow_structure.sh` to enforce the optimized final-gate shape.
+- [x] Keep new checks standalone and callable from `tools/test_lesson_repository.sh`.
+- [x] Pass local aggregate tests, full/no-cache hooks, pre-commit, and sub-agent verification.
+- [x] Keep remote `CI` / `Lesson14 CI` as required external completion gates before final reporting.
+
 ## Implemented Documentation Map Synchronization
 
 The lesson now explains the repository's rule, routing, skill, design, workflow, and memory documents in a way that non-engineer learners can understand.
@@ -407,6 +435,11 @@ SYNC-ID: test_ci_safe_time_optimization_plan
 STATUS: implemented
 ARTIFACTS: docs/workflow/TEST_PLAN_MANIFEST.tsv,tools/lib/test_plan.sh,tools/test-plan,tools/check_test_plan_coverage.sh,tools/test_test_plan.sh,tools/lib/fixture_copy.sh,tools/fixture-copy,tools/test_fixture_copy.sh,docs/workflow/GIT_HOOK_CHECKS.tsv,docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv,docs/workflow/GIT_HOOK_RECOMMENDATION_PATHS.tsv,tools/git-hooks,tools/test_git_hooks_parallel.sh,tools/check_ci_workflow_structure.sh,tools/test_lesson_repository.sh,.github/workflows/ci.yml,.github/workflows/lesson14-ci.yml
 TESTS: tools/check_test_plan_coverage.sh,tools/test_test_plan.sh,tools/test_fixture_copy.sh,tools/test_git_hooks_parallel.sh,tools/check_ci_workflow_structure.sh
+
+SYNC-ID: test_ci_final_gate_optimization_plan
+STATUS: implemented
+ARTIFACTS: docs/workflow/TEST_PLAN_MANIFEST.tsv,docs/workflow/GIT_HOOK_CHECKS.tsv,docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv,docs/workflow/GIT_HOOK_RECOMMENDATION_PATHS.tsv,docs/workflow/FINAL_GATE_GAP_COMMANDS.tsv,docs/workflow/FINAL_GATE_COVERAGE.tsv,docs/workflow/RESOURCE_POLICY.tsv,tools/lib/ci_evidence.sh,tools/lib/as_built_evidence.sh,tools/ci-evidence,tools/ci-final-gate,tools/git-hooks,tools/lib/git_hooks_policy.sh,tools/lib/resource_guard.sh,tools/check_as_built_sync_contract.sh,tools/as-built-sync,tools/docs-tour,tools/check_ci_workflow_structure.sh,tools/test_lesson_playwright.sh,tools/test_lesson_start_position.sh,tools/test_lesson14.sh,tools/test_lesson_repository.sh,tools/test_ci_evidence.sh,tools/test_ci_final_gate.sh,tools/test_resource_cleanup.sh,.github/workflows/ci.yml,.github/workflows/lesson14-ci.yml
+TESTS: tools/test_ci_evidence.sh,tools/test_ci_final_gate.sh,tools/check_ci_workflow_structure.sh,tools/test_git_hooks_parallel.sh,tools/test_resource_cleanup.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_test_plan_coverage.sh,tools/test_docs_tour.sh,tools/test_as_built_sync_contract.sh,tools/test_lesson_start_position.sh,tools/test_lesson14.sh
 ```
 
 ## Planned Learner Context Foundation Synchronization
@@ -589,5 +622,5 @@ Real product operations testing remains available through `tools/test_production
 
 ## Remaining Work
 
-- Commit and push only after all local checks pass.
+- For `test_ci_final_gate_optimization_plan`, commit and push only after local checks pass; final reporting remains gated on remote `CI` and `Lesson14 CI` for the pushed commit.
 - Translate remaining learner-facing Markdown files to English using the audit output from `tools/list_non_english_docs.sh`.

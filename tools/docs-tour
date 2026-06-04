@@ -9,6 +9,8 @@ export LESSON_CONFIG
 source "$ROOT/tools/lib/lesson_common.sh"
 # shellcheck source=tools/lib/document_paths.sh
 source "$ROOT/tools/lib/document_paths.sh"
+# shellcheck source=tools/lib/as_built_evidence.sh
+source "$ROOT/tools/lib/as_built_evidence.sh"
 
 DOC_MAP="$ROOT/guides/DOCUMENT_MAP.md"
 
@@ -57,7 +59,19 @@ file_presence() {
 sync_status() {
   local command="$1"
   local label="$2"
-  if "$ROOT/$command" >/dev/null 2>&1; then
+  local check_status=1
+  case "$command" in
+    tools/check_as_built_docs.sh)
+      as_built_evidence_run_docs_check >/dev/null 2>&1 && check_status=0
+      ;;
+    tools/check_as_built_sync_contract.sh)
+      as_built_evidence_run_sync_contract_check >/dev/null 2>&1 && check_status=0
+      ;;
+    *)
+      "$ROOT/$command" >/dev/null 2>&1 && check_status=0
+      ;;
+  esac
+  if [[ "$check_status" -eq 0 ]]; then
     printf '%s: synchronized\n' "$label"
   else
     printf '%s: needs review\n' "$label"

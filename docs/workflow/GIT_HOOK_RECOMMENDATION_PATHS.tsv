@@ -7,6 +7,8 @@ docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv	full-no-cache	Git hooks parallel grou
 docs/workflow/GIT_HOOK_RECOMMENDATION_PATHS.tsv	full-no-cache	Git hooks recommendation-policy changes affect local verification guidance.
 docs/workflow/TEST_PLAN_MANIFEST.tsv	full-no-cache	Test plan manifest changes affect observe-only verification planning.
 docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv	full-no-cache	As-built sync-contract changes affect mechanical document synchronization.
+docs/workflow/FINAL_GATE_GAP_COMMANDS.tsv	full-no-cache	Final-gate gap command changes affect CI-equivalent final verification.
+docs/workflow/FINAL_GATE_COVERAGE.tsv	full-no-cache	Final-gate coverage changes affect duplicate-test elimination safety.
 docs/workflow/SAFEFLOW_SECURITY_BACKFILL.tsv	full-no-cache	SafeFlow security policy changes affect mechanical security validation.
 docs/workflow/PRODUCT_SECURITY_POLICY.tsv	full-no-cache	Product security policy changes affect product workflow gates.
 learning/context/WORKFLOW_CONTEXT_MAP.tsv	full-no-cache	Workflow context mapping changes affect product security and menu readiness.
@@ -14,6 +16,10 @@ docs/workflow/RESOURCE_POLICY.tsv	full-no-cache	Resource policy changes affect l
 learning/RESOURCE_SETTINGS.tsv	full-no-cache	Resource settings changes affect local verification behavior.
 tools/git-hooks	full-no-cache	Git hooks runner changes affect local verification behavior.
 tools/lib/git_hooks_policy.sh	full-no-cache	Git hooks shared helper changes affect local verification behavior.
+tools/ci-final-gate	full-no-cache	Final-gate runner changes affect CI-equivalent final verification.
+tools/ci-evidence	full-no-cache	CI evidence command changes affect same-run verification reuse.
+tools/lib/ci_evidence.sh	full-no-cache	CI evidence helper changes affect same-run verification reuse.
+tools/lib/as_built_evidence.sh	full-no-cache	As-built evidence helper changes affect same-run sync-check reuse.
 tools/lib/resource_guard.sh	full-no-cache	Resource guard shared helper changes affect local verification behavior.
 tools/resource-guard	full-no-cache	Resource guard runner changes affect local verification behavior.
 tools/as-built-sync	full-no-cache	As-built status changes affect sync-contract visibility.

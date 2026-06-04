@@ -1,0 +1,49 @@
+# aggregate_requirement	coverage_kind	coverage_id	description
+./tools/check_lesson_structure.sh	hook	check_lesson_structure	Aggregate lesson structure coverage is provided by the matching Git hook row.
+./tools/check_document_organization.sh	hook	check_document_organization	Aggregate document organization coverage is provided by the matching Git hook row.
+./tools/check_learner_display.sh	hook	check_learner_display	Aggregate learner display coverage is provided by the matching Git hook row.
+./tools/check_lesson14_structure.sh	hook	check_lesson14_structure	Aggregate Lesson14 structure coverage is provided by the matching Git hook row.
+./tools/check_lesson14_sync.sh	hook	check_lesson14_sync	Aggregate Lesson14 sync coverage is provided by the matching Git hook row.
+./tools/check_agents_skills.sh	hook	check_agents_skills	Aggregate AGENTS and skills coverage is provided by the matching Git hook row.
+as_built_evidence_run_docs_check	hook	check_as_built_docs	Aggregate as-built docs coverage is provided by the matching Git hook row.
+as_built_evidence_run_sync_contract_check	hook	check_as_built_sync_contract	Aggregate as-built sync-contract coverage is provided by the matching Git hook row.
+./tools/check_test_plan_coverage.sh	hook	check_test_plan_coverage	Aggregate test-plan coverage is provided by the matching Git hook row.
+./tools/check_security_invariants.sh	hook	check_security_invariants	Aggregate security invariant coverage is provided by the matching Git hook row.
+./tools/check_workflow_pair_sync.sh	hook	check_workflow_pair_sync	Aggregate workflow pair sync coverage is provided by the matching Git hook row.
+./tools/check_review_protocol.sh	hook	check_review_protocol	Aggregate review protocol coverage is provided by the matching Git hook row.
+./tools/check_developer_memory_requirements.sh	hook	check_developer_memory_requirements	Aggregate developer-memory coverage is provided by the matching Git hook row.
+./tools/test_docs_tour.sh	hook	test_docs_tour	Aggregate documentation tour coverage is provided by the matching Git hook row.
+./tools/test_as_built_sync_contract.sh	hook	test_as_built_sync_contract	Aggregate sync-contract regression coverage is provided by the matching Git hook row.
+./tools/test_test_plan.sh	hook	test_test_plan	Aggregate test-plan regression coverage is provided by the matching Git hook row.
+./tools/test_security_invariants.sh	hook	test_security_invariants	Aggregate security invariant regression coverage is provided by the matching Git hook row.
+./tools/test_git_workflow_policy.sh	hook	test_git_workflow_policy	Aggregate Git workflow policy coverage is provided by the matching Git hook row.
+./tools/test_git_hooks.sh	hook	test_git_hooks	Aggregate Git hooks coverage is provided by the matching Git hook row.
+./tools/test_resource_guard.sh	hook	test_resource_guard	Aggregate resource guard coverage is provided by the matching Git hook row.
+./tools/test_resource_guard_summary.sh	hook	test_resource_guard_summary	Aggregate resource guard summary coverage is provided by the matching Git hook row.
+./tools/test_resource_cleanup.sh	hook	test_resource_cleanup	Aggregate resource cleanup coverage is provided by the matching Git hook row.
+./tools/test_git_hooks_parallel.sh	hook	test_git_hooks_parallel	Aggregate Git hooks parallel coverage is provided by the matching Git hook row.
+./tools/test_fixture_copy.sh	hook	test_fixture_copy	Aggregate fixture-copy coverage is provided by the matching Git hook row.
+./tools/test_ci_evidence.sh	hook	test_ci_evidence	Aggregate CI evidence coverage is provided by the matching Git hook row.
+./tools/test_ci_final_gate.sh	hook	test_ci_final_gate	Aggregate CI final gate coverage is provided by the matching Git hook row.
+./tools/check_ci_workflow_structure.sh	hook	check_ci_workflow_structure	Aggregate CI workflow structure coverage is provided by the matching Git hook row.
+./tools/menu	gap	menu_status	Aggregate menu rendering coverage is provided by a final-gap command.
+./tools/dashboard all	gap	dashboard_all	Aggregate dashboard rendering coverage is provided by a final-gap command.
+./tools/as-built-sync status	gap	as_built_sync_status	Aggregate as-built sync status coverage is provided by a final-gap command.
+./tools/illustrations list	gap	illustrations_list	Aggregate illustration list coverage is provided by a final-gap command.
+./tools/git-hooks status	gap	git_hooks_status	Aggregate Git hooks status coverage is provided by a final-gap command.
+./tools/resource-guard status	gap	resource_guard_status	Aggregate resource guard status coverage is provided by a final-gap command.
+./tools/resource-guard summary	gap	resource_guard_summary	Aggregate resource guard summary coverage is provided by a final-gap command.
+./tools/resource-guard summary --short	gap	resource_guard_summary_short	Aggregate short resource guard summary coverage is provided by a final-gap command.
+./tools/product-improvement status	gap	product_improvement_status	Aggregate product-improvement status coverage is provided by a final-gap command.
+./tools/external-integration status	gap	external_integration_status	Aggregate external-integration status coverage is provided by a final-gap command.
+./tools/product-repository-cleanup status	gap	product_repository_cleanup_status	Aggregate product-repository-cleanup status coverage is provided by a final-gap command.
+./tools/git-workflow status	gap	git_workflow_status	Aggregate Git workflow status coverage is provided by a final-gap command.
+./tools/git-workflow cleanup-plan	gap	git_workflow_cleanup_plan	Aggregate Git workflow cleanup-plan coverage is provided by a final-gap command.
+./tools/test_lesson_playwright.sh	hook	test_lesson_playwright	Aggregate Playwright coverage is provided by the matching Git hook row and same-run Playwright evidence.
+./tools/test_menu_prerequisites.sh	hook	test_menu_prerequisites	Aggregate menu prerequisite coverage is provided by the matching Git hook row.
+./tools/test_product_gate_tools.sh	hook	test_product_gate_tools	Aggregate product gate coverage is provided by the matching Git hook row.
+./tools/test_product_repository_cleanup.sh	hook	test_product_repository_cleanup	Aggregate product repository cleanup coverage is provided by the matching Git hook row.
+./tools/test_product_security.sh	hook	test_product_security	Aggregate product security coverage is provided by the matching Git hook row.
+./tools/test_lesson_start_position.sh	hook	test_lesson_start_position	Aggregate lesson start-position coverage is provided by the matching Git hook row.
+./tools/test_lesson.sh	hook	test_lesson	Aggregate 7-step lesson CLI coverage is provided by the matching Git hook row.
+./tools/test_lesson14.sh	hook	test_lesson14	Aggregate 14-step lesson CLI coverage is provided by the matching Git hook row.

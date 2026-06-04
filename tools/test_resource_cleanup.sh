@@ -38,6 +38,7 @@ profile	default	2048	Default heavy work	Test profile.
 cleanup_target	playwright-report	playwright-report	playwright	Test Playwright report.
 cleanup_target	playwright-results	test-results	playwright	Test Playwright results.
 cleanup_target	git-hooks-cache	.git/pre-commit-cache	git-hooks-full	Test Git hooks cache.
+cleanup_target	ci-evidence	.git/ci-evidence	aggregate	Test same-run evidence.
 cleanup_target	resource-temp	tmp/resource-guard	all	Test repo-local temporary directory.
 EOF
 }
@@ -68,11 +69,13 @@ EOF
 
 reset_repo() {
   rm -rf "$REPO_ROOT"
-  mkdir -p "$REPO_ROOT/playwright-report" "$REPO_ROOT/test-results" "$REPO_ROOT/.git/pre-commit-cache" "$REPO_ROOT/tmp/resource-guard"
+  mkdir -p "$REPO_ROOT/playwright-report" "$REPO_ROOT/test-results" "$REPO_ROOT/.git/pre-commit-cache" "$REPO_ROOT/.git/ci-evidence" "$REPO_ROOT/tmp/resource-guard"
   printf 'report\n' >"$REPO_ROOT/playwright-report/index.html"
   printf 'result\n' >"$REPO_ROOT/test-results/result.txt"
   printf 'git-hooks-cache-v1\n' >"$REPO_ROOT/.git/pre-commit-cache/.git-hooks-cache"
   printf 'cache\n' >"$REPO_ROOT/.git/pre-commit-cache/check.cache"
+  printf 'ci-evidence-v1\n' >"$REPO_ROOT/.git/ci-evidence/.ci-evidence"
+  printf 'evidence\n' >"$REPO_ROOT/.git/ci-evidence/sample.evidence"
   printf 'temp\n' >"$REPO_ROOT/tmp/resource-guard/tmp.txt"
 }
 
@@ -107,9 +110,11 @@ dry_run_output="$(run_guard cleanup --dry-run)"
 [[ "$dry_run_output" == *"Action: dry-run"* ]]
 [[ "$dry_run_output" == *"cleanup-would-delete	playwright-report	playwright-report"* ]]
 [[ "$dry_run_output" == *"cleanup-would-delete	git-hooks-cache	.git/pre-commit-cache"* ]]
+[[ "$dry_run_output" == *"cleanup-would-delete	ci-evidence	.git/ci-evidence"* ]]
 [[ -d "$REPO_ROOT/playwright-report" ]]
 [[ -d "$REPO_ROOT/test-results" ]]
 [[ -d "$REPO_ROOT/.git/pre-commit-cache" ]]
+[[ -d "$REPO_ROOT/.git/ci-evidence" ]]
 
 profile_output="$(run_guard cleanup --profile playwright --dry-run)"
 [[ "$profile_output" == *"cleanup-would-delete	playwright-report	playwright-report"* ]]
@@ -138,11 +143,25 @@ hook_output="$(run_guard cleanup --safe --profile git-hooks-full)"
 [[ "$hook_output" == *"cleanup-deleted	git-hooks-cache	.git/pre-commit-cache"* ]]
 [[ ! -e "$REPO_ROOT/.git/pre-commit-cache" ]]
 [[ -d "$REPO_ROOT/playwright-report" ]]
+[[ -d "$REPO_ROOT/.git/ci-evidence" ]]
+
+reset_repo
+evidence_output="$(run_guard cleanup --safe --profile aggregate)"
+[[ "$evidence_output" == *"cleanup-deleted	ci-evidence	.git/ci-evidence"* ]]
+[[ ! -e "$REPO_ROOT/.git/ci-evidence" ]]
+[[ -d "$REPO_ROOT/.git/pre-commit-cache" ]]
 
 reset_repo
 rm -f "$REPO_ROOT/.git/pre-commit-cache/.git-hooks-cache"
 if run_guard cleanup --safe --profile git-hooks-full >/dev/null 2>&1; then
   printf 'unmarked git hooks cache cleanup passed unexpectedly\n' >&2
+  exit 1
+fi
+
+reset_repo
+rm -f "$REPO_ROOT/.git/ci-evidence/.ci-evidence"
+if run_guard cleanup --safe --profile aggregate >/dev/null 2>&1; then
+  printf 'unmarked same-run evidence cleanup passed unexpectedly\n' >&2
   exit 1
 fi
 

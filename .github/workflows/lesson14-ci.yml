@@ -8,6 +8,9 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  CI_EVIDENCE_RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
+
 jobs:
   syntax-checks:
     runs-on: ubuntu-latest
@@ -22,6 +25,8 @@ jobs:
           bash -n tools/lib/git_workflow_policy.sh
           bash -n tools/lib/git_hooks_policy.sh
           bash -n tools/lib/resource_guard.sh
+          bash -n tools/lib/ci_evidence.sh
+          bash -n tools/lib/as_built_evidence.sh
           bash -n tools/lib/test_plan.sh
           bash -n tools/lib/fixture_copy.sh
           bash -n tools/lib/security_invariants.sh
@@ -56,6 +61,9 @@ jobs:
           bash -n tools/test_resource_cleanup.sh
           bash -n tools/test_git_hooks_parallel.sh
           bash -n tools/test_fixture_copy.sh
+          bash -n tools/test_ci_evidence.sh
+          bash -n tools/test_ci_final_gate.sh
+          bash -n tools/test_lesson_start_position.sh
           bash -n tools/test_lesson.sh
           bash -n tools/test_menu_prerequisites.sh
           bash -n tools/test_product_gate_tools.sh
@@ -65,6 +73,8 @@ jobs:
           bash -n tools/product-security
           bash -n tools/test_product_security.sh
           bash -n tools/test_lesson_repository.sh
+          bash -n tools/ci-evidence
+          bash -n tools/ci-final-gate
           bash -n tools/test_lesson14.sh
           bash -n tools/menu
           bash -n tools/as-built-sync
@@ -122,6 +132,8 @@ jobs:
           ./tools/test_resource_cleanup.sh
           ./tools/test_git_hooks_parallel.sh
           ./tools/test_fixture_copy.sh
+          ./tools/test_ci_evidence.sh
+          ./tools/test_ci_final_gate.sh
           ./tools/test_docs_tour.sh
           ./tools/test_product_security.sh
           ./tools/check_ci_workflow_structure.sh
@@ -137,17 +149,39 @@ jobs:
 
   playwright-tests:
     runs-on: ubuntu-latest
+    needs:
+      - syntax-checks
+      - lesson14-structure-sync
+      - policy-regression-tests
     steps:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Install browser test dependencies
+      - name: Shared Playwright coverage compatibility gate
         run: |
-          npm install
-          npx playwright install chromium
+          ./tools/check_lesson14_structure.sh
+          ./tools/check_lesson14_sync.sh
+          ./tools/check_ci_workflow_structure.sh
+          printf 'Lesson14 CI keeps the playwright-tests job context; browser coverage is provided by CI / playwright-tests for the same commit.\n'
 
-      - name: Lesson Playwright dashboard checks
-        run: ./tools/test_lesson_playwright.sh
+  lesson14-final-gate:
+    runs-on: ubuntu-latest
+    needs:
+      - syntax-checks
+      - lesson14-structure-sync
+      - policy-regression-tests
+      - lesson14-cli-tests
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Lesson14 final verification
+        run: |
+          ./tools/check_lesson14_structure.sh
+          ./tools/check_lesson14_sync.sh
+          ./tools/test_lesson_start_position.sh
+          ./tools/test_lesson14.sh
+          ./tools/check_ci_workflow_structure.sh
 
   aggregate-and-full-hooks:
     runs-on: ubuntu-latest
@@ -157,19 +191,15 @@ jobs:
       - policy-regression-tests
       - lesson14-cli-tests
       - playwright-tests
+      - lesson14-final-gate
     steps:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Install browser test dependencies
+      - name: Compatibility aggregate and full-hooks gate
         run: |
-          npm install
-          npx playwright install chromium
-
-      - name: Lesson aggregate test
-        run: ./tools/test_lesson_repository.sh
-
-      - name: Git hooks full no-cache regression
-        env:
-          RESOURCE_GUARD_SKIP_LOCAL_CHECK: "1"
-        run: ./tools/git-hooks run --mode full --no-cache --jobs 4
+          ./tools/check_lesson14_structure.sh
+          ./tools/check_lesson14_sync.sh
+          ./tools/test_lesson_start_position.sh
+          ./tools/check_ci_workflow_structure.sh
+          printf 'Lesson14 CI keeps the aggregate-and-full-hooks job context; common aggregate/full-hooks coverage is provided by CI / aggregate-and-full-hooks for the same commit.\n'

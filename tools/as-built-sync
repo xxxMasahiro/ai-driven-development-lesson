@@ -4,6 +4,8 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=tools/lib/lesson_common.sh
 source "$SCRIPT_DIR/lib/lesson_common.sh"
+# shellcheck source=tools/lib/as_built_evidence.sh
+source "$SCRIPT_DIR/lib/as_built_evidence.sh"
 
 ROOT="${AS_BUILT_SYNC_ROOT:-$LESSON_ROOT}"
 CONTRACT_FILE="${AS_BUILT_SYNC_CONTRACT_FILE:-$ROOT/docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv}"
@@ -75,6 +77,13 @@ active_command_reference() {
     [[ -n "$line" ]] || continue
     [[ "$line" != \#* ]] || continue
 
+    if [[ "$test_relpath" == "tools/check_as_built_docs.sh" && "$line" == *"as_built_evidence_run_docs_check"* ]]; then
+      return 0
+    fi
+    if [[ "$test_relpath" == "tools/check_as_built_sync_contract.sh" && "$line" == *"as_built_evidence_run_sync_contract_check"* ]]; then
+      return 0
+    fi
+
     if [[ "$line" == run:* ]]; then
       line="$(trim "${line#run:}")"
     fi
@@ -97,15 +106,15 @@ active_command_reference() {
 }
 
 git_hooks_runner_reference() {
-  local test_relpath="$1"
-  local pre_commit="$ROOT/.githooks/pre-commit"
+  local wiring_file="$1"
+  local test_relpath="$2"
   local checks_file="$ROOT/docs/workflow/GIT_HOOK_CHECKS.tsv"
   local policy_file="$ROOT/docs/workflow/GIT_HOOKS_POLICY.tsv"
   local allowed_modes
   local hook_mode="full"
 
-  [[ -f "$pre_commit" && -f "$checks_file" && -f "$policy_file" ]] || return 1
-  active_command_reference "$pre_commit" "tools/git-hooks" || return 1
+  [[ -f "$wiring_file" && -f "$checks_file" && -f "$policy_file" ]] || return 1
+  active_command_reference "$wiring_file" "tools/git-hooks" || return 1
   allowed_modes="$(awk -F '\t' '$1 == "hook_mode" { print $2; found = 1 } END { if (!found) exit 1 }' "$policy_file")" || return 1
   case "|$allowed_modes|" in
     *"|$hook_mode|"*) ;;
@@ -127,6 +136,8 @@ git_hooks_runner_reference() {
       check_id = trim($1)
       modes_field = trim($2)
       command = trim($3)
+      split(command, command_parts, /[[:space:]]+/)
+      command_name = command_parts[1]
       if (check_id == "" || modes_field == "" || command == "") {
         invalid = 1
         next
@@ -143,7 +154,7 @@ git_hooks_runner_reference() {
           selected = 1
         }
       }
-      if (!row_invalid && selected && (command == rel || command == abs)) {
+      if (!row_invalid && selected && (command_name == rel || command_name == abs)) {
         found = 1
       }
     }
@@ -164,7 +175,7 @@ test_wiring_status() {
       total=$((total + 1))
       if [[ -f "$ROOT/$wiring_relpath" ]] && active_command_reference "$ROOT/$wiring_relpath" "$test_relpath"; then
         present=$((present + 1))
-      elif [[ "$wiring_relpath" == ".githooks/pre-commit" ]] && git_hooks_runner_reference "$test_relpath"; then
+      elif [[ -f "$ROOT/$wiring_relpath" ]] && git_hooks_runner_reference "$ROOT/$wiring_relpath" "$test_relpath"; then
         present=$((present + 1))
       fi
     done
@@ -197,7 +208,7 @@ show_status() {
     printf '\n'
   done <"$CONTRACT_FILE"
 
-  "$SCRIPT_DIR/check_as_built_sync_contract.sh"
+  as_built_evidence_run_sync_contract_check
 }
 
 case "${1:-status}" in

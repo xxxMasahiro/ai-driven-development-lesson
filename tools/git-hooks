@@ -115,6 +115,18 @@ case "$cmd" in
           ;;
       esac
     done
+    if [[ -z "${CI_EVIDENCE_RUN_ID:-}" && -z "${GITHUB_RUN_ID:-}" ]]; then
+      export CI_EVIDENCE_RUN_ID="local-git-hooks-$$-$(date +%s)"
+    fi
+    if [[ "$mode" == "full" && "$no_cache" == "true" ]]; then
+      export CI_FINAL_GATE_REQUIRE_HOOK_EVIDENCE="1"
+    fi
+    if [[ "$mode" == "full" && "$no_cache" == "true" && -z "${CI_EVIDENCE_USE:-}" ]]; then
+      export CI_EVIDENCE_USE="1"
+    fi
+    if [[ "$mode" == "full" && "$no_cache" == "true" && -z "${CI_EVIDENCE_PLAYWRIGHT_SOURCE_JOB:-}" ]]; then
+      export CI_EVIDENCE_PLAYWRIGHT_SOURCE_JOB="playwright-local"
+    fi
     case "$mode" in
       full|fast)
         if [[ "${RESOURCE_GUARD_SKIP_LOCAL_CHECK:-0}" == "1" ]]; then

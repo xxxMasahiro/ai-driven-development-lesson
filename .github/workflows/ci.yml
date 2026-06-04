@@ -8,6 +8,9 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  CI_EVIDENCE_RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
+
 jobs:
   syntax-checks:
     runs-on: ubuntu-latest
@@ -23,6 +26,8 @@ jobs:
           bash -n tools/lib/git_workflow_policy.sh
           bash -n tools/lib/git_hooks_policy.sh
           bash -n tools/lib/resource_guard.sh
+          bash -n tools/lib/ci_evidence.sh
+          bash -n tools/lib/as_built_evidence.sh
           bash -n tools/lib/test_plan.sh
           bash -n tools/lib/fixture_copy.sh
           bash -n tools/lib/security_invariants.sh
@@ -52,7 +57,11 @@ jobs:
           bash -n tools/test_resource_cleanup.sh
           bash -n tools/test_git_hooks_parallel.sh
           bash -n tools/test_fixture_copy.sh
+          bash -n tools/test_ci_evidence.sh
+          bash -n tools/test_ci_final_gate.sh
+          bash -n tools/test_lesson_start_position.sh
           bash -n tools/test_lesson.sh
+          bash -n tools/test_lesson14.sh
           bash -n tools/test_menu_prerequisites.sh
           bash -n tools/test_product_gate_tools.sh
           bash -n tools/product-repository-cleanup
@@ -61,6 +70,8 @@ jobs:
           bash -n tools/product-security
           bash -n tools/test_product_security.sh
           bash -n tools/test_lesson_repository.sh
+          bash -n tools/ci-evidence
+          bash -n tools/ci-final-gate
           bash -n tools/menu
           bash -n tools/as-built-sync
           bash -n tools/test-plan
@@ -146,6 +157,8 @@ jobs:
           ./tools/test_resource_cleanup.sh
           ./tools/test_git_hooks_parallel.sh
           ./tools/test_fixture_copy.sh
+          ./tools/test_ci_evidence.sh
+          ./tools/test_ci_final_gate.sh
           ./tools/test_menu_prerequisites.sh
           ./tools/test_product_gate_tools.sh
           ./tools/test_product_repository_cleanup.sh
@@ -167,13 +180,39 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-ms-playwright-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-ms-playwright-
+
       - name: Install browser test dependencies
         run: |
           npm install
           npx playwright install chromium
 
       - name: Lesson Playwright dashboard checks
-        run: ./tools/test_lesson_playwright.sh
+        env:
+          CI_EVIDENCE_DIR: ${{ runner.temp }}/ci-evidence
+          CI_EVIDENCE_SOURCE_JOB: playwright-tests
+        run: ./tools/test_lesson_playwright.sh --write-evidence
+
+      - name: Upload Playwright evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-evidence-playwright-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/ci-evidence
+          if-no-files-found: error
+          include-hidden-files: true
+          retention-days: 1
 
   aggregate-and-full-hooks:
     runs-on: ubuntu-latest
@@ -187,15 +226,42 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-ms-playwright-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-ms-playwright-
+
+      - name: Download same-run evidence
+        uses: actions/download-artifact@v4
+        with:
+          name: ci-evidence-playwright-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/ci-evidence
+
       - name: Install browser test dependencies
         run: |
           npm install
           npx playwright install chromium
 
       - name: Lesson aggregate test
-        run: ./tools/test_lesson_repository.sh
+        env:
+          CI_EVIDENCE_DIR: ${{ runner.temp }}/ci-evidence
+          CI_EVIDENCE_SOURCE_JOB: aggregate-and-full-hooks
+          CI_EVIDENCE_PLAYWRIGHT_SOURCE_JOB: playwright-tests
+        run: ./tools/test_lesson_repository.sh --use-evidence --write-evidence
 
       - name: Git hooks full no-cache regression
         env:
           RESOURCE_GUARD_SKIP_LOCAL_CHECK: "1"
+          CI_EVIDENCE_DIR: ${{ runner.temp }}/ci-evidence
+          CI_EVIDENCE_SOURCE_JOB: aggregate-and-full-hooks
+          CI_EVIDENCE_PLAYWRIGHT_SOURCE_JOB: playwright-tests
         run: ./tools/git-hooks run --mode full --no-cache --jobs 4

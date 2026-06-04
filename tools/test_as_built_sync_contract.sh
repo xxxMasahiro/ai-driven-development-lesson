@@ -141,6 +141,15 @@ run_check "$RUNNER_POLICY_DEFAULT" >/dev/null
 policy_default_status_output="$(AS_BUILT_SYNC_ROOT="$RUNNER_POLICY_DEFAULT" AS_BUILT_SYNC_CONTRACT_FILE="$RUNNER_POLICY_DEFAULT/docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv" "$ROOT/tools/as-built-sync" status)"
 assert_contains "$policy_default_status_output" "Active test wiring: 4/4 present"
 
+CI_RUNNER_WIRING="$TMP_DIR/ci-runner-wiring"
+copy_fixture "$RUNNER_WIRING" "$CI_RUNNER_WIRING"
+cat >"$CI_RUNNER_WIRING/.github/workflows/ci.yml" <<'EOF'
+run: ./tools/git-hooks run --mode full --no-cache
+EOF
+run_check "$CI_RUNNER_WIRING" >/dev/null
+ci_runner_status_output="$(AS_BUILT_SYNC_ROOT="$CI_RUNNER_WIRING" AS_BUILT_SYNC_CONTRACT_FILE="$CI_RUNNER_WIRING/docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv" "$ROOT/tools/as-built-sync" status)"
+assert_contains "$ci_runner_status_output" "Active test wiring: 4/4 present"
+
 RUNNER_TRAILING_INVALID="$TMP_DIR/runner-trailing-invalid"
 copy_fixture "$RUNNER_WIRING" "$RUNNER_TRAILING_INVALID"
 cat >"$RUNNER_TRAILING_INVALID/docs/workflow/GIT_HOOK_CHECKS.tsv" <<'EOF'

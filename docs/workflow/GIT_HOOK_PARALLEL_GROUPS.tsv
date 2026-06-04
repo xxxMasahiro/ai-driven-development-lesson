@@ -24,11 +24,15 @@ test_resource_guard_summary	regression	parallel	Resource guard summary regressio
 test_resource_cleanup	regression	parallel	Resource cleanup regression uses fixtures and can run in parallel.
 test_git_hooks_parallel	regression	parallel	Git hooks parallel regression uses fixtures and can run in parallel.
 test_fixture_copy	regression	parallel	Fixture-copy regression uses temporary directories and can run in parallel.
+test_ci_evidence	regression	parallel	Same-run evidence regression uses fixtures and can run in parallel.
+test_ci_final_gate	regression	parallel	Final-gate regression uses fixtures and can run in parallel.
 check_ci_workflow_structure	regression	parallel	CI workflow structure validation is read-only and can run in parallel.
 test_menu_prerequisites	regression	parallel	Menu prerequisite regression uses fixtures and can run in parallel.
 test_product_gate_tools	regression	parallel	Product gate regression uses fixtures and can run in parallel.
 test_product_repository_cleanup	regression	parallel	Product repository cleanup regression uses fixtures and can run in parallel.
 test_product_security	regression	parallel	Product security regression uses fixtures and can run in parallel.
 test_lesson_playwright	heavy	heavy	Playwright is browser-heavy and uses its own resource guard profile.
+test_lesson_start_position	lesson-cli	serial	Lesson start-position regression mutates fixture lesson state and remains serial.
 test_lesson	lesson-cli	serial	Lesson CLI regression can mutate lesson state in fixtures and remains serial.
-test_lesson_repository	final	final-gate	Aggregate repository test remains the final local gate.
+test_lesson14	lesson-cli	serial	Lesson14 CLI regression can mutate lesson state in fixtures and remains serial.
+test_lesson_repository	final	final-gate	Same-run evidence final gate remains the final local gate.

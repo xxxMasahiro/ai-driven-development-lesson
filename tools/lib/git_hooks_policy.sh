@@ -6,6 +6,10 @@ if [[ -z "${LESSON_ROOT:-}" ]]; then
   source "$SCRIPT_DIR/lesson_common.sh"
 fi
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=ci_evidence.sh
+source "$SCRIPT_DIR/ci_evidence.sh"
+
 git_hooks_policy_file() {
   printf '%s\n' "${GIT_HOOKS_POLICY_FILE:-$LESSON_ROOT/docs/workflow/GIT_HOOKS_POLICY.tsv}"
 }
@@ -413,6 +417,9 @@ git_hooks_run_one() {
 
   printf 'hook run: %s\n' "$check_id"
   if (cd "$root" && bash -c "$command"); then
+    if [[ "${CI_EVIDENCE_DISABLE_HOOK_RECORD:-0}" != "1" ]]; then
+      ci_evidence_record_git_hook "$check_id" "$command"
+    fi
     if [[ "$mode" == "fast" && "$no_cache" == "false" && "$cache_allowed" == "true" ]]; then
       {
         printf '%s\n' "$cache_key"

@@ -301,7 +301,7 @@ resource_guard_validate_policy() {
           printf 'Invalid cleanup target path %s: %s\n' "$key" "$value" >&2
           invalid=1
         fi
-        if [[ "$value" == ".git" || "$value" == ".git/"* && "$value" != ".git/pre-commit-cache" ]]; then
+        if [[ "$value" == ".git" || ( "$value" == ".git/"* && "$value" != ".git/pre-commit-cache" && "$value" != ".git/ci-evidence" ) ]]; then
           printf 'Invalid cleanup target under .git for %s: %s\n' "$key" "$value" >&2
           invalid=1
         fi
@@ -663,7 +663,7 @@ resource_guard_cleanup_relative_path_valid() {
       return 1
       ;;
   esac
-  if [[ "$relpath" == ".git" || ( "$relpath" == ".git/"* && "$relpath" != ".git/pre-commit-cache" ) ]]; then
+  if [[ "$relpath" == ".git" || ( "$relpath" == ".git/"* && "$relpath" != ".git/pre-commit-cache" && "$relpath" != ".git/ci-evidence" ) ]]; then
     printf 'Unsafe cleanup target under .git: %s\n' "$relpath" >&2
     return 1
   fi
@@ -759,6 +759,12 @@ resource_guard_cleanup_preflight_safe() {
         invalid=1
       fi
     fi
+    if [[ -e "$target_path" && "$relpath" == ".git/ci-evidence" ]]; then
+      if [[ ! -f "$target_path/.ci-evidence" || "$(sed -n '1p' "$target_path/.ci-evidence")" != "ci-evidence-v1" ]]; then
+        printf 'cleanup-error\t%s\t%s\tmissing-or-invalid-evidence-marker\n' "$key" "$relpath"
+        invalid=1
+      fi
+    fi
   done <"$policy_file"
 
   [[ "$invalid" -eq 0 ]]
@@ -845,6 +851,13 @@ resource_guard_cleanup_plan() {
     if [[ "$relpath" == ".git/pre-commit-cache" ]]; then
       if [[ ! -f "$target_path/.git-hooks-cache" || "$(sed -n '1p' "$target_path/.git-hooks-cache")" != "git-hooks-cache-v1" ]]; then
         printf 'cleanup-error\t%s\t%s\tmissing-or-invalid-cache-marker\n' "$key" "$relpath"
+        invalid=1
+        continue
+      fi
+    fi
+    if [[ "$relpath" == ".git/ci-evidence" ]]; then
+      if [[ ! -f "$target_path/.ci-evidence" || "$(sed -n '1p' "$target_path/.ci-evidence")" != "ci-evidence-v1" ]]; then
+        printf 'cleanup-error\t%s\t%s\tmissing-or-invalid-evidence-marker\n' "$key" "$relpath"
         invalid=1
         continue
       fi

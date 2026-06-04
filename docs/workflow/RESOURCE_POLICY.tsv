@@ -24,3 +24,4 @@ profile	default	2048	Default heavy work	Estimated MiB budget per parallel job fo
 cleanup_target	playwright-report	playwright-report	playwright	Repo-local Playwright HTML report directory.
 cleanup_target	playwright-results	test-results	playwright	Repo-local Playwright test result directory.
 cleanup_target	git-hooks-cache	.git/pre-commit-cache	git-hooks-full	Marked repo-local Git hooks cache directory.
+cleanup_target	ci-evidence	.git/ci-evidence	aggregate	Marked repo-local same-run CI evidence directory.

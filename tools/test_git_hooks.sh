@@ -29,6 +29,9 @@ cat >"$RECOMMENDATION_FILE" <<'EOF'
 # pattern	recommendation	reason
 .github/workflows/	full-no-cache	CI workflow changes need full verification.
 docs/workflow/GIT_HOOK_CHECKS.tsv	full-no-cache	Check-list changes need full verification.
+docs/workflow/FINAL_GATE_COVERAGE.tsv	full-no-cache	Final-gate coverage changes need full verification.
+tools/ci-final-gate	full-no-cache	Final-gate runner changes need full verification.
+tools/lib/ci_evidence.sh	full-no-cache	CI evidence helper changes need full verification.
 tools/test_*.sh	full-no-cache	Regression-test changes need full verification.
 EOF
 
@@ -91,6 +94,12 @@ recommend_output="$(run_git_hooks recommend --paths docs/workflow/GIT_HOOK_CHECK
 [[ "$recommend_output" == *"docs/workflow/GIT_HOOK_CHECKS.tsv"* ]]
 recommend_output="$(run_git_hooks recommend --paths ./.github/workflows/ci.yml)"
 [[ "$recommend_output" == *"Recommended command: ./tools/git-hooks run --mode full --no-cache"* ]]
+recommend_output="$(run_git_hooks recommend --paths docs/workflow/FINAL_GATE_COVERAGE.tsv)"
+[[ "$recommend_output" == *"Recommended command: ./tools/git-hooks run --mode full --no-cache"* ]]
+recommend_output="$(run_git_hooks recommend --paths tools/ci-final-gate)"
+[[ "$recommend_output" == *"Recommended command: ./tools/git-hooks run --mode full --no-cache"* ]]
+recommend_output="$(run_git_hooks recommend --paths tools/lib/ci_evidence.sh)"
+[[ "$recommend_output" == *"Recommended command: ./tools/git-hooks run --mode full --no-cache"* ]]
 recommend_output="$(run_git_hooks recommend --paths "$TEST_REPO/tools/test_git_hooks.sh")"
 [[ "$recommend_output" == *"Recommended command: ./tools/git-hooks run --mode full --no-cache"* ]]
 recommend_output="$(run_git_hooks recommend --paths tools/test_git_hooks.sh)"
@@ -112,6 +121,9 @@ cat >"$RECOMMENDATION_FILE" <<'EOF'
 # pattern	recommendation	reason
 .github/workflows/	full-no-cache	CI workflow changes need full verification.
 docs/workflow/GIT_HOOK_CHECKS.tsv	full-no-cache	Check-list changes need full verification.
+docs/workflow/FINAL_GATE_COVERAGE.tsv	full-no-cache	Final-gate coverage changes need full verification.
+tools/ci-final-gate	full-no-cache	Final-gate runner changes need full verification.
+tools/lib/ci_evidence.sh	full-no-cache	CI evidence helper changes need full verification.
 tools/test_*.sh	full-no-cache	Regression-test changes need full verification.
 EOF
 run_git_hooks mode fast >/dev/null

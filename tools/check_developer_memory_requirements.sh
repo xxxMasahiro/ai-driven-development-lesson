@@ -49,8 +49,11 @@ require_pre_commit_check() {
     if git_hooks_validate_mode "$hook_mode" >/dev/null 2>&1; then
       row_separator=$'\034'
       rows="$(git_hooks_rows_for_mode "$hook_mode")" || rows=""
-      while IFS="$row_separator" read -r _ _ row_command _; do
-        if [[ "$row_command" == "./tools/$command" || "$row_command" == "$ROOT/tools/$command" ]]; then
+      while IFS="$row_separator" read -r check_id _ row_command _; do
+        if [[ "$row_command" == "./tools/$command" || "$row_command" == "./tools/$command "* || "$row_command" == "$ROOT/tools/$command" || "$row_command" == "$ROOT/tools/$command "* ]]; then
+          return
+        fi
+        if [[ "$command" == "test_lesson_repository.sh" && "$check_id" == "test_lesson_repository" && ( "$row_command" == "./tools/ci-final-gate" || "$row_command" == "$ROOT/tools/ci-final-gate" ) ]]; then
           return
         fi
       done <<<"$rows"
