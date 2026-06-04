@@ -84,8 +84,10 @@ check_main_ci() {
   require_job_contains "$file" syntax-checks "bash -n tools/test_fixture_copy.sh"
   require_job_contains "$file" syntax-checks "bash -n tools/ci-evidence"
   require_job_contains "$file" syntax-checks "bash -n tools/ci-final-gate"
+  require_job_contains "$file" syntax-checks "bash -n tools/ci-playwright-setup"
   require_job_contains "$file" syntax-checks "bash -n tools/test_ci_evidence.sh"
   require_job_contains "$file" syntax-checks "bash -n tools/test_ci_final_gate.sh"
+  require_job_contains "$file" syntax-checks "bash -n tools/test_ci_pipeline_acceleration.sh"
   require_job_contains "$file" syntax-checks "bash -n tools/test_lesson_start_position.sh"
   require_job_contains "$file" syntax-checks "bash -n tools/test_lesson14.sh"
   require_job_contains "$file" syntax-checks "bash -n tools/check_security_invariants.sh"
@@ -100,6 +102,7 @@ check_main_ci() {
   require_job_contains "$file" policy-regression-tests "./tools/test_fixture_copy.sh"
   require_job_contains "$file" policy-regression-tests "./tools/test_ci_evidence.sh"
   require_job_contains "$file" policy-regression-tests "./tools/test_ci_final_gate.sh"
+  require_job_contains "$file" policy-regression-tests "./tools/test_ci_pipeline_acceleration.sh"
   require_job_contains "$file" policy-regression-tests "./tools/test_security_invariants.sh"
   require_job_contains "$file" policy-regression-tests "./tools/test_product_gate_tools.sh"
   require_job_contains "$file" policy-regression-tests "./tools/test_product_security.sh"
@@ -109,8 +112,9 @@ check_main_ci() {
   require_job_contains "$file" playwright-tests "actions/cache@v4"
   require_job_contains "$file" playwright-tests "cache: npm"
   require_job_contains "$file" playwright-tests "path: ~/.cache/ms-playwright"
-  require_job_contains "$file" playwright-tests "npm install"
-  require_job_contains "$file" playwright-tests "npx playwright install chromium"
+  require_job_contains "$file" playwright-tests "./tools/ci-playwright-setup"
+  reject_job_contains "$file" playwright-tests "npm install"
+  reject_job_contains "$file" playwright-tests "npx playwright install chromium"
   require_job_contains "$file" playwright-tests 'CI_EVIDENCE_DIR: ${{ runner.temp }}/ci-evidence'
   require_job_contains "$file" playwright-tests "CI_EVIDENCE_SOURCE_JOB: playwright-tests"
   require_job_contains "$file" playwright-tests "./tools/test_lesson_playwright.sh --write-evidence"
@@ -127,8 +131,9 @@ check_main_ci() {
   require_job_contains "$file" aggregate-and-full-hooks "actions/download-artifact@v4"
   require_job_contains "$file" aggregate-and-full-hooks "cache: npm"
   require_job_contains "$file" aggregate-and-full-hooks "path: ~/.cache/ms-playwright"
-  require_job_contains "$file" aggregate-and-full-hooks "npm install"
-  require_job_contains "$file" aggregate-and-full-hooks "npx playwright install chromium"
+  require_job_contains "$file" aggregate-and-full-hooks "./tools/ci-playwright-setup"
+  reject_job_contains "$file" aggregate-and-full-hooks "npm install"
+  reject_job_contains "$file" aggregate-and-full-hooks "npx playwright install chromium"
   require_job_contains "$file" aggregate-and-full-hooks "RESOURCE_GUARD_SKIP_LOCAL_CHECK: \"1\""
   require_job_contains "$file" aggregate-and-full-hooks 'CI_EVIDENCE_DIR: ${{ runner.temp }}/ci-evidence'
   require_job_contains "$file" aggregate-and-full-hooks "CI_EVIDENCE_SOURCE_JOB: aggregate-and-full-hooks"
@@ -163,8 +168,10 @@ check_lesson14_ci() {
   require_job_contains "$file" syntax-checks "bash -n tools/test_fixture_copy.sh"
   require_job_contains "$file" syntax-checks "bash -n tools/ci-evidence"
   require_job_contains "$file" syntax-checks "bash -n tools/ci-final-gate"
+  require_job_contains "$file" syntax-checks "bash -n tools/ci-playwright-setup"
   require_job_contains "$file" syntax-checks "bash -n tools/test_ci_evidence.sh"
   require_job_contains "$file" syntax-checks "bash -n tools/test_ci_final_gate.sh"
+  require_job_contains "$file" syntax-checks "bash -n tools/test_ci_pipeline_acceleration.sh"
   require_job_contains "$file" syntax-checks "bash -n tools/test_lesson_start_position.sh"
   require_job_contains "$file" syntax-checks "bash -n tools/check_security_invariants.sh"
   require_job_contains "$file" syntax-checks "bash -n tools/product-security"
@@ -172,16 +179,16 @@ check_lesson14_ci() {
   require_job_contains "$file" lesson14-structure-sync "./tools/check_lesson14_sync.sh"
   require_job_contains "$file" lesson14-structure-sync "./tools/check_test_plan_coverage.sh"
   require_job_contains "$file" lesson14-structure-sync "./tools/check_security_invariants.sh"
-  require_job_contains "$file" policy-regression-tests "./tools/test_resource_guard_summary.sh"
-  require_job_contains "$file" policy-regression-tests "./tools/test_test_plan.sh"
-  require_job_contains "$file" policy-regression-tests "./tools/test_git_hooks_parallel.sh"
-  require_job_contains "$file" policy-regression-tests "./tools/test_fixture_copy.sh"
-  require_job_contains "$file" policy-regression-tests "./tools/test_ci_evidence.sh"
-  require_job_contains "$file" policy-regression-tests "./tools/test_ci_final_gate.sh"
-  require_job_contains "$file" policy-regression-tests "./tools/test_security_invariants.sh"
-  require_job_contains "$file" policy-regression-tests "./tools/test_product_gate_tools.sh"
-  require_job_contains "$file" policy-regression-tests "./tools/test_product_security.sh"
+  require_job_contains "$file" policy-regression-tests "./tools/check_test_plan_coverage.sh"
+  require_job_contains "$file" policy-regression-tests "./tools/check_security_invariants.sh"
   require_job_contains "$file" policy-regression-tests "./tools/check_ci_workflow_structure.sh"
+  require_job_contains "$file" policy-regression-tests "./tools/test_ci_pipeline_acceleration.sh"
+  require_job_contains "$file" policy-regression-tests "Lesson14 CI keeps the policy-regression-tests job context"
+  require_job_contains "$file" policy-regression-tests "common policy regressions are provided by CI / policy-regression-tests"
+  reject_job_contains "$file" policy-regression-tests "./tools/test_docs_tour.sh"
+  reject_job_contains "$file" policy-regression-tests "./tools/test_git_workflow_policy.sh"
+  reject_job_contains "$file" policy-regression-tests "./tools/test_git_hooks.sh"
+  reject_job_contains "$file" policy-regression-tests "./tools/test_product_gate_tools.sh"
   require_job_contains "$file" lesson14-cli-tests "./tools/test_lesson14.sh"
   require_job_contains "$file" playwright-tests "needs:"
   require_job_contains "$file" playwright-tests "- syntax-checks"
@@ -224,6 +231,16 @@ check_lesson14_ci() {
 
 require_file_contains "$ROOT/.github/workflows/ci.yml" "concurrency:"
 require_file_contains "$ROOT/.github/workflows/lesson14-ci.yml" "concurrency:"
+for workflow_file in "$ROOT/.github/workflows/ci.yml" "$ROOT/.github/workflows/lesson14-ci.yml"; do
+  if grep -Eq 'actions/(checkout|setup-node|cache|upload-artifact|download-artifact)@v[123]' "$workflow_file"; then
+    printf 'Deprecated Node-action major version in %s\n' "$workflow_file" >&2
+    exit 1
+  fi
+  if grep -Fq 'continue-on-error: true' "$workflow_file"; then
+    printf 'CI workflow must not use continue-on-error: true: %s\n' "$workflow_file" >&2
+    exit 1
+  fi
+done
 check_main_ci
 check_lesson14_ci
 

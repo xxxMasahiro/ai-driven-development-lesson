@@ -19,6 +19,7 @@ tools/ci-final-gate	critical	test_ci_final_gate|test_lesson_repository	true	true
 tools/ci-evidence	critical	test_ci_evidence|test_lesson_repository	true	true	none	false	CI evidence command changes affect same-run evidence inspection.
 tools/lib/ci_evidence.sh	critical	test_ci_evidence|test_ci_final_gate|test_lesson_repository	true	true	none	false	CI evidence helper changes affect same-run verification safety.
 tools/lib/as_built_evidence.sh	critical	check_as_built_sync_contract|test_lesson_repository	true	true	none	false	As-built evidence helper changes affect synchronized document verification safety.
+tools/ci-playwright-setup	critical	test_ci_pipeline_acceleration|check_ci_workflow_structure|test_lesson_playwright	true	true	dependency	false	Playwright setup changes affect browser dependency reproducibility and CI runtime.
 tools/as-built-sync	critical	check_as_built_sync_contract|test_as_built_sync_contract	true	true	none	false	As-built status changes affect sync-contract visibility.
 tools/check_as_built_sync_contract.sh	critical	check_as_built_sync_contract|test_as_built_sync_contract	true	true	none	false	As-built contract checker changes affect synchronization enforcement.
 tools/test-plan	critical	check_test_plan_coverage|test_test_plan	true	true	none	false	Test plan command changes affect observe-only verification planning.
@@ -41,6 +42,7 @@ tools/test_*.sh	high	test_lesson_repository	true	true	none	false	Regression-test
 tools/check_*.sh	high	test_lesson_repository	true	true	none	false	Checker changes require aggregate verification.
 tools/test_lesson_start_position.sh	high	test_lesson_start_position|test_lesson_repository	true	true	none	false	Lesson start-position regression changes affect free lesson navigation coverage.
 tools/test_lesson14.sh	high	test_lesson14|test_lesson_repository	true	true	none	false	Lesson14 regression changes affect 14-step lesson coverage.
+tools/test_ci_pipeline_acceleration.sh	high	test_ci_pipeline_acceleration|test_lesson_repository	true	true	none	false	CI acceleration regression changes affect local and remote verification timing guarantees.
 tools/lib/resource_guard.sh	high	test_resource_guard|test_resource_guard_summary	true	true	none	false	Resource guard helper changes affect safe parallel execution.
 tools/resource-guard	high	test_resource_guard|test_resource_guard_summary	true	true	none	false	Resource guard command changes affect safe parallel execution.
 docs/workflow/RESOURCE_POLICY.tsv	high	test_resource_guard|test_resource_guard_summary	true	true	same-run	false	Resource policy changes affect local verification behavior.

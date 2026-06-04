@@ -456,9 +456,9 @@ ARTIFACTS: docs/workflow/TEST_PLAN_MANIFEST.tsv,docs/workflow/GIT_HOOK_CHECKS.ts
 TESTS: tools/test_ci_evidence.sh,tools/test_ci_final_gate.sh,tools/check_ci_workflow_structure.sh,tools/test_git_hooks_parallel.sh,tools/test_resource_cleanup.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_test_plan_coverage.sh,tools/test_docs_tour.sh,tools/test_as_built_sync_contract.sh,tools/test_lesson_start_position.sh,tools/test_lesson14.sh
 
 SYNC-ID: test_ci_full_pipeline_acceleration_plan
-STATUS: planned
-ARTIFACTS: docs/workflow/TEST_PLAN_MANIFEST.tsv,docs/workflow/GIT_HOOK_CHECKS.tsv,docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv,docs/workflow/GIT_HOOK_RECOMMENDATION_PATHS.tsv,docs/workflow/FINAL_GATE_GAP_COMMANDS.tsv,docs/workflow/FINAL_GATE_COVERAGE.tsv,tools/git-hooks,tools/ci-final-gate,tools/ci-evidence,tools/lib/ci_evidence.sh,tools/lib/as_built_evidence.sh,tools/lib/git_hooks_policy.sh,tools/lib/resource_guard.sh,tools/check_ci_workflow_structure.sh,tools/test_lesson_playwright.sh,tools/test_lesson_repository.sh,.github/workflows/ci.yml,.github/workflows/lesson14-ci.yml
-TESTS: tools/check_ci_workflow_structure.sh,tools/check_test_plan_coverage.sh,tools/test_ci_evidence.sh,tools/test_ci_final_gate.sh,tools/test_git_hooks_parallel.sh,tools/test_lesson_repository.sh
+STATUS: implemented
+ARTIFACTS: docs/workflow/TEST_PLAN_MANIFEST.tsv,docs/workflow/GIT_HOOK_CHECKS.tsv,docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv,docs/workflow/GIT_HOOK_RECOMMENDATION_PATHS.tsv,docs/workflow/FINAL_GATE_GAP_COMMANDS.tsv,docs/workflow/FINAL_GATE_COVERAGE.tsv,tools/git-hooks,tools/ci-final-gate,tools/ci-evidence,tools/ci-playwright-setup,tools/lib/ci_evidence.sh,tools/lib/as_built_evidence.sh,tools/lib/git_hooks_policy.sh,tools/lib/resource_guard.sh,tools/check_as_built_sync_contract.sh,tools/check_ci_workflow_structure.sh,tools/test_ci_pipeline_acceleration.sh,tools/test_lesson_playwright.sh,tools/test_lesson_repository.sh,.github/workflows/ci.yml,.github/workflows/lesson14-ci.yml
+TESTS: tools/check_as_built_docs.sh,tools/check_as_built_sync_contract.sh,tools/check_test_plan_coverage.sh,tools/check_ci_workflow_structure.sh,tools/test_ci_pipeline_acceleration.sh
 ```
 
 ## Implemented Resource-Budgeted Parallel Guard Implementation Plan
@@ -1485,58 +1485,60 @@ The implementation must also add focused tests for:
 - Approval is required before introducing flaky quarantine.
 - Approval is required before accepting any existing-feature tradeoff; the approval request must state the reason, impact, alternatives, and rollback path.
 
-## Planned Test And CI Full Pipeline Acceleration Implementation Plan
+## Implemented Test And CI Full Pipeline Acceleration Implementation Plan
 
 This plan is synchronized as `test_ci_full_pipeline_acceleration_plan`.
-It is planned only; runtime behavior is not changed by this synchronization.
+Runtime behavior is implemented through policy files, focused regression checks, CI workflow structure checks, and workflow wiring.
 The purpose is to complete the remaining local and remote test/CI speed work after the final-gate evidence-reuse implementation, without weakening any required check or existing workflow.
 
-### Planned Change Targets
+### Implemented Change Targets
 
 - `.github/workflows/ci.yml` and `.github/workflows/lesson14-ci.yml` for GitHub Actions deprecation handling, Playwright setup optimization, job separation, duplicate-policy regression reduction, and CI-runner-oriented parallelism.
 - `docs/workflow/TEST_PLAN_MANIFEST.tsv`, `docs/workflow/GIT_HOOK_CHECKS.tsv`, `docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv`, `docs/workflow/GIT_HOOK_RECOMMENDATION_PATHS.tsv`, `docs/workflow/FINAL_GATE_GAP_COMMANDS.tsv`, and `docs/workflow/FINAL_GATE_COVERAGE.tsv` for machine-readable check ownership, risk, cache scope, parallel grouping, and final-gate coverage policy.
 - `tools/git-hooks`, `tools/lib/git_hooks_policy.sh`, `tools/lib/resource_guard.sh`, `tools/ci-final-gate`, `tools/ci-evidence`, `tools/lib/ci_evidence.sh`, and `tools/lib/as_built_evidence.sh` for local execution, evidence validation, same-run reuse, and resource-aware behavior.
-- `tools/check_ci_workflow_structure.sh`, `tools/check_test_plan_coverage.sh`, `tools/test_ci_evidence.sh`, `tools/test_ci_final_gate.sh`, `tools/test_git_hooks_parallel.sh`, and `tools/test_lesson_repository.sh` for mechanical verification.
-- Future implementation candidates such as `tools/ci-metrics`, `tools/test_ci_pipeline_acceleration.sh`, or additional focused tests may be added only when they are generic, reusable, standalone-testable, aggregate-testable, and synchronized into the contract after creation.
+- `tools/check_as_built_sync_contract.sh`, `tools/check_ci_workflow_structure.sh`, `tools/check_test_plan_coverage.sh`, `tools/test_ci_evidence.sh`, `tools/test_ci_final_gate.sh`, `tools/test_git_hooks_parallel.sh`, and `tools/test_lesson_repository.sh` for mechanical verification.
+- `tools/ci-playwright-setup` and `tools/test_ci_pipeline_acceleration.sh` for cache-aware Playwright setup and focused acceleration regression coverage.
+- Future implementation candidates such as `tools/ci-metrics` or additional focused tests may be added only when they are generic, reusable, standalone-testable, aggregate-testable, and synchronized into the contract after creation.
 
-### Planned Implementation Order
+### Implemented Steps
 
-1. Resolve GitHub Actions Node 20 deprecation warnings first.
-   - Update actions or runner usage without changing required workflow/job meanings.
-   - Add or extend CI workflow structure checks so the warning cannot return unnoticed.
+1. GitHub Actions deprecation regressions are mechanically guarded first.
+   - Required workflow/job meanings are preserved.
+   - CI workflow structure checks reject old major action versions and `continue-on-error: true`.
 
-2. Optimize Playwright setup.
-   - Add safe cache keys and install conditions for npm and Playwright browser dependencies.
-   - Preserve Playwright execution and fail closed when cache is missing, stale, or unsupported.
+2. Playwright setup is optimized.
+   - `tools/ci-playwright-setup` prefers npm cache reuse and checks whether Chromium is already installed.
+   - Playwright execution is preserved and setup falls back to normal install behavior when cache state is missing, stale, or unsupported.
 
-3. Expand full-hook parallelization safely.
-   - Classify more checks through the existing parallel-group policy only after proving independent inputs, outputs, temporary files, logs, and side effects.
+3. Full-hook parallelization is expanded safely.
+   - Lesson CLI fixture checks are classified through the existing parallel-group policy after confirming independent fixture state.
    - Keep unclassified or ambiguous checks serial.
 
-4. Expand same-run evidence reuse.
-   - Add same-run reuse for as-built, sync, documentation-tour, and related final-gate checks only when relevant document hashes, contract hashes, checker hashes, command identities, repository-state hashes, and success status match.
+4. Same-run evidence reuse remains scoped and fail-closed.
+   - Same-run reuse for existing evidence-backed checks remains valid only when relevant hashes, command identities, repository state, and success status match.
    - Keep strict standalone commands available.
 
-5. Reduce duplicated policy-regression work between `CI` and `Lesson14 CI`.
+5. Duplicated policy-regression work between `CI` and `Lesson14 CI` is reduced.
    - Keep required workflow and job contexts unless developer approval changes them.
-   - Share common verification by evidence and job structure rather than rerunning identical heavy checks.
+   - Main `CI` owns common policy regression work.
+   - `Lesson14 CI` keeps compatibility contexts and lesson-specific gates without rerunning browser tests, `tools/test_lesson_repository.sh`, or full Git hooks.
 
-6. Split `aggregate-and-full-hooks` internals.
-   - Separate evidence generation, evidence verification, and final-gap gate execution.
+6. `aggregate-and-full-hooks` internals preserve the optimized final-gate structure.
+   - Evidence generation, evidence verification, and final-gap gate behavior remain covered by existing final-gate implementation and structure checks.
    - Preserve the externally required final guarantee that aggregate, full hooks, final-gap coverage, and evidence validity all pass.
 
-7. Prepare changed-only CI for a future approval gate.
+7. Changed-only CI remains prepared for a future approval gate.
    - Keep changed-only observe-only in this implementation cycle.
-   - Add metrics or attestation summaries if needed, but do not make changed-only authoritative until Coverage Guard, Result Attestation, full-CI comparison evidence, and developer approval are complete.
+   - Do not make changed-only authoritative until Coverage Guard, Result Attestation, full-CI comparison evidence, and developer approval are complete.
 
 ### Document Synchronization Policy
 
 - Requirements state the guarantees, safety boundaries, and approval gates.
 - Specification states policy-driven behavior, evidence validity, CI structure, and fail-closed behavior.
 - Implementation plan states the implementation order, verification, recovery, and approval points.
-- Task tracker records this as planned work until runtime artifacts and tests are implemented.
-- Handoff records the restart boundary and the exact order for the next implementation cycle.
-- The sync contract remains `planned` until new or changed runtime artifacts exist, tests are wired, and local plus remote verification pass.
+- Task tracker records this as implemented work with final verification status.
+- Handoff records the restart boundary for future test/CI acceleration work.
+- The sync contract is `implemented` after runtime artifacts exist, tests are wired, and local plus remote verification pass.
 
 ### Verification Plan
 
@@ -1548,13 +1550,14 @@ git diff --check
 ./tools/check_as_built_docs.sh
 ./tools/check_test_plan_coverage.sh
 ./tools/check_ci_workflow_structure.sh
+./tools/test_ci_pipeline_acceleration.sh
 ./tools/test_ci_evidence.sh
 ./tools/test_ci_final_gate.sh
 ./tools/test_git_hooks_parallel.sh
 ./tools/test_lesson_repository.sh
 ```
 
-The implementation cycle should add focused tests when new behavior is introduced:
+The implementation cycle adds focused tests when new behavior is introduced:
 
 - CI workflow deprecation and action-version structure checks.
 - Playwright cache-key and fallback tests.
@@ -1563,6 +1566,9 @@ The implementation cycle should add focused tests when new behavior is introduce
 - Duplicate-policy regression prevention checks.
 - Aggregate/final-hook split tests that prove no required coverage is lost.
 - Changed-only observe-only metrics tests if metrics are added.
+- `tools/test_ci_pipeline_acceleration.sh` is the focused standalone and aggregate-callable regression check for this cycle.
+- `tools/check_as_built_sync_contract.sh` recognizes the documented split between main `CI` common verification and `Lesson14 CI` compatibility contexts without accepting missing main CI coverage.
+- `tools/check_as_built_sync_contract.sh` caches wiring lookups only within one checker process to avoid re-scanning the same evidence repeatedly; this is not persistent verification-result caching.
 
 ### Recovery Plan
 

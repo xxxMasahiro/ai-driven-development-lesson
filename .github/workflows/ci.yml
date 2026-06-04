@@ -59,6 +59,7 @@ jobs:
           bash -n tools/test_fixture_copy.sh
           bash -n tools/test_ci_evidence.sh
           bash -n tools/test_ci_final_gate.sh
+          bash -n tools/test_ci_pipeline_acceleration.sh
           bash -n tools/test_lesson_start_position.sh
           bash -n tools/test_lesson.sh
           bash -n tools/test_lesson14.sh
@@ -72,6 +73,7 @@ jobs:
           bash -n tools/test_lesson_repository.sh
           bash -n tools/ci-evidence
           bash -n tools/ci-final-gate
+          bash -n tools/ci-playwright-setup
           bash -n tools/menu
           bash -n tools/as-built-sync
           bash -n tools/test-plan
@@ -159,6 +161,7 @@ jobs:
           ./tools/test_fixture_copy.sh
           ./tools/test_ci_evidence.sh
           ./tools/test_ci_final_gate.sh
+          ./tools/test_ci_pipeline_acceleration.sh
           ./tools/test_menu_prerequisites.sh
           ./tools/test_product_gate_tools.sh
           ./tools/test_product_repository_cleanup.sh
@@ -195,9 +198,7 @@ jobs:
             ${{ runner.os }}-ms-playwright-
 
       - name: Install browser test dependencies
-        run: |
-          npm install
-          npx playwright install chromium
+        run: ./tools/ci-playwright-setup
 
       - name: Lesson Playwright dashboard checks
         env:
@@ -247,9 +248,7 @@ jobs:
           path: ${{ runner.temp }}/ci-evidence
 
       - name: Install browser test dependencies
-        run: |
-          npm install
-          npx playwright install chromium
+        run: ./tools/ci-playwright-setup
 
       - name: Lesson aggregate test
         env:

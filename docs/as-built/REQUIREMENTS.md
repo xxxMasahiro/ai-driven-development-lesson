@@ -318,9 +318,9 @@ ARTIFACTS: docs/workflow/TEST_PLAN_MANIFEST.tsv,docs/workflow/GIT_HOOK_CHECKS.ts
 TESTS: tools/test_ci_evidence.sh,tools/test_ci_final_gate.sh,tools/check_ci_workflow_structure.sh,tools/test_git_hooks_parallel.sh,tools/test_resource_cleanup.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_test_plan_coverage.sh,tools/test_docs_tour.sh,tools/test_as_built_sync_contract.sh,tools/test_lesson_start_position.sh,tools/test_lesson14.sh
 
 SYNC-ID: test_ci_full_pipeline_acceleration_plan
-STATUS: planned
-ARTIFACTS: docs/workflow/TEST_PLAN_MANIFEST.tsv,docs/workflow/GIT_HOOK_CHECKS.tsv,docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv,docs/workflow/GIT_HOOK_RECOMMENDATION_PATHS.tsv,docs/workflow/FINAL_GATE_GAP_COMMANDS.tsv,docs/workflow/FINAL_GATE_COVERAGE.tsv,tools/git-hooks,tools/ci-final-gate,tools/ci-evidence,tools/lib/ci_evidence.sh,tools/lib/as_built_evidence.sh,tools/lib/git_hooks_policy.sh,tools/lib/resource_guard.sh,tools/check_ci_workflow_structure.sh,tools/test_lesson_playwright.sh,tools/test_lesson_repository.sh,.github/workflows/ci.yml,.github/workflows/lesson14-ci.yml
-TESTS: tools/check_ci_workflow_structure.sh,tools/check_test_plan_coverage.sh,tools/test_ci_evidence.sh,tools/test_ci_final_gate.sh,tools/test_git_hooks_parallel.sh,tools/test_lesson_repository.sh
+STATUS: implemented
+ARTIFACTS: docs/workflow/TEST_PLAN_MANIFEST.tsv,docs/workflow/GIT_HOOK_CHECKS.tsv,docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv,docs/workflow/GIT_HOOK_RECOMMENDATION_PATHS.tsv,docs/workflow/FINAL_GATE_GAP_COMMANDS.tsv,docs/workflow/FINAL_GATE_COVERAGE.tsv,tools/git-hooks,tools/ci-final-gate,tools/ci-evidence,tools/ci-playwright-setup,tools/lib/ci_evidence.sh,tools/lib/as_built_evidence.sh,tools/lib/git_hooks_policy.sh,tools/lib/resource_guard.sh,tools/check_as_built_sync_contract.sh,tools/check_ci_workflow_structure.sh,tools/test_ci_pipeline_acceleration.sh,tools/test_lesson_playwright.sh,tools/test_lesson_repository.sh,.github/workflows/ci.yml,.github/workflows/lesson14-ci.yml
+TESTS: tools/check_as_built_docs.sh,tools/check_as_built_sync_contract.sh,tools/check_test_plan_coverage.sh,tools/check_ci_workflow_structure.sh,tools/test_ci_pipeline_acceleration.sh
 ```
 
 ## Planned Learner Context Foundation Requirements
@@ -545,20 +545,20 @@ The implementation targets the current `aggregate-and-full-hooks` bottleneck wit
 - Require mechanical tests that prove the gap-only gate cannot drop aggregate coverage, Playwright evidence reuse cannot hide changed browser-test inputs, and as-built evidence reuse cannot hide changed synchronized documents.
 - Require developer approval before changing required CI check names, reducing full/no-cache scope, making changed-only CI authoritative, sharing verification-result cache across runs, or accepting any existing-feature tradeoff.
 
-## Planned Test And CI Full Pipeline Acceleration Requirements
+## Implemented Test And CI Full Pipeline Acceleration Requirements
 
-The next test and CI acceleration cycle should finish the remaining safe speed work without reducing safety, correctness, auditability, existing lesson behavior, or required verification.
-This is a planned synchronization only; runtime behavior is not changed by this entry.
+The test and CI acceleration cycle finishes the remaining safe speed work without reducing safety, correctness, auditability, existing lesson behavior, or required verification.
+Runtime behavior is implemented through policy files, focused checks, CI workflow structure checks, and workflow wiring.
 
-- Resolve GitHub Actions Node 20 deprecation warnings without changing the meaning of any required check.
-- Shorten Playwright setup by using safe dependency and browser caches plus install conditions, while preserving Playwright coverage.
-- Expand full Git hook parallelization only for checks that are mechanically proven independent; unclassified checks must remain serial.
-- Expand same-run evidence reuse for as-built, sync, documentation-tour, and final-gate style checks when command identity, relevant input hashes, repository state, and success status match.
-- Do not introduce persistent verification-result cache across commits, branches, workflow runs, repositories, or users.
-- Reduce duplicated `policy-regression-tests` style work between `CI` and `Lesson14 CI` while preserving required workflow contexts and branch-protection compatibility.
-- Split the current `aggregate-and-full-hooks` bottleneck into evidence-generation, evidence-verification, and final-gap gate units while preserving the same final guarantee.
-- Keep changed-only CI observe-only until Coverage Guard, Result Attestation, full-CI comparison evidence, and developer approval prove that it can become authoritative safely.
+- GitHub Actions deprecation regressions are guarded mechanically without changing the meaning of any required check.
+- Playwright setup is shortened through the shared `tools/ci-playwright-setup` wrapper, which uses npm's local cache preference, checks for an existing Chromium executable, and falls back to a normal install when cache state is missing or stale.
+- Full Git hook parallelization is expanded only for checks classified in policy as mechanically independent; unclassified checks remain serial.
+- Same-run evidence reuse remains scoped to the current run and does not introduce persistent verification-result cache across commits, branches, workflow runs, repositories, or users.
+- Duplicated `policy-regression-tests` style work between `CI` and `Lesson14 CI` is reduced while preserving required workflow contexts and branch-protection compatibility.
+- The `Lesson14 CI` compatibility contexts stay present but avoid rerunning common heavy browser, aggregate, and full-hook work already covered by the main `CI` workflow for the same commit.
+- Changed-only CI remains observe-only until Coverage Guard, Result Attestation, full-CI comparison evidence, and developer approval prove that it can become authoritative safely.
 - Preserve the existing Step 1-7 lesson path, Step 1-14 lesson path, applied lesson, menu, dashboard, Git workflow policy, Git hooks policy, SafeFlow security checks, product-security checks, as-built sync, docs-tour, pre-commit, local full/no-cache verification, and remote CI behavior.
+- Require focused regression coverage through `tools/test_ci_pipeline_acceleration.sh`, which is standalone-callable and aggregate-callable.
 - Require developer approval before changing required workflow or job names, reducing full/no-cache scope, making changed-only CI authoritative, adding persistent verification-result cache, adding flaky quarantine, accepting an existing-feature tradeoff, or weakening any safety gate.
 
 ## Mechanical Enforcement

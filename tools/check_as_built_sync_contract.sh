@@ -27,6 +27,9 @@ wiring_relpaths=(
 )
 
 contract_sync_ids=()
+declare -A active_command_reference_cache=()
+declare -A git_hooks_runner_reference_cache=()
+declare -A lesson14_common_ci_reference_cache=()
 
 report_missing() {
   printf '%s\n' "$1" >&2
@@ -184,6 +187,25 @@ active_command_reference() {
   return 1
 }
 
+active_command_reference_cached() {
+  local file="$1"
+  local test_relpath="$2"
+  local key="$file|$test_relpath"
+
+  if [[ -n "${active_command_reference_cache[$key]+set}" ]]; then
+    [[ "${active_command_reference_cache[$key]}" == "1" ]]
+    return
+  fi
+
+  if active_command_reference "$file" "$test_relpath"; then
+    active_command_reference_cache[$key]="1"
+    return 0
+  fi
+
+  active_command_reference_cache[$key]="0"
+  return 1
+}
+
 git_hooks_runner_reference() {
   local wiring_file="$1"
   local test_relpath="$2"
@@ -241,6 +263,60 @@ git_hooks_runner_reference() {
   ' "$checks_file"
 }
 
+git_hooks_runner_reference_cached() {
+  local wiring_file="$1"
+  local test_relpath="$2"
+  local key="$wiring_file|$test_relpath"
+
+  if [[ -n "${git_hooks_runner_reference_cache[$key]+set}" ]]; then
+    [[ "${git_hooks_runner_reference_cache[$key]}" == "1" ]]
+    return
+  fi
+
+  if git_hooks_runner_reference "$wiring_file" "$test_relpath"; then
+    git_hooks_runner_reference_cache[$key]="1"
+    return 0
+  fi
+
+  git_hooks_runner_reference_cache[$key]="0"
+  return 1
+}
+
+lesson14_common_ci_reference() {
+  local test_relpath="$1"
+  local main_ci="$ROOT/.github/workflows/ci.yml"
+  local lesson14_ci="$ROOT/.github/workflows/lesson14-ci.yml"
+  local key="$test_relpath"
+
+  [[ -f "$main_ci" && -f "$lesson14_ci" ]] || return 1
+
+  if [[ -n "${lesson14_common_ci_reference_cache[$key]+set}" ]]; then
+    [[ "${lesson14_common_ci_reference_cache[$key]}" == "1" ]]
+    return
+  fi
+
+  if ! active_command_reference_cached "$main_ci" "$test_relpath" && ! git_hooks_runner_reference_cached "$main_ci" "$test_relpath"; then
+    lesson14_common_ci_reference_cache[$key]="0"
+    return 1
+  fi
+
+  if grep -Fq "common policy regressions are provided by CI / policy-regression-tests" "$lesson14_ci"; then
+    lesson14_common_ci_reference_cache[$key]="1"
+    return 0
+  fi
+  if grep -Fq "browser coverage is provided by CI / playwright-tests" "$lesson14_ci"; then
+    lesson14_common_ci_reference_cache[$key]="1"
+    return 0
+  fi
+  if grep -Fq "common aggregate/full-hooks coverage is provided by CI / aggregate-and-full-hooks" "$lesson14_ci"; then
+    lesson14_common_ci_reference_cache[$key]="1"
+    return 0
+  fi
+
+  lesson14_common_ci_reference_cache[$key]="0"
+  return 1
+}
+
 require_test_wiring() {
   local test_relpath="$1"
   local wiring_relpath
@@ -252,13 +328,16 @@ require_test_wiring() {
       report_missing "missing wiring file: $wiring_relpath"
       continue
     fi
-    if active_command_reference "$ROOT/$wiring_relpath" "$test_relpath"; then
+    if active_command_reference_cached "$ROOT/$wiring_relpath" "$test_relpath"; then
       continue
     fi
-    if git_hooks_runner_reference "$ROOT/$wiring_relpath" "$test_relpath"; then
+    if git_hooks_runner_reference_cached "$ROOT/$wiring_relpath" "$test_relpath"; then
       continue
     fi
-    if ! active_command_reference "$ROOT/$wiring_relpath" "$test_relpath"; then
+    if [[ "$wiring_relpath" == ".github/workflows/lesson14-ci.yml" ]] && lesson14_common_ci_reference "$test_relpath"; then
+      continue
+    fi
+    if ! active_command_reference_cached "$ROOT/$wiring_relpath" "$test_relpath"; then
       report_missing "missing active test wiring for $test_relpath in $wiring_relpath"
     fi
   done
@@ -305,7 +384,7 @@ require_runtime_evidence_reference() {
     if grep -F "$item" "$ROOT/$evidence_relpath" >/dev/null; then
       return
     fi
-    if git_hooks_runner_reference "$ROOT/$evidence_relpath" "$item"; then
+    if git_hooks_runner_reference_cached "$ROOT/$evidence_relpath" "$item"; then
       return
     fi
   done

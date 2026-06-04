@@ -1,0 +1,69 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+usage() {
+  cat <<'USAGE'
+Usage:
+  ./tools/ci-playwright-setup [--dry-run]
+
+Install Node dependencies and ensure the Chromium browser needed by Playwright
+is available. The command is cache-aware: it uses npm's CI install path and
+skips the browser install when Playwright already resolves an executable.
+USAGE
+}
+
+dry_run="false"
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --dry-run)
+      dry_run="true"
+      shift
+      ;;
+    help|--help|-h)
+      usage
+      exit 0
+      ;;
+    *)
+      usage >&2
+      exit 1
+      ;;
+  esac
+done
+
+print_plan() {
+  cat <<'PLAN'
+Playwright CI setup plan
+- install dependencies: npm ci --prefer-offline --no-audit --no-fund
+- browser cache path: ~/.cache/ms-playwright
+- browser install condition: install chromium only when Playwright cannot resolve an existing executable
+- fallback: stale or missing cache installs chromium normally
+PLAN
+}
+
+if [[ "$dry_run" == "true" ]]; then
+  print_plan
+  exit 0
+fi
+
+cd "$ROOT"
+
+if [[ -f package-lock.json ]]; then
+  npm ci --prefer-offline --no-audit --no-fund
+else
+  npm install --no-audit --no-fund
+fi
+
+if node <<'NODE'
+const fs = require('fs');
+const { chromium } = require('@playwright/test');
+const executablePath = chromium.executablePath();
+process.exit(fs.existsSync(executablePath) ? 0 : 1);
+NODE
+then
+  printf 'Playwright chromium cache hit; browser install skipped.\n'
+else
+  printf 'Playwright chromium cache missing; installing browser.\n'
+  npx playwright install chromium
+fi

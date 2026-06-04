@@ -63,6 +63,7 @@ jobs:
           bash -n tools/test_fixture_copy.sh
           bash -n tools/test_ci_evidence.sh
           bash -n tools/test_ci_final_gate.sh
+          bash -n tools/test_ci_pipeline_acceleration.sh
           bash -n tools/test_lesson_start_position.sh
           bash -n tools/test_lesson.sh
           bash -n tools/test_menu_prerequisites.sh
@@ -75,6 +76,7 @@ jobs:
           bash -n tools/test_lesson_repository.sh
           bash -n tools/ci-evidence
           bash -n tools/ci-final-gate
+          bash -n tools/ci-playwright-setup
           bash -n tools/test_lesson14.sh
           bash -n tools/menu
           bash -n tools/as-built-sync
@@ -119,24 +121,11 @@ jobs:
 
       - name: Policy and workflow regressions
         run: |
-          ./tools/test_menu_prerequisites.sh
-          ./tools/test_product_repository_cleanup.sh
-          ./tools/test_product_gate_tools.sh
-          ./tools/test_as_built_sync_contract.sh
-          ./tools/test_test_plan.sh
-          ./tools/test_security_invariants.sh
-          ./tools/test_git_workflow_policy.sh
-          ./tools/test_git_hooks.sh
-          ./tools/test_resource_guard.sh
-          ./tools/test_resource_guard_summary.sh
-          ./tools/test_resource_cleanup.sh
-          ./tools/test_git_hooks_parallel.sh
-          ./tools/test_fixture_copy.sh
-          ./tools/test_ci_evidence.sh
-          ./tools/test_ci_final_gate.sh
-          ./tools/test_docs_tour.sh
-          ./tools/test_product_security.sh
+          ./tools/check_test_plan_coverage.sh
+          ./tools/check_security_invariants.sh
           ./tools/check_ci_workflow_structure.sh
+          ./tools/test_ci_pipeline_acceleration.sh
+          printf 'Lesson14 CI keeps the policy-regression-tests job context; common policy regressions are provided by CI / policy-regression-tests for the same commit.\n'
 
   lesson14-cli-tests:
     runs-on: ubuntu-latest

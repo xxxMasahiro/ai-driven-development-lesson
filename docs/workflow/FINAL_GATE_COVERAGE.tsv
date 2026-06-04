@@ -25,6 +25,7 @@ as_built_evidence_run_sync_contract_check	hook	check_as_built_sync_contract	Aggr
 ./tools/test_fixture_copy.sh	hook	test_fixture_copy	Aggregate fixture-copy coverage is provided by the matching Git hook row.
 ./tools/test_ci_evidence.sh	hook	test_ci_evidence	Aggregate CI evidence coverage is provided by the matching Git hook row.
 ./tools/test_ci_final_gate.sh	hook	test_ci_final_gate	Aggregate CI final gate coverage is provided by the matching Git hook row.
+./tools/test_ci_pipeline_acceleration.sh	hook	test_ci_pipeline_acceleration	Aggregate CI pipeline acceleration coverage is provided by the matching Git hook row.
 ./tools/check_ci_workflow_structure.sh	hook	check_ci_workflow_structure	Aggregate CI workflow structure coverage is provided by the matching Git hook row.
 ./tools/menu	gap	menu_status	Aggregate menu rendering coverage is provided by a final-gap command.
 ./tools/dashboard all	gap	dashboard_all	Aggregate dashboard rendering coverage is provided by a final-gap command.

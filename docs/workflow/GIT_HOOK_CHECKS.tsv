@@ -26,6 +26,7 @@ test_git_hooks_parallel	full|fast	./tools/test_git_hooks_parallel.sh	Run Git hoo
 test_fixture_copy	full|fast	./tools/test_fixture_copy.sh	Run lightweight fixture-copy regression tests.
 test_ci_evidence	full|fast	./tools/test_ci_evidence.sh	Run same-run CI evidence regression tests.
 test_ci_final_gate	full|fast	./tools/test_ci_final_gate.sh	Run same-run final-gate regression tests.
+test_ci_pipeline_acceleration	full|fast	./tools/test_ci_pipeline_acceleration.sh	Run full pipeline CI acceleration regression tests.
 check_ci_workflow_structure	full|fast	./tools/check_ci_workflow_structure.sh	Validate required CI workflow job splitting and final gates.
 test_menu_prerequisites	full|fast	./tools/test_menu_prerequisites.sh	Run menu prerequisite regression tests.
 test_product_gate_tools	full|fast	./tools/test_product_gate_tools.sh	Run product gate regression tests.
@@ -34,5 +35,5 @@ test_product_security	full|fast	./tools/test_product_security.sh	Run product sec
 test_lesson_playwright	full|fast	./tools/test_lesson_playwright.sh --use-evidence	Run lesson dashboard and illustration Playwright checks.
 test_lesson_start_position	full|fast	./tools/test_lesson_start_position.sh	Run free lesson start-position regression tests.
 test_lesson	full|fast	./tools/test_lesson.sh	Run 7-day lesson CLI regression tests.
-test_lesson14	full|fast	./tools/test_lesson14.sh	Run 14-day lesson CLI regression tests.
+test_lesson14	full|fast	./tools/test_lesson14.sh	Run 14-step lesson CLI regression tests.
 test_lesson_repository	full|fast	./tools/ci-final-gate	Run the same-run evidence final gate.
