@@ -785,6 +785,31 @@ It builds on the existing Test Plan Manifest, Git hook check catalog, Git hook p
 - `tools/test_ci_pipeline_acceleration.sh` verifies the acceleration contract as a standalone check and is wired into aggregate lesson-repository validation.
 - Future implementation candidates such as `tools/ci-metrics` may be added only after they exist, are generic, are testable, and are connected to the sync contract.
 
+### Planned CI Timing And Approved Auto-Improvement Specification
+
+The planned CI timing and approved auto-improvement cycle extends the existing CI acceleration work with measured evidence and proposal-only recommendations.
+It does not make any generated recommendation authoritative and does not change full/no-cache coverage until a later developer-approved implementation does so.
+
+- Timing records should be generated for checks inside `aggregate-and-full-hooks` and any future final-gate check group that dominates CI runtime.
+- A timing record should include check id, display name where available, command id, mode, start time, end time, duration seconds, exit status, relevant input hash, policy hash where applicable, repository-state hash where applicable, evidence-use status, workflow name, job name, run id, and commit SHA.
+- Timing output should be machine-readable and suitable for CI artifact upload, while remaining explainable from CLI output or dashboard summaries.
+- Timing output must not include secrets, tokens, private messages, full environment dumps, external service payloads, or raw logs that are not needed for duration analysis.
+- `tools/check_ci_status.sh` should distinguish workflow name, run id when supplied, commit SHA, run status, job status, and conclusion so one successful workflow cannot mask another still-running required workflow.
+- CI improvement proposal generation should be read-only.
+- Proposal generation should report slow checks, duplicated coverage, same-run hash-evidence reuse candidates, cache-miss candidates, and parallel-group candidates.
+- Proposal generation should include the reason, expected benefit, affected files, required verification, and developer-approval requirement for each candidate.
+- Proposal generation must not edit `.github/workflows/`, `docs/workflow/`, `.githooks/`, `tools/`, or any synchronized document.
+- Same-run evidence reuse can be recommended only when input hashes, command identity, policy hash, repository-state hash, workflow/run identity, and success status are available.
+- Missing, stale, corrupted, mismatched, or untrusted evidence should lead to strict rerun or explicit failure, not silent success.
+- Conditional `full no-cache` operation should remain a future approval-gated mode.
+- The first implementation should measure, improve CI status accuracy, and generate proposals before reducing duplicate checks or changing `full no-cache` behavior.
+- Existing policy files and check catalogs remain the integration points; future implementation should connect to them instead of adding hard-coded branches.
+
+SYNC-ID: ci_timing_auto_improvement_plan
+STATUS: planned
+ARTIFACTS: docs/workflow/TEST_PLAN_MANIFEST.tsv,docs/workflow/GIT_HOOK_CHECKS.tsv,docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv,docs/workflow/GIT_HOOK_RECOMMENDATION_PATHS.tsv,docs/workflow/FINAL_GATE_GAP_COMMANDS.tsv,docs/workflow/FINAL_GATE_COVERAGE.tsv,tools/check_ci_status.sh,tools/check_ci_workflow_structure.sh,tools/test_ci_pipeline_acceleration.sh,tools/test_ci_evidence.sh,tools/test_ci_final_gate.sh,tools/test_git_hooks_parallel.sh,tools/test_lesson_repository.sh,.github/workflows/ci.yml,.github/workflows/lesson14-ci.yml
+TESTS: tools/check_ci_workflow_structure.sh,tools/test_ci_pipeline_acceleration.sh,tools/test_ci_evidence.sh,tools/test_ci_final_gate.sh,tools/test_git_hooks_parallel.sh,tools/check_as_built_sync_contract.sh,tools/test_lesson_repository.sh
+
 ## Product Repository Boundary
 
 The default lesson-created product repository path is outside this repository:
