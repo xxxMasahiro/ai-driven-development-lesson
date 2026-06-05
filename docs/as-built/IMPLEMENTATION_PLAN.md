@@ -1855,6 +1855,96 @@ Full completion verification:
 - Approval is required before changing existing `tools/dashboard` output semantics.
 - Approval is required before selecting among redesign alternatives when an apparent existing-feature tradeoff is encountered; accepting the tradeoff is not allowed.
 
+## Planned Dashboard Control Center React UI Implementation Plan
+
+SYNC-ID: dashboard_control_center_react_ui_plan
+STATUS: planned
+ARTIFACTS: docs/workflow/DASHBOARD_DATA_SCHEMA.tsv,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,tools/dashboard-data,tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh
+TESTS: tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_ci_workflow_structure.sh
+
+This planned implementation turns the implemented read-only dashboard JSON layer into a browser control center in a later approved runtime step.
+This sync step records the proposal and plan only; it does not add dependencies, package scripts, Vite runtime files, or browser UI code.
+
+### Planned Change Targets
+
+- Add a React/Vite browser UI only after developer approval for dependency and package-script changes.
+- Keep `tools/dashboard-data` as the data contract and keep `tools/dashboard` as the human-readable CLI compatibility surface.
+- Add reusable frontend adapters for dashboard JSON so components consume schema fields and state vocabulary rather than current prose wording.
+- Add control-center sections for summary, lessons, workflows, maintenance, security, and action previews.
+- Keep the initial UI read-only and preview-only for commands.
+- Add a maintained dashboard entry point that hides Vite startup, URL selection, JSON loading, and check orchestration from ordinary users.
+- Add future browser/layout tests that are standalone-callable and aggregate-callable after runtime UI artifacts exist.
+
+### Planned Implementation Order
+
+1. Keep this planned sync separate from the implemented data-layer sync.
+   - Preserve `dashboard_control_center_data_layer` as implemented.
+   - Add `dashboard_control_center_react_ui_plan` as planned.
+
+2. Confirm approval gates before runtime work.
+   - Obtain developer approval before adding React/Vite dependencies, package scripts, dev-server wrappers, generated assets, or browser test wiring.
+   - Stop if any existing-feature tradeoff appears necessary.
+
+3. Introduce the frontend contract layer.
+   - Build adapters around dashboard JSON fields, source attribution, allowed status values, guidance items, blockers, and command previews.
+   - Keep adapter logic generic over the schema instead of special-casing the current product stack or current display text.
+   - If lesson points, warnings, or next learning actions are needed beyond existing JSON fields, extend and test the dashboard data schema before UI implementation.
+
+4. Implement read-only UI sections.
+   - Summary: mode, concise guidance, blockers, next safe action.
+   - Lessons: 7-day, 14-day, applied lesson progress, points, warnings, and next learning action.
+   - Workflows: product/workflow state, Git sync, CI, gates, evidence, approvals, blockers, and next operational action.
+   - Maintenance and security: as-built sync, workflow pair sync, developer-memory, repo-local skills, policy/gate separation, and preview-only command guidance.
+
+5. Hide Vite mechanics behind maintained tooling.
+   - Ordinary users get a single dashboard/control-center entry action.
+   - Maintained tooling handles server startup, URL selection, JSON generation, and check orchestration.
+
+6. Add runtime checks after artifacts exist.
+   - Add focused UI rendering/layout checks that can run standalone.
+   - Wire them into aggregate tests, Git hooks, pre-commit, CI, and sync contract only after the files exist.
+
+### Document Synchronization Policy
+
+- Requirements describe purpose, problems, scope, non-scope, existing-feature impact, document updates, tests, and risks.
+- Specification describes the UI sections, data handling, UX constraints, and planned verification boundaries.
+- Implementation plan describes change targets, order, verification, recovery, and approval gates.
+- `docs/workflow/TASK_TRACKER.md` records planned state and future task boundaries.
+- `docs/workflow/HANDOFF.md` records restart context and safety-sensitive decisions.
+
+### Verification Method For This Sync
+
+```bash
+git diff --check
+./tools/test_dashboard_schema.sh
+./tools/test_dashboard_data.sh
+./tools/check_as_built_sync_contract.sh
+./tools/check_as_built_docs.sh
+./tools/check_ci_workflow_structure.sh
+./tools/test_lesson_repository.sh
+./tools/git-hooks run --mode full --no-cache --jobs 4
+.githooks/pre-commit
+```
+
+After commit and push, required remote `CI` and `Lesson14 CI` must pass, and local/remote sync must match.
+
+### Recovery Plan
+
+- If sync checks fail, correct the five document blocks and contract row before changing runtime scope.
+- If dashboard schema/data tests fail, fix the data-layer contract or this plan so future UI work remains contract-driven.
+- If future frontend work duplicates owner-layer checks, move the logic back to shared CLI/helper code.
+- If future UI hides workflow gates, evidence, blockers, approvals, or next actions, redesign the component model before implementation.
+- If Vite mechanics leak into ordinary user workflow, keep the UI behind maintained tooling and update the entry plan.
+- If any existing-feature tradeoff appears necessary, stop and redesign; accepting the tradeoff is not allowed.
+
+### Developer Approval Gates
+
+- Approval is required before adding React/Vite dependencies, package scripts, dev-server wrappers, or browser runtime files.
+- Approval is required before adding action execution from the UI.
+- Approval is required before making live network, CI, or GitHub status authoritative for rendering.
+- Approval is required before changing existing `tools/dashboard` semantics or replacing `tools/dashboard-data`.
+- Approval is required before accepting any design alternative that would weaken existing lessons, workflows, checks, CI, pre-commit, docs, or sync behavior.
+
 ## Acceptance Criteria
 
 - Existing 7-day and 14-day flows still pass structure checks.

@@ -18,6 +18,7 @@ The current implemented test and CI safe time optimization first phase is docume
 The current implemented CI timing and approved auto-improvement cycle is documented as `ci_timing_auto_improvement_plan`; it records measured final common aggregate/full-hooks timing, provides precise CI status targeting, and generates proposal-only CI improvement candidates while keeping future full/no-cache policy refinement developer-approved.
 The current implemented CI aggregate and full-hooks split is documented as `ci_aggregate_full_hooks_split`; it runs main `CI` lesson aggregate and full/no-cache Git hook verification as separate jobs with a strict final gate while preserving cache policy and full/no-cache semantics.
 The current implemented dashboard control center data layer is documented as `dashboard_control_center_data_layer`; it provides a read-only JSON source behind an AI-driven development control center while preserving the existing CLI dashboard and deferring React/Vite UI and command execution.
+The current planned dashboard control center React UI plan is documented as `dashboard_control_center_react_ui_plan`; it records the future read-only browser control-center scope without adding dependencies, package scripts, Vite runtime files, or UI action execution.
 
 ## Key Implemented Capabilities
 
@@ -415,7 +416,7 @@ TESTS: tools/check_ci_workflow_structure.sh,tools/test_ci_timing.sh,tools/test_c
 CI aggregate and full-hooks split handoff:
 
 - Sync ID: `ci_aggregate_full_hooks_split`.
-- Status: `implemented`; local verification and sub-agent review passed after CI artifact-safety fixes, and final PASS requires commit, push, required remote CI, and local/remote sync.
+- Status: `implemented`; local verification, sub-agent review, commit, push, required remote `CI` and `Lesson14 CI`, and local/remote sync passed.
 - Purpose: shorten the main `CI` wall time by running lesson aggregate verification and full/no-cache Git hook verification as separate jobs, then requiring a strict final gate.
 - Scope: main `CI` final common verification only. `Lesson14 CI` compatibility contexts remain unchanged.
 - The implementation intentionally does not add persistent verification-result cache, conditional full/no-cache skipping, changed-only authoritative CI, Git hook group matrix splitting, or flaky quarantine.
@@ -459,6 +460,25 @@ SYNC-ID: dashboard_control_center_data_layer
 STATUS: implemented
 ARTIFACTS: docs/workflow/DASHBOARD_DATA_SCHEMA.tsv,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/TEST_PLAN_MANIFEST.tsv,docs/workflow/GIT_HOOK_CHECKS.tsv,docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv,docs/workflow/FINAL_GATE_GAP_COMMANDS.tsv,docs/workflow/FINAL_GATE_COVERAGE.tsv,tools/lib/dashboard_data.sh,tools/dashboard-data,tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/test_lesson_repository.sh,tools/check_lesson_structure.sh,tools/check_lesson14_structure.sh,tools/check_ci_workflow_structure.sh,.github/workflows/ci.yml,.github/workflows/lesson14-ci.yml
 TESTS: tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/check_test_plan_coverage.sh,tools/test_git_hooks.sh,tools/test_git_hooks_parallel.sh,tools/test_ci_final_gate.sh,tools/check_ci_workflow_structure.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh
+
+Dashboard control center React UI plan handoff:
+
+- Sync ID: `dashboard_control_center_react_ui_plan`.
+- Status: `planned`.
+- Purpose: plan a read-only React/Vite browser control center that consumes the implemented dashboard JSON data layer without changing existing CLI dashboard behavior.
+- Current boundary: this sync records the plan only; it does not add dependencies, package scripts, Vite runtime files, browser UI files, dev-server wrappers, or UI action execution.
+- Future user path: ordinary users should have one dashboard/control-center entry action; maintained tooling must handle Vite startup, URL selection, JSON loading, and check orchestration.
+- Future UI model: keep lessons and workflows distinct. Lessons need plain-language content, progress, points, warnings, and next learning action. Workflows need practical gate, evidence, blocker, approval, Git/CI sync, and next operational action detail for engineers.
+- Data source: consume `tools/dashboard-data` output and `docs/workflow/DASHBOARD_DATA_SCHEMA.tsv`; do not parse `tools/dashboard` prose.
+- Contract gap handling: do not synthesize lesson points, warnings, or next learning actions from CLI prose; extend and test the dashboard JSON contract first if those fields are required.
+- Safety: keep command previews read-only, treat untrusted text as data, avoid secrets/raw logs/external payloads, and do not make frontend-only state authoritative for safety decisions.
+- Required future approval: React/Vite dependencies, package scripts, dev-server wrappers, browser runtime files, browser test wiring, action execution, live authoritative network status, and any `tools/dashboard` semantic change require developer approval.
+- Recovery: if future UI work weakens existing lessons, workflows, Security guard, Resource guard, Git workflow, CI, pre-commit, as-built sync, docs, or dashboard data boundaries, restore existing behavior and redesign. Existing-feature tradeoffs are not allowed.
+
+SYNC-ID: dashboard_control_center_react_ui_plan
+STATUS: planned
+ARTIFACTS: docs/workflow/DASHBOARD_DATA_SCHEMA.tsv,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,tools/dashboard-data,tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh
+TESTS: tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_ci_workflow_structure.sh
 
 The previously synchronized menu-wide implementation is `menu_git_workflow_policy`.
 It promotes the existing Git workflow policy into a shared menu-level policy without weakening any existing lesson, menu, dashboard, cleanup, CI, pre-commit, or as-built synchronization behavior.

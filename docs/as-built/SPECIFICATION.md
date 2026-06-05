@@ -908,6 +908,45 @@ STATUS: implemented
 ARTIFACTS: docs/workflow/DASHBOARD_DATA_SCHEMA.tsv,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/TEST_PLAN_MANIFEST.tsv,docs/workflow/GIT_HOOK_CHECKS.tsv,docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv,docs/workflow/FINAL_GATE_GAP_COMMANDS.tsv,docs/workflow/FINAL_GATE_COVERAGE.tsv,tools/lib/dashboard_data.sh,tools/dashboard-data,tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/test_lesson_repository.sh,tools/check_lesson_structure.sh,tools/check_lesson14_structure.sh,tools/check_ci_workflow_structure.sh,.github/workflows/ci.yml,.github/workflows/lesson14-ci.yml
 TESTS: tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/check_test_plan_coverage.sh,tools/test_git_hooks.sh,tools/test_git_hooks_parallel.sh,tools/test_ci_final_gate.sh,tools/check_ci_workflow_structure.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh
 
+### Planned Dashboard Control Center React UI Specification
+
+The planned React/Vite UI is a read-only browser consumer for the implemented dashboard JSON data layer.
+It must treat `tools/dashboard-data` and `docs/workflow/DASHBOARD_DATA_SCHEMA.tsv` as the contract boundary, and it must not parse learner-facing CLI prose or move existing CLI, policy, evidence, Git, CI, Security guard, Resource guard, or lesson progression logic into React.
+
+Planned surface model:
+
+- A top control-center summary that shows current mode, concise guidance, blockers, and next safe action from the dashboard JSON.
+- A lesson area for STEP 1-7, STEP 1-14, and applied lesson state, with progress, current step or all-steps-completed state, lesson points, warnings, and next learning action in plain language.
+- A workflow area for product/development state, workflow document status, Git sync, CI status, gates, evidence, approvals, blockers, and next operational action with enough precision for practical engineering work.
+- A maintenance area for as-built sync, workflow pair sync, developer-memory state, repo-local skill state, and relevant documentation routes.
+- A security/action-preview area that clearly separates policy readiness, settings readiness, gate passage, approval requirement, cached or same-run evidence, optional lookup failures, and unknown state.
+
+Planned data handling:
+
+- UI data adapters must consume structured JSON fields and allowed state values rather than current prose labels.
+- UI data adapters must not synthesize lesson points, warnings, or next learning actions from CLI prose; if those fields are needed, the dashboard JSON schema and producer must be extended first.
+- Untrusted Markdown, CLI-derived strings, generated text, warnings, partial failures, and external output must be rendered as data, not executable markup or commands.
+- Secret-like values, raw logs, private messages, full environment dumps, credential material, and unnecessary absolute paths must stay out of the UI data path.
+- Command previews may explain intent, target, risk, approval requirement, and manual command text, but the initial UI execution mode remains preview-only.
+
+Planned UX constraints:
+
+- Ordinary users should access the control center through a maintained dashboard entry point; they should not need to run npm scripts, choose ports, paste URLs, start Vite manually, or invoke JSON/check commands manually.
+- The UI must keep lesson status and workflow status visibly distinct in navigation, grouping, labels, density, and status hierarchy.
+- It must provide concise notes and points near lesson/workflow cards without turning the UI into a tutorial wall or hiding operational detail from engineers.
+- It must not use frontend-only state to decide safety, gate passage, approval, or CI truth.
+
+Planned verification:
+
+- Keep `tools/test_dashboard_schema.sh` and `tools/test_dashboard_data.sh` as the contract guards.
+- Future UI tests should validate rendering against generic dashboard JSON fixtures, state vocabulary coverage, lesson/workflow separation, command-preview safety, secret-like redaction, and responsive layout.
+- Future browser tests should be standalone-callable and aggregate-callable, and should connect through existing Playwright, Git hooks, pre-commit, CI, and as-built synchronization routes after runtime artifacts exist.
+
+SYNC-ID: dashboard_control_center_react_ui_plan
+STATUS: planned
+ARTIFACTS: docs/workflow/DASHBOARD_DATA_SCHEMA.tsv,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,tools/dashboard-data,tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh
+TESTS: tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_ci_workflow_structure.sh
+
 ## Product Repository Boundary
 
 The default lesson-created product repository path is outside this repository:

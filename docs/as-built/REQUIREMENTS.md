@@ -647,6 +647,66 @@ STATUS: implemented
 ARTIFACTS: docs/workflow/DASHBOARD_DATA_SCHEMA.tsv,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/TEST_PLAN_MANIFEST.tsv,docs/workflow/GIT_HOOK_CHECKS.tsv,docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv,docs/workflow/FINAL_GATE_GAP_COMMANDS.tsv,docs/workflow/FINAL_GATE_COVERAGE.tsv,tools/lib/dashboard_data.sh,tools/dashboard-data,tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/test_lesson_repository.sh,tools/check_lesson_structure.sh,tools/check_lesson14_structure.sh,tools/check_ci_workflow_structure.sh,.github/workflows/ci.yml,.github/workflows/lesson14-ci.yml
 TESTS: tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/check_test_plan_coverage.sh,tools/test_git_hooks.sh,tools/test_git_hooks_parallel.sh,tools/test_ci_final_gate.sh,tools/check_ci_workflow_structure.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh
 
+## Planned Dashboard Control Center React UI Requirements
+
+The planned React/Vite control-center UI should turn the implemented read-only dashboard JSON layer into a browser dashboard while preserving the existing CLI dashboard, lesson flows, workflow checks, CI, pre-commit, and document routes.
+This plan is additive and does not install dependencies, change package scripts, or implement browser runtime files yet.
+
+Purpose:
+
+- Give non-engineer users a clear control-center view for lesson content, lesson progress, lesson management, concise points, and next safe learning action.
+- Give intermediate and senior engineers a practical workflow control panel for workflow content, workflow progress, gate status, evidence, blockers, approvals, Git/CI sync, and next operational action.
+- Keep the ordinary user interaction to one dashboard/control-center entry action; Vite startup, dev-server URLs, package scripts, JSON loading, and checks must stay behind maintained tooling.
+
+Problems to solve:
+
+- The current JSON data layer is stable but not yet presented as an accessible browser control center.
+- Lessons and workflows must both be visible without collapsing learning progress into workflow state or workflow gates into vague learner-only labels.
+- Concise notes, points, warnings, and next safe actions need a consistent UI placement so users can understand what matters before starting or resuming work.
+
+Target scope:
+
+- Plan a read-only React/Vite UI that consumes `tools/dashboard-data` output rather than parsing `tools/dashboard` prose.
+- Keep lesson and workflow surfaces visually and structurally distinct, with shared summary, guidance, blockers, and next-action areas.
+- Use reusable frontend data adapters and component boundaries so the UI remains generic over the dashboard schema instead of hard-coding current wording or product-stack assumptions.
+- Defer any lesson points, warnings, or next-action fields that are not present in the dashboard JSON contract until the data layer and schema are explicitly extended and tested.
+- Require future UI checks to be standalone-callable and aggregate-callable, connected through existing dashboard schema/data tests, Playwright where appropriate, Git hooks, pre-commit, CI, and repo-local validation routes.
+
+Non-scope:
+
+- Do not replace `tools/dashboard`, `tools/dashboard-data`, `tools/menu`, `tools/lesson`, or `tools/lesson14`.
+- Do not add React/Vite dependencies, package scripts, dev-server launchers, or browser files in this planned-sync step.
+- Do not expose Vite internals, dev-server URLs, npm commands, or frontend build mechanics as the ordinary dashboard workflow.
+- Do not execute push, PR creation, merge, cleanup, deletion, external integration, OAuth/API, credential, or destructive operations from the initial UI.
+- Do not make live network or GitHub status authoritative for rendering unless a later approved check explicitly requires it.
+
+Existing-feature impact:
+
+- Existing 7-day, 14-day, applied lesson, menu, dashboard CLI, Git workflow, Git hooks, Security guard, product-security, as-built sync, docs-tour, CI, local full/no-cache, and pre-commit behavior must remain unchanged.
+- No existing-feature tradeoff is allowed; if a future UI implementation appears to require one, it must stop and be redesigned.
+
+Required document updates:
+
+- Synchronize this plan through `docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv`, the three as-built documents, `docs/workflow/TASK_TRACKER.md`, and `docs/workflow/HANDOFF.md`.
+- Keep the implemented dashboard data-layer block separate from this planned React UI block.
+
+Required tests:
+
+- Run existing dashboard schema/data tests, as-built sync checks, structure checks, aggregate repository tests, full/no-cache Git hooks, pre-commit, and remote CI after synchronization.
+- Future implementation tests must avoid route-name-only, UI-only, keyword-only, current-wording-only, and product-stack-specific assertions.
+
+Risks:
+
+- Frontend implementation could accidentally duplicate source-of-truth logic already owned by CLI/helpers.
+- The UI could over-simplify workflow gates, evidence, blockers, approvals, or next actions.
+- Tooling could expose Vite mechanics to ordinary users.
+- Browser rendering could leak untrusted text, secret-like data, raw logs, external payloads, or unnecessary absolute paths if data boundaries are weakened.
+
+SYNC-ID: dashboard_control_center_react_ui_plan
+STATUS: planned
+ARTIFACTS: docs/workflow/DASHBOARD_DATA_SCHEMA.tsv,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,tools/dashboard-data,tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh
+TESTS: tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_ci_workflow_structure.sh
+
 ## Mechanical Enforcement
 
 - 14-day progression requires approval receipts through `tools/lesson14 承認`.
