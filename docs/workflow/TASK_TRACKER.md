@@ -325,7 +325,7 @@ TESTS: tools/check_ci_workflow_structure.sh,tools/test_ci_timing.sh,tools/test_c
 
 ## CI Aggregate And Full-Hooks Split Work
 
-Status: implemented locally; local verification and sub-agent review passed; pending commit, push, remote CI PASS, and local/remote sync confirmation.
+Status: implemented locally; local verification and sub-agent review passed after CI artifact-safety fixes; pending commit, push, remote CI PASS, and local/remote sync confirmation.
 This cycle implements only the approved first timing-based acceleration candidate: split the main `CI` final common verification job into parallel lesson aggregate and full Git hook jobs with a strict final gate.
 Cache policy changes are out of scope for this cycle.
 
@@ -338,17 +338,18 @@ Cache policy changes are out of scope for this cycle.
 - [x] Require `final-gate` to always start, validate split prerequisite results, consume same-run Git hook evidence, and fail closed when evidence is missing or mismatched.
 - [x] Avoid timing artifact filename collisions by writing split timing reports to distinct files.
 - [x] Prevent split-job `CI_TIMING_REPORT` paths from leaking into nested timing self-tests.
+- [x] Keep same-run evidence filenames safe for GitHub artifact upload while preserving original evidence ids in metadata.
 - [x] Use a stable Lesson14 compatibility marker instead of a free-form prose dependency.
 - [x] Update `tools/check_ci_workflow_structure.sh` for the split job graph, evidence handoff, and timing artifact merge.
 - [x] Update `tools/test_ci_pipeline_acceleration.sh` so the split remains standalone and aggregate-callable.
-- [x] Run synchronization, structure, focused CI, aggregate, full/no-cache, and pre-commit verification.
-- [x] Complete sub-agent review and resolve findings.
+- [x] Run synchronization, structure, focused CI, aggregate, full/no-cache, and pre-commit verification after artifact-safety fixes.
+- [x] Complete sub-agent review and resolve findings after artifact-safety fixes.
 - [ ] Commit, push, confirm required remote `CI` and `Lesson14 CI`, and verify local/remote sync.
 
 SYNC-ID: ci_aggregate_full_hooks_split
 STATUS: implemented
-ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/TEST_PLAN_MANIFEST.tsv,tools/check_ci_workflow_structure.sh,tools/test_ci_pipeline_acceleration.sh,tools/check_as_built_sync_contract.sh,tools/ci-timing,tools/test_ci_timing.sh,.github/workflows/ci.yml,.github/workflows/lesson14-ci.yml
-TESTS: tools/check_ci_workflow_structure.sh,tools/test_ci_pipeline_acceleration.sh,tools/test_ci_timing.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/TEST_PLAN_MANIFEST.tsv,tools/check_ci_workflow_structure.sh,tools/test_ci_pipeline_acceleration.sh,tools/check_as_built_sync_contract.sh,tools/ci-timing,tools/test_ci_timing.sh,tools/lib/ci_evidence.sh,tools/test_ci_evidence.sh,.github/workflows/ci.yml,.github/workflows/lesson14-ci.yml
+TESTS: tools/check_ci_workflow_structure.sh,tools/test_ci_pipeline_acceleration.sh,tools/test_ci_timing.sh,tools/test_ci_evidence.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh
 
 ## Implemented Dashboard Control Center Data Layer Work
 

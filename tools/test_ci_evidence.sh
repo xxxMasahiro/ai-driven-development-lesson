@@ -27,6 +27,17 @@ run_evidence() {
 run_evidence status >/dev/null
 run_evidence record sample --command command-v1 --inputs input.txt >/dev/null
 run_evidence verify sample --command command-v1 --inputs input.txt >/dev/null
+run_evidence record 'git-hook:sample_check' --command command-v1 --inputs input.txt >/dev/null
+run_evidence verify 'git-hook:sample_check' --command command-v1 --inputs input.txt >/dev/null
+
+if find "$EVIDENCE_DIR" -name '*:*' -print -quit | grep -q .; then
+  printf 'artifact-unsafe evidence filename was created\n' >&2
+  exit 1
+fi
+if ! grep -R -F 'id=git-hook:sample_check' "$EVIDENCE_DIR" >/dev/null; then
+  printf 'original evidence id was not preserved in metadata\n' >&2
+  exit 1
+fi
 
 if run_evidence verify sample --command command-v2 --inputs input.txt >/dev/null 2>&1; then
   printf 'command-mismatched evidence verified unexpectedly\n' >&2

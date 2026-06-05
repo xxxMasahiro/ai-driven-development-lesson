@@ -24,12 +24,14 @@ git -C "$TEST_REPO" add input.txt
 git -C "$TEST_REPO" commit -q -m "Initial timing fixture"
 
 run_timing() {
-  LESSON_ROOT="$TEST_REPO" \
-  CI_TIMING_DIR="$TIMING_DIR" \
-  CI_EVIDENCE_RUN_ID="${TEST_RUN_ID:-timing-run-1}" \
-  GITHUB_WORKFLOW="Timing Test" \
-  GITHUB_JOB="${TEST_JOB_ID:-aggregate-and-full-hooks}" \
-  "$ROOT/tools/ci-timing" "$@"
+  env -u CI_TIMING_REPORT \
+    -u CI_EVIDENCE_SOURCE_JOB \
+    LESSON_ROOT="$TEST_REPO" \
+    CI_TIMING_DIR="$TIMING_DIR" \
+    CI_EVIDENCE_RUN_ID="${TEST_RUN_ID:-timing-run-1}" \
+    GITHUB_WORKFLOW="Timing Test" \
+    GITHUB_JOB="${TEST_JOB_ID:-aggregate-and-full-hooks}" \
+    "$ROOT/tools/ci-timing" "$@"
 }
 
 run_timing status | grep 'Status: not-initialized' >/dev/null
@@ -66,13 +68,14 @@ grep -F 'failing_fixture' "$report" >/dev/null
 awk -F '\t' '$1 == "failing_fixture" && $8 == "7" { found = 1 } END { exit found ? 0 : 1 }' "$report"
 
 custom_report="$TMP_DIR/custom-report.tsv"
-LESSON_ROOT="$TEST_REPO" \
-CI_TIMING_DIR="$TIMING_DIR" \
-CI_TIMING_REPORT="$custom_report" \
-CI_EVIDENCE_RUN_ID="timing-run-report-leak" \
-GITHUB_WORKFLOW="Timing Test" \
-GITHUB_JOB="aggregate-and-full-hooks" \
-"$ROOT/tools/ci-timing" run report_scope_fixture \
+env -u CI_EVIDENCE_SOURCE_JOB \
+  LESSON_ROOT="$TEST_REPO" \
+  CI_TIMING_DIR="$TIMING_DIR" \
+  CI_TIMING_REPORT="$custom_report" \
+  CI_EVIDENCE_RUN_ID="timing-run-report-leak" \
+  GITHUB_WORKFLOW="Timing Test" \
+  GITHUB_JOB="aggregate-and-full-hooks" \
+  "$ROOT/tools/ci-timing" run report_scope_fixture \
   --display-name "Report Scope Fixture" \
   --command-id "report-scope-fixture-v1" \
   --mode aggregate \
@@ -118,12 +121,12 @@ fi
 BROKEN_DIR="$TMP_DIR/broken-timing"
 mkdir -p "$BROKEN_DIR"
 printf 'not marked\n' >"$BROKEN_DIR/file.txt"
-if LESSON_ROOT="$TEST_REPO" CI_TIMING_DIR="$BROKEN_DIR" "$ROOT/tools/ci-timing" run broken -- bash -c 'exit 0' >/dev/null 2>&1; then
+if env -u CI_TIMING_REPORT -u CI_EVIDENCE_SOURCE_JOB LESSON_ROOT="$TEST_REPO" CI_TIMING_DIR="$BROKEN_DIR" "$ROOT/tools/ci-timing" run broken -- bash -c 'exit 0' >/dev/null 2>&1; then
   printf 'unmarked non-empty timing directory was accepted\n' >&2
   exit 1
 fi
 set +e
-LESSON_ROOT="$TEST_REPO" CI_TIMING_DIR="$BROKEN_DIR" "$ROOT/tools/ci-timing" run broken-failure -- bash -c 'exit 7' >/dev/null 2>&1
+env -u CI_TIMING_REPORT -u CI_EVIDENCE_SOURCE_JOB LESSON_ROOT="$TEST_REPO" CI_TIMING_DIR="$BROKEN_DIR" "$ROOT/tools/ci-timing" run broken-failure -- bash -c 'exit 7' >/dev/null 2>&1
 status="$?"
 set -e
 if [[ "$status" != "7" ]]; then

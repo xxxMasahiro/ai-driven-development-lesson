@@ -37,7 +37,12 @@ ci_evidence_hash_stream() {
 }
 
 ci_evidence_safe_id() {
-  printf '%s' "$1" | tr -c 'A-Za-z0-9_.:-' '_'
+  local raw="$1"
+  local safe digest
+  safe="$(printf '%s' "$raw" | tr -c 'A-Za-z0-9_.-' '_')"
+  [[ -n "$safe" ]] || safe="evidence"
+  digest="$(printf '%s' "$raw" | sha256sum | awk '{ print substr($1, 1, 12) }')"
+  printf '%s-%s' "$safe" "$digest"
 }
 
 ci_evidence_file_for() {
