@@ -1,0 +1,155 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck source=tools/lib/lesson_common.sh
+source "$ROOT/tools/lib/lesson_common.sh"
+# shellcheck source=tools/lib/ci_timing.sh
+source "$ROOT/tools/lib/ci_timing.sh"
+
+usage() {
+  cat <<'USAGE'
+Usage:
+  ./tools/ci-timing status
+  ./tools/ci-timing run <check_id> [--display-name <name>] [--command-id <id>] [--mode <mode>] [--evidence <status>] [--inputs <path>...] -- <command> [args...]
+  ./tools/ci-timing propose [--input <path>] [--slow-threshold <seconds>]
+
+The run command records machine-readable timing and preserves the wrapped
+command's exit status. The propose command is read-only and never edits
+workflow, policy, hook, or synchronized documents.
+USAGE
+}
+
+cmd="${1:-status}"
+shift || true
+
+case "$cmd" in
+  status)
+    ci_timing_print_status
+    ;;
+  run)
+    [[ $# -ge 1 ]] || {
+      usage >&2
+      exit 1
+    }
+    check_id="$1"
+    shift
+    display_name="$check_id"
+    command_id="$check_id"
+    mode="unspecified"
+    evidence_status="none"
+    inputs=()
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --display-name)
+          [[ $# -ge 2 ]] || {
+            printf -- '--display-name requires a value.\n' >&2
+            exit 1
+          }
+          display_name="$2"
+          shift 2
+          ;;
+        --command-id)
+          [[ $# -ge 2 ]] || {
+            printf -- '--command-id requires a value.\n' >&2
+            exit 1
+          }
+          command_id="$2"
+          shift 2
+          ;;
+        --mode)
+          [[ $# -ge 2 ]] || {
+            printf -- '--mode requires a value.\n' >&2
+            exit 1
+          }
+          mode="$2"
+          shift 2
+          ;;
+        --evidence)
+          [[ $# -ge 2 ]] || {
+            printf -- '--evidence requires a value.\n' >&2
+            exit 1
+          }
+          evidence_status="$2"
+          shift 2
+          ;;
+        --inputs)
+          shift
+          while [[ $# -gt 0 && "$1" != "--" ]]; do
+            inputs+=("$1")
+            shift
+          done
+          ;;
+        --)
+          shift
+          break
+          ;;
+        *)
+          usage >&2
+          exit 1
+          ;;
+      esac
+    done
+    [[ $# -ge 1 ]] || {
+      printf 'ci-timing run requires a command after --.\n' >&2
+      exit 1
+    }
+    start_epoch="$(date +%s)"
+    set +e
+    "$@"
+    exit_status="$?"
+    set -e
+    end_epoch="$(date +%s)"
+    set +e
+    ci_timing_record "$check_id" "$display_name" "$command_id" "$mode" "$start_epoch" "$end_epoch" "$exit_status" "$evidence_status" "${inputs[@]}"
+    record_status="$?"
+    set -e
+    if [[ "$record_status" -ne 0 ]]; then
+      if [[ "$exit_status" -ne 0 ]]; then
+        exit "$exit_status"
+      fi
+      exit "$record_status"
+    fi
+    exit "$exit_status"
+    ;;
+  propose)
+    input="$(ci_timing_report_file)"
+    slow_threshold="${CI_TIMING_SLOW_THRESHOLD_SECONDS:-60}"
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --input)
+          [[ $# -ge 2 ]] || {
+            printf -- '--input requires a value.\n' >&2
+            exit 1
+          }
+          input="$2"
+          shift 2
+          ;;
+        --slow-threshold)
+          [[ $# -ge 2 ]] || {
+            printf -- '--slow-threshold requires a value.\n' >&2
+            exit 1
+          }
+          slow_threshold="$2"
+          shift 2
+          ;;
+        *)
+          usage >&2
+          exit 1
+          ;;
+      esac
+    done
+    if ! [[ "$slow_threshold" =~ ^[0-9]+$ ]]; then
+      printf 'slow threshold must be a non-negative integer: %s\n' "$slow_threshold" >&2
+      exit 1
+    fi
+    ci_timing_propose "$input" "$slow_threshold"
+    ;;
+  help|--help|-h)
+    usage
+    ;;
+  *)
+    usage >&2
+    exit 1
+    ;;
+esac

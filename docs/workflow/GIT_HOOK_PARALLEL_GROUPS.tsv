@@ -26,6 +26,7 @@ test_resource_cleanup	regression	parallel	Resource cleanup regression uses fixtu
 test_git_hooks_parallel	regression	parallel	Git hooks parallel regression uses fixtures and can run in parallel.
 test_fixture_copy	regression	parallel	Fixture-copy regression uses temporary directories and can run in parallel.
 test_ci_evidence	regression	parallel	Same-run evidence regression uses fixtures and can run in parallel.
+test_ci_timing	regression	parallel	CI timing regression uses fixtures and can run in parallel.
 test_ci_final_gate	regression	parallel	Final-gate regression uses fixtures and can run in parallel.
 test_ci_pipeline_acceleration	regression	parallel	CI pipeline acceleration regression is read-only and can run in parallel.
 check_ci_workflow_structure	regression	parallel	CI workflow structure validation is read-only and can run in parallel.

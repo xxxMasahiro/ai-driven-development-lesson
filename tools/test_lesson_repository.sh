@@ -96,6 +96,7 @@ WORKFLOW_PAIR_SINGLE_FILE_REASON="aggregate test may run while remediation docum
 ./tools/test_git_hooks_parallel.sh
 ./tools/test_fixture_copy.sh
 ./tools/test_ci_evidence.sh
+./tools/test_ci_timing.sh
 ./tools/test_ci_final_gate.sh
 ./tools/test_ci_pipeline_acceleration.sh
 ./tools/check_ci_workflow_structure.sh

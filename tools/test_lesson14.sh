@@ -169,10 +169,28 @@ if [[ "$1 $2 $3 $4 $5" == "repo view --json nameWithOwner --jq" ]]; then
 fi
 
 if [[ "$1" == "api" ]]; then
+  if printf '%s\n' "$*" | grep -q '/jobs'; then
+    if printf '%s\n' "$*" | grep -q '/runs/2/jobs'; then
+      printf 'aggregate-and-full-hooks\tcompleted\tfailure\n'
+    else
+      printf 'syntax-checks\tcompleted\tsuccess\n'
+      printf 'aggregate-and-full-hooks\tcompleted\tsuccess\n'
+    fi
+    exit 0
+  fi
+  if printf '%s\n' "$*" | grep -q '/actions/runs/42'; then
+    printf 'completed\tsuccess\tCI\told-branch\told-sha\t42\t2026-05-01T00:00:00Z\n'
+    exit 0
+  fi
+  if printf '%s\n' "$*" | grep -q 'branch=api-empty'; then
+    exit 0
+  fi
   if printf '%s\n' "$*" | grep -q 'branch=fail'; then
-    printf 'completed\tfailure\tCI\tCI\tfail\t2\t0\t1s\t2026-06-01T00:00:00Z\n'
+    printf 'completed\tfailure\tCI\tfail\t\t2\t2026-06-01T00:00:00Z\n'
+    printf 'completed\tsuccess\tLesson14 CI\tfail\t\t3\t2026-06-01T00:00:00Z\n'
   else
-    printf 'completed\tsuccess\tCI\tCI\tmain\t1\t0\t1s\t2026-06-01T00:00:00Z\n'
+    printf 'completed\tsuccess\tCI\tmain\t\t1\t2026-06-01T00:00:00Z\n'
+    printf 'completed\tsuccess\tLesson14 CI\tmain\t\t3\t2026-06-01T00:00:00Z\n'
   fi
   exit 0
 fi
@@ -203,8 +221,30 @@ exit 1
 GH
 chmod +x "$fake_bin/gh"
 PATH="$fake_bin:$PATH" "$work/lesson/tools/check_ci_status.sh" --required --branch main | grep 'CI status: latest run succeeded'
+PATH="$fake_bin:$PATH" "$work/lesson/tools/check_ci_status.sh" --workflow CI --branch main | grep 'CI status: latest run succeeded'
+PATH="$fake_bin:$PATH" "$work/lesson/tools/check_ci_status.sh" --branch api-empty | grep 'CI status: latest run succeeded'
+PATH="$fake_bin:$PATH" "$work/lesson/tools/check_ci_status.sh" --required --branch api-empty --commit missing-sha >/tmp/lesson14-ci-api-empty-commit.out 2>&1 && exit 1 || true
+grep 'No GitHub Actions runs found' /tmp/lesson14-ci-api-empty-commit.out >/dev/null
+PATH="$fake_bin:$PATH" "$work/lesson/tools/check_ci_status.sh" --run-id 42 --branch old-branch --commit old-sha | grep 'CI status: latest run succeeded'
+PATH="$fake_bin:$PATH" "$work/lesson/tools/check_ci_status.sh" --required --run-id 42 --branch main --commit different-sha >/tmp/lesson14-ci-run-id-mismatch.out 2>&1 && exit 1 || true
+grep 'No GitHub Actions runs matched the requested target' /tmp/lesson14-ci-run-id-mismatch.out >/dev/null
 PATH="$fake_bin:$PATH" "$work/lesson/tools/check_ci_status.sh" --required --branch fail >/tmp/lesson14-ci-fail.out 2>&1 && exit 1 || true
 grep 'CI status: latest run is not successful' /tmp/lesson14-ci-fail.out >/dev/null
+cd "$work/lesson"
+PATH="$fake_bin:$PATH" ./tools/check_ci_status.sh --required --branch main | grep 'CI status: required workflows succeeded'
+PATH="$fake_bin:$PATH" ./tools/check_ci_status.sh --required --branch fail >/tmp/lesson14-required-ci-fail.out 2>&1 && exit 1 || true
+grep 'CI status: one or more required workflows are not successful' /tmp/lesson14-required-ci-fail.out >/dev/null
+custom_ci_repo="$work/custom-ci-repo"
+mkdir -p "$custom_ci_repo/.github/workflows"
+cd "$custom_ci_repo"
+git init -b main >/dev/null
+printf 'name: CI\n' > .github/workflows/ci.yml
+printf 'name: Lesson14 CI\n' > .github/workflows/lesson14-ci.yml
+printf 'custom\n' > README.md
+git add .
+git -c user.name=Test -c user.email=test@example.com commit -m custom-ci >/dev/null
+git remote add origin https://github.com/owner/repo.git
+PATH="$fake_bin:$PATH" "$work/lesson/tools/check_ci_status.sh" --repo "$custom_ci_repo" --required --branch main | grep 'CI status: latest run succeeded'
 
 product_repo="$HOME/projects/task-tracker-repository"
 mkdir -p "$product_repo"

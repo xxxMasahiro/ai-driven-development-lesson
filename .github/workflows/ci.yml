@@ -28,6 +28,7 @@ jobs:
           bash -n tools/lib/git_hooks_policy.sh
           bash -n tools/lib/resource_guard.sh
           bash -n tools/lib/ci_evidence.sh
+          bash -n tools/lib/ci_timing.sh
           bash -n tools/lib/as_built_evidence.sh
           bash -n tools/lib/test_plan.sh
           bash -n tools/lib/fixture_copy.sh
@@ -59,6 +60,7 @@ jobs:
           bash -n tools/test_git_hooks_parallel.sh
           bash -n tools/test_fixture_copy.sh
           bash -n tools/test_ci_evidence.sh
+          bash -n tools/test_ci_timing.sh
           bash -n tools/test_ci_final_gate.sh
           bash -n tools/test_ci_pipeline_acceleration.sh
           bash -n tools/test_lesson_start_position.sh
@@ -73,6 +75,7 @@ jobs:
           bash -n tools/test_product_security.sh
           bash -n tools/test_lesson_repository.sh
           bash -n tools/ci-evidence
+          bash -n tools/ci-timing
           bash -n tools/ci-final-gate
           bash -n tools/ci-playwright-setup
           bash -n tools/menu
@@ -162,9 +165,11 @@ jobs:
           ./tools/test_git_hooks_parallel.sh
           ./tools/test_fixture_copy.sh
           ./tools/test_ci_evidence.sh
+          ./tools/test_ci_timing.sh
           ./tools/test_ci_final_gate.sh
           ./tools/test_ci_pipeline_acceleration.sh
           ./tools/test_menu_prerequisites.sh
+          ./tools/test_lesson_start_position.sh
           ./tools/test_lesson14.sh
           ./tools/test_product_gate_tools.sh
           ./tools/test_product_repository_cleanup.sh
@@ -258,7 +263,8 @@ jobs:
           CI_EVIDENCE_DIR: ${{ runner.temp }}/ci-evidence
           CI_EVIDENCE_SOURCE_JOB: aggregate-and-full-hooks
           CI_EVIDENCE_PLAYWRIGHT_SOURCE_JOB: playwright-tests
-        run: ./tools/test_lesson_repository.sh --use-evidence --write-evidence
+          CI_TIMING_DIR: ${{ runner.temp }}/ci-timing
+        run: ./tools/ci-timing run lesson_aggregate --display-name "Lesson aggregate test" --command-id "tools/test_lesson_repository.sh --use-evidence --write-evidence" --mode aggregate --evidence used --inputs AGENTS.MD docs learning lesson skills reviews templates tools .github/workflows package.json package-lock.json playwright.config.js tests -- ./tools/test_lesson_repository.sh --use-evidence --write-evidence
 
       - name: Git hooks full no-cache regression
         env:
@@ -266,4 +272,15 @@ jobs:
           CI_EVIDENCE_DIR: ${{ runner.temp }}/ci-evidence
           CI_EVIDENCE_SOURCE_JOB: aggregate-and-full-hooks
           CI_EVIDENCE_PLAYWRIGHT_SOURCE_JOB: playwright-tests
-        run: ./tools/git-hooks run --mode full --no-cache --jobs 4
+          CI_TIMING_DIR: ${{ runner.temp }}/ci-timing
+        run: ./tools/ci-timing run git_hooks_full_no_cache --display-name "Git hooks full no-cache regression" --command-id "tools/git-hooks run --mode full --no-cache --jobs 4" --mode full-no-cache --evidence recorded --inputs docs/workflow/GIT_HOOK_CHECKS.tsv docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv docs/workflow/GIT_HOOKS_POLICY.tsv docs/workflow/FINAL_GATE_COVERAGE.tsv docs/workflow/FINAL_GATE_GAP_COMMANDS.tsv tools .github/workflows -- ./tools/git-hooks run --mode full --no-cache --jobs 4
+
+      - name: Upload CI timing report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-timing-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/ci-timing
+          if-no-files-found: warn
+          include-hidden-files: true
+          retention-days: 7

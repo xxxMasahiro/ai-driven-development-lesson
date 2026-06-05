@@ -15,7 +15,7 @@ The current planned learner context runtime integration separates learning conte
 The current implemented Security guard backfill adds repository-level security invariants, `docs/workflow/SAFEFLOW_SECURITY_BACKFILL.tsv`, `tools/check_security_invariants.sh`, and `tools/test_security_invariants.sh`.
 The current implemented product security workflow gate adds `docs/workflow/PRODUCT_SECURITY_POLICY.tsv`, `learning/context/WORKFLOW_CONTEXT_MAP.tsv`, `tools/product-security`, `tools/test_product_security.sh`, and gate wiring for menu items 4, 5, and 6.
 The current implemented test and CI safe time optimization first phase is documented as `test_ci_safe_time_optimization_plan`; it provides observe-only planning, fail-closed coverage validation, result attestation, CI-safe Git hooks parallelism, and lightweight fixture copying while preserving full/no-cache verification.
-The current planned CI timing and approved auto-improvement cycle is documented as `ci_timing_auto_improvement_plan`; it prepares measured final-gate timing, precise CI status targeting, proposal-only CI improvement generation, evidence-based duplicate detection, and future developer-approved full/no-cache policy refinement without changing runtime behavior yet.
+The current implemented CI timing and approved auto-improvement cycle is documented as `ci_timing_auto_improvement_plan`; it records measured final-gate timing, provides precise CI status targeting, and generates proposal-only CI improvement candidates while keeping future full/no-cache policy refinement developer-approved.
 
 ## Key Implemented Capabilities
 
@@ -128,8 +128,8 @@ The product security workflow gate is implemented as `product_security_workflow_
 The test and CI safe time optimization first phase is implemented as `test_ci_safe_time_optimization_plan`.
 The latest implemented test/CI cycle is `test_ci_final_gate_optimization_plan`; local verification and remote synchronization passed for that cycle.
 The latest implemented full-pipeline test/CI acceleration cycle is `test_ci_full_pipeline_acceleration_plan`.
-The next planned test/CI acceleration cycle is `ci_timing_auto_improvement_plan`.
-If future test/CI acceleration work is resumed, inspect Git state, confirm the sync contract is clean, preserve required workflow names, and implement only the documented scope for `ci_timing_auto_improvement_plan`.
+The latest implemented CI timing and approved auto-improvement cycle is `ci_timing_auto_improvement_plan`.
+If future test/CI acceleration work is resumed, inspect Git state, confirm the sync contract is clean, preserve required workflow names, and implement only developer-approved candidates generated from `ci_timing_auto_improvement_plan` evidence.
 Do not perform `.wslconfig` writes, swap creation/deletion, privileged cleanup, arbitrary process killing, CI weakening, pre-commit weakening, or Git hooks mode semantic changes without developer approval.
 If resource guard behavior is changed later, preserve policy/settings-driven implementation, user-configurable available-memory floor, active-heavy-process fallback, explicit parallel-mode safe-stop, unknown-profile rejection, safe-stop failure for checks and job recommendations, standalone and aggregate tests, CI/pre-commit wiring, Playwright wrapper wiring, and existing Git hooks mode semantics.
 If cleanup behavior is changed later, preserve dry-run by default, explicit `--safe` deletion, repo-local path validation, symlink escape rejection, marked Git hooks cache validation, fixture-based tests, CI/pre-commit wiring, and the prohibition on OS cache, swap, Docker, process, product repository, and global cache cleanup without developer approval.
@@ -145,7 +145,7 @@ Developer approval is required before changing `GIT_HOOK_CHECKS.tsv` columns, ch
 For future Security guard/product-security refinement, developer approval is required before expanding `AGENTS.MD` invariant wording, expanding blocking conditions that stop learner or workflow progress, adding network-dependent audits, changing external-integration approval prompts, or adding destructive cleanup behavior.
 The `safeflow_security_backfill` and `product_security_workflow_gate` sync contracts are implemented with actual runtime artifacts, runtime tests, and runtime evidence.
 For future `test_ci_safe_time_optimization_plan` refinement, keep changed-only selection observe-only until Coverage Guard and Result Attestation have enough full-CI evidence and developer approval. Do not reduce full/no-cache coverage, required CI checks, Playwright coverage, as-built sync enforcement, security checks, product-security checks, pre-commit behavior, or Git hooks mode semantics without developer approval.
-For future `ci_timing_auto_improvement_plan` implementation, start by adding timing evidence and CI status precision before any duplicate-check removal or full/no-cache policy change. Generated CI improvement candidates must remain read-only proposals until the developer approves implementation.
+For future `ci_timing_auto_improvement_plan` refinement, generated CI improvement candidates must remain read-only proposals until the developer approves implementation. Do not remove duplicate checks, reduce full/no-cache scope, or change workflow/job names without explicit developer approval.
 
 Implemented Git workflow policy scope:
 
@@ -386,26 +386,26 @@ Implemented test and CI full pipeline acceleration handoff:
 - Stop for developer approval before changing required CI workflow or job names, reducing full/no-cache scope, caching verification results across runs, introducing flaky quarantine, making changed-only CI authoritative, or accepting any existing-feature tradeoff.
 - Recovery: if cache, parallelization, evidence reuse, or job splitting weakens determinism or coverage, revert that specific optimization path and keep the strict existing check.
 
-Planned CI timing and approved auto-improvement handoff:
+CI timing and approved auto-improvement handoff:
 
 - Sync ID: `ci_timing_auto_improvement_plan`.
-- Status: `planned`.
-- Purpose: make further `aggregate-and-full-hooks` shortening evidence-driven by recording per-check timing, identifying duplicate checks, generating read-only improvement proposals, and requiring developer approval before implementation.
-- Runtime behavior has not changed yet for this sync; this is a documentation and workflow-plan synchronization step.
-- The first implementation step is timing report support for final-gate checks, especially `aggregate-and-full-hooks`.
-- The second implementation step is improving `tools/check_ci_status.sh` so main `CI` and `Lesson14 CI` cannot be confused when one workflow succeeds before another required workflow finishes.
-- The third implementation step is a read-only CI improvement proposal surface that reports slow checks, duplicate coverage, same-run evidence reuse candidates, cache misses, and parallelization candidates with expected benefit, risk, required tests, and developer-approval requirement.
-- Same-run hash evidence reuse may be expanded only when command identity, input hashes, policy hashes, repository-state hash, workflow/run identity, and success status match.
-- Full hook parallel-group refinement should happen only after timing evidence identifies remaining bottlenecks.
-- Conditional `full no-cache` scope reduction remains a later developer-approved operation, not part of the first measurement or proposal-only implementation.
+- Status: `implemented`.
+- Purpose: make further `aggregate-and-full-hooks` shortening evidence-driven by recording per-check timing, generating read-only improvement proposals, and requiring developer approval before implementing generated candidates.
+- Runtime behavior now includes `tools/ci-timing`, `tools/lib/ci_timing.sh`, `tools/test_ci_timing.sh`, strict `check_ci_status.sh` workflow/job matching, and main `CI` timing artifacts for `aggregate-and-full-hooks`.
+- The main `CI` workflow records timing for `Lesson aggregate test` and `Git hooks full no-cache regression`, then uploads `ci-timing-${{ github.run_id }}-${{ github.run_attempt }}`.
+- `tools/ci-timing propose` is read-only and reports slow checks, same-run evidence candidates, and parallelization candidates with developer-approval requirements.
+- `tools/check_ci_status.sh --required` requires both `CI` and `Lesson14 CI` when run from this lesson repository without an explicit workflow; product or custom repositories keep the narrower single-workflow behavior.
+- Same-run hash evidence reuse may be implemented only when command identity, input hashes, policy hashes, repository-state hash, workflow/run identity, and success status match.
+- Full hook parallel-group refinement should happen only after timing evidence identifies remaining bottlenecks and the grouping stays policy-driven.
+- Conditional `full no-cache` scope reduction remains a later developer-approved operation.
 - Preserve existing Step 1-7, Step 1-14, applied lesson, menu, dashboard, Git workflow, Git hooks, Security guard checks, product-security checks, docs-tour, as-built sync, pre-commit, local full/no-cache, and remote CI behavior.
 - Do not implement generated CI improvement candidates without developer approval.
 - Recovery: if timing, proposal generation, evidence reuse, or status targeting weakens determinism or coverage, restore strict existing checks and keep the candidate proposal-only.
 
 SYNC-ID: ci_timing_auto_improvement_plan
-STATUS: planned
-ARTIFACTS: docs/workflow/TEST_PLAN_MANIFEST.tsv,docs/workflow/GIT_HOOK_CHECKS.tsv,docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv,docs/workflow/GIT_HOOK_RECOMMENDATION_PATHS.tsv,docs/workflow/FINAL_GATE_GAP_COMMANDS.tsv,docs/workflow/FINAL_GATE_COVERAGE.tsv,tools/check_ci_status.sh,tools/check_ci_workflow_structure.sh,tools/test_ci_pipeline_acceleration.sh,tools/test_ci_evidence.sh,tools/test_ci_final_gate.sh,tools/test_git_hooks_parallel.sh,tools/test_lesson_repository.sh,.github/workflows/ci.yml,.github/workflows/lesson14-ci.yml
-TESTS: tools/check_ci_workflow_structure.sh,tools/test_ci_pipeline_acceleration.sh,tools/test_ci_evidence.sh,tools/test_ci_final_gate.sh,tools/test_git_hooks_parallel.sh,tools/check_as_built_sync_contract.sh,tools/test_lesson_repository.sh
+STATUS: implemented
+ARTIFACTS: docs/workflow/TEST_PLAN_MANIFEST.tsv,docs/workflow/GIT_HOOK_CHECKS.tsv,docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv,docs/workflow/GIT_HOOK_RECOMMENDATION_PATHS.tsv,docs/workflow/FINAL_GATE_GAP_COMMANDS.tsv,docs/workflow/FINAL_GATE_COVERAGE.tsv,tools/check_ci_status.sh,tools/check_ci_workflow_structure.sh,tools/lib/ci_timing.sh,tools/ci-timing,tools/test_ci_timing.sh,tools/test_ci_pipeline_acceleration.sh,tools/test_ci_evidence.sh,tools/test_ci_final_gate.sh,tools/test_git_hooks_parallel.sh,tools/test_lesson_repository.sh,.github/workflows/ci.yml,.github/workflows/lesson14-ci.yml
+TESTS: tools/check_ci_workflow_structure.sh,tools/test_ci_timing.sh,tools/test_ci_pipeline_acceleration.sh,tools/test_ci_evidence.sh,tools/test_ci_final_gate.sh,tools/test_git_hooks_parallel.sh,tools/check_as_built_sync_contract.sh
 
 The previously synchronized menu-wide implementation is `menu_git_workflow_policy`.
 It promotes the existing Git workflow policy into a shared menu-level policy without weakening any existing lesson, menu, dashboard, cleanup, CI, pre-commit, or as-built synchronization behavior.

@@ -55,9 +55,15 @@ for workflow in .github/workflows/ci.yml .github/workflows/lesson14-ci.yml; do
   reject_file_contains "$workflow" 'continue-on-error: true'
   require_file_contains "$workflow" 'actions/checkout@v6'
   require_file_contains "$workflow" './tools/test_ci_pipeline_acceleration.sh'
+  require_file_contains "$workflow" 'tools/ci-timing'
+  require_file_contains "$workflow" 'tools/test_ci_timing.sh'
 done
 
 require_file_contains .github/workflows/ci.yml './tools/ci-playwright-setup'
+require_file_contains .github/workflows/ci.yml './tools/ci-timing run lesson_aggregate'
+require_file_contains .github/workflows/ci.yml './tools/ci-timing run git_hooks_full_no_cache'
+require_file_contains .github/workflows/ci.yml 'Upload CI timing report'
+require_file_contains .github/workflows/ci.yml 'ci-timing-${{ github.run_id }}-${{ github.run_attempt }}'
 reject_file_contains .github/workflows/ci.yml 'npm install'
 reject_file_contains .github/workflows/ci.yml 'npx playwright install chromium'
 
@@ -74,10 +80,16 @@ require_parallel_kind test_lesson14 parallel
 require_parallel_kind test_lesson_repository final-gate
 
 require_file_contains tools/check_ci_workflow_structure.sh 'tools/ci-playwright-setup'
+require_file_contains tools/check_ci_workflow_structure.sh 'tools/ci-timing'
 require_file_contains tools/check_ci_workflow_structure.sh 'tools/test_ci_pipeline_acceleration.sh'
+require_file_contains tools/check_ci_workflow_structure.sh 'tools/test_ci_timing.sh'
 require_file_contains tools/test_lesson_repository.sh './tools/test_ci_pipeline_acceleration.sh'
+require_file_contains tools/test_lesson_repository.sh './tools/test_ci_timing.sh'
 require_file_contains docs/workflow/TEST_PLAN_MANIFEST.tsv 'tools/ci-playwright-setup'
+require_file_contains docs/workflow/TEST_PLAN_MANIFEST.tsv 'tools/ci-timing'
 require_file_contains docs/workflow/GIT_HOOK_CHECKS.tsv 'test_ci_pipeline_acceleration'
+require_file_contains docs/workflow/GIT_HOOK_CHECKS.tsv 'test_ci_timing'
 require_file_contains docs/workflow/FINAL_GATE_COVERAGE.tsv './tools/test_ci_pipeline_acceleration.sh'
+require_file_contains docs/workflow/FINAL_GATE_COVERAGE.tsv './tools/test_ci_timing.sh'
 
 printf 'CI pipeline acceleration tests passed.\n'

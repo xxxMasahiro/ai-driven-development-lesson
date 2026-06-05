@@ -18,6 +18,8 @@ tools/lib/git_hooks_policy.sh	critical	test_git_hooks|test_git_hooks_parallel	tr
 tools/ci-final-gate	critical	test_ci_final_gate|test_lesson_repository	true	true	none	false	CI final-gate command changes affect full/no-cache completion guarantees.
 tools/ci-evidence	critical	test_ci_evidence|test_lesson_repository	true	true	none	false	CI evidence command changes affect same-run evidence inspection.
 tools/lib/ci_evidence.sh	critical	test_ci_evidence|test_ci_final_gate|test_lesson_repository	true	true	none	false	CI evidence helper changes affect same-run verification safety.
+tools/ci-timing	critical	test_ci_timing|test_lesson_repository	true	true	none	false	CI timing command changes affect timing evidence and improvement proposal reporting.
+tools/lib/ci_timing.sh	critical	test_ci_timing|test_lesson_repository	true	true	none	false	CI timing helper changes affect timing evidence and proposal classification.
 tools/lib/as_built_evidence.sh	critical	check_as_built_sync_contract|test_lesson_repository	true	true	none	false	As-built evidence helper changes affect synchronized document verification safety.
 tools/ci-playwright-setup	critical	test_ci_pipeline_acceleration|check_ci_workflow_structure|test_lesson_playwright	true	true	dependency	false	Playwright setup changes affect browser dependency reproducibility and CI runtime.
 tools/as-built-sync	critical	check_as_built_sync_contract|test_as_built_sync_contract	true	true	none	false	As-built status changes affect sync-contract visibility.

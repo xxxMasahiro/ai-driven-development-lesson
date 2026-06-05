@@ -561,31 +561,31 @@ Runtime behavior is implemented through policy files, focused checks, CI workflo
 - Require focused regression coverage through `tools/test_ci_pipeline_acceleration.sh`, which is standalone-callable and aggregate-callable.
 - Require developer approval before changing required workflow or job names, reducing full/no-cache scope, making changed-only CI authoritative, adding persistent verification-result cache, adding flaky quarantine, accepting an existing-feature tradeoff, or weakening any safety gate.
 
-## Planned CI Timing And Approved Auto-Improvement Requirements
+## CI Timing And Approved Auto-Improvement Requirements
 
-The next CI improvement cycle must make `aggregate-and-full-hooks` optimization evidence-driven before changing final-gate behavior.
-This planned work is additive and must not trade away the Step 1-7 lesson path, Step 1-14 lesson path, applied lesson, menu, dashboard, Git workflow policy, Git hooks policy, Security guard checks, product-security checks, as-built sync, docs-tour, pre-commit, local full/no-cache verification, or remote CI behavior.
+The CI timing and approved auto-improvement cycle makes `aggregate-and-full-hooks` optimization evidence-driven before any future final-gate behavior change.
+This implemented work is additive and does not trade away the Step 1-7 lesson path, Step 1-14 lesson path, applied lesson, menu, dashboard, Git workflow policy, Git hooks policy, Security guard checks, product-security checks, as-built sync, docs-tour, pre-commit, local full/no-cache verification, or remote CI behavior.
 
 - Record per-check execution timing for `aggregate-and-full-hooks` in a machine-readable report.
 - Preserve learner/maintainer readability by showing check name, duration, exit status, mode, command identity, relevant input hash, and whether same-run evidence was used.
 - Store CI timing reports as workflow artifacts or same-run evidence files without storing secrets, tokens, private messages, environment dumps, or external service payloads.
-- Strengthen CI status checking so the agent can distinguish main `CI` from `Lesson14 CI`, can target the current commit SHA, and does not report success while a required workflow is still running.
+- Strengthen CI status checking so the agent can distinguish main `CI` from `Lesson14 CI`, can target the current commit SHA, can inspect job state, and does not report success while a required workflow is still running.
 - Generate CI improvement candidates from measured evidence rather than intuition.
-- Improvement candidates must identify slow checks, duplicate checks, cache misses, same-run evidence reuse candidates, and safe parallelization candidates.
-- The candidate generator must be proposal-only; it must not rewrite workflows, checks, policies, or hook groups by itself.
+- Improvement candidates must identify slow checks, same-run evidence reuse candidates, and safe parallelization candidates with reason, affected files, required verification, and developer approval requirement.
+- The candidate generator must be proposal-only; it must not rewrite workflows, checks, policies, hook groups, synchronized documents, or tools by itself.
 - Require developer approval before implementing any generated improvement candidate.
 - Reuse same-run hash evidence only when command identity, relevant input hashes, policy hashes, repository-state hash, workflow/run identity, and success status match.
 - Keep `full no-cache` as the safe baseline until measured evidence, same-run evidence validation, and developer approval justify any conditional operation.
-- Treat conditional `full no-cache` scope reduction as a later approval-gated step, not as part of the initial measurement or proposal-only stage.
+- Treat conditional `full no-cache` scope reduction as a later approval-gated step, not as part of this measurement and proposal-only implementation.
 - Keep CI optimization configuration-driven through existing policy files, shared libraries, checks, repo-local skills, aggregate tests, CI, and pre-commit.
 - Do not introduce fixed one-off string checks, product-stack-specific behavior, or a tool that can only operate on the current task.
 - Add new focused checks only when they are standalone-callable and aggregate-callable.
 - Preserve fail-closed behavior when timing evidence is missing, stale, corrupted, produced by a different command, or generated for different inputs.
 
 SYNC-ID: ci_timing_auto_improvement_plan
-STATUS: planned
-ARTIFACTS: docs/workflow/TEST_PLAN_MANIFEST.tsv,docs/workflow/GIT_HOOK_CHECKS.tsv,docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv,docs/workflow/GIT_HOOK_RECOMMENDATION_PATHS.tsv,docs/workflow/FINAL_GATE_GAP_COMMANDS.tsv,docs/workflow/FINAL_GATE_COVERAGE.tsv,tools/check_ci_status.sh,tools/check_ci_workflow_structure.sh,tools/test_ci_pipeline_acceleration.sh,tools/test_ci_evidence.sh,tools/test_ci_final_gate.sh,tools/test_git_hooks_parallel.sh,tools/test_lesson_repository.sh,.github/workflows/ci.yml,.github/workflows/lesson14-ci.yml
-TESTS: tools/check_ci_workflow_structure.sh,tools/test_ci_pipeline_acceleration.sh,tools/test_ci_evidence.sh,tools/test_ci_final_gate.sh,tools/test_git_hooks_parallel.sh,tools/check_as_built_sync_contract.sh,tools/test_lesson_repository.sh
+STATUS: implemented
+ARTIFACTS: docs/workflow/TEST_PLAN_MANIFEST.tsv,docs/workflow/GIT_HOOK_CHECKS.tsv,docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv,docs/workflow/GIT_HOOK_RECOMMENDATION_PATHS.tsv,docs/workflow/FINAL_GATE_GAP_COMMANDS.tsv,docs/workflow/FINAL_GATE_COVERAGE.tsv,tools/check_ci_status.sh,tools/check_ci_workflow_structure.sh,tools/lib/ci_timing.sh,tools/ci-timing,tools/test_ci_timing.sh,tools/test_ci_pipeline_acceleration.sh,tools/test_ci_evidence.sh,tools/test_ci_final_gate.sh,tools/test_git_hooks_parallel.sh,tools/test_lesson_repository.sh,.github/workflows/ci.yml,.github/workflows/lesson14-ci.yml
+TESTS: tools/check_ci_workflow_structure.sh,tools/test_ci_timing.sh,tools/test_ci_pipeline_acceleration.sh,tools/test_ci_evidence.sh,tools/test_ci_final_gate.sh,tools/test_git_hooks_parallel.sh,tools/check_as_built_sync_contract.sh
 
 ## Mechanical Enforcement
 

@@ -1588,61 +1588,63 @@ The implementation cycle adds focused tests when new behavior is introduced:
 - Approval is required before adding flaky quarantine.
 - Approval is required before accepting any existing-feature tradeoff; the approval request must state the reason, impact, alternatives, and rollback path.
 
-## Planned CI Timing And Approved Auto-Improvement Implementation Plan
+## CI Timing And Approved Auto-Improvement Implementation Plan
 
 SYNC-ID: ci_timing_auto_improvement_plan
-STATUS: planned
-ARTIFACTS: docs/workflow/TEST_PLAN_MANIFEST.tsv,docs/workflow/GIT_HOOK_CHECKS.tsv,docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv,docs/workflow/GIT_HOOK_RECOMMENDATION_PATHS.tsv,docs/workflow/FINAL_GATE_GAP_COMMANDS.tsv,docs/workflow/FINAL_GATE_COVERAGE.tsv,tools/check_ci_status.sh,tools/check_ci_workflow_structure.sh,tools/test_ci_pipeline_acceleration.sh,tools/test_ci_evidence.sh,tools/test_ci_final_gate.sh,tools/test_git_hooks_parallel.sh,tools/test_lesson_repository.sh,.github/workflows/ci.yml,.github/workflows/lesson14-ci.yml
-TESTS: tools/check_ci_workflow_structure.sh,tools/test_ci_pipeline_acceleration.sh,tools/test_ci_evidence.sh,tools/test_ci_final_gate.sh,tools/test_git_hooks_parallel.sh,tools/check_as_built_sync_contract.sh,tools/test_lesson_repository.sh
+STATUS: implemented
+ARTIFACTS: docs/workflow/TEST_PLAN_MANIFEST.tsv,docs/workflow/GIT_HOOK_CHECKS.tsv,docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv,docs/workflow/GIT_HOOK_RECOMMENDATION_PATHS.tsv,docs/workflow/FINAL_GATE_GAP_COMMANDS.tsv,docs/workflow/FINAL_GATE_COVERAGE.tsv,tools/check_ci_status.sh,tools/check_ci_workflow_structure.sh,tools/lib/ci_timing.sh,tools/ci-timing,tools/test_ci_timing.sh,tools/test_ci_pipeline_acceleration.sh,tools/test_ci_evidence.sh,tools/test_ci_final_gate.sh,tools/test_git_hooks_parallel.sh,tools/test_lesson_repository.sh,.github/workflows/ci.yml,.github/workflows/lesson14-ci.yml
+TESTS: tools/check_ci_workflow_structure.sh,tools/test_ci_timing.sh,tools/test_ci_pipeline_acceleration.sh,tools/test_ci_evidence.sh,tools/test_ci_final_gate.sh,tools/test_git_hooks_parallel.sh,tools/check_as_built_sync_contract.sh
 
-This planned implementation adds measurement, precise CI completion checks, and approval-gated improvement proposals before any reduction in final-gate or full/no-cache behavior.
-It is intentionally planned, not runtime-implemented.
+This implementation adds measurement, precise CI completion checks, and approval-gated improvement proposals before any reduction in final-gate or full/no-cache behavior.
+It is runtime-implemented for timing and proposal generation, while generated improvements remain read-only until developer approval.
 
-### Planned Change Targets
+### Implemented Change Targets
 
-- Add reusable timing report support for final-gate and Git hooks checks.
-- Connect timing report output to CI artifact collection for `aggregate-and-full-hooks`.
-- Strengthen `tools/check_ci_status.sh` so workflow name, run id, commit SHA, run state, job state, and conclusion are checked without confusing `CI` and `Lesson14 CI`.
-- Add a read-only CI improvement proposal command or mode that consumes timing/evidence records and reports slow checks, duplicate coverage, same-run evidence reuse candidates, cache misses, and parallelization candidates.
-- Extend same-run hash-evidence reuse only where command identity, input hashes, policy hashes, repository-state hash, workflow/run identity, and success status match.
-- Use `docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv`, `docs/workflow/GIT_HOOK_CHECKS.tsv`, `docs/workflow/TEST_PLAN_MANIFEST.tsv`, final-gate policy files, and existing evidence helpers as integration points.
-- Keep conditional `full no-cache` reduction as the final, developer-approved step after measurement and evidence reuse have proven safe.
+- Added reusable timing report support for final-gate and Git hooks checks through `tools/lib/ci_timing.sh` and `tools/ci-timing`.
+- Connected timing report output to CI artifact collection for the main `CI` workflow `aggregate-and-full-hooks` job.
+- Strengthened `tools/check_ci_status.sh` so workflow name, run id, commit SHA when available, run state, job state, and conclusion are checked without confusing `CI` and `Lesson14 CI`.
+- Added read-only CI improvement proposal generation through `tools/ci-timing propose`.
+- Kept same-run hash-evidence reuse recommendations gated by command identity, input hashes, policy hashes, repository-state hash, workflow/run identity, and success status.
+- Connected the implementation through `docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv`, `docs/workflow/GIT_HOOK_CHECKS.tsv`, `docs/workflow/TEST_PLAN_MANIFEST.tsv`, final-gate policy files, CI workflow structure checks, and aggregate tests.
+- Kept conditional `full no-cache` reduction as a future developer-approved step.
 
-### Planned Implementation Order
+### Implemented Order
 
-1. Add timing report data structures and a focused test.
-   - Record check id, command id, mode, start time, end time, duration seconds, exit status, relevant hashes, evidence-use state, workflow/job/run identity, and commit SHA.
-   - Keep output machine-readable and secret-free.
+1. Added timing report data structures and focused tests.
+   - `tools/lib/ci_timing.sh` records check id, display name, command id, mode, start time, end time, duration seconds, exit status, command hash, input hash, policy hash, repository-state hash, evidence-use state, workflow/job/run identity, and commit SHA.
+   - `tools/test_ci_timing.sh` validates success recording, failure recording, marker safety, proposal generation, and read-only behavior.
 
-2. Attach timing report generation to `aggregate-and-full-hooks`.
-   - Preserve existing final-gate commands.
-   - Upload or retain timing output as same-run CI evidence.
+2. Attached timing report generation to `aggregate-and-full-hooks`.
+   - The `Lesson aggregate test` step runs through `tools/ci-timing run lesson_aggregate`.
+   - The `Git hooks full no-cache regression` step runs through `tools/ci-timing run git_hooks_full_no_cache`.
+   - The job uploads the timing report as `ci-timing-${{ github.run_id }}-${{ github.run_attempt }}`.
 
-3. Improve CI status targeting.
-   - Make `tools/check_ci_status.sh` target current commit and required workflow identity.
-   - Avoid treating a successful `Lesson14 CI` run as proof that main `CI` has completed.
+3. Improved CI status targeting.
+   - `tools/check_ci_status.sh` can target workflow identity and run id.
+   - When run from this lesson repository with `--required` and no explicit workflow, it requires both `CI` and `Lesson14 CI` for the target branch/commit.
+   - It checks job status and conclusion for the selected required run.
+   - Calls from product or other repositories preserve the narrower single-workflow behavior.
 
-4. Add read-only improvement proposal generation.
-   - Produce candidate items with reason, expected benefit, affected files, required tests, risk, and developer-approval requirement.
-   - Do not modify workflow or policy files from the proposal command.
+4. Added read-only improvement proposal generation.
+   - `tools/ci-timing propose` reports slow checks, same-run evidence candidates, and parallelization candidates.
+   - Proposals include reason, affected files, required verification, and developer-approval requirement.
+   - The command never edits workflow or policy files.
 
-5. Expand same-run hash-evidence reuse for measured duplicate checks.
-   - Start with duplicate as-built, docs/sync, Playwright, and final-gate evidence only when hashes and command identity match.
-   - Fail closed to strict rerun or failure when evidence is missing or mismatched.
+5. Connected tests and policies.
+   - Added `test_ci_timing` to Git hook checks, parallel groups, final-gate coverage, Test Plan Manifest, CI syntax checks, CI policy regression checks, and aggregate repository tests.
+   - Updated `tools/check_ci_workflow_structure.sh` and `tools/test_ci_pipeline_acceleration.sh` so workflow timing integration is mechanically checked.
 
-6. Optimize full hook parallel groups after measurement.
-   - Move only mechanically independent checks into parallel-safe groups.
-   - Keep unclassified or shared-state checks serial.
-
-7. Prepare conditional `full no-cache` operation.
-   - Keep it disabled or proposal-only until developer approval.
-   - Require dangerous-change escalation, full-CI comparison evidence, and clear recovery path before any authoritative use.
+6. Preserved future approval gates.
+   - Same-run evidence reuse expansion remains fail-closed and recommendation-only unless a later approved implementation changes strict rerun behavior.
+   - Full hook parallel-group refinement remains policy-driven.
+   - Conditional `full no-cache` operation remains disabled until developer approval.
 
 ### Verification Plan
 
 ```bash
 git diff --check
 ./tools/check_ci_workflow_structure.sh
+./tools/test_ci_timing.sh
 ./tools/test_ci_pipeline_acceleration.sh
 ./tools/test_ci_evidence.sh
 ./tools/test_ci_final_gate.sh

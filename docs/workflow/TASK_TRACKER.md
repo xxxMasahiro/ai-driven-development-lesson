@@ -14,7 +14,7 @@ The current planned learner context foundation prepares source documents under `
 The current planned learner context runtime integration separates learning context from workflow context; Free Development Mode remains a workflow, not a lesson.
 The current implemented Security guard backfill adds repository-level security invariants, a policy table, a reusable checker, standalone tests, aggregate-test wiring, Git hooks wiring, CI wiring, and pre-commit wiring.
 The current implemented product security workflow gate adds `tools/product-security status|preflight|advise|check|gate` for menu items 4, 5, and 6 while preserving their existing document, repository-boundary, Git sync, CI, and approval gates.
-The current planned CI timing and approved auto-improvement cycle prepares measured timing reports, precise CI status targeting, read-only improvement proposals, same-run hash-evidence reuse candidates, and future developer-approved full/no-cache policy refinement.
+The current implemented CI timing and approved auto-improvement cycle records measured `aggregate-and-full-hooks` timing, strengthens CI status targeting, provides read-only improvement proposals, and keeps future full/no-cache policy refinement developer-approved.
 Safe product repository cleanup remains implemented for the external product repository created by the 7-day or 14-day lessons.
 It also preserves the 7-day and 14-day learning-mode, workflow display language, product development language, and expanded language-list controls.
 The shared standard language list remains `ja`, `en`, `ko`, `zh-CN`, `zh-TW`, `es`, `pt-BR`, `fr`, `de`, `id`, `vi`, `th`, `hi`, and `ar`, while `zh` remains a `zh-CN` alias and `custom` remains available.
@@ -136,7 +136,7 @@ The following developer-memory remediation items are implemented and mechanicall
 - The planned learner context runtime integration is synchronized in the same five documents as the next runtime implementation plan.
 - The implemented Security guard backfill is synchronized in the same five documents as repository-security invariant enforcement.
 - The implemented product security workflow gate is synchronized in the same five documents as menu 4/5/6 runtime security gate enforcement.
-- The planned CI timing and approved auto-improvement cycle is synchronized in the same five documents as the next evidence-driven CI optimization plan.
+- The implemented CI timing and approved auto-improvement cycle is synchronized in the same five documents as the evidence-driven CI optimization proposal mechanism.
 - The synchronization passes only when the implemented content is present in all five documents.
 - Preserve refactorability, ecosystem fit, reusable design, generality, and the no-existing-feature-tradeoff rule while maintaining the implemented remediation.
 
@@ -298,27 +298,27 @@ Runtime behavior is implemented through CI workflow wiring, policy rows, focused
 - [x] Keep as-built sync-contract compatibility checks fast with process-local wiring lookup caching only.
 - [x] Pass local verification, remote `CI`, and remote `Lesson14 CI` after implementation.
 
-## Planned CI Timing And Approved Auto-Improvement Work
+## CI Timing And Approved Auto-Improvement Work
 
-Status: planned.
-This planned cycle records the next safe CI optimization step without changing runtime behavior yet.
-It must start from measured `aggregate-and-full-hooks` timing and proposal-only recommendations before any full/no-cache behavior changes.
+Status: implemented.
+This cycle adds measured `aggregate-and-full-hooks` timing and proposal-only recommendations before any full/no-cache behavior changes.
+It preserves the current final-gate behavior and leaves generated improvements approval-gated.
 
 - [x] Synchronize the plan into the three as-built documents and the two workflow-state documents.
-- [ ] Add machine-readable timing report support for `aggregate-and-full-hooks` checks.
-- [ ] Store timing reports as CI artifacts or same-run evidence without secrets or raw environment data.
-- [ ] Strengthen `tools/check_ci_status.sh` so required workflow identity, current commit SHA, run state, job state, and conclusion are not confused across `CI` and `Lesson14 CI`.
-- [ ] Add read-only CI improvement proposal generation from measured evidence.
-- [ ] Report slow checks, duplicate coverage, cache misses, same-run evidence reuse candidates, and safe parallelization candidates with reason, expected benefit, risk, required tests, and developer approval requirement.
-- [ ] Reuse same-run hash evidence only after command identity, input hashes, policy hashes, repository-state hash, workflow/run identity, and success status match.
-- [ ] Refine full hook parallel groups only after timing evidence shows which serial checks remain bottlenecks.
-- [ ] Keep conditional `full no-cache` scope reduction as a later approval-gated step.
-- [ ] Require developer approval before implementing any generated improvement candidate or changing final-gate/full-no-cache behavior.
+- [x] Add machine-readable timing report support for `aggregate-and-full-hooks` checks through `tools/ci-timing`.
+- [x] Store timing reports as CI artifacts without secrets or raw environment data.
+- [x] Strengthen `tools/check_ci_status.sh` so required workflow identity, current commit SHA when available, run state, job state, and conclusion are not confused across `CI` and `Lesson14 CI`.
+- [x] Add read-only CI improvement proposal generation from measured evidence.
+- [x] Report slow checks, same-run evidence reuse candidates, and safe parallelization candidates with reason, affected files, required verification, and developer approval requirement.
+- [x] Keep same-run hash evidence reuse recommendations gated by command identity, input hashes, policy hashes, repository-state hash, workflow/run identity, and success status.
+- [x] Add `test_ci_timing` as a standalone and aggregate-callable regression test.
+- [x] Keep conditional `full no-cache` scope reduction as a later approval-gated step.
+- [x] Require developer approval before implementing any generated improvement candidate or changing final-gate/full-no-cache behavior.
 
 SYNC-ID: ci_timing_auto_improvement_plan
-STATUS: planned
-ARTIFACTS: docs/workflow/TEST_PLAN_MANIFEST.tsv,docs/workflow/GIT_HOOK_CHECKS.tsv,docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv,docs/workflow/GIT_HOOK_RECOMMENDATION_PATHS.tsv,docs/workflow/FINAL_GATE_GAP_COMMANDS.tsv,docs/workflow/FINAL_GATE_COVERAGE.tsv,tools/check_ci_status.sh,tools/check_ci_workflow_structure.sh,tools/test_ci_pipeline_acceleration.sh,tools/test_ci_evidence.sh,tools/test_ci_final_gate.sh,tools/test_git_hooks_parallel.sh,tools/test_lesson_repository.sh,.github/workflows/ci.yml,.github/workflows/lesson14-ci.yml
-TESTS: tools/check_ci_workflow_structure.sh,tools/test_ci_pipeline_acceleration.sh,tools/test_ci_evidence.sh,tools/test_ci_final_gate.sh,tools/test_git_hooks_parallel.sh,tools/check_as_built_sync_contract.sh,tools/test_lesson_repository.sh
+STATUS: implemented
+ARTIFACTS: docs/workflow/TEST_PLAN_MANIFEST.tsv,docs/workflow/GIT_HOOK_CHECKS.tsv,docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv,docs/workflow/GIT_HOOK_RECOMMENDATION_PATHS.tsv,docs/workflow/FINAL_GATE_GAP_COMMANDS.tsv,docs/workflow/FINAL_GATE_COVERAGE.tsv,tools/check_ci_status.sh,tools/check_ci_workflow_structure.sh,tools/lib/ci_timing.sh,tools/ci-timing,tools/test_ci_timing.sh,tools/test_ci_pipeline_acceleration.sh,tools/test_ci_evidence.sh,tools/test_ci_final_gate.sh,tools/test_git_hooks_parallel.sh,tools/test_lesson_repository.sh,.github/workflows/ci.yml,.github/workflows/lesson14-ci.yml
+TESTS: tools/check_ci_workflow_structure.sh,tools/test_ci_timing.sh,tools/test_ci_pipeline_acceleration.sh,tools/test_ci_evidence.sh,tools/test_ci_final_gate.sh,tools/test_git_hooks_parallel.sh,tools/check_as_built_sync_contract.sh
 
 ## Implemented Documentation Map Synchronization
 

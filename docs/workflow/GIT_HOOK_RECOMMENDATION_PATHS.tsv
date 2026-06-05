@@ -18,8 +18,10 @@ tools/git-hooks	full-no-cache	Git hooks runner changes affect local verification
 tools/lib/git_hooks_policy.sh	full-no-cache	Git hooks shared helper changes affect local verification behavior.
 tools/ci-final-gate	full-no-cache	Final-gate runner changes affect CI-equivalent final verification.
 tools/ci-evidence	full-no-cache	CI evidence command changes affect same-run verification reuse.
+tools/ci-timing	full-no-cache	CI timing command changes affect timing evidence and improvement proposal reporting.
 tools/ci-playwright-setup	full-no-cache	Playwright setup changes affect browser dependency reproducibility and CI runtime.
 tools/lib/ci_evidence.sh	full-no-cache	CI evidence helper changes affect same-run verification reuse.
+tools/lib/ci_timing.sh	full-no-cache	CI timing helper changes affect timing evidence and proposal classification.
 tools/lib/as_built_evidence.sh	full-no-cache	As-built evidence helper changes affect same-run sync-check reuse.
 tools/lib/resource_guard.sh	full-no-cache	Resource guard shared helper changes affect local verification behavior.
 tools/resource-guard	full-no-cache	Resource guard runner changes affect local verification behavior.
