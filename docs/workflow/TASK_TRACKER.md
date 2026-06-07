@@ -8,6 +8,7 @@ The previous implemented change promotes the Git workflow policy into a shared m
 The previous implemented change added user-configurable Git workflow policy settings and the as-built sync contract that mechanically enforces synchronization across the three design/as-built documents and the two workflow-state documents.
 The current implemented Git workflow action settings split Git workflow behavior into detailed settings for commit, push, PR creation, PR CI monitoring, merge execution, developer-responsibility auto-merge, main CI monitoring, and local/remote sync monitoring.
 The current implemented Git hooks policy provides faster safe serial pre-commit operation through `full`, `fast`, and `minimal` modes, conservative Git-local caching, and a path-based local full/no-cache recommendation command.
+The current implemented local verification scope policy records that everyday test execution must follow workflow contracts, change scope, and user approval, with heavy recommended checks presented before execution.
 The current implemented resource-budgeted parallel guard provides safe optional parallel execution decisions for Git hooks, Playwright, CI, and aggregate checks through user-configured memory and swap budgets.
 The current implemented test and CI safe time optimization first phase adds observe-only Test Plan Manifest behavior, Coverage Guard, Result Attestation, CI-safe Git hooks parallelism, and lightweight fixture-copy optimization while preserving full/no-cache verification.
 The current planned learner context foundation prepares source documents under `learning/context/` for the next lesson-content implementation cycle; runtime lesson output has not been changed by that foundation step.
@@ -784,6 +785,24 @@ It is synchronized as `git_hooks_policy` with `STATUS: implemented`.
 - Extend `tools/test_git_hooks.sh` for local verification recommendation behavior.
 - Verify full/no-cache coverage, aggregate wiring, CI wiring, and preservation of existing checks through `tools/git-hooks run --mode full --no-cache`, `.githooks/pre-commit`, `tools/test_lesson_repository.sh`, and the CI workflow definitions.
 - Require developer approval before changing the minimal-mode required check list or using cache to skip Playwright-related checks beyond the implemented fail-closed behavior.
+
+## Implemented Local Verification Scope Policy
+
+Status: implemented; this is a documentation and contract synchronization update over existing verification policy artifacts.
+
+- [x] Add the AGENTS invariant after existing rules without changing existing rule text.
+- [x] Record that this everyday rule is below the no-existing-feature-tradeoff invariant.
+- [x] Preserve `TEST_PLAN_MANIFEST.tsv` as the changed-path required-check source.
+- [x] Preserve `GIT_HOOK_CHECKS.tsv` as the runnable check catalog.
+- [x] Preserve `GIT_HOOK_RECOMMENDATION_PATHS.tsv` as recommendation policy, not automatic agent permission.
+- [x] Keep lightweight UI, wording, CSS, and layout changes scoped to contract-relevant verification unless risk expands.
+- [x] Keep contract, schema, shared-tooling, Git hooks, CI, test-infrastructure, and broad implementation changes on the broader contract-required verification path.
+- [x] Keep developer-memory documentation out of scope.
+
+SYNC-ID: local_verification_scope_policy
+STATUS: implemented
+ARTIFACTS: AGENTS.MD,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/TEST_PLAN_MANIFEST.tsv,docs/workflow/GIT_HOOKS_POLICY.tsv,docs/workflow/GIT_HOOK_CHECKS.tsv,docs/workflow/GIT_HOOK_RECOMMENDATION_PATHS.tsv,learning/GIT_HOOK_SETTINGS.tsv,tools/lib/test_plan.sh,tools/test-plan,tools/lib/git_hooks_policy.sh,tools/git-hooks,tools/check_test_plan_coverage.sh,tools/test_test_plan.sh,tools/test_git_hooks.sh
+TESTS: tools/check_test_plan_coverage.sh,tools/test_test_plan.sh,tools/test_git_hooks.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh
 
 ## Implemented Menu Prerequisite Control
 

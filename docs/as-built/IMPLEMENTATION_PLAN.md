@@ -975,6 +975,61 @@ The work is implemented through runtime artifacts, tests, and the `git_hooks_pol
    - Updated these five synchronized documents and `docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv` together.
    - Keep unrelated existing content unchanged.
 
+## Implemented Local Verification Scope Policy Implementation Plan
+
+SYNC-ID: local_verification_scope_policy
+STATUS: implemented
+ARTIFACTS: AGENTS.MD,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/TEST_PLAN_MANIFEST.tsv,docs/workflow/GIT_HOOKS_POLICY.tsv,docs/workflow/GIT_HOOK_CHECKS.tsv,docs/workflow/GIT_HOOK_RECOMMENDATION_PATHS.tsv,learning/GIT_HOOK_SETTINGS.tsv,tools/lib/test_plan.sh,tools/test-plan,tools/lib/git_hooks_policy.sh,tools/git-hooks,tools/check_test_plan_coverage.sh,tools/test_test_plan.sh,tools/test_git_hooks.sh
+TESTS: tools/check_test_plan_coverage.sh,tools/test_test_plan.sh,tools/test_git_hooks.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh
+
+This implementation records an everyday local-verification scope rule over the existing Test Plan Manifest and Git hooks policy.
+It adds no runtime branch and does not reduce CI, pre-commit, aggregate, full/no-cache, or sync-contract coverage.
+
+### Implemented Change Targets
+
+- Add an AGENTS invariant that limits test execution to workflow contract, change scope, and user approval.
+- Synchronize the rule through the five as-built/workflow documents under `local_verification_scope_policy`.
+- Connect the rule to existing `TEST_PLAN_MANIFEST.tsv`, `GIT_HOOK_CHECKS.tsv`, `GIT_HOOK_RECOMMENDATION_PATHS.tsv`, `GIT_HOOKS_POLICY.tsv`, and `GIT_HOOK_SETTINGS.tsv`.
+- Keep developer-memory documentation out of scope because it is not the durable source for this rule.
+
+### Implemented Order
+
+1. Add the invariant after existing AGENTS rules without changing prior rule wording or numbering.
+2. Add the sync-contract row so the five synchronized documents can be checked mechanically.
+3. Add role-specific content:
+   - requirements state the user-facing and agent-behavior requirement;
+   - specification defines how existing contracts decide verification scope;
+   - implementation plan records targets, order, verification, recovery, and approval boundaries;
+   - task tracker records implemented status;
+   - handoff records restart behavior.
+4. Preserve all existing Git hooks, CI, pre-commit, resource guard, and test-plan semantics.
+
+### Verification Plan
+
+The contract-required checks for this documentation synchronization are:
+
+```bash
+./tools/check_test_plan_coverage.sh
+./tools/test_test_plan.sh
+./tools/test_git_hooks.sh
+./tools/check_as_built_sync_contract.sh
+./tools/check_as_built_docs.sh
+```
+
+Heavy or recommended checks outside this set must be presented before execution unless the change scope later expands into runtime hook, CI, schema, shared-tooling, or broad implementation changes.
+
+### Recovery Plan
+
+- If the sync contract fails, align the contract row and all five synchronized document blocks before changing runtime artifacts.
+- If the new invariant conflicts with the no-existing-feature-tradeoff rule, keep the no-existing-feature-tradeoff rule authoritative and narrow the new text.
+- If future agents treat recommendation paths as automatic approval to run heavy tests, clarify recommendation versus permission in AGENTS and the specification before changing tools.
+- If lightweight changes still trigger excessive local work, inspect the path policy and present a policy-change proposal rather than bypassing the existing contract.
+
+### Developer Approval Gates
+
+- Approval is required before reducing full/no-cache scope, changing required CI contexts, changing `full`, `fast`, or `minimal` semantics, making changed-only checks authoritative, weakening pre-commit or sync-contract coverage, or accepting any existing-feature tradeoff.
+- Approval is required before changing `TEST_PLAN_MANIFEST.tsv`, `GIT_HOOK_CHECKS.tsv`, or `GIT_HOOK_RECOMMENDATION_PATHS.tsv` behavior to make this rule more or less aggressive.
+
 ## Verification Plan
 
 Run:

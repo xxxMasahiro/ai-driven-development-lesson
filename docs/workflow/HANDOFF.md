@@ -9,6 +9,7 @@ The implementation adds `docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv`, `tools/check
 The implemented Git workflow policy now applies at menu level for items 1 through 7 and preserves all existing Git sync, CI, menu, dashboard, cleanup, lesson, and as-built synchronization behavior.
 The current implemented Git workflow action settings separate Git workflow actions into detailed controls for commit, push, PR creation, PR CI monitoring, merge execution, developer-responsibility auto-merge, main CI monitoring, and local/remote sync monitoring while preserving existing broad Git settings and menu-wide Git policy behavior.
 The current implemented Git hooks policy provides faster safe serial pre-commit behavior with `full`, `fast`, and `minimal` modes, conservative Git-local caching, and a path-based recommendation for when local full/no-cache should be run before push.
+The current implemented local verification scope policy requires everyday test execution to follow workflow contracts, changed scope, and user approval; heavy recommended checks must be presented before execution unless an immediate safety condition requires stopping.
 The current implemented resource-budgeted parallel guard captures the developer-approved implementation proposal for safe optional parallel execution based on user-configured memory and swap budgets; runtime policy, settings, CLI, Git hooks integration, Playwright worker recommendation, CI wiring, and tests are present.
 The current planned learner context foundation adds source documents under `learning/context/` for the next lesson-content implementation cycle; it does not yet change runtime lesson output.
 The current planned learner context runtime integration separates learning context from workflow context; Free Development Mode must remain a workflow and must not be implemented as a lesson.
@@ -57,12 +58,35 @@ The current implemented dashboard control center detail-page mock parity follow-
 - `tools/git-hooks status|recommend|mode|cache|run` provides the Git hooks policy command surface.
 - `tools/test_git_hooks.sh` covers standalone Git hooks policy/cache/recommendation success and failure paths.
 - `tools/git-hooks run --mode full --no-cache` and `.githooks/pre-commit` cover full/no-cache and real pre-commit dispatch verification.
+- `local_verification_scope_policy` records that agents must not treat full/no-cache recommendations as automatic permission to run heavy verification without presenting the need.
 - Dashboard readiness output shows menu items 1 through 7 and menu-wide Git workflow policy status.
 - As-built document checks.
 - Sub-agent review protocol.
 - Lesson repository aggregate test.
 - Real product operations test for explicit product-repository runs.
 - Quality constraints: refactorability, ecosystem fit, reusability, generality, and no existing-feature tradeoffs.
+
+## Implemented Local Verification Scope Policy Handoff
+
+Implemented local verification scope policy sync:
+
+- Sync ID: `local_verification_scope_policy`.
+- Current status: `implemented`.
+- Current scope: durable AGENTS invariant plus five-document synchronization for everyday test-execution scope.
+- This rule is lower priority than the no-existing-feature-tradeoff invariant.
+- Use `TEST_PLAN_MANIFEST.tsv` to identify required checks for changed paths.
+- Use `GIT_HOOK_CHECKS.tsv` to map check IDs to commands.
+- Use `GIT_HOOK_RECOMMENDATION_PATHS.tsv` as recommendation policy, not as approval to run heavy verification automatically.
+- Use `learning/GIT_HOOK_SETTINGS.tsv` for the current local hook mode; `.githooks/pre-commit` delegates to `tools/git-hooks run`.
+- For lightweight UI, wording, CSS, and layout changes, present only contract-relevant target verification unless the change touches schema, shared tools, command boundaries, CI, hooks, or sync contracts.
+- For document synchronization, contract, schema, shared-tooling, Git hooks, CI, test-infrastructure, or broad implementation changes, follow the broader contract-required verification path.
+- Do not record this rule in developer memory because that file is not the durable source for this preference.
+- Required contract checks for this sync ID are `tools/check_test_plan_coverage.sh`, `tools/test_test_plan.sh`, `tools/test_git_hooks.sh`, `tools/check_as_built_sync_contract.sh`, and `tools/check_as_built_docs.sh`.
+
+SYNC-ID: local_verification_scope_policy
+STATUS: implemented
+ARTIFACTS: AGENTS.MD,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/TEST_PLAN_MANIFEST.tsv,docs/workflow/GIT_HOOKS_POLICY.tsv,docs/workflow/GIT_HOOK_CHECKS.tsv,docs/workflow/GIT_HOOK_RECOMMENDATION_PATHS.tsv,learning/GIT_HOOK_SETTINGS.tsv,tools/lib/test_plan.sh,tools/test-plan,tools/lib/git_hooks_policy.sh,tools/git-hooks,tools/check_test_plan_coverage.sh,tools/test_test_plan.sh,tools/test_git_hooks.sh
+TESTS: tools/check_test_plan_coverage.sh,tools/test_test_plan.sh,tools/test_git_hooks.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh
 
 ## Implemented Remediation Plan
 

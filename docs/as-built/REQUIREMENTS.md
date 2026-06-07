@@ -475,6 +475,28 @@ This implemented work is additive and does not trade away any existing 7-day les
 - Full/no-cache coverage, aggregate-test wiring, CI wiring, and preservation of existing pre-commit behavior must be verified through `tools/git-hooks run --mode full --no-cache`, `.githooks/pre-commit`, `tools/test_lesson_repository.sh`, and the CI workflow definitions.
 - Require developer approval before changing the minimal-mode required check list or skipping Playwright-related checks through cache beyond the implemented fail-closed cache behavior.
 
+## Implemented Local Verification Scope Policy Requirements
+
+The lesson repository must make local verification practical for day-to-day work without weakening the existing no-tradeoff rule, CI guarantees, pre-commit behavior, or sync-contract enforcement.
+This implemented policy records a high-priority everyday agent rule that remains subordinate to the invariant that no existing-feature tradeoff is allowed.
+
+- Agents must select verification from the workflow contract, changed paths, change risk, and user approval rather than personal preference.
+- Agents must not add heavy verification, full repository checks, no-cache checks, CI final gates, or remote CI waiting solely by discretion.
+- The Test Plan Manifest must remain the source for path-based required checks.
+- The Git hooks check catalog must remain the source for check IDs and runnable commands.
+- The Git hooks recommendation-path policy may recommend local full/no-cache verification, but a recommendation is not by itself permission for the agent to run a heavy check without presenting the need.
+- Lightweight UI, wording, CSS, and layout adjustments must use the narrowest contract-relevant checks unless a safety boundary, schema, shared tool, CI, hook, or sync contract is changed.
+- Document synchronization, contract, schema, shared tooling, Git hooks, CI, test infrastructure, and broad implementation changes must continue to use the contract-required synchronization, structure, target, aggregate, and full/no-cache verification paths.
+- Required checks and recommended checks must remain distinguishable in user-facing reports and agent behavior.
+- Heavy recommended checks must be presented before execution unless an immediate high-confidence safety condition requires stopping work.
+- Existing CI and final verification semantics must remain available; this policy limits unnecessary local execution, not coverage.
+- The implementation must stay policy-driven, reusable, stack-agnostic, and independent of a single file name, product stack, phrase, or one-off test case.
+
+SYNC-ID: local_verification_scope_policy
+STATUS: implemented
+ARTIFACTS: AGENTS.MD,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/TEST_PLAN_MANIFEST.tsv,docs/workflow/GIT_HOOKS_POLICY.tsv,docs/workflow/GIT_HOOK_CHECKS.tsv,docs/workflow/GIT_HOOK_RECOMMENDATION_PATHS.tsv,learning/GIT_HOOK_SETTINGS.tsv,tools/lib/test_plan.sh,tools/test-plan,tools/lib/git_hooks_policy.sh,tools/git-hooks,tools/check_test_plan_coverage.sh,tools/test_test_plan.sh,tools/test_git_hooks.sh
+TESTS: tools/check_test_plan_coverage.sh,tools/test_test_plan.sh,tools/test_git_hooks.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh
+
 ## Implemented Security Guard Backfill Requirements
 
 The lesson repository must provide an implemented Security guard backfill with runtime artifacts, standalone checks, aggregate-test wiring, Git hooks wiring, CI wiring, and pre-commit wiring.

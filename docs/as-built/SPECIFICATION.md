@@ -562,6 +562,33 @@ The runtime behavior is implemented through a reusable hook runner and synchroni
 - Existing sync, AGENTS/skills, developer-memory, and status checks recognize `.githooks/pre-commit` -> `tools/git-hooks` -> `docs/workflow/GIT_HOOK_CHECKS.tsv` as active wiring while preserving direct-command detection; as-built active pre-commit wiring is checked against full-mode coverage so a local `minimal` setting does not weaken implemented sync-contract verification.
 - CI must not rely on local cache state; CI should run full or no-cache verification.
 
+### Implemented Local Verification Scope Policy
+
+The local verification scope policy is implemented as a documentation and contract alignment rule over the existing Test Plan Manifest and Git hooks policy.
+It does not redefine `full`, `fast`, `minimal`, full/no-cache semantics, CI final gates, or remote CI behavior.
+
+- `AGENTS.MD` records the high-priority everyday rule for agents.
+- The rule is lower priority than the no-existing-feature-tradeoff invariant.
+- `docs/workflow/TEST_PLAN_MANIFEST.tsv` remains the path-to-required-checks contract.
+- `docs/workflow/GIT_HOOK_CHECKS.tsv` remains the check-id-to-command catalog.
+- `docs/workflow/GIT_HOOK_RECOMMENDATION_PATHS.tsv` remains the local full/no-cache recommendation policy.
+- `learning/GIT_HOOK_SETTINGS.tsv` remains the persisted local hook mode selection.
+- `.githooks/pre-commit` delegates to `tools/git-hooks run`, which uses the selected mode unless an explicit mode is passed.
+- Agents must treat `tools/git-hooks recommend` output as planning guidance and must present heavy recommended checks before running them when user approval is not already clear.
+- Agents must distinguish:
+  - required checks from `TEST_PLAN_MANIFEST.tsv`;
+  - runnable commands from `GIT_HOOK_CHECKS.tsv`;
+  - local full/no-cache recommendations from `GIT_HOOK_RECOMMENDATION_PATHS.tsv`;
+  - final CI or completion evidence from remote workflows and final gates.
+- Lightweight UI, wording, CSS, or layout changes may use narrow target verification when they do not alter schema, command execution boundaries, shared tooling, CI, hooks, or sync contracts.
+- Contract, schema, shared tooling, Git hooks, CI, test infrastructure, or broad implementation changes continue to require the contract-defined broader verification path.
+- The policy changes agent execution behavior and documentation alignment only; it does not remove any check from CI, pre-commit, aggregate tests, or sync-contract enforcement.
+
+SYNC-ID: local_verification_scope_policy
+STATUS: implemented
+ARTIFACTS: AGENTS.MD,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/TEST_PLAN_MANIFEST.tsv,docs/workflow/GIT_HOOKS_POLICY.tsv,docs/workflow/GIT_HOOK_CHECKS.tsv,docs/workflow/GIT_HOOK_RECOMMENDATION_PATHS.tsv,learning/GIT_HOOK_SETTINGS.tsv,tools/lib/test_plan.sh,tools/test-plan,tools/lib/git_hooks_policy.sh,tools/git-hooks,tools/check_test_plan_coverage.sh,tools/test_test_plan.sh,tools/test_git_hooks.sh
+TESTS: tools/check_test_plan_coverage.sh,tools/test_test_plan.sh,tools/test_git_hooks.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh
+
 ### Design Quality Constraints
 
 - Additions must preserve existing 7-day and 14-day behavior.
