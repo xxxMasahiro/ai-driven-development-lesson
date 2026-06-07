@@ -5,6 +5,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 RUNTIME_DIR="$ROOT/.dashboard-control-center"
 DATA_FILE="$RUNTIME_DIR/dashboard-data.json"
 DEFAULT_PORT="${DASHBOARD_CONTROL_CENTER_PORT:-5173}"
+REFRESH_SECONDS="${DASHBOARD_CONTROL_CENTER_REFRESH_SECONDS:-3}"
 
 usage() {
   cat <<'USAGE'
@@ -28,10 +29,41 @@ require_node_tools() {
 
 write_snapshot() {
   local output="$1"
-  local output_dir
+  local output_dir tmp
   output_dir="$(dirname "$output")"
   mkdir -p "$output_dir"
-  "$ROOT/tools/dashboard-data" >"$output"
+  tmp="$(mktemp "$output_dir/.dashboard-data.XXXXXX.tmp")"
+  if "$ROOT/tools/dashboard-data" >"$tmp" && (cd "$ROOT" && node --input-type=module - "$tmp" <<'NODE'
+import fs from "node:fs";
+import { validateDashboardData } from "./vite.config.mjs";
+
+const file = process.argv[2];
+const body = fs.readFileSync(file, "utf8");
+try {
+  JSON.parse(body);
+} catch (error) {
+  console.error(`invalid dashboard-data snapshot: ${error.message}`);
+  process.exit(1);
+}
+if (!validateDashboardData(body)) {
+  console.error("dashboard-data snapshot failed schema validation");
+  process.exit(1);
+}
+NODE
+  ); then
+    mv "$tmp" "$output"
+  else
+    rm -f "$tmp"
+    return 1
+  fi
+}
+
+refresh_snapshots_loop() {
+  local output="$1"
+  while :; do
+    sleep "$REFRESH_SECONDS" || return
+    write_snapshot "$output" || printf 'Dashboard control-center refresh kept the last valid snapshot.\n' >&2
+  done
 }
 
 build_control_center() {
@@ -52,9 +84,16 @@ open_control_center() {
     printf 'configured dashboard control-center port must be a positive integer.\n' >&2
     exit 1
   fi
+  if ! [[ "$REFRESH_SECONDS" =~ ^[1-9][0-9]*$ ]]; then
+    printf 'configured dashboard control-center refresh interval must be a positive integer.\n' >&2
+    exit 1
+  fi
 
   require_node_tools
   write_snapshot "$DATA_FILE"
+  refresh_snapshots_loop "$DATA_FILE" &
+  refresh_pid="$!"
+  trap 'kill "$refresh_pid" 2>/dev/null || true' EXIT INT TERM
   printf 'Dashboard control center is opening through maintained tooling.\n'
   (
     cd "$ROOT"

@@ -1,8 +1,8 @@
 {
   "schema_version": "0.2.0",
-  "generated_at": "2026-06-05T00:00:00Z",
-  "snapshot_id": "2026-06-05T00:00:00Z-aaaaaaaaaaaa",
-  "content_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "generated_at": "2026-06-05T00:01:00Z",
+  "snapshot_id": "2026-06-05T00:01:00Z-bbbbbbbbbbbb",
+  "content_hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
   "source_files": [
     "docs/workflow/DASHBOARD_DATA_SCHEMA.tsv",
     "learning/LESSON_STATE.tsv"
@@ -10,39 +10,18 @@
   "source_commands": [
     "tools/dashboard-data"
   ],
-  "warnings": [
-    "TOKEN=abcdefghijklmnop should be redacted before display."
-  ],
-  "partial_failures": [
-    {
-      "source": "ci_required_gate",
-      "status": "failed",
-      "reason": "Required CI evidence is not passing in this fixture.",
-      "required_command": "./tools/check_ci_status.sh --required"
-    },
-    {
-      "source": "workflow_pair_sync",
-      "status": "unknown",
-      "reason": "Workflow pair evidence has not been validated in this fixture.",
-      "required_command": "./tools/check_workflow_pair_sync.sh"
-    },
-    {
-      "source": "security_gate",
-      "status": "blocked",
-      "reason": "Security gate review must be completed before treating the workflow as clear.",
-      "required_command": "./tools/product-security gate --context product-improvement"
-    }
-  ],
+  "warnings": [],
+  "partial_failures": [],
   "summary": {
     "mode": "maintenance",
-    "next_safe_action": "Review the listed blockers and previews before continuing.",
+    "next_safe_action": "Review updated dashboard state.",
     "primary_action": {
       "title": "Review lessons and accept for workflow",
-      "description": "Review lesson readiness, blockers, and manual follow-ups before treating workflow status as ready.",
+      "description": "Updated fixture shows all lessons ready for workflow review.",
       "target": "Lessons and workflow readiness",
-      "expected_result": "Required approvals and checks are clear before operational actions.",
+      "expected_result": "Workflow review can proceed after manual follow-ups are clear.",
       "risk_level": "low",
-      "status": "approval_required",
+      "status": "ready",
       "source": "summary.category_metrics.lessons"
     },
     "category_metrics": {
@@ -50,56 +29,56 @@
         "id": "overview",
         "label": "Overview",
         "unit": "items",
-        "total": 12,
-        "healthy": 8,
-        "warning": 3,
-        "problem": 1,
-        "percent": 66,
-        "status": "blocked"
+        "total": 10,
+        "healthy": 9,
+        "warning": 1,
+        "problem": 0,
+        "percent": 90,
+        "status": "unknown"
       },
       "lessons": {
         "id": "lessons",
         "label": "Lesson Health",
         "unit": "items",
-        "total": 3,
-        "healthy": 2,
-        "warning": 1,
+        "total": 4,
+        "healthy": 4,
+        "warning": 0,
         "problem": 0,
-        "percent": 66,
-        "status": "unknown"
+        "percent": 100,
+        "status": "ready"
       },
       "workflow": {
         "id": "workflow",
         "label": "Workflow Health",
         "unit": "steps",
-        "total": 8,
-        "healthy": 5,
+        "total": 6,
+        "healthy": 4,
         "warning": 2,
-        "problem": 1,
-        "percent": 62,
-        "status": "blocked"
+        "problem": 0,
+        "percent": 66,
+        "status": "unknown"
       },
       "maintenance": {
         "id": "maintenance",
         "label": "Maintenance Health",
         "unit": "items",
-        "total": 4,
-        "healthy": 3,
+        "total": 5,
+        "healthy": 4,
         "warning": 1,
         "problem": 0,
-        "percent": 75,
+        "percent": 80,
         "status": "unknown"
       },
       "security": {
         "id": "security",
         "label": "Security Health",
         "unit": "checks",
-        "total": 3,
+        "total": 2,
         "healthy": 2,
-        "warning": 1,
+        "warning": 0,
         "problem": 0,
-        "percent": 66,
-        "status": "unknown"
+        "percent": 100,
+        "status": "ready"
       }
     },
     "guidance_items": [
@@ -107,37 +86,24 @@
         "surface": "lesson",
         "audience": "non_engineer",
         "priority": "info",
-        "message": "Review the current lesson step.",
+        "message": "All fixture lessons are ready.",
         "related_command": "./tools/dashboard lesson"
       },
       {
         "surface": "workflow",
         "audience": "engineer",
         "priority": "attention",
-        "message": "Confirm gates and evidence before operations.",
+        "message": "Confirm manual evidence before operations.",
         "related_command": "./tools/dashboard development"
       }
     ],
-    "blocking_items": [
-      {
-        "source": "approval",
-        "status": "approval_required",
-        "reason": "A high-risk operation requires approval.",
-        "required_command": "./tools/git-workflow status"
-      }
-    ],
+    "blocking_items": [],
     "manual_followups": [
       {
         "source": "product_ci_live",
         "status": "optional",
-        "reason": "Live CI is optional and not authoritative in this fixture.",
+        "reason": "Live CI remains a manual follow-up.",
         "required_command": "./tools/check_ci_status.sh --product --required"
-      },
-      {
-        "source": "product_git_sync_live",
-        "status": "optional",
-        "reason": "Live Git sync is a manual follow-up in this fixture.",
-        "required_command": "./tools/check_git_sync.sh --product --required"
       }
     ]
   },
@@ -148,15 +114,13 @@
       "current_step": "step.current",
       "learning_mode_status": "ready",
       "workflow_language_status": "ready",
-      "product_language_status": "missing",
+      "product_language_status": "ready",
       "source_state_file": "learning/LESSON_STATE.tsv",
       "points": [
-        "Keep lesson progress separate from workflow gates."
+        "Updated fixture lesson is ready."
       ],
-      "warnings": [
-        "One lesson setting is missing."
-      ],
-      "next_learning_action": "Select the missing setting before passing the step."
+      "warnings": [],
+      "next_learning_action": "Continue with workflow review."
     },
     "extended": {
       "label": "Extended Lesson",
@@ -211,21 +175,6 @@
           "./tools/test_dashboard_data.sh"
         ],
         "command_text": "./tools/test_dashboard_data.sh",
-        "execution_mode": "preview_only",
-        "non_executable": true
-      },
-      {
-        "intent": "Preview merge boundary",
-        "target": "current Git repository",
-        "risk_level": "critical",
-        "requires_approval": true,
-        "approval_gate_id": "git_workflow_merge_approval",
-        "argv": [
-          "./tools/git-workflow",
-          "approve",
-          "merge"
-        ],
-        "command_text": "./tools/git-workflow approve merge",
         "execution_mode": "preview_only",
         "non_executable": true
       }

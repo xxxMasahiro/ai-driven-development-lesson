@@ -20,7 +20,11 @@ The current implemented CI aggregate and full-hooks split is documented as `ci_a
 The current implemented dashboard control center data layer is documented as `dashboard_control_center_data_layer`; it provides a read-only JSON source behind an AI-driven development control center while preserving the existing CLI dashboard.
 The current implemented dashboard control center React UI is documented as `dashboard_control_center_react_ui_plan`; it provides a read-only browser control-center scope with maintained entry tooling, standalone/aggregate browser checks, and no UI action execution.
 The current implemented dashboard control center information architecture is documented as `dashboard_control_center_information_architecture`; it provides category navigation, Overview-first presentation, `en`/`ja` fixed-label localization, snapshot freshness display, and Safety Actions command-preview isolation while preserving read-only behavior.
-The current implemented dashboard control center visual polish is documented as `dashboard_control_center_visual_polish`; it brings the categorized read-only UI closer to `dashboard-control-center/mock-categorized-dashboard.png` without adding automatic refresh, live CI/Git authority, or UI command execution.
+The current implemented dashboard control center visual polish is documented as `dashboard_control_center_visual_polish`; that layer brings the categorized read-only UI closer to `dashboard-control-center/mock-categorized-dashboard.png` without itself adding automatic refresh, live CI/Git authority, or UI command execution.
+The current implemented dashboard control center mock parity is documented as `dashboard_control_center_mock_parity`; it brings the Overview structure closer to `mock-categorized-dashboard.png` with producer-owned metrics, compact issue preview expansion, central percentage rings, and Explore Pages metrics without fixed mock values.
+The latest implemented dashboard control center live snapshot sync is documented as `dashboard_control_center_live_snapshot_sync`; it adds atomic schema-validated snapshot publication plus read-only browser polling and last-known-good behavior without browser command execution or live CI/Git authority.
+The current implemented dashboard control center mock-aligned Overview is documented as `dashboard_control_center_mock_aligned_overview`; it keeps the Overview closer to the mock, makes empty Partial Failures explicit, separates manual follow-ups, avoids layout-changing Overview expansion, and preserves the read-only browser boundary.
+The current implemented dashboard control center detail-page mock parity follow-up is documented as `dashboard_control_center_detail_mock_parity`; it uses the four approved detail mock images as UI/UX source references to make category pages explain what they check, what judgment they support, and what must be reviewed next while preserving the read-only browser boundary.
 
 ## Key Implemented Capabilities
 
@@ -135,9 +139,9 @@ The latest implemented test/CI cycle is `test_ci_final_gate_optimization_plan`; 
 The latest implemented full-pipeline test/CI acceleration cycle is `test_ci_full_pipeline_acceleration_plan`.
 The latest implemented CI timing and approved auto-improvement cycle is `ci_timing_auto_improvement_plan`.
 The latest implemented CI split cycle is `ci_aggregate_full_hooks_split`; it is limited to main `CI` job scheduling and same-run evidence handoff.
-The latest implemented dashboard/control-center cycle is `dashboard_control_center_visual_polish`; it aligns the categorized read-only React/Vite control center more closely with the generated mock while preserving the implemented JSON data layer, category boundaries, and no UI action execution.
+The latest implemented dashboard/control-center cycle is `dashboard_control_center_mock_aligned_overview`, following `dashboard_control_center_live_snapshot_sync`; together they provide data-backed mock parity, seamless read-only snapshot refresh, stable Overview summaries, and no UI action execution.
 If future test/CI acceleration work is resumed, inspect Git state, confirm the sync contract is clean, preserve required workflow contexts, and implement only developer-approved candidates generated from `ci_timing_auto_improvement_plan` evidence.
-If future dashboard control-center work is resumed, inspect Git state, confirm the sync contract is clean, keep existing `tools/dashboard` semantics, preserve `tools/dashboard-data` as read-only, and request developer approval before automatic updates, broad localization, live authoritative network status, or any command execution.
+If future dashboard control-center work is resumed, inspect Git state, confirm the sync contract is clean, keep existing `tools/dashboard` semantics, preserve `tools/dashboard-data` as read-only, and request developer approval before broad localization, live authoritative CI/Git/network status, browser-triggered checks, or any command execution.
 Do not perform `.wslconfig` writes, swap creation/deletion, privileged cleanup, arbitrary process killing, CI weakening, pre-commit weakening, or Git hooks mode semantic changes without developer approval.
 If resource guard behavior is changed later, preserve policy/settings-driven implementation, user-configurable available-memory floor, active-heavy-process fallback, explicit parallel-mode safe-stop, unknown-profile rejection, safe-stop failure for checks and job recommendations, standalone and aggregate tests, CI/pre-commit wiring, Playwright wrapper wiring, and existing Git hooks mode semantics.
 If cleanup behavior is changed later, preserve dry-run by default, explicit `--safe` deletion, repo-local path validation, symlink escape rejection, marked Git hooks cache validation, fixture-based tests, CI/pre-commit wiring, and the prohibition on OS cache, swap, Docker, process, product repository, and global cache cleanup without developer approval.
@@ -493,8 +497,8 @@ Dashboard control center information architecture handoff:
 - Localization boundary: fixed UI labels support `en` and `ja` from the device language with English fallback; commands, file paths, gate IDs, source names, and dashboard JSON prose are not browser-translated.
 - Freshness boundary: generated time and relative age are display context only; they do not make stale/live status authoritative.
 - Safety boundary: command previews remain preview-only and non-executable; no command-execution buttons were added.
-- Tests: `tools/test_dashboard_control_center.sh` now covers category navigation, Overview-first behavior, Safety Actions isolation, no buttons, secret-like redaction, mobile layout, and `en`/`ja` fixed-label localization.
-- Deferred phases: automatic updates, UI-triggered command execution, live authoritative CI/Git status, data-schema localization fields, and broad language coverage require separate specification, synchronization, approval, and tests.
+- Tests: `tools/test_dashboard_control_center.sh` now covers category navigation, Overview-first behavior, Safety Actions isolation, absence of command-execution controls, secret-like redaction, mobile layout, and `en`/`ja` fixed-label localization.
+- Deferred phases: UI-triggered command execution, live authoritative CI/Git status, data-schema localization fields, and broad language coverage require separate specification, synchronization, approval, and tests. Read-only live snapshot refresh is implemented later as `dashboard_control_center_live_snapshot_sync`.
 - Recovery: if future dashboard work hides safety details, translates operational data text, weakens `tools/dashboard-data`, or changes existing CLI/lesson/check behavior, restore the implemented read-only category boundary and redesign. Existing-feature tradeoffs are not allowed.
 
 SYNC-ID: dashboard_control_center_information_architecture
@@ -512,7 +516,7 @@ Dashboard control center visual polish handoff:
 - Localization boundary: fixed UI labels remain `en`/`ja` with English fallback; commands, file paths, source names, status text from dashboard JSON, and other operational data remain data text.
 - Safety boundary: visual shortcuts are navigation links only. They must not become command-execution controls without a separate specification, synchronization, approval, and tests.
 - Tests: `tools/test_dashboard_control_center.sh` covers the visual structure through Playwright without relying on pixel-perfect screenshot matching.
-- Deferred phases: automatic refresh, UI-triggered checks, live authoritative CI/Git integration, command execution, new dependencies, and broad localization remain separate future phases.
+- Follow-up boundary: automatic read-only snapshot refresh is implemented later as `dashboard_control_center_live_snapshot_sync`; UI-triggered checks, live authoritative CI/Git integration, command execution, new dependencies, and broad localization remain separate future phases.
 - Recovery: if future dashboard visual work weakens the CLI dashboard, `tools/dashboard-data`, category isolation, Safety Actions preview-only behavior, mobile layout, existing lessons, checks, CI, or pre-commit, restore the implemented boundary and redesign. Existing-feature tradeoffs are not allowed.
 
 SYNC-ID: dashboard_control_center_visual_polish
@@ -695,6 +699,167 @@ Git hooks checks passed: full mode
 ```
 
 Run `tools/test_production_operations.sh` only when a product repository is intentionally present.
+
+## Implemented Dashboard Control Center Mock Parity Handoff
+
+Sync ID: `dashboard_control_center_mock_parity`.
+Current status: `implemented`.
+
+Current restart context:
+
+- The existing React/Vite control center is implemented and read-only.
+- `dashboard-control-center/mock-categorized-dashboard.png` is the current visual reference.
+- The real UI now has data-backed parity for compact Next Safe Action, Partial Failures preview, central percentage rings, and Explore Pages metrics.
+- Do not regress by hard-coding mock values such as fixed percentages, fixed item counts, or fixture-specific text into the browser.
+- Metrics must stay producer/schema-owned before display.
+- Keep optional/unverified live checks separate from true failures by using manual follow-ups rather than `partial_failures`.
+- Use normal and alternate valid fixtures so hard-coded percentages or counts fail in tests.
+- Keep full issue details reachable through category pages as read-only navigation, not command-execution actions.
+- Keep command previews isolated under Safety Actions and non-executable.
+
+Implemented verification entry points:
+
+1. `tools/test_dashboard_schema.sh`.
+2. `tools/test_dashboard_data.sh`.
+3. `tools/test_dashboard_control_center.sh`.
+4. `tools/test_lesson_repository.sh`.
+
+Sync-contract note: keep `tools/test_lesson_repository.sh`, full/no-cache Git hooks, `.githooks/pre-commit`, and `tools/ci-final-gate` as final verification/runtime evidence rather than `TESTS` field entries for this sync ID, because the as-built contract requires `TESTS` entries to be directly wired standalone checks.
+
+Recovery path:
+
+- If metrics cannot be derived safely, stop before UI implementation and request approval rather than inventing values.
+- If optional statuses look like true Partial Failures, split the display and data fields.
+- If mock parity conflicts with read-only safety, preserve safety and report the conflict.
+
+SYNC-ID: dashboard_control_center_mock_parity
+STATUS: implemented
+ARTIFACTS: docs/workflow/DASHBOARD_DATA_SCHEMA.tsv,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,tools/lib/dashboard_data.sh,tools/dashboard-data,dashboard-control-center/mock-categorized-dashboard.png,dashboard-control-center/src/App.jsx,dashboard-control-center/src/dashboardData.js,dashboard-control-center/src/i18n.js,dashboard-control-center/src/styles.css,tests/fixtures/dashboard-control-center.json,tests/fixtures/dashboard-control-center-live-update.json,tests/fixtures/dashboard-control-center-invalid.json,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/test_dashboard_control_center.sh,tools/test_lesson_repository.sh
+TESTS: tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/test_dashboard_control_center.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_test_plan_coverage.sh,tools/check_ci_workflow_structure.sh
+
+## Implemented Dashboard Control Center Live Snapshot Sync Handoff
+
+Sync ID: `dashboard_control_center_live_snapshot_sync`.
+Current status: `implemented`.
+
+Current restart context:
+
+- The user approved and this implementation adds a staged path toward seamless live dashboard updates.
+- The browser updates while open next to the dashboard CLI, but it remains read-only.
+- `tools/dashboard-data` remains the JSON producer; `tools/dashboard` prose must not become a browser data source.
+- `tools/dashboard-control-center open` is the right shell boundary for periodic snapshot publication.
+- `tools/dashboard-data` must publish producer-owned `snapshot_id` and `content_hash`; browser change detection should use those fields.
+- React should keep the last known good snapshot on failed or invalid refresh.
+- Browser polling must be GET-only and must not call Git, GitHub, CI, shell, or `tools/*` command endpoints.
+
+Implemented verification entry points:
+
+1. `tools/test_dashboard_schema.sh`.
+2. `tools/test_dashboard_data.sh`.
+3. `tools/test_dashboard_control_center.sh`.
+4. `tools/test_lesson_repository.sh`.
+
+Sync-contract note: keep `tools/test_lesson_repository.sh`, full/no-cache Git hooks, `.githooks/pre-commit`, and `tools/ci-final-gate` as final verification/runtime evidence rather than `TESTS` field entries for this sync ID, because the as-built contract requires `TESTS` entries to be directly wired standalone checks.
+
+Recovery path:
+
+- If atomic snapshot publishing fails, keep the previous one-shot snapshot behavior and stop before enabling refresh.
+- If polling blanks the UI on bad data, restore last-known-good behavior before continuing.
+- If any browser execution path appears necessary, stop and request approval as a separate future sync ID.
+
+SYNC-ID: dashboard_control_center_live_snapshot_sync
+STATUS: implemented
+ARTIFACTS: docs/workflow/DASHBOARD_DATA_SCHEMA.tsv,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,tools/lib/dashboard_data.sh,tools/dashboard-data,tools/dashboard-control-center,vite.config.mjs,dashboard-control-center/src/App.jsx,dashboard-control-center/src/dashboardData.js,dashboard-control-center/src/i18n.js,dashboard-control-center/src/styles.css,tests/fixtures/dashboard-control-center.json,tests/fixtures/dashboard-control-center-live-update.json,tests/fixtures/dashboard-control-center-invalid.json,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_control_center.sh,tools/test_lesson_repository.sh
+TESTS: tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/test_dashboard_control_center.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_test_plan_coverage.sh,tools/check_ci_workflow_structure.sh
+
+## Implemented Dashboard Control Center Mock-Aligned Overview Handoff
+
+Sync ID: `dashboard_control_center_mock_aligned_overview`.
+Current status: `implemented`.
+
+Current restart context:
+
+- The browser control center is already read-only and has live snapshot sync.
+- `dashboard-control-center/mock-categorized-dashboard.png` remains the visual reference.
+- The implemented Overview removes visible non-mock header and snapshot explanation chrome while preserving an accessible page title.
+- Next Safe Action keeps the label/helper outside the green primary action row, with target, expected result, and risk as white icon-led metadata rows.
+- Partial Failures is always visible as a control-panel category; an empty list shows a concise none state.
+- Manual follow-ups do not appear as true failures and are summarized in a separate row with detail navigation.
+- The visible Category Health heading is removed; the accessible category-health region remains.
+- The four health cards are height-aligned in the grid.
+- The four health rings use distinct category colors for lessons, workflow, maintenance, and safety.
+- Overview details do not rely on expansion that changes layout height; detailed lists belong on existing category pages.
+- Icons added to navigation, status, repeated rows/cards, summaries, and details are decorative or accessible labels only; they must not become buttons or execution affordances.
+- The bottom notice is concise repository-control-panel UI chrome.
+
+Implemented verification entry points:
+
+1. `tools/test_dashboard_control_center.sh`.
+2. `tools/check_as_built_sync_contract.sh`.
+3. `tools/check_as_built_docs.sh`.
+4. `tools/check_test_plan_coverage.sh`.
+5. `tools/check_ci_workflow_structure.sh`.
+6. `tools/test_lesson_repository.sh`.
+
+Sync-contract note: keep full/no-cache Git hooks, `.githooks/pre-commit`, `tools/test_lesson_repository.sh`, and `tools/ci-final-gate` as final verification/runtime evidence rather than broadening this sync ID's `TESTS` field beyond directly wired standalone checks.
+
+Recovery path:
+
+- If removing the visible header breaks accessibility, restore a screen-reader-only title, not the large visible header.
+- If manual follow-up navigation is unclear, keep the Overview summary but improve link labels before adding new disclosure behavior.
+- If any command execution, non-GET fetch, or command preview leakage appears outside Safety Actions, remove it before continuing.
+- If mobile overflow appears, fix responsive constraints rather than adding language-specific branches.
+
+SYNC-ID: dashboard_control_center_mock_aligned_overview
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,dashboard-control-center/mock-categorized-dashboard.png,dashboard-control-center/src/App.jsx,dashboard-control-center/src/i18n.js,dashboard-control-center/src/styles.css,tests/fixtures/dashboard-control-center.json,tests/fixtures/dashboard-control-center-live-update.json,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_control_center.sh,tools/test_lesson_repository.sh
+TESTS: tools/test_dashboard_control_center.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_test_plan_coverage.sh,tools/check_ci_workflow_structure.sh
+
+## Implemented Dashboard Control Center Detail-Page Mock Parity Handoff
+
+Sync ID: `dashboard_control_center_detail_mock_parity`.
+Current status: `implemented`.
+
+Current restart context:
+
+- The copied visual references are `dashboard-control-center/mock-detail-lessons.png`, `mock-detail-workflow.png`, `mock-detail-maintenance.png`, and `mock-detail-safety.png`.
+- The detail-page mock images are the UI/UX source references for layout, information priority, colors, density, and icon direction; tests validate structure and safety, not pixel-perfect screenshot equality.
+- Each detail page starts with a mock-aligned page header and decision summary: what the page checks, current judgment, must-review items, and the next safe check.
+- Workflow category icons use one centralized branching `Network` icon component across Overview, navigation, Explore Pages, workflow detail header, and workflow category summary rows.
+- Lessons detail surfaces missing settings, warnings, and next learning action in inspection panels before completed details; the primary warning label is derived from structured lesson status fields.
+- Development Workflow detail prioritizes approval-required and unknown items in checklist rows, uses human-readable titles, and moves technical keys to secondary metadata.
+- Maintenance Sync detail groups snapshot trust, manual follow-ups, warnings, and source boundaries as status cards, a confirmation table, and a source-boundary panel.
+- Safety Actions detail separates status cards, Partial Failures table, and display-only Command Previews without adding execution affordances.
+- Short localized risk/status labels such as `低` are visually centered.
+- English remains the repository-standard data language; fixed UI labels and known control-center source/intent labels display through the resolved UI locale.
+- The control-panel UI locale resolver is separate from user-selected lesson display language and workflow/product language settings.
+- The browser remains read-only; no route may execute shell, Git, GitHub, CI, or `tools/*` commands.
+
+Planned verification entry points:
+
+1. `tools/test_dashboard_control_center.sh`.
+2. `tools/check_as_built_sync_contract.sh`.
+3. `tools/check_as_built_docs.sh`.
+4. `tools/check_test_plan_coverage.sh`.
+5. `tools/check_ci_workflow_structure.sh`.
+6. `tools/test_dashboard_schema.sh`.
+7. `tools/test_dashboard_data.sh`.
+8. `tools/test_lesson_repository.sh`.
+
+Sync-contract note: keep full/no-cache Git hooks, `.githooks/pre-commit`, `tools/test_lesson_repository.sh`, and `tools/ci-final-gate` as final verification/runtime evidence rather than broadening this sync ID's `TESTS` field beyond directly wired standalone checks.
+
+Recovery path:
+
+- If detail summaries contradict snapshot data, derive them from existing helper functions and translator labels before adding styling.
+- If workflow icon replacement imports fail, use one centralized lucide branching-workflow icon that matches the approved mock direction.
+- If mobile overflow appears, adjust responsive constraints instead of adding language-specific branches.
+- If command previews look executable, strengthen display-only labels and remove any action-like affordance before continuing.
+- If any existing-feature tradeoff appears necessary, stop and request developer approval.
+
+SYNC-ID: dashboard_control_center_detail_mock_parity
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,dashboard-control-center/mock-detail-lessons.png,dashboard-control-center/mock-detail-workflow.png,dashboard-control-center/mock-detail-maintenance.png,dashboard-control-center/mock-detail-safety.png,dashboard-control-center/src/App.jsx,dashboard-control-center/src/i18n.js,dashboard-control-center/src/styles.css,tests/fixtures/dashboard-control-center.json,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_control_center.sh,tools/test_lesson_repository.sh
+TESTS: tools/test_dashboard_control_center.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_test_plan_coverage.sh,tools/check_ci_workflow_structure.sh
 
 ## Implemented Lesson Display Label Policy Handoff
 

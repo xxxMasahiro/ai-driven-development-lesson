@@ -828,6 +828,257 @@ STATUS: implemented
 ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,dashboard-control-center/mock-categorized-dashboard.png,dashboard-control-center/src/App.jsx,dashboard-control-center/src/i18n.js,dashboard-control-center/src/styles.css,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_control_center.sh,tools/test_lesson_repository.sh
 TESTS: tools/test_dashboard_control_center.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_test_plan_coverage.sh,tools/check_ci_workflow_structure.sh
 
+## Implemented Dashboard Control Center Mock Parity Requirements
+
+The mock-parity follow-up is implemented as a data-backed visual and information-structure correction for the existing read-only React/Vite dashboard.
+It must close the known gap between the visible dashboard and `dashboard-control-center/mock-categorized-dashboard.png` without making the generated image itself the source of truth.
+
+Problems to solve:
+
+- The Next Safe Action area can become too tall because long issue lists are shown directly in the Overview.
+- The mock-level primary action, including the Review lessons and accept for workflow intent, is not represented as structured dashboard data.
+- Partial Failures need a compact Overview summary with access to full detail.
+- Health cards use icon-like centers where the mock uses data-derived progress percentages.
+- Explore Pages cards lack data-derived bottom metrics such as counts, units, progress, and state markers.
+- The UI must not invent progress numbers or mock-specific fixed values when the dashboard JSON does not provide those values.
+
+Target scope:
+
+- Extend the dashboard data schema and producer with category metrics and a structured primary action derived from existing lesson, workflow, maintenance, Git, CI, and security status sources.
+- Render the mock-aligned Overview composition: compact Next Safe Action, limited issue summaries with full detail preserved outside the Overview, central percentage rings, and Explore Pages metrics.
+- Keep fixed UI labels localized through the existing `en`/`ja` boundary while preserving data-originated text, commands, file paths, gate IDs, and technical identifiers.
+- Keep optional or unverified live checks as manual follow-ups instead of true Partial Failures.
+- Keep the dashboard read-only and keep command previews isolated to Safety Actions.
+- Keep tests structure-oriented and data-driven instead of depending on one fixed mock screenshot value.
+
+Non-scope:
+
+- Do not execute commands from the browser.
+- Do not parse `tools/dashboard` prose in the browser.
+- Do not add live CI/Git authority, broad localization, or new dependency stacks in this mock-parity layer.
+- Do not weaken or replace the 7-day flow, 14-day flow, existing CI, existing checks, document routes, data-layer contract, or visual-polish layer.
+
+Existing-feature impact:
+
+- Existing dashboard data, React/Vite entry points, schema checks, Playwright checks, aggregate tests, Git hooks, CI, and pre-commit remain active.
+- Existing 7-day and 14-day lesson behavior must be preserved.
+- No existing-feature tradeoff is allowed.
+
+Required document updates:
+
+- Keep `dashboard_control_center_data_layer`, `dashboard_control_center_react_ui_plan`, `dashboard_control_center_information_architecture`, and `dashboard_control_center_visual_polish` as implemented layers.
+- Add this mock-parity sync ID to the sync contract and the five synchronized documents.
+- Update the dashboard data schema only for producer-owned fields needed by the UI.
+
+Required tests:
+
+- Dashboard schema and dashboard data checks must validate category metrics and structured primary action fields.
+- Control-center tests must verify compact issue summary behavior, data-derived percentage rings, Explore Pages metrics, localization boundaries, read-only behavior, and command-preview isolation.
+- Control-center tests must use at least two valid fixtures with different metrics so hard-coded mock percentages or counts fail.
+- Mock-parity acceptance requires compact Next Safe Action, compact issue summaries with full detail reachable through category pages, visible Partial Failures when true failures exist, central percentage rings, Explore Pages bottom metrics, and no fixed mock values.
+- Aggregate and sync checks must continue to pass.
+- The sync-contract `TESTS` field lists directly wired standalone checks; aggregate test, full/no-cache hooks, pre-commit, and final gate remain required final verification evidence outside that field.
+
+Risks:
+
+- Mock parity could accidentally become pixel-copy testing or fixed-value testing.
+- Optional or unverified checks could be mislabelled as true failures.
+- New percentages could imply gate authority if they are not clearly derived scan aids.
+- Additional cards could regress mobile or Japanese text wrapping.
+
+SYNC-ID: dashboard_control_center_mock_parity
+STATUS: implemented
+ARTIFACTS: docs/workflow/DASHBOARD_DATA_SCHEMA.tsv,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,tools/lib/dashboard_data.sh,tools/dashboard-data,dashboard-control-center/mock-categorized-dashboard.png,dashboard-control-center/src/App.jsx,dashboard-control-center/src/dashboardData.js,dashboard-control-center/src/i18n.js,dashboard-control-center/src/styles.css,tests/fixtures/dashboard-control-center.json,tests/fixtures/dashboard-control-center-live-update.json,tests/fixtures/dashboard-control-center-invalid.json,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/test_dashboard_control_center.sh,tools/test_lesson_repository.sh
+TESTS: tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/test_dashboard_control_center.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_test_plan_coverage.sh,tools/check_ci_workflow_structure.sh
+
+## Implemented Dashboard Control Center Live Snapshot Sync Requirements
+
+The live-snapshot follow-up is implemented as a safe read-only refresh layer for the React/Vite control center.
+It must let an already-open dashboard update from newly published dashboard JSON without a page reload and without allowing the browser to run repository commands.
+
+Problems to solve:
+
+- The current dashboard updates only after a page reload.
+- The control-center CLI writes one snapshot before opening the UI, so an adjacent running CLI can diverge from the browser display.
+- Invalid or partially written JSON could cause a blank or misleading dashboard if refresh is not fail-closed.
+
+Target scope:
+
+- Make the control-center snapshot writer publish JSON atomically through validate-then-rename behavior.
+- Make the control-center open command refresh the JSON snapshot on a small configurable interval while the dev server is running.
+- Make the React app poll only the dashboard JSON endpoint with GET requests, detect changed snapshots through producer-owned snapshot identity, update without reload, and retain the last known good snapshot on invalid, missing, or temporarily failed reads.
+- Surface stale or refresh-error state as UI status without converting it into CI, Git, approval, or security authority.
+
+Non-scope:
+
+- Do not add WebSocket, server-sent events, browser-triggered checks, browser-triggered Git/GitHub/CI calls, or command execution.
+- Do not add automatic merge, push, PR creation, destructive operations, or approval bypass.
+- Do not weaken existing snapshot, schema, control-center, CI, or pre-commit coverage.
+
+Existing-feature impact:
+
+- Existing manual snapshot generation, Vite dashboard opening, data validation, no-prose parsing rule, and read-only safety boundary must keep working.
+- 7-day, 14-day, existing CI, existing checks, and existing document navigation remain unaffected.
+- No existing-feature tradeoff is allowed.
+
+Required document updates:
+
+- Add this live-sync sync ID to the sync contract and the five synchronized documents.
+- Update the dashboard data schema only where snapshot identity or live refresh state needs a producer-owned field.
+- Keep live sync separate from mock parity so future command execution or CI/Git live authority cannot be smuggled into this read-only refresh layer.
+
+Required tests:
+
+- Standalone control-center checks must cover atomic snapshot writing, valid JSON publication, read-only source boundaries, and static no-command-execution invariants.
+- Playwright coverage must verify a visible update without page reload and last-known-good behavior on a failed refresh.
+- Aggregate, sync, test-plan, and CI-structure checks must continue to pass.
+- The sync-contract `TESTS` field lists directly wired standalone checks; aggregate test, full/no-cache hooks, pre-commit, and final gate remain required final verification evidence outside that field.
+
+Risks:
+
+- Polling too often could make local development noisy or slow.
+- Partial writes could break the UI if the writer is not atomic.
+- Refresh failures could be mistaken for authoritative gate failures.
+- Test timing could become flaky unless update tests are deterministic.
+
+SYNC-ID: dashboard_control_center_live_snapshot_sync
+STATUS: implemented
+ARTIFACTS: docs/workflow/DASHBOARD_DATA_SCHEMA.tsv,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,tools/lib/dashboard_data.sh,tools/dashboard-data,tools/dashboard-control-center,vite.config.mjs,dashboard-control-center/src/App.jsx,dashboard-control-center/src/dashboardData.js,dashboard-control-center/src/i18n.js,dashboard-control-center/src/styles.css,tests/fixtures/dashboard-control-center.json,tests/fixtures/dashboard-control-center-live-update.json,tests/fixtures/dashboard-control-center-invalid.json,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_control_center.sh,tools/test_lesson_repository.sh
+TESTS: tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/test_dashboard_control_center.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_test_plan_coverage.sh,tools/check_ci_workflow_structure.sh
+
+## Implemented Dashboard Control Center Mock-Aligned Overview Requirements
+
+The mock-aligned Overview follow-up makes the browser control center match `dashboard-control-center/mock-categorized-dashboard.png` more closely while preserving the read-only repository control-panel boundary.
+The work is additive to the implemented data layer, React UI, information architecture, visual polish, mock parity, and live snapshot sync layers.
+
+Problems to solve:
+
+- The visible main header and snapshot explanation add non-mock chrome above the operational dashboard content.
+- The Next Safe Action card is not yet visually strong enough as the primary decision area.
+- The Next Safe Action heading, emphasized action row, and metadata rows need to match the mock hierarchy instead of using one uniformly colored card.
+- Empty Partial Failures are not explicitly represented as a stable no-failure state.
+- Manual follow-ups can appear at the same visual level as true Partial Failures.
+- Overview expansion controls can change page height and make the control panel less stable.
+- Repeated navigation, status, card, summary, and detail rows need mock-aligned left-side visual anchors for scanning.
+- The four health rings need stable category color identity so frequent users can recognize lesson, workflow, maintenance, and safety at a glance.
+- The bottom read-only notice needs wording specific to this repository control panel.
+
+Implemented scope:
+
+- The Overview begins with compact status information and mock-aligned operational cards instead of a large page header.
+- An accessible page title is preserved without displaying the previous large header block.
+- The visible snapshot explanation block is removed from the Overview.
+- Next Safe Action is structured with a leading safe-action icon outside the emphasized action row, a green-accented action title row, and white icon-led metadata rows.
+- Partial Failures is always shown; when there are no true failures, it shows a concise none state instead of hiding the category.
+- Manual follow-ups are in a separate third-row summary card that shows necessary summary information and links to detail pages.
+- Overview disclosure expansion that changes the page layout is avoided; detailed lists route to the existing category pages.
+- Consistent mock-aligned left-side icons or glyphs are added to navigation, status, repeated item rows, summaries, and cards without making them executable controls.
+- Health cards and Explore Pages remain data-driven through existing metrics rather than fixed mock values.
+- The four health rings use distinct category colors for lessons, workflow, maintenance, and safety.
+- The generic bottom read-only warning is replaced with a concise repository-control-panel notice.
+- The visible Category Health heading is removed while keeping the category-health region available to assistive technology.
+- The four health cards are height-aligned within the grid.
+
+Non-scope:
+
+- Do not add browser command execution, browser-triggered checks, live authoritative CI/Git status, destructive operations, or new dependency stacks.
+- Do not change the dashboard JSON producer ownership model or parse `tools/dashboard` prose in the browser.
+- Do not change 7-day lessons, 14-day lessons, existing CI, existing checks, pre-commit behavior, document routes, or command-preview safety boundaries.
+- Do not make the mock image a pixel-perfect test oracle.
+
+Existing-feature impact:
+
+- Existing dashboard schema, data producer, live snapshot sync, last-known-good behavior, Safety Actions isolation, localization boundary, aggregate tests, Git hooks, CI, and pre-commit must remain active.
+- The Overview changes must preserve read-only behavior and all existing category navigation paths.
+- No existing-feature tradeoff is allowed.
+
+Implemented document updates:
+
+- Add this sync ID to the sync contract and the five synchronized documents.
+- Keep this work separate from the earlier mock-parity and live-snapshot sync layers so future command execution or live authority cannot be smuggled into a visual-alignment follow-up.
+
+Implemented tests:
+
+- Control-center Playwright coverage verifies the removed visible header chrome, removed visible Category Health heading, stable Partial Failures none state, separate manual follow-up summary, mock-aligned Next Safe Action structure, global left-side icon anchors, distinct health-ring category colors, bottom repository notice, and no Overview expansion dependency.
+- Existing schema, data, sync, test-plan, CI-structure, aggregate, hook, pre-commit, and final-gate checks remain required.
+
+Risks:
+
+- Removing the visible header could remove the only accessible page title if not replaced with an accessible equivalent.
+- Added icons could create mobile overflow or decorative accessibility noise.
+- Moving follow-ups could hide necessary operator context unless the summary and detail links remain clear.
+- Mock-aligned styling could accidentally create command-like affordances if links and previews are not kept distinct.
+
+SYNC-ID: dashboard_control_center_mock_aligned_overview
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,dashboard-control-center/mock-categorized-dashboard.png,dashboard-control-center/src/App.jsx,dashboard-control-center/src/i18n.js,dashboard-control-center/src/styles.css,tests/fixtures/dashboard-control-center.json,tests/fixtures/dashboard-control-center-live-update.json,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_control_center.sh,tools/test_lesson_repository.sh
+TESTS: tools/test_dashboard_control_center.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_test_plan_coverage.sh,tools/check_ci_workflow_structure.sh
+
+## Implemented Dashboard Control Center Detail-Page Mock Parity Requirements
+
+The detail-page mock-parity follow-up aligns the four category detail pages with the approved detail mock images while preserving the existing read-only dashboard data model and live snapshot behavior.
+The work is additive to the implemented Overview mock alignment and uses the four copied reference images as the UI/UX source of truth for hierarchy, density, color direction, and icon direction while keeping screenshot equality out of the automated contract.
+
+Problems solved:
+
+- Detail pages currently read like raw status data lists, so general repository users cannot immediately tell what they are checking or what decision the page supports.
+- The workflow icon still differs from the approved mock direction and can look like eyeglasses.
+- The Overview and detail pages do not consistently reuse the same workflow icon, category colors, status hierarchy, and scan-first visual language.
+- The risk pill can look off-center for single-character Japanese values such as `低`.
+- Workflow detail labels expose technical keys such as `Development.Product Repository` as primary headings.
+- Detail cards can be too empty or too evenly weighted, which hides approval-required, unknown, failed, blocked, missing, and manual-follow-up priorities.
+- Partial Failures, manual follow-ups, warnings, and command previews need clearer visual separation without adding browser execution affordances.
+
+Implemented scope:
+
+- Added reusable detail-page chrome and decision summaries that show what each page checks, current judgment, must-review items, and the next safe check.
+- Applied the summary pattern to Lessons, Development Workflow, Maintenance Sync, and Safety Actions.
+- Replaced the workflow category icon with a centralized branching `Network` icon component reused across navigation, Overview, Explore Pages, and workflow detail surfaces.
+- Kept Lessons blue, Workflow teal, Maintenance purple, and Safety green while preserving separate warning/error colors.
+- Reworked Lessons into mock-aligned inspection panels with a status band, prominent lesson heading, warning callout, and row-based checks.
+- Reworked Development Workflow into prioritized must-review and ready row lists with human-readable labels and secondary technical keys.
+- Reworked Maintenance Sync into status cards, a manual confirmation table, and an expanded source boundary panel.
+- Reworked Safety Actions into safety status cards, a Partial Failures table, display-only command preview cards, and a read-only notice.
+- Kept risk/status pill content centered for short and localized labels.
+- Preserved English as the repository-standard data language while using the existing translator boundary to display fixed UI labels and known control-center source/intent labels in the viewer's resolved UI locale.
+- Kept lesson/workflow language settings as user-selected state fields, not as the UI locale resolver.
+
+Non-scope:
+
+- Do not add browser command execution, browser-triggered checks, live authoritative CI/Git status, destructive operations, schema ownership changes, or new dependency stacks.
+- Do not change 7-day lessons, 14-day lessons, existing CI, existing checks, pre-commit behavior, document routes, or command-preview safety boundaries.
+- Do not make the generated detail mock images pixel-perfect test oracles.
+- Do not hard-code fixture-specific counts or wording into runtime logic.
+- Do not treat lesson display language or product development language settings as the control-panel UI locale.
+
+Existing-feature impact:
+
+- Existing dashboard schema, data producer, live snapshot sync, last-known-good behavior, Safety Actions isolation, localization boundary, aggregate tests, Git hooks, CI, and pre-commit must remain active.
+- The detail-page changes must preserve all existing category routes and read-only source boundaries.
+- No existing-feature tradeoff is allowed.
+
+Required document updates:
+
+- Synchronize this sync ID through the sync contract and the five synchronized documents.
+- Keep this work distinct from Overview mock alignment so future detail-page changes can be validated independently.
+
+Required tests:
+
+- Control-center Playwright coverage must verify each detail page exposes the decision summary, active navigation, no command execution buttons, readable workflow titles, unified workflow icons, centered short risk labels, safe command-preview presentation, and no mobile overflow.
+- Existing sync, test-plan, CI-structure, aggregate, hook, pre-commit, and final-gate checks remain required final verification evidence.
+
+Risks:
+
+- Adding summaries could duplicate data unless they are derived from existing dashboard data and translator helpers.
+- Hiding technical keys too aggressively could reduce developer traceability unless raw keys remain available as secondary labels.
+- Stronger safety styling could make read-only command previews look actionable unless labels and button absence remain explicit.
+- Mock-aligned layouts could break on variable-length data unless responsive constraints and non-hard-coded tests are maintained.
+
+SYNC-ID: dashboard_control_center_detail_mock_parity
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,dashboard-control-center/mock-detail-lessons.png,dashboard-control-center/mock-detail-workflow.png,dashboard-control-center/mock-detail-maintenance.png,dashboard-control-center/mock-detail-safety.png,dashboard-control-center/src/App.jsx,dashboard-control-center/src/i18n.js,dashboard-control-center/src/styles.css,tests/fixtures/dashboard-control-center.json,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_control_center.sh,tools/test_lesson_repository.sh
+TESTS: tools/test_dashboard_control_center.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_test_plan_coverage.sh,tools/check_ci_workflow_structure.sh
+
 ## Mechanical Enforcement
 
 - 14-day progression requires approval receipts through `tools/lesson14 承認`.

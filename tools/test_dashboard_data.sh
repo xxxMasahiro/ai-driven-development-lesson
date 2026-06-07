@@ -64,11 +64,25 @@ if (!/^[0-9]+\.[0-9]+\.[0-9]+$/.test(requireField('schema_version'))) {
 if (requireField('generated_at') !== '2026-06-05T00:00:00Z') {
   fail('generated_at override was not honored');
 }
+const snapshotId = requireField('snapshot_id');
+const contentHash = requireField('content_hash');
+if (typeof snapshotId !== 'string' || !snapshotId.startsWith('2026-06-05T00:00:00Z-')) {
+  fail(`snapshot_id must be generated from producer-owned snapshot identity, got ${snapshotId}`);
+}
+if (!/^[a-f0-9]{64}$/.test(contentHash)) {
+  fail(`content_hash must be a sha256 hex value, got ${contentHash}`);
+}
+if (!snapshotId.endsWith(contentHash.slice(0, 12))) {
+  fail('snapshot_id must include the content_hash prefix');
+}
 
 for (const path of ['source_files', 'source_commands', 'partial_failures']) {
   if (!Array.isArray(requireField(path))) {
     fail(`${path} must be an array`);
   }
+}
+if (!Array.isArray(requireField('summary.manual_followups'))) {
+  fail('summary.manual_followups must be an array');
 }
 
 for (const sourceFile of data.source_files) {
@@ -125,6 +139,54 @@ if (!['learning', 'development', 'maintenance', 'unknown'].includes(data.summary
 if (!Array.isArray(data.summary.blocking_items)) {
   fail('summary.blocking_items must be an array');
 }
+const primaryAction = requireField('summary.primary_action');
+for (const field of ['title', 'description', 'target', 'expected_result', 'risk_level', 'status', 'source']) {
+  if (!(field in primaryAction)) {
+    fail(`summary.primary_action missing ${field}`);
+  }
+}
+if (!['low', 'medium', 'high', 'critical'].includes(primaryAction.risk_level)) {
+  fail(`invalid primary action risk level: ${primaryAction.risk_level}`);
+}
+if (!allowedStates.has(primaryAction.status)) {
+  fail(`invalid primary action status: ${primaryAction.status}`);
+}
+
+const categoryMetrics = requireField('summary.category_metrics');
+for (const metricKey of ['overview', 'lessons', 'workflow', 'maintenance', 'security']) {
+  const metric = categoryMetrics[metricKey];
+  if (!metric || typeof metric !== 'object' || Array.isArray(metric)) {
+    fail(`missing category metric: ${metricKey}`);
+  }
+  for (const field of ['total', 'healthy', 'warning', 'problem', 'percent']) {
+    if (!Number.isInteger(metric[field]) || metric[field] < 0) {
+      fail(`invalid ${metricKey} metric ${field}: ${metric[field]}`);
+    }
+  }
+  if (metric.percent > 100) {
+    fail(`invalid ${metricKey} percent: ${metric.percent}`);
+  }
+  if (metric.total !== metric.healthy + metric.warning + metric.problem) {
+    fail(`category metric counts do not add up for ${metricKey}`);
+  }
+  if (typeof metric.unit !== 'string' || metric.unit.length === 0) {
+    fail(`missing metric unit for ${metricKey}`);
+  }
+  if (!allowedStates.has(metric.status)) {
+    fail(`invalid category metric status for ${metricKey}: ${metric.status}`);
+  }
+}
+
+const lessonStatuses = Object.values(data.lessons).map((lesson) => lesson.status);
+const expectedLessonHealthy = lessonStatuses.filter((state) => state === 'ready' || state === 'passed').length;
+if (categoryMetrics.lessons.total !== lessonStatuses.length || categoryMetrics.lessons.healthy !== expectedLessonHealthy) {
+  fail('lesson category metric must be derived from structured lesson statuses');
+}
+const expectedLessonPercent = lessonStatuses.length ? Math.floor((expectedLessonHealthy * 100) / lessonStatuses.length) : 0;
+if (categoryMetrics.lessons.percent !== expectedLessonPercent) {
+  fail('lesson category metric percent must be data-derived');
+}
+
 if (!Array.isArray(data.summary.guidance_items) || data.summary.guidance_items.length < 2) {
   fail('summary.guidance_items must be a non-empty array for lesson and workflow guidance');
 }
@@ -164,12 +226,25 @@ for (const failure of data.partial_failures) {
       fail(`partial failure missing ${field}`);
     }
   }
-  if (!['optional', 'failed', 'unknown'].includes(failure.status)) {
+  if (!['failed', 'blocked', 'unknown'].includes(failure.status)) {
     fail(`invalid partial failure status: ${failure.status}`);
   }
 }
-if (!data.partial_failures.some((failure) => failure.source === 'product_ci_live')) {
-  fail('partial failures must include optional product CI lookup');
+if (data.partial_failures.some((failure) => failure.status === 'optional')) {
+  fail('partial_failures must not include optional manual follow-ups');
+}
+for (const followup of data.summary.manual_followups) {
+  for (const field of ['source', 'status', 'reason', 'required_command']) {
+    if (!(field in followup)) {
+      fail(`manual follow-up missing ${field}`);
+    }
+  }
+  if (!['optional', 'cached', 'unknown'].includes(followup.status)) {
+    fail(`invalid manual follow-up status: ${followup.status}`);
+  }
+}
+if (!data.summary.manual_followups.some((followup) => followup.source === 'product_ci_live')) {
+  fail('manual follow-ups must include optional product CI lookup');
 }
 
 if ('status' in data.git_workflow || 'status' in data.security) {

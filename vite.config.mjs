@@ -8,6 +8,18 @@ import { defineConfig } from "vite";
 const repoRoot = path.dirname(fileURLToPath(import.meta.url));
 const appRoot = path.join(repoRoot, "dashboard-control-center");
 const runtimeRoot = path.join(repoRoot, ".dashboard-control-center");
+const allowedStates = new Set(["missing", "ready", "passed", "failed", "blocked", "unknown", "approval_required", "optional", "cached"]);
+const riskLevels = new Set(["low", "medium", "high", "critical"]);
+const partialFailureStates = new Set(["failed", "blocked", "unknown"]);
+const manualFollowupStates = new Set(["optional", "cached", "unknown"]);
+
+function isObject(value) {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function nonEmptyString(value) {
+  return typeof value === "string" && value.length > 0;
+}
 
 function realpathInside(child, parent) {
   const realChild = fs.realpathSync.native(child);
@@ -44,13 +56,66 @@ export function validateDashboardData(body) {
   if (!data || typeof data !== "object" || !/^[0-9]+\.[0-9]+\.[0-9]+$/.test(String(data.schema_version || ""))) {
     return false;
   }
+  if (
+    typeof data.generated_at !== "string" ||
+    typeof data.snapshot_id !== "string" ||
+    typeof data.content_hash !== "string" ||
+    !/^[a-f0-9]{64}$/.test(data.content_hash) ||
+    !data.snapshot_id.startsWith(`${data.generated_at}-`) ||
+    !data.snapshot_id.endsWith(data.content_hash.slice(0, 12))
+  ) {
+    return false;
+  }
   if (!Array.isArray(data.source_commands) || !data.source_commands.includes("tools/dashboard-data")) {
     return false;
   }
   if (data.source_commands.some((command) => /^(\.\/)?tools\/dashboard(\s|$)/.test(String(command)))) {
     return false;
   }
-  if (!data.summary || typeof data.summary !== "object" || !data.lessons || typeof data.lessons !== "object") {
+  for (const key of ["summary", "lessons", "development", "maintenance", "git_workflow", "security", "actions"]) {
+    if (!isObject(data[key])) {
+      return false;
+    }
+  }
+  if (!["learning", "development", "maintenance", "unknown"].includes(String(data.summary.mode || ""))) {
+    return false;
+  }
+  const primaryAction = data.summary.primary_action;
+  if (
+    !isObject(primaryAction) ||
+    !["title", "description", "target", "expected_result", "source"].every((field) => nonEmptyString(primaryAction[field])) ||
+    !riskLevels.has(String(primaryAction.risk_level || "")) ||
+    !allowedStates.has(String(primaryAction.status || ""))
+  ) {
+    return false;
+  }
+  const metrics = data.summary.category_metrics;
+  for (const key of ["overview", "lessons", "workflow", "maintenance", "security"]) {
+    const metric = metrics?.[key];
+    if (
+      !metric ||
+      typeof metric !== "object" ||
+      !Number.isInteger(metric.total) ||
+      !Number.isInteger(metric.healthy) ||
+      !Number.isInteger(metric.warning) ||
+      !Number.isInteger(metric.problem) ||
+      !Number.isInteger(metric.percent) ||
+      metric.total !== metric.healthy + metric.warning + metric.problem ||
+      metric.percent < 0 ||
+      metric.percent > 100 ||
+      !nonEmptyString(metric.unit) ||
+      !allowedStates.has(String(metric.status || ""))
+    ) {
+      return false;
+    }
+  }
+  if (!Array.isArray(data.partial_failures) || data.partial_failures.some((failure) => !isObject(failure) || !partialFailureStates.has(String(failure.status || "")))) {
+    return false;
+  }
+  if (
+    !Array.isArray(data.summary.manual_followups) ||
+    data.summary.manual_followups.some((followup) => !isObject(followup) || !manualFollowupStates.has(String(followup.status || "")))
+  ) {
     return false;
   }
   const previews = Array.isArray(data.actions?.command_previews) ? data.actions.command_previews : [];
@@ -60,7 +125,7 @@ export function validateDashboardData(body) {
       typeof preview !== "object" ||
       preview.execution_mode !== "preview_only" ||
       preview.non_executable !== true ||
-      !["low", "medium", "high", "critical"].includes(String(preview.risk_level || "")) ||
+      !riskLevels.has(String(preview.risk_level || "")) ||
       typeof preview.requires_approval !== "boolean"
     ) {
       return false;

@@ -2017,6 +2017,9 @@ It preserves the implemented dashboard JSON data layer, the initial read-only Re
 
 ### Verification Method
 
+The `TESTS` field for this sync ID lists directly wired standalone checks required by the as-built sync contract.
+`tools/test_lesson_repository.sh`, full/no-cache Git hooks, `.githooks/pre-commit`, and `tools/ci-final-gate` remain final verification and runtime evidence, not `required_tests` entries, because the sync-contract checker requires each `required_tests` command to be directly wired in the repository test surfaces.
+
 ```bash
 git diff --check
 ./tools/test_dashboard_schema.sh
@@ -2128,6 +2131,292 @@ git diff --check
 ### Developer Approval Boundaries
 
 - Automatic refresh, broad localization, live CI/Git authority, UI-triggered checks, command execution, new dependencies, and any existing-feature tradeoff remain outside this phase.
+
+## Implemented Dashboard Control Center Mock Parity Implementation Plan
+
+SYNC-ID: dashboard_control_center_mock_parity
+STATUS: implemented
+ARTIFACTS: docs/workflow/DASHBOARD_DATA_SCHEMA.tsv,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,tools/lib/dashboard_data.sh,tools/dashboard-data,dashboard-control-center/mock-categorized-dashboard.png,dashboard-control-center/src/App.jsx,dashboard-control-center/src/dashboardData.js,dashboard-control-center/src/i18n.js,dashboard-control-center/src/styles.css,tests/fixtures/dashboard-control-center.json,tests/fixtures/dashboard-control-center-live-update.json,tests/fixtures/dashboard-control-center-invalid.json,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/test_dashboard_control_center.sh,tools/test_lesson_repository.sh
+TESTS: tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/test_dashboard_control_center.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_test_plan_coverage.sh,tools/check_ci_workflow_structure.sh
+
+This plan is synchronized as an implemented follow-up to the implemented visual-polish layer.
+It implements mock parity through structured dashboard data and reusable UI components, not through fixed mock values.
+
+### Implemented Change Targets
+
+- `docs/workflow/DASHBOARD_DATA_SCHEMA.tsv` for category metrics, structured primary action, and failure/follow-up separation.
+- `tools/lib/dashboard_data.sh` and `tools/dashboard-data` for producer-owned metric calculation and safe JSON output.
+- `dashboard-control-center/src/dashboardData.js` for validation of the new fields.
+- `dashboard-control-center/src/App.jsx`, `dashboard-control-center/src/i18n.js`, and `dashboard-control-center/src/styles.css` for mock-aligned compact cards, progress rings, issue summaries with detail-page navigation, and Explore Pages metrics.
+- `tests/fixtures/dashboard-control-center.json`, `tests/fixtures/dashboard-control-center-live-update.json`, `tests/fixtures/dashboard-control-center-invalid.json`, and Playwright tests for data-driven visual structure, alternate metrics, and invalid refresh behavior.
+- `tools/test_dashboard_schema.sh`, `tools/test_dashboard_data.sh`, `tools/test_dashboard_control_center.sh`, and aggregate wiring for standalone and full validation.
+
+### Implemented Order
+
+1. Extend the schema and producer with metric and primary-action fields.
+2. Update frontend validation so unsupported or malformed data fails closed.
+3. Refactor the Overview UI into compact primary-action, issue-preview, metric-ring, and Explore Pages components.
+4. Update localization labels only for fixed UI chrome.
+5. Add tests proving that percentages and counts come from fixture or producer data rather than fixed mock values.
+6. Replace any global no-buttons assertion with no command-execution controls, because read-only navigation and summaries are permitted controls.
+7. Run sync, structure, targeted UI, data, and aggregate checks.
+
+### Document Synchronization Policy
+
+- Requirements describe why mock parity is needed and what is out of scope.
+- Specification describes the schema-owned data and UI behavior.
+- Implementation plan describes files, order, validation, recovery, and approval gates.
+- Task tracker records planned, in-progress, and implemented status.
+- Handoff records restart context and known boundaries.
+
+### Verification Method
+
+The `TESTS` field for this sync ID lists directly wired standalone checks required by the as-built sync contract.
+`tools/test_lesson_repository.sh`, full/no-cache Git hooks, `.githooks/pre-commit`, and `tools/ci-final-gate` remain final verification and runtime evidence, not `required_tests` entries, because the sync-contract checker requires each `required_tests` command to be directly wired in the repository test surfaces.
+
+```bash
+git diff --check
+./tools/test_dashboard_schema.sh
+./tools/test_dashboard_data.sh
+./tools/test_dashboard_control_center.sh
+./tools/check_as_built_sync_contract.sh
+./tools/check_as_built_docs.sh
+./tools/check_test_plan_coverage.sh
+./tools/check_ci_workflow_structure.sh
+./tools/test_lesson_repository.sh
+```
+
+### Failure Recovery
+
+- If schema validation fails, correct the producer/schema boundary before changing UI.
+- If visual tests become pixel-brittle, replace them with structure and data-flow assertions without weakening safety checks.
+- If percentages appear fixed, move calculation into the producer or fixture and assert alternate fixture values.
+- If optional checks are misrepresented as partial failures, separate them into manual follow-ups before rerunning.
+- If Overview detail navigation conflicts with safety tests, keep read-only detail access and tighten tests around executable actions instead.
+- If existing 7-day, 14-day, CI, hook, or document checks regress, stop and restore compatibility before continuing.
+
+### Developer Approval Boundaries
+
+- Approval is required before accepting any existing-feature tradeoff.
+- Approval is required before broadening localization beyond the current `en`/`ja` fixed-label boundary.
+- Approval is required before adding new dependencies.
+- Approval is required before making the mock image a pixel-perfect correctness gate.
+- Approval is required before changing command-preview safety or browser execution boundaries.
+
+## Implemented Dashboard Control Center Live Snapshot Sync Implementation Plan
+
+SYNC-ID: dashboard_control_center_live_snapshot_sync
+STATUS: implemented
+ARTIFACTS: docs/workflow/DASHBOARD_DATA_SCHEMA.tsv,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,tools/lib/dashboard_data.sh,tools/dashboard-data,tools/dashboard-control-center,vite.config.mjs,dashboard-control-center/src/App.jsx,dashboard-control-center/src/dashboardData.js,dashboard-control-center/src/i18n.js,dashboard-control-center/src/styles.css,tests/fixtures/dashboard-control-center.json,tests/fixtures/dashboard-control-center-live-update.json,tests/fixtures/dashboard-control-center-invalid.json,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_control_center.sh,tools/test_lesson_repository.sh
+TESTS: tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/test_dashboard_control_center.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_test_plan_coverage.sh,tools/check_ci_workflow_structure.sh
+
+This plan is synchronized as an implemented separate read-only refresh layer.
+It follows mock parity because live refresh should move validated schema-owned data, not UI-invented values.
+
+### Implemented Change Targets
+
+- `tools/dashboard-control-center` for atomic snapshot writing and refresh while the Vite server is open.
+- `tools/dashboard-data` and `tools/lib/dashboard_data.sh` for mandatory producer-owned `snapshot_id` and `content_hash`.
+- `dashboard-control-center/src/dashboardData.js` for validated snapshot fetches and signature handling.
+- `dashboard-control-center/src/App.jsx` and `dashboard-control-center/src/styles.css` for in-place refresh, stale status, and last-known-good UI.
+- Playwright fixtures and tests for live update, failed refresh, no reload, and no browser command execution.
+- Existing standalone and aggregate test entry points for reusable verification.
+
+### Implemented Order
+
+1. Add mandatory producer-owned `snapshot_id` and `content_hash` to the dashboard JSON contract.
+2. Implement atomic snapshot writing in the control-center shell entry point.
+3. Add a configurable refresh loop to `tools/dashboard-control-center open`.
+4. Update the React app to poll the dashboard JSON endpoint with GET and keep last-known-good data on refresh failure.
+5. Add deterministic Playwright tests for changed data and failed refresh.
+6. Add static safety checks for browser execution boundaries.
+7. Run targeted, sync, structure, aggregate, hook, pre-commit, and CI/final-gate checks as needed.
+
+### Document Synchronization Policy
+
+- Keep live refresh separate from command execution and real CI/Git authority.
+- Keep the schema and producer as the data owner.
+- Record any future UI-triggered command work as a separate sync ID and approval-gated phase.
+
+### Verification Method
+
+```bash
+git diff --check
+./tools/test_dashboard_schema.sh
+./tools/test_dashboard_data.sh
+./tools/test_dashboard_control_center.sh
+./tools/check_as_built_sync_contract.sh
+./tools/check_as_built_docs.sh
+./tools/check_test_plan_coverage.sh
+./tools/check_ci_workflow_structure.sh
+./tools/test_lesson_repository.sh
+./tools/git-hooks run --mode full --no-cache
+.githooks/pre-commit
+./tools/ci-final-gate
+```
+
+### Failure Recovery
+
+- If atomic writing fails, keep the previous snapshot writer and stop before enabling live refresh.
+- If polling produces flaky tests, move the test to deterministic fixture sequencing rather than increasing sleeps.
+- If invalid JSON blanks the UI, restore last-known-good behavior before continuing.
+- If the browser gains any command execution, non-GET dashboard-data fetch, or `tools/*` fetch path, remove it and rerun safety checks.
+- If existing checks regress, restore the previous read-only snapshot behavior and request approval if a tradeoff appears unavoidable.
+
+### Developer Approval Boundaries
+
+- Approval is required before browser-triggered checks, POST/PUT/PATCH/DELETE requests, WebSocket/server push, GitHub API calls, Git/CI authority, or command execution.
+- Approval is required before new dependencies.
+- Approval is required before changing existing CI, pre-commit, Git hooks, 7-day, or 14-day behavior.
+- Approval is required before accepting any stale-data behavior that hides validation failure.
+
+## Implemented Dashboard Control Center Mock-Aligned Overview Implementation Plan
+
+SYNC-ID: dashboard_control_center_mock_aligned_overview
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,dashboard-control-center/mock-categorized-dashboard.png,dashboard-control-center/src/App.jsx,dashboard-control-center/src/i18n.js,dashboard-control-center/src/styles.css,tests/fixtures/dashboard-control-center.json,tests/fixtures/dashboard-control-center-live-update.json,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_control_center.sh,tools/test_lesson_repository.sh
+TESTS: tools/test_dashboard_control_center.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_test_plan_coverage.sh,tools/check_ci_workflow_structure.sh
+
+This plan is synchronized as a visual and interaction follow-up to mock parity and live snapshot sync.
+It preserves the existing data producer, schema validation, read-only browser boundary, and live refresh behavior.
+
+### Implemented Change Targets
+
+- `dashboard-control-center/src/App.jsx` for Overview hierarchy, accessible title handling, mock-aligned Next Safe Action structure, global mock-aligned icon placement, stable Partial Failures none state, manual follow-up summary placement, bottom notice, and non-expanding summary navigation.
+- `dashboard-control-center/src/i18n.js` for fixed UI labels, none-state text, manual follow-up summary text, and repository-control-panel notice text.
+- `dashboard-control-center/src/styles.css` for mock-aligned spacing, four health-ring category colors, left icons, health-card height alignment, stable summary cards, responsive layout, and accessible visually hidden title support.
+- `tests/fixtures/dashboard-control-center.json` and `tests/fixtures/dashboard-control-center-live-update.json` for non-empty and empty Partial Failures coverage without fixed mock values.
+- `tests/playwright/dashboard-control-center.spec.js` and `tools/test_dashboard_control_center.sh` for standalone browser verification.
+
+### Implemented Order
+
+1. Synchronized this sync ID into the sync contract and five synchronized documents.
+2. Ran sync and structure checks before runtime changes.
+3. Removed the visible main header and snapshot explanation while preserving an accessible page title.
+4. Refactored `PrimaryActionCard` into the mock-aligned safe-action structure with the heading/helper outside the green primary action row and white metadata rows below it.
+5. Replaced Overview issue-preview expansion with stable summary cards.
+6. Rendered Partial Failures as an always-present summary with a none state when empty.
+7. Moved manual follow-ups into a third-row summary card with concise count, representative context, and detail navigation.
+8. Removed the visible Category Health heading and preserved the accessible category-health region.
+9. Aligned the four health-card heights inside the grid.
+10. Added decorative left icons to navigation, status, repeated cards, summaries, detail rows, and command previews without adding command affordances.
+11. Applied distinct category colors to the four health rings.
+12. Added the repository-control-panel read-only notice at the Overview bottom.
+13. Updated Playwright assertions for structure, global icons, four health-ring colors, no-overflow, localization, live refresh, and safety boundaries.
+14. Ran targeted checks, sync checks, aggregate checks, full hooks, pre-commit, final gate, and sub-agent review as final verification.
+
+### Document Synchronization Policy
+
+- Requirements describe why the mock-aligned Overview is needed and what remains out of scope.
+- Specification describes the Overview structure, stable summaries, icon behavior, and safety model.
+- Implementation plan describes files, order, validation, recovery, and approval boundaries.
+- Task tracker records planned, in-progress, and implemented status.
+- Handoff records restart context, detail-link expectations, safety boundaries, and verification commands.
+
+### Verification Method
+
+```bash
+git diff --check
+npm run dashboard:build
+./tools/test_dashboard_schema.sh
+./tools/test_dashboard_data.sh
+./tools/test_dashboard_control_center.sh
+./tools/check_as_built_sync_contract.sh
+./tools/check_as_built_docs.sh
+./tools/check_test_plan_coverage.sh
+./tools/check_ci_workflow_structure.sh
+./tools/test_lesson_repository.sh
+./tools/git-hooks run --mode full --no-cache --jobs 4
+.githooks/pre-commit
+./tools/ci-final-gate
+```
+
+### Failure Recovery
+
+- If accessible heading coverage fails, restore a screen-reader-only `h1` rather than restoring visible header chrome.
+- If mobile overflow appears, reduce fixed widths and preserve responsive constraints.
+- If Partial Failures or manual follow-ups are confused, restore the data distinction before styling changes.
+- If the Overview appears to execute commands or expose command previews outside Safety Actions, remove that affordance and rerun safety checks.
+- If sync checks fail, fix the contract and all five synchronized documents before further runtime work.
+
+### Developer Approval Boundaries
+
+- Approval is required before any existing-feature tradeoff.
+- Approval is required before changing command-preview isolation, browser command execution boundaries, live CI/Git authority, dependencies, CI/pre-commit semantics, or 7-day/14-day lesson behavior.
+
+## Implemented Dashboard Control Center Detail-Page Mock Parity Implementation Plan
+
+SYNC-ID: dashboard_control_center_detail_mock_parity
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,dashboard-control-center/mock-detail-lessons.png,dashboard-control-center/mock-detail-workflow.png,dashboard-control-center/mock-detail-maintenance.png,dashboard-control-center/mock-detail-safety.png,dashboard-control-center/src/App.jsx,dashboard-control-center/src/i18n.js,dashboard-control-center/src/styles.css,tests/fixtures/dashboard-control-center.json,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_control_center.sh,tools/test_lesson_repository.sh
+TESTS: tools/test_dashboard_control_center.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_test_plan_coverage.sh,tools/check_ci_workflow_structure.sh
+
+This implementation is synchronized as a visual and information-architecture follow-up to the approved Overview mock alignment.
+It preserves the existing data producer, schema validation, read-only browser boundary, live refresh behavior, and category routes.
+The approved detail mock images are treated as the UI/UX source of truth for hierarchy, density, color direction, and icon direction; automated tests validate structural parity and safety boundaries rather than pixel-perfect screenshots.
+
+### Implemented Change Targets
+
+- `dashboard-control-center/mock-detail-lessons.png`, `mock-detail-workflow.png`, `mock-detail-maintenance.png`, and `mock-detail-safety.png` remain checked-in visual source references.
+- `dashboard-control-center/src/App.jsx` adds shared detail page headers, decision summaries, workflow icon centralization, lesson inspection panels, workflow checklist rows, maintenance confirmation tables, safety failure tables, display-only command preview cards, and source-boundary panels.
+- `dashboard-control-center/src/i18n.js` adds fixed decision-summary labels, page judgments, must-review labels, display-only labels, known source/intent display labels, and locale-resolution support that does not mix UI locale with lesson/workflow language settings.
+- `dashboard-control-center/src/styles.css` adds category-colored detail summaries, mock-aligned panels/rows/tables, centered risk/status pills, responsive constraints, severity rails, command/reference chips, and read-only banners.
+- `tests/playwright/dashboard-control-center.spec.js` verifies the implemented detail structure and safety boundaries through `tools/test_dashboard_control_center.sh`.
+
+### Implementation Order Completed
+
+1. Synchronize this sync ID into the sync contract and five synchronized documents.
+2. Run sync, test-plan, and CI-structure checks before runtime changes.
+3. Added reusable helpers for detail page headers, decision summaries, item display metadata, source labels, command labels, and structured lesson attention labels without changing the dashboard data schema.
+4. Added one centralized workflow category icon component using a branching `Network` icon and reused it across Overview, navigation, Explore Pages, and detail pages.
+5. Tuned shared pill CSS so short localized labels are visually centered.
+6. Refactored Lessons detail into the approved decision-summary and inspection-panel layout.
+7. Refactored Development Workflow detail into must-review and ready checklist rows with human-readable titles and secondary technical keys.
+8. Refactored Maintenance Sync detail into status cards, manual confirmation table, and source-boundary panel.
+9. Refactored Safety Actions detail into safety status cards, Partial Failures table, and display-only Command Preview cards.
+10. Updated Playwright assertions for detail summaries, icon consistency, readable labels, safety boundaries, centered short pills, and desktop/mobile no-overflow.
+11. Targeted checks and final verification are run after synchronization before completion reporting.
+
+### Document Synchronization Policy
+
+- Requirements describe the user-facing decision problems and out-of-scope boundaries.
+- Specification describes shared detail-page structure, page-specific behavior, icon/color rules, and safety model.
+- Implementation plan describes files, order, validation, recovery, and approval boundaries.
+- Task tracker records planned, in-progress, and implemented status.
+- Handoff records restart context, mock-image references, read-only boundaries, and verification commands.
+
+### Verification Method
+
+```bash
+git diff --check
+npm run dashboard:build
+./tools/test_dashboard_control_center.sh
+./tools/check_as_built_sync_contract.sh
+./tools/check_as_built_docs.sh
+./tools/check_test_plan_coverage.sh
+./tools/check_ci_workflow_structure.sh
+./tools/test_dashboard_schema.sh
+./tools/test_dashboard_data.sh
+./tools/test_lesson_repository.sh
+./tools/git-hooks run --mode full --no-cache --jobs 4
+.githooks/pre-commit
+./tools/ci-final-gate
+```
+
+### Failure Recovery
+
+- If sync checks fail, fix the contract and all five synchronized documents before further runtime work.
+- If decision summaries duplicate or contradict data, derive them from shared helpers and existing snapshot fields before styling changes.
+- If workflow icon replacement creates ambiguity or import issues, keep one centralized workflow category icon component and use the closest lucide branching workflow icon to the approved mock rather than mixing multiple workflow icons.
+- If mobile overflow appears, reduce fixed widths and preserve responsive constraints rather than adding language-specific branches.
+- If technical traceability is lost, restore technical keys as secondary metadata, not primary headings.
+- If command previews look executable or expose controls outside Safety Actions, remove the affordance and rerun safety checks.
+
+### Developer Approval Boundaries
+
+- Approval is required before any existing-feature tradeoff.
+- Approval is required before changing dashboard data schema ownership, command-preview isolation, browser command execution boundaries, live CI/Git authority, dependencies, CI/pre-commit semantics, or 7-day/14-day lesson behavior.
+- Approval is required before replacing the copied detail mock images or treating them as pixel-perfect test oracles.
 
 ## Acceptance Criteria
 

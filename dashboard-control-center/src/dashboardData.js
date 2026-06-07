@@ -11,6 +11,8 @@ export const ALLOWED_STATES = new Set([
 ]);
 
 export const RISK_LEVELS = new Set(["low", "medium", "high", "critical"]);
+export const MANUAL_FOLLOWUP_STATES = new Set(["optional", "cached", "unknown"]);
+export const PARTIAL_FAILURE_STATES = new Set(["failed", "blocked", "unknown"]);
 
 const SECRET_PATTERN =
   /(SECRET|TOKEN|API_KEY|PASSWORD|PRIVATE_KEY)\s*[:=]\s*[^\s#]{8,}|gh[pousr]_[A-Za-z0-9_]{20,}|sk-[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16}|BEGIN (RSA |OPENSSH |EC |DSA )?PRIVATE KEY/i;
@@ -56,6 +58,13 @@ export function asArray(value) {
   return [value];
 }
 
+export function asObject(value, name = "value") {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error(`${name} must be an object`);
+  }
+  return value;
+}
+
 export function objectEntries(value) {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return [];
@@ -91,6 +100,73 @@ export function validateCommandPreviews(actions) {
   }
 }
 
+function validateIdentity(data) {
+  if (!displayText(data.snapshot_id, "").startsWith(`${displayText(data.generated_at, "")}-`)) {
+    throw new Error("dashboard snapshot_id is invalid");
+  }
+  if (!/^[a-f0-9]{64}$/.test(displayText(data.content_hash, ""))) {
+    throw new Error("dashboard content_hash is invalid");
+  }
+  if (!displayText(data.snapshot_id, "").endsWith(displayText(data.content_hash, "").slice(0, 12))) {
+    throw new Error("dashboard snapshot_id and content_hash do not match");
+  }
+}
+
+function validatePrimaryAction(summary) {
+  const primaryAction = asObject(summary.primary_action, "dashboard primary action");
+  for (const key of ["title", "description", "target", "expected_result", "source"]) {
+    if (!displayText(primaryAction[key], "")) {
+      throw new Error(`dashboard primary action is missing ${key}`);
+    }
+  }
+  if (!RISK_LEVELS.has(displayText(primaryAction.risk_level, ""))) {
+    throw new Error("dashboard primary action risk level is invalid");
+  }
+  if (!ALLOWED_STATES.has(displayText(primaryAction.status, ""))) {
+    throw new Error("dashboard primary action status is invalid");
+  }
+}
+
+function validateCategoryMetrics(summary) {
+  const metrics = asObject(summary.category_metrics, "dashboard category metrics");
+  for (const key of ["overview", "lessons", "workflow", "maintenance", "security"]) {
+    const metric = asObject(metrics[key], `dashboard category metric ${key}`);
+    for (const field of ["total", "healthy", "warning", "problem", "percent"]) {
+      if (!Number.isInteger(metric[field]) || metric[field] < 0) {
+        throw new Error(`dashboard category metric ${key}.${field} is invalid`);
+      }
+    }
+    if (metric.percent > 100 || metric.total !== metric.healthy + metric.warning + metric.problem) {
+      throw new Error(`dashboard category metric ${key} counts are invalid`);
+    }
+    if (!displayText(metric.unit, "")) {
+      throw new Error(`dashboard category metric ${key}.unit is invalid`);
+    }
+    if (!ALLOWED_STATES.has(displayText(metric.status, ""))) {
+      throw new Error(`dashboard category metric ${key}.status is invalid`);
+    }
+  }
+}
+
+function validateIssues(data) {
+  for (const failure of asArray(data.partial_failures)) {
+    if (!failure || typeof failure !== "object" || Array.isArray(failure)) {
+      throw new Error("dashboard partial failure must be an object");
+    }
+    if (!PARTIAL_FAILURE_STATES.has(displayText(failure.status, ""))) {
+      throw new Error("dashboard partial failure status is invalid");
+    }
+  }
+  for (const followup of asArray(data.summary?.manual_followups)) {
+    if (!followup || typeof followup !== "object" || Array.isArray(followup)) {
+      throw new Error("dashboard manual follow-up must be an object");
+    }
+    if (!MANUAL_FOLLOWUP_STATES.has(displayText(followup.status, ""))) {
+      throw new Error("dashboard manual follow-up status is invalid");
+    }
+  }
+}
+
 export function validateDashboardData(data) {
   if (!data || typeof data !== "object" || Array.isArray(data)) {
     throw new Error("dashboard data must be an object");
@@ -98,6 +174,7 @@ export function validateDashboardData(data) {
   if (!/^[0-9]+\.[0-9]+\.[0-9]+$/.test(displayText(data.schema_version, ""))) {
     throw new Error("dashboard data schema version is invalid");
   }
+  validateIdentity(data);
   const sourceCommands = asArray(data.source_commands).map((command) => displayText(command, ""));
   if (!sourceCommands.includes("tools/dashboard-data")) {
     throw new Error("dashboard data source command is missing");
@@ -113,17 +190,31 @@ export function validateDashboardData(data) {
   if (!["learning", "development", "maintenance", "unknown"].includes(displayText(data.summary.mode, "unknown"))) {
     throw new Error("dashboard mode is invalid");
   }
+  validatePrimaryAction(data.summary);
+  validateCategoryMetrics(data.summary);
+  validateIssues(data);
   validateCommandPreviews(data.actions);
   return data;
 }
 
-export async function fetchDashboardData() {
+export async function fetchDashboardDataSnapshot() {
   const response = await fetch("./dashboard-data.json", {
     cache: "no-store",
     credentials: "same-origin",
+    method: "GET",
   });
   if (!response.ok) {
     throw new Error(`dashboard data request failed with ${response.status}`);
   }
-  return validateDashboardData(await response.json());
+  const raw = await response.text();
+  const data = validateDashboardData(JSON.parse(raw));
+  return {
+    data,
+    signature: `${data.snapshot_id}:${data.content_hash}`,
+  };
+}
+
+export async function fetchDashboardData() {
+  const snapshot = await fetchDashboardDataSnapshot();
+  return snapshot.data;
 }

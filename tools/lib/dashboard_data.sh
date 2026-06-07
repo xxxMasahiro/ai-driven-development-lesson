@@ -17,7 +17,7 @@ if ! declare -F product_security_policy_file >/dev/null 2>&1; then
 fi
 
 dashboard_data_schema_version() {
-  printf '0.1.0'
+  printf '0.2.0'
 }
 
 dashboard_data_generated_at() {
@@ -120,9 +120,17 @@ dashboard_data_validate_state() {
 
 dashboard_data_validate_partial_status() {
   case "$1" in
-    optional|failed|unknown) return 0 ;;
+    failed|blocked|unknown) return 0 ;;
   esac
   printf 'invalid dashboard partial failure status: %s\n' "$1" >&2
+  return 1
+}
+
+dashboard_data_validate_manual_followup_status() {
+  case "$1" in
+    optional|cached|unknown) return 0 ;;
+  esac
+  printf 'invalid dashboard manual follow-up status: %s\n' "$1" >&2
   return 1
 }
 
@@ -183,6 +191,124 @@ dashboard_json_partial_failure() {
   printf '}'
 }
 
+dashboard_json_manual_followup() {
+  local source="$1"
+  local status="$2"
+  local reason="$3"
+  local required_command="$4"
+  dashboard_data_validate_manual_followup_status "$status"
+  printf '{"source":'
+  dashboard_json_string "$source"
+  printf ',"status":'
+  dashboard_json_string "$status"
+  printf ',"reason":'
+  dashboard_json_string "$reason"
+  printf ',"required_command":'
+  dashboard_json_string "$required_command"
+  printf '}'
+}
+
+dashboard_json_primary_action() {
+  local title="$1"
+  local description="$2"
+  local target="$3"
+  local expected_result="$4"
+  local risk_level="$5"
+  local status="$6"
+  local source="$7"
+
+  dashboard_data_validate_risk_level "$risk_level"
+  dashboard_data_validate_state "$status"
+
+  printf '{"title":'
+  dashboard_json_string "$title"
+  printf ',"description":'
+  dashboard_json_string "$description"
+  printf ',"target":'
+  dashboard_json_string "$target"
+  printf ',"expected_result":'
+  dashboard_json_string "$expected_result"
+  printf ',"risk_level":'
+  dashboard_json_string "$risk_level"
+  printf ',"status":'
+  dashboard_json_string "$status"
+  printf ',"source":'
+  dashboard_json_string "$source"
+  printf '}'
+}
+
+dashboard_data_metric_bucket() {
+  case "$1" in
+    ready|passed)
+      printf 'healthy'
+      ;;
+    failed|blocked)
+      printf 'problem'
+      ;;
+    *)
+      printf 'warning'
+      ;;
+  esac
+}
+
+dashboard_data_metric_status() {
+  local healthy="$1"
+  local warning="$2"
+  local problem="$3"
+  local total="$4"
+  if (( problem > 0 )); then
+    printf 'blocked'
+  elif (( total > 0 && healthy == total )); then
+    printf 'ready'
+  elif (( warning > 0 )); then
+    printf 'unknown'
+  else
+    printf 'unknown'
+  fi
+}
+
+dashboard_json_category_metric() {
+  local id="$1"
+  local label="$2"
+  local unit="$3"
+  shift 3
+  local total=0
+  local healthy=0
+  local warning=0
+  local problem=0
+  local state bucket percent status
+
+  for state in "$@"; do
+    [[ -n "$state" ]] || continue
+    dashboard_data_validate_state "$state"
+    total=$((total + 1))
+    bucket="$(dashboard_data_metric_bucket "$state")"
+    case "$bucket" in
+      healthy) healthy=$((healthy + 1)) ;;
+      warning) warning=$((warning + 1)) ;;
+      problem) problem=$((problem + 1)) ;;
+    esac
+  done
+
+  if (( total > 0 )); then
+    percent=$(((healthy * 100) / total))
+  else
+    percent=0
+  fi
+  status="$(dashboard_data_metric_status "$healthy" "$warning" "$problem" "$total")"
+
+  printf '{"id":'
+  dashboard_json_string "$id"
+  printf ',"label":'
+  dashboard_json_string "$label"
+  printf ',"unit":'
+  dashboard_json_string "$unit"
+  printf ',"total":%d,"healthy":%d,"warning":%d,"problem":%d,"percent":%d,' "$total" "$healthy" "$warning" "$problem" "$percent"
+  printf '"status":'
+  dashboard_json_string "$status"
+  printf '}'
+}
+
 dashboard_json_blocking_item() {
   local source="$1"
   local status="$2"
@@ -228,6 +354,21 @@ dashboard_data_add_partial_failure() {
   local -n target_array="$1"
   shift
   target_array+=("$(dashboard_json_partial_failure "$@")")
+}
+
+dashboard_data_add_manual_followup() {
+  local -n target_array="$1"
+  shift
+  target_array+=("$(dashboard_json_manual_followup "$@")")
+}
+
+dashboard_data_content_hash() {
+  local seed="$1"
+  if command -v sha256sum >/dev/null 2>&1; then
+    printf '%s' "$seed" | sha256sum | awk '{print $1}'
+  else
+    printf '%s' "$seed" | shasum -a 256 | awk '{print $1}'
+  fi
 }
 
 dashboard_data_add_blocking_item() {
