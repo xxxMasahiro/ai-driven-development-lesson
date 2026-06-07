@@ -5,6 +5,16 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$TMP_DIR"' EXIT
 
+search_guard() {
+  local pattern="$1"
+  shift
+  if command -v rg >/dev/null 2>&1; then
+    rg -n "$pattern" "$@"
+    return
+  fi
+  grep -RInE "$pattern" "$@"
+}
+
 if [[ ! -x "$ROOT/node_modules/.bin/vite" || ! -x "$ROOT/node_modules/.bin/playwright" ]]; then
   printf 'Dashboard control-center dependencies are not installed.\n' >&2
   printf 'Run npm install before running this check.\n' >&2
@@ -132,17 +142,17 @@ if grep -Eq 'dashboard-data" >"\$output"|dashboard-data" >\$output' "$ROOT/tools
   exit 1
 fi
 
-if rg -n "child_process|exec\\(|spawn\\(" "$ROOT/dashboard-control-center/src" "$ROOT/vite.config.mjs"; then
+if search_guard "child_process|exec\\(|spawn\\(" "$ROOT/dashboard-control-center/src" "$ROOT/vite.config.mjs"; then
   printf 'dashboard-control-center browser surface must not expose command execution paths\n' >&2
   exit 1
 fi
 
-if rg -n "method:[[:space:]]*[\"'](POST|PUT|PATCH|DELETE)" "$ROOT/dashboard-control-center/src" "$ROOT/vite.config.mjs"; then
+if search_guard "method:[[:space:]]*[\"'](POST|PUT|PATCH|DELETE)" "$ROOT/dashboard-control-center/src" "$ROOT/vite.config.mjs"; then
   printf 'dashboard-control-center browser fetches must not use non-GET mutation methods\n' >&2
   exit 1
 fi
 
-if rg -n "fetch\\([\"'](\\./)?tools/" "$ROOT/dashboard-control-center/src"; then
+if search_guard "fetch\\([\"'](\\./)?tools/" "$ROOT/dashboard-control-center/src"; then
   printf 'dashboard-control-center browser surface must not fetch tool command paths\n' >&2
   exit 1
 fi

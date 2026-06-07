@@ -193,6 +193,7 @@ test.describe("English dashboard control center", () => {
     await expect(page.locator(".detail-row")).toHaveCount(8);
 
     await navigation.getByRole("link", { name: /Maintenance Sync/ }).click();
+    await expect(page.getByRole("heading", { name: "Maintenance Sync" })).toBeVisible();
     await expect(page.getByLabel("Detail page decision summary")).toBeVisible();
     await expectCenteredSvg(page.locator(".decision-summary__icon"));
     await expectCenteredSvg(page.locator(".detail-page-header__icon"));
