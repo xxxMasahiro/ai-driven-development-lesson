@@ -39,6 +39,30 @@ async function routeDashboardDataPayload(page, payload, methods = []) {
   });
 }
 
+async function expectCenteredSvg(locator, tolerance = 1) {
+  const deltas = await locator.evaluateAll((elements) =>
+    elements.map((element) => {
+      const svg = element.querySelector("svg");
+      const outer = element.getBoundingClientRect();
+      const inner = svg.getBoundingClientRect();
+      return Math.abs(inner.top + inner.height / 2 - (outer.top + outer.height / 2));
+    }),
+  );
+  expect(deltas.length).toBeGreaterThan(0);
+  expect(Math.max(...deltas)).toBeLessThanOrEqual(tolerance);
+}
+
+async function expectCenteredText(locator, tolerance = 1) {
+  const delta = await locator.evaluate((element) => {
+    const range = document.createRange();
+    range.selectNodeContents(element);
+    const outer = element.getBoundingClientRect();
+    const inner = range.getBoundingClientRect();
+    return Math.abs(inner.top + inner.height / 2 - (outer.top + outer.height / 2));
+  });
+  expect(delta).toBeLessThanOrEqual(tolerance);
+}
+
 test.beforeEach(async ({ page }) => {
   await page.route("**/dashboard-control-center/index.html*", async (route) => {
     await route.fulfill({
@@ -139,6 +163,7 @@ test.describe("English dashboard control center", () => {
     await navigation.getByRole("link", { name: /Lessons/ }).click();
     await expect(page.getByRole("heading", { name: "Lessons" })).toBeVisible();
     await expect(page.getByLabel("Detail page decision summary")).toBeVisible();
+    await expectCenteredSvg(page.locator(".decision-summary__icon"));
     await expect(page.getByText("What this page checks")).toBeVisible();
     await expect(page.getByText("Current judgment")).toBeVisible();
     await expect(page.getByText("Must review")).toBeVisible();
@@ -152,6 +177,7 @@ test.describe("English dashboard control center", () => {
     await navigation.getByRole("link", { name: /Development Workflow/ }).click();
     await expect(page.getByRole("heading", { name: "Development Workflow" })).toBeVisible();
     await expect(page.getByLabel("Detail page decision summary")).toBeVisible();
+    await expectCenteredSvg(page.locator(".decision-summary__icon"));
     await expect(page.getByRole("heading", { name: "Must Review First" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Ready Items" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Product Repository" })).toBeVisible();
@@ -164,6 +190,7 @@ test.describe("English dashboard control center", () => {
 
     await navigation.getByRole("link", { name: /Maintenance Sync/ }).click();
     await expect(page.getByLabel("Detail page decision summary")).toBeVisible();
+    await expectCenteredSvg(page.locator(".decision-summary__icon"));
     await expect(page.getByRole("heading", { name: "Manual Confirmation Flow" })).toBeVisible();
     await expect(page.locator(".confirmation-row")).toHaveCount(3);
     await expect(page.getByText("product_git_sync_live")).toHaveCount(0);
@@ -173,6 +200,7 @@ test.describe("English dashboard control center", () => {
     await navigation.getByRole("link", { name: /Safety Actions/ }).click();
     await expect(page.getByRole("heading", { name: "Safety Actions" })).toBeVisible();
     await expect(page.getByLabel("Detail page decision summary")).toBeVisible();
+    await expectCenteredSvg(page.locator(".decision-summary__icon"));
     await expect(page.getByRole("heading", { name: "Partial Failures" })).toBeVisible();
     await expect(page.getByText("Security gate violation")).toBeVisible();
     await expect(page.getByText("security_gate")).toHaveCount(0);
@@ -301,6 +329,7 @@ test.describe("Japanese dashboard control center", () => {
     await expect(page.getByRole("region", { name: "カテゴリ別の状態" }).getByText(/ワークフロー項目/)).toBeVisible();
     await expect(page.getByRole("heading", { name: "ページを確認" })).toBeVisible();
     await expect(page.getByText("最終更新")).toBeVisible();
+    await expectCenteredText(page.locator(".action-meta .risk", { hasText: "低" }).first());
     await expect(page.getByText("このリポジトリ管理パネルは読み取り専用です。", { exact: false })).toBeVisible();
     const manualFollowups = page.locator(".issue-summary", { hasText: "手動確認事項" });
     await expect(manualFollowups).toContainText("ライブCI状態");

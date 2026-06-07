@@ -436,9 +436,11 @@ h4 {
   .command-preview__icon,
   .failure-row__severity
 ) {
+  display: inline-flex;
   align-items: center;
+  justify-content: center;
   justify-items: center;
-  line-height: 0;
+  line-height: 1;
 }
 
 :is(
@@ -520,11 +522,12 @@ h4 {
 }
 
 .decision-summary__icon {
-  display: grid;
+  display: inline-flex;
   width: 38px;
   height: 38px;
   flex: 0 0 auto;
-  place-items: center;
+  align-items: center;
+  justify-content: center;
   border-radius: 999px;
   background: var(--category-soft, #eef4ff);
   color: var(--category-color, #0f6f78);
@@ -534,7 +537,7 @@ h4 {
   min-width: 0;
 }
 
-.decision-summary__item span {
+.decision-summary__item > div > span {
   display: block;
   color: var(--category-color, #0f6f78);
   font-size: 0.86rem;
@@ -1107,7 +1110,7 @@ h4 {
   min-width: 0;
 }
 
-.action-meta-row span {
+.action-meta-row > div > span {
   display: block;
   color: #69777d;
   font-size: 0.72rem;
@@ -1461,16 +1464,17 @@ h4 {
 .status,
 .risk {
   display: inline-flex;
+  height: 26px;
   min-height: 26px;
   min-width: 26px;
   align-items: center;
   justify-content: center;
   gap: 5px;
-  padding: 4px 8px;
+  padding: 0 8px;
   border-radius: 999px;
   font-size: 0.76rem;
   font-weight: 750;
-  line-height: 0;
+  line-height: 1;
   text-align: center;
   white-space: nowrap;
 }
