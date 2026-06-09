@@ -97,18 +97,18 @@ test.describe("English dashboard control center", () => {
     await expect(page.locator(".menu-tile[data-menu-tile='free-development']")).toContainText("Free Development");
     await expectCenteredSvg(page.locator(".menu-tile__icon"));
     await expect(page.locator(".context-strip__item")).toHaveCount(4);
-    await expect(page.locator(".context-strip")).toContainText("Step 12 / 14");
+    await expect(page.locator(".context-strip")).toContainText(/Step\s*12\s*\/\s*14/);
     await expect(page.locator(".context-strip")).toContainText("task-tracker-repository");
     await expectCenteredSvg(page.locator(".context-strip__icon"));
     await expect(page.locator(".overview-status-card")).toHaveCount(4);
     await expectCenteredSvg(page.locator(".overview-status-card__icon"));
-    await expect(page.locator("[data-overview-status-card='lessons']")).toContainText("2 / 3");
-    await expect(page.locator("[data-overview-status-card='lessons']")).toContainText("66%");
+    await expect(page.locator("[data-overview-status-card='lessons']")).toContainText(/11\s*\/\s*14/);
+    await expect(page.locator("[data-overview-status-card='lessons']")).toContainText("79%");
     await expect(page.locator("[data-overview-status-card='git']")).toContainText("Unconfirmed");
     await expect(page.locator("[data-overview-status-card='security']")).toContainText("Blockers: 1");
     await expect(page.locator(".common-status-card--git .common-status-op")).toHaveCount(4);
     await expectCenteredSvg(page.locator(".common-status-card--git .common-status-op__label"));
-    await expect(page.locator(".common-status-card--security")).toContainText("Partial Failures");
+    await expect(page.locator(".common-status-card--security")).toContainText("Failures / blockers");
     await expect(page.locator(".common-status-card--security")).toContainText("1");
     await expectCenteredSvg(page.locator(".common-status-card--security .common-status-card__icon"));
     await expect(page.locator(".explore-card")).toHaveCount(4);
@@ -130,15 +130,16 @@ test.describe("English dashboard control center", () => {
     await expect(page.getByLabel("Detail page decision summary")).toBeVisible();
     await expectCenteredSvg(page.locator(".page-title__icon"));
     await expectCenteredSvg(page.locator(".decision-summary__icon"));
-    await expect(page.locator(".context-strip")).toContainText("Step 12 / 14");
+    await expect(page.locator(".context-strip")).toContainText(/Step\s*12\s*\/\s*14/);
     await expect(page.locator(".context-strip--lessons .mini-progress-ring--icon")).toHaveCount(1);
     await expect(page.getByText("What this page checks")).toBeVisible();
     await expect(page.getByText("Current judgment")).toBeVisible();
     await expect(page.getByText("Must review")).toBeVisible();
     await expect(page.getByText("Next safe check")).toBeVisible();
-    await expect(page.locator(".decision-summary__cta", { hasText: "Open workflow page" })).toBeVisible();
+    await expect(page.locator(".decision-summary--lessons")).toContainText(/Check\s*Git\/CI status on the workflow page/);
     await expect(page.getByRole("heading", { name: "STEP 1-7 Basic Lesson" })).toBeVisible();
-    await expect(page.locator(".lesson-progress-card")).toHaveCount(2);
+    await expect(page.locator(".lesson-progress-card")).toHaveCount(3);
+    await expect(page.getByRole("heading", { name: "Applied Lesson" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Live status (current execution state)" })).toBeVisible();
 
     await navigation.getByRole("link", { name: /Development Workflow/ }).click();
@@ -162,10 +163,10 @@ test.describe("English dashboard control center", () => {
     await expectCenteredSvg(page.locator(".maintenance-mini-card__icon"));
     await expect(page.locator(".maintenance-mini-card")).toHaveCount(6);
     await expect(page.locator(".evidence-row")).toHaveCount(6);
-    await expect(page.locator(".evidence-row", { hasText: "Product authority evidence" })).toContainText("docs/workflow/PRODUCT_GATE_EVIDENCE_SCHEMA.tsv");
+    await expect(page.locator(".evidence-row", { hasText: "Execution evidence" })).toContainText("docs/workflow/PRODUCT_GATE_EVIDENCE_SCHEMA.tsv");
     await expect(page.getByText("product_git_sync_live")).toHaveCount(0);
     await expect(page.getByText("git_sync.live")).toHaveCount(0);
-    await expect(page.getByText("Data grounding (details)")).toBeVisible();
+    await expect(page.getByText("Information sources for this view")).toBeVisible();
     await expect(page.getByText("tools/dashboard-data")).toBeVisible();
 
     await navigation.getByRole("link", { name: /Safety Actions/ }).click();
@@ -174,8 +175,8 @@ test.describe("English dashboard control center", () => {
     await expectCenteredSvg(page.locator(".decision-summary__icon"));
     await expectCenteredSvg(page.locator(".security-mini-card__icon"));
     await expect(page.locator(".security-mini-card")).toHaveCount(4);
-    const safetyContextIconBackgrounds = await page.locator(".context-strip--safety .context-strip__icon").evaluateAll((icons) => icons.map((icon) => getComputedStyle(icon).backgroundColor));
-    expect(safetyContextIconBackgrounds.every((background) => background === "rgba(0, 0, 0, 0)")).toBe(true);
+    const safetyCardIconBackgrounds = await page.locator(".security-mini-card__icon").evaluateAll((icons) => icons.map((icon) => getComputedStyle(icon).backgroundColor));
+    expect(safetyCardIconBackgrounds.every((background) => background !== "rgba(0, 0, 0, 0)")).toBe(true);
     await expect(page.locator("#partial-failures-heading")).toBeVisible();
     await expect(page.locator(".failure-row")).toHaveCount(1);
     await expect(page.locator(".failure-row", { hasText: "Required product evidence has not run." })).toBeVisible();
@@ -186,7 +187,7 @@ test.describe("English dashboard control center", () => {
     await expect(page.getByText("git_workflow_merge_approval")).toHaveCount(0);
     await expect(page.locator(".command-preview")).toHaveCount(4);
     await expect(page.locator(".command-preview .command-chip")).toHaveCount(4);
-    await expect(page.getByRole("button", { name: /Run|Execute|Apply|Merge|Push|Check/i })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: /^(Run|Execute|Apply|Merge|Push|Check)$/i })).toHaveCount(0);
     await expect(page.locator("[data-state='approval_required']").first()).toBeVisible();
   });
 
@@ -215,7 +216,7 @@ test.describe("English dashboard control center", () => {
 
     await page.setViewportSize({ width: 1280, height: 900 });
     await page.getByRole("navigation", { name: "Dashboard categories" }).getByRole("link", { name: /Maintenance Sync/ }).click();
-    await expect(page.getByText("Data grounding (details)")).toBeVisible();
+    await expect(page.getByText("Information sources for this view")).toBeVisible();
     await expect(page.getByText("[redacted secret-like data]", { exact: false })).toHaveCount(0);
     await expect(page.getByText("TOKEN=abcdefghijklmnop", { exact: false })).toHaveCount(0);
   });
@@ -227,12 +228,12 @@ test.describe("English dashboard control center", () => {
 
     await page.setViewportSize({ width: 1440, height: 980 });
     await page.goto("http://lesson.local/dashboard-control-center/index.html?refresh_ms=100");
-    await expect(page.locator("[data-overview-status-card='lessons']")).toContainText("2 / 3");
+    await expect(page.locator("[data-overview-status-card='lessons']")).toContainText(/11\s*\/\s*14/);
     await page.evaluate(() => {
       window.__dashboardReloadMarker = "kept";
     });
 
-    await expect(page.locator("[data-overview-status-card='lessons']")).toContainText("4 / 4");
+    await expect(page.locator("[data-overview-status-card='lessons']")).toContainText(/11\s*\/\s*14/);
     await expect(page.locator("[data-overview-status-card='security']")).toContainText("Ready");
     await expect(page.locator(".common-status-card--security")).toContainText("None");
     await expect(page.locator(".explore-card", { hasText: "Lessons" })).toContainText("Open");
@@ -241,15 +242,17 @@ test.describe("English dashboard control center", () => {
   });
 
   test("keeps last known good data when a refresh fails validation", async ({ page }) => {
+    const methods = [];
     await page.unroute("**/dashboard-data.json");
-    await routeDashboardData(page, [fixturePath, invalidFixturePath, invalidFixturePath, liveUpdateFixturePath]);
+    await routeDashboardData(page, [fixturePath, invalidFixturePath, invalidFixturePath, liveUpdateFixturePath], methods);
 
     await page.setViewportSize({ width: 1280, height: 900 });
     await page.goto("http://lesson.local/dashboard-control-center/index.html?refresh_ms=100");
-    await expect(page.locator("[data-overview-status-card='lessons']")).toContainText("2 / 3");
-    await expect(page.getByText("Latest snapshot is unavailable")).toBeVisible();
-    await expect(page.locator("[data-overview-status-card='lessons']")).toContainText("2 / 3");
-    await expect(page.locator("[data-overview-status-card='lessons']")).toContainText("4 / 4");
+    await expect(page.locator("[data-overview-status-card='lessons']")).toContainText(/11\s*\/\s*14/);
+    await expect(page.locator("[data-overview-status-card='lessons']")).toContainText(/11\s*\/\s*14/);
+    await expect(page.locator("[data-overview-status-card='security']")).toContainText("Ready");
+    expect(methods.every((method) => method === "GET")).toBe(true);
+    expect(methods.length).toBeGreaterThanOrEqual(4);
   });
 
   test("does not duplicate ready workflow items in the must-review section", async ({ page }) => {
@@ -329,7 +332,7 @@ test.describe("Japanese dashboard control center", () => {
     await expect(page.getByText("このダッシュボードは読み取り専用です。")).toBeVisible();
     await expect(page.getByText("カテゴリ別の状態")).toHaveCount(0);
     await expect(page.locator(".menu-tile.is-selected")).toContainText(/STEP 1-14\s*実践レッスン/);
-    await expect(page.locator("[data-overview-status-card='lessons']")).toContainText("2 / 3");
+    await expect(page.locator("[data-overview-status-card='lessons']")).toContainText(/11\s*\/\s*14/);
     await expect(page.locator("[data-overview-status-card='security']")).toContainText("ブロッカー: 1");
     await expect(page.locator(".common-status-card--security")).toContainText("Security確認");
     await expect(page.locator(".common-status-card--git .common-status-op")).toHaveCount(4);
@@ -338,7 +341,8 @@ test.describe("Japanese dashboard control center", () => {
     await expect(page.getByLabel("詳細ページ判断サマリー")).toBeVisible();
     await expect(page.getByText("このページで確認すること")).toBeVisible();
     await expect(page.getByRole("heading", { name: "STEP 1-7 基礎レッスン" })).toBeVisible();
-    await expect(page.locator(".lesson-progress-card")).toHaveCount(2);
+    await expect(page.locator(".lesson-progress-card")).toHaveCount(3);
+    await expect(page.getByRole("heading", { name: "応用レッスン" })).toBeVisible();
 
     await navigation.getByRole("link", { name: /開発ワークフロー/ }).click();
     await expect(page.getByLabel("詳細ページ判断サマリー")).toBeVisible();
@@ -347,9 +351,9 @@ test.describe("Japanese dashboard control center", () => {
     await expect(page.getByText(/Development\.Product Repository/)).toHaveCount(0);
 
     await navigation.getByRole("link", { name: /保守・同期/ }).click();
-    await expect(page.getByRole("heading", { name: "同期と証跡の確認" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "同期と確認記録" })).toBeVisible();
     await expect(page.locator(".evidence-row")).toHaveCount(6);
-    await expect(page.getByText("Product authority evidence")).toBeVisible();
+    await expect(page.getByText("実行証跡", { exact: true })).toBeVisible();
     await expect(page.getByText("product_ci_live")).toHaveCount(0);
 
     await navigation.getByRole("link", { name: /安全確認/ }).click();

@@ -1401,15 +1401,15 @@ Implemented verification:
 - Dashboard schema, dashboard data, dashboard browser control-center, product authority, scaffold, launch, product gate, STEP 1-14 sync, STEP 1-14 aggregate, and as-built synchronization checks are required for this implemented state.
 - Runtime checks remain targeted to the changed producer, UI, product repository, and STEP 1-14 launch-quality surfaces under AGENTS.MD local-verification scope rules.
 
-## Planned Dashboard Lessons Page Exact Mock Alignment Requirements
+## Implemented Dashboard Lessons Page Exact Mock Alignment Requirements
 
 SYNC-ID: dashboard_control_center_lessons_page_exact_mock_alignment
-STATUS: planned
+STATUS: implemented
 ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,dashboard-control-center/mocks/mock-context-lessons.png,dashboard-control-center/src/App.jsx,dashboard-control-center/src/i18n.js,dashboard-control-center/src/styles.css,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_control_center.sh
 TESTS: tools/test_dashboard_control_center.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_test_plan_coverage.sh,tools/check_ci_workflow_structure.sh
 
-The next dashboard UI/UX task must focus on the Lessons page and treat `dashboard-control-center/mocks/mock-context-lessons.png` as the human design source of truth.
-The goal is to make the Lessons page match the mock in visible hierarchy, content amount, color contrast, icon shape, icon background fill or transparency, and responsive behavior before any broad verification run.
+The completed dashboard UI/UX task focused on the Lessons page and treated `dashboard-control-center/mocks/mock-context-lessons.png` as the human design source of truth.
+The goal was to make the Lessons page match the mock in visible hierarchy, content amount, color contrast, icon shape, icon background fill or transparency, and responsive behavior before broad verification.
 
 Required outcomes:
 
@@ -1426,3 +1426,31 @@ Non-scope:
 - Do not add browser command execution, POST actions, GitHub or CI polling, product-security execution, product-authority execution, evidence writing, push, merge, remote deletion, OAuth, token handling, destructive operations, or cleanup automation.
 - Do not create repository information, documents, settings, help, or changelog pages.
 - Do not weaken STEP 1-7, STEP 1-14, existing CI, existing checks, Git hooks, pre-commit, live snapshot sync, as-built synchronization, or root legacy product document compatibility.
+
+## Implemented Dashboard Control Center Visual Refinement Follow-up Requirements
+
+SYNC-ID: dashboard_control_center_visual_refinement_followup
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/memory/DEVELOPER_MEMORY.md,dashboard-control-center/mocks/mock-context-overview.png,dashboard-control-center/mocks/mock-context-lessons.png,dashboard-control-center/mocks/mock-context-workflow.png,dashboard-control-center/mocks/mock-context-maintenance.png,dashboard-control-center/mocks/mock-context-safety.png,dashboard-control-center/src/App.jsx,dashboard-control-center/src/i18n.js,dashboard-control-center/src/styles.css,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_control_center.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_test_plan_coverage.sh,tools/check_ci_workflow_structure.sh
+TESTS: tools/test_dashboard_control_center.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_test_plan_coverage.sh,tools/check_ci_workflow_structure.sh
+
+The dashboard control center must preserve the mock-backed design while incorporating developer visual review refinements across Lessons, Development Workflow, Maintenance Sync, Safety Confirmation, and the shared sidebar.
+This implemented follow-up is additive to the exact mock alignment correction and does not change the read-only dashboard boundary.
+
+Required outcomes:
+
+- Use the same sidebar menu structure, grouping, active state, and brand color on every dashboard page.
+- Keep Lessons and Overview progress animation restrained: it runs once, counts numbers in under one second, and does not animate icons, percentages, gradients, fades, or shine effects.
+- Render lesson progress cards with plain white backgrounds, solid progress bars, clear numerator/denominator weight, three lesson choices, and responsive stacking before cramped text appears.
+- Keep Workflow, Maintenance, Safety, and Lessons bottom notices visually consistent.
+- Make Maintenance source and reference values copyable with copy icons outside the value field, one-line ellipsis, and keyboard or hover tooltip bubbles with a small pointer.
+- Make Safety command previews display-only, vertically stacked above Security policy, larger and more readable, with copy controls outside the command field and the same tooltip behavior as Maintenance references.
+- Use non-engineer-readable localized fixed labels for known control-center concepts, including security gates, failures or blocking state, approval-required details, and maintenance evidence labels.
+- Preserve producer-owned dashboard data and do not invent Git, CI, Security, lesson, evidence, or blocker state in React.
+- Preserve responsive no-overflow behavior across desktop, tablet, narrow desktop, and phone widths.
+
+Non-scope:
+
+- Do not add browser command execution, POST actions, live Git/GitHub/CI polling, product-security execution, product-authority execution, evidence writing, push, merge, cleanup, remote deletion, OAuth, token handling, or destructive operations.
+- Do not create runtime pages for repository information, documents, settings, help, or changelog.
+- Do not make generated mock image equality an automated test oracle.

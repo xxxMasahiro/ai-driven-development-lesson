@@ -1270,20 +1270,39 @@ STATUS: implemented
 ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/DASHBOARD_DATA_SCHEMA.tsv,docs/workflow/PRODUCT_REPOSITORY_STRUCTURE.tsv,docs/workflow/PRODUCT_GATE_EVIDENCE_SCHEMA.tsv,docs/workflow/TEST_PLAN_MANIFEST.tsv,docs/workflow/GIT_HOOK_CHECKS.tsv,docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv,docs/workflow/FINAL_GATE_COVERAGE.tsv,free-development/FREE_DEVELOPMENT_MODE.md,templates/TEMPLATES.md,lesson/SYNC_GATES_14_DAYS.tsv,tools/lib/dashboard_data.sh,tools/dashboard-data,tools/lib/product_repository_authority.sh,tools/free-development,tools/product-improvement,tools/external-integration,tools/product-scaffold-check,tools/product-launch-check,dashboard-control-center/mocks/mock-context-overview.png,dashboard-control-center/mocks/mock-context-lessons.png,dashboard-control-center/mocks/mock-context-workflow.png,dashboard-control-center/mocks/mock-context-maintenance.png,dashboard-control-center/mocks/mock-context-safety.png,dashboard-control-center/src/App.jsx,dashboard-control-center/src/dashboardData.js,dashboard-control-center/src/i18n.js,dashboard-control-center/src/styles.css,tests/fixtures/dashboard-control-center.json,tests/fixtures/dashboard-control-center-live-update.json,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/test_dashboard_control_center.sh,tools/test_product_repository_authority.sh,tools/test_product_scaffold_check.sh,tools/test_product_launch_check.sh,tools/test_product_gate_tools.sh,tools/check_lesson14_sync.sh,tools/test_lesson14.sh,tools/check_test_plan_coverage.sh,tools/check_ci_workflow_structure.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh
 TESTS: tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/test_dashboard_control_center.sh,tools/test_product_repository_authority.sh,tools/test_product_scaffold_check.sh,tools/test_product_launch_check.sh,tools/test_product_gate_tools.sh,tools/check_lesson14_sync.sh,tools/test_lesson14.sh,tools/check_test_plan_coverage.sh,tools/test_test_plan.sh,tools/test_git_hooks.sh,tools/test_git_hooks_parallel.sh,tools/test_ci_final_gate.sh,tools/check_ci_workflow_structure.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh
 
-## Planned Dashboard Lessons Page Exact Mock Alignment Handoff
+## Implemented Dashboard Lessons Page Exact Mock Alignment Handoff
 
 SYNC-ID: dashboard_control_center_lessons_page_exact_mock_alignment
-STATUS: planned
+STATUS: implemented
 ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,dashboard-control-center/mocks/mock-context-lessons.png,dashboard-control-center/src/App.jsx,dashboard-control-center/src/i18n.js,dashboard-control-center/src/styles.css,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_control_center.sh
 TESTS: tools/test_dashboard_control_center.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_test_plan_coverage.sh,tools/check_ci_workflow_structure.sh
 
 Restart context:
 
-- Next runtime work starts with the Lessons page only.
+- The Lessons page mock-alignment pass is implemented.
 - Source mock: `dashboard-control-center/mocks/mock-context-lessons.png`.
-- The developer rejected the current Lessons page as not fully mock-aligned and wants the page matched to the mock before broad verification.
-- Start with a browser screenshot of the current Lessons page and compare it with the source mock for content amount, color contrast, icon identity, icon background fill or transparency, spacing, progress presentation, and responsive behavior.
+- Future Lessons work should start from the implemented three-card, responsive, read-only page and compare against the source mock for regressions.
 - Keep the dashboard read-only and producer-owned. Do not invent lesson progress, blocker, approval, repository, Git, CI, Security, or language facts in React.
 - For future visual implementation, perform visual alignment first and run tests after developer visual approval unless the workflow owner explicitly requests Git/CI closure.
 - Use the existing dashboard dev command when visual inspection is needed: `DASHBOARD_CONTROL_CENTER_DATA_FILE=.dashboard-control-center/dashboard-data.json npm run dashboard:dev -- --host 127.0.0.1`.
 - Do not create repository information, documents, settings, help, or changelog runtime pages in this planned pass.
+
+## Implemented Dashboard Control Center Visual Refinement Follow-up Handoff
+
+SYNC-ID: dashboard_control_center_visual_refinement_followup
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/memory/DEVELOPER_MEMORY.md,dashboard-control-center/mocks/mock-context-overview.png,dashboard-control-center/mocks/mock-context-lessons.png,dashboard-control-center/mocks/mock-context-workflow.png,dashboard-control-center/mocks/mock-context-maintenance.png,dashboard-control-center/mocks/mock-context-safety.png,dashboard-control-center/src/App.jsx,dashboard-control-center/src/i18n.js,dashboard-control-center/src/styles.css,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_control_center.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_test_plan_coverage.sh,tools/check_ci_workflow_structure.sh
+TESTS: tools/test_dashboard_control_center.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_test_plan_coverage.sh,tools/check_ci_workflow_structure.sh
+
+Restart context:
+
+- The active dashboard visual refinement now spans Lessons, Development Workflow, Maintenance Sync, Safety Confirmation, and the shared sidebar.
+- The left sidebar is unified across implemented pages and should remain consistent with the dashboard overview menu.
+- Lessons and dashboard lesson-progress cards use white backgrounds, solid-color progress, one-time count-up animation only, and no gradient/fade/shine/icon scaling effects.
+- Maintenance source and reference fields use one-line ellipsis, copy buttons outside the field, and tooltip bubbles with a pointer for full values.
+- Safety command previews use the same copy/tooltip behavior and are stacked above Security policy for readability.
+- Known fixed labels should remain localized through `i18n.js`; file paths, command text, evidence ids, and repository facts remain producer data.
+- Developer Memory was intentionally reset and repopulated with active dashboard/maintenance follow-ups.
+- Minimal verification and Git/CI closure are the remaining active steps for this request.
+
+Stop and ask before adding browser command execution, POST actions, live Git/GitHub/CI polling, product-security execution, product-authority execution, evidence writing, push/merge automation inside the dashboard, destructive operations, runtime placeholder pages, or screenshot-equality test oracles.

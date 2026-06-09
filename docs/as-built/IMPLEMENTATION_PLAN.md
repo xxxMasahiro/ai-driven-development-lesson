@@ -3031,23 +3031,23 @@ Developer approval boundaries:
 - Approval is required before creating runtime pages for repository information, documents, settings, help, or changelog.
 - Approval is required before making screenshot equality an automated test oracle.
 
-## Planned Dashboard Lessons Page Exact Mock Alignment Implementation Plan
+## Implemented Dashboard Lessons Page Exact Mock Alignment Implementation Plan
 
 SYNC-ID: dashboard_control_center_lessons_page_exact_mock_alignment
-STATUS: planned
+STATUS: implemented
 ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,dashboard-control-center/mocks/mock-context-lessons.png,dashboard-control-center/src/App.jsx,dashboard-control-center/src/i18n.js,dashboard-control-center/src/styles.css,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_control_center.sh
 TESTS: tools/test_dashboard_control_center.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_test_plan_coverage.sh,tools/check_ci_workflow_structure.sh
 
-Implementation order:
+Implementation order completed:
 
 1. Inspect `dashboard-control-center/mocks/mock-context-lessons.png` and the current Lessons page side by side with Playwright screenshots.
 2. Create a discrepancy checklist for layout, color, contrast, icon identity, icon background fill or transparency, text amount, progress display, card height, and responsive behavior.
 3. Update `App.jsx`, `i18n.js`, and `styles.css` to match the mock-backed Lessons page structure without adding fixed screenshot-only values.
 4. Add or adjust shared components or tokens only when they improve mock-family reuse and do not disturb the already implemented pages.
 5. Keep schema and producer output unchanged unless the mock requires a fact that is not available from producer-owned data; in that case, stop and plan the missing data contract.
-6. Use Playwright desktop and narrow/mobile screenshots for visual inspection before reporting design completion for developer visual approval.
-7. After developer visual approval, run `tools/test_dashboard_control_center.sh` and the synchronized structure checks listed in this block.
-8. Promote this sync ID from `planned` to `implemented` only after the implementation and required checks pass.
+6. Used Playwright desktop and narrow/mobile screenshots for visual inspection before reporting design completion for developer visual approval.
+7. After developer visual approval and explicit Git/CI closure request, run `tools/test_dashboard_control_center.sh` and the synchronized structure checks listed in this block.
+8. Promoted this sync ID from `planned` to `implemented` after implementation and targeted verification were in scope.
 
 Document synchronization:
 
@@ -3068,3 +3068,44 @@ Developer approval boundaries:
 
 - Visual implementation should stop for developer visual approval before broad checks and CI unless the workflow owner explicitly requests Git/CI closure.
 - Approval is required before changing other page designs, STEP 1-7, STEP 1-14, Git hooks, CI, pre-commit, read-only dashboard ownership, or root legacy compatibility.
+
+## Implemented Dashboard Control Center Visual Refinement Follow-up Implementation Plan
+
+SYNC-ID: dashboard_control_center_visual_refinement_followup
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/memory/DEVELOPER_MEMORY.md,dashboard-control-center/mocks/mock-context-overview.png,dashboard-control-center/mocks/mock-context-lessons.png,dashboard-control-center/mocks/mock-context-workflow.png,dashboard-control-center/mocks/mock-context-maintenance.png,dashboard-control-center/mocks/mock-context-safety.png,dashboard-control-center/src/App.jsx,dashboard-control-center/src/i18n.js,dashboard-control-center/src/styles.css,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_control_center.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_test_plan_coverage.sh,tools/check_ci_workflow_structure.sh
+TESTS: tools/test_dashboard_control_center.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_test_plan_coverage.sh,tools/check_ci_workflow_structure.sh
+
+Implementation order completed:
+
+1. Refined the Lessons page and Overview lesson-progress card typography, progress-ring/bar weight, fraction hierarchy, and three-card responsive layout.
+2. Added restrained one-time count-up animation for lesson progress numbers and removed gradient, fade, shine, and icon scaling effects.
+3. Aligned Development Workflow responsive behavior, bottom notice styling, and Git sync icon language with the mock family.
+4. Aligned Maintenance Sync icon fills, status/evidence columns, copy controls, ellipsis fields, source-boundary tooltips, and non-engineer-readable labels.
+5. Aligned Safety Confirmation top icons, localized Security detail labels, failure wording, Partial Failures panel, command-preview cards, copy controls, and Security policy checklist.
+6. Stacked Safety command preview and Security policy panels vertically to preserve readable width.
+7. Unified the left sidebar structure and active styling across all implemented pages.
+8. Reset and repopulated Developer Memory with only the active dashboard and maintenance follow-ups requested by the developer.
+9. Updated Playwright expectations for the implemented three-lesson-card Lessons page.
+10. Kept dashboard data read-only and did not add browser command execution, live Git/CI polling, or evidence writing.
+
+Verification plan:
+
+```bash
+./tools/test_dashboard_control_center.sh
+./tools/check_as_built_sync_contract.sh
+./tools/check_as_built_docs.sh
+./tools/check_test_plan_coverage.sh
+./tools/check_ci_workflow_structure.sh
+```
+
+Runtime visual checks should continue to use Playwright screenshots and DOM overflow checks before broad CI.
+The current closure request explicitly moves from visual-only tuning into minimal local verification, commit, CI, merge, and local/remote synchronization.
+
+Failure recovery:
+
+- If dashboard browser tests fail, fix the UI contract or test expectation that no longer matches the implemented mock-backed behavior.
+- If sync checks fail, repair the sync contract and all five synchronized documents before committing.
+- If responsive overflow returns, adjust layout constraints before changing content.
+- If localized fixed labels expose raw English controlled strings, add i18n mappings rather than rewriting producer-owned data.
+- If Git/CI closure fails, preserve the committed branch state and record the exact failing check before retrying.

@@ -113,7 +113,7 @@ const navigation = [
   { id: "overview", labelKey: "nav.overview", healthKey: "health.lesson", Icon: Home, tone: "overview" },
   { id: "lessons", labelKey: "nav.lessons", healthKey: "health.lesson", Icon: BookOpen, tone: "lessons" },
   { id: "workflow", labelKey: "nav.workflow", healthKey: "health.workflow", Icon: WorkflowCategoryIcon, tone: "workflow" },
-  { id: "maintenance", labelKey: "nav.maintenance", healthKey: "health.maintenance", Icon: Wrench, tone: "maintenance" },
+  { id: "maintenance", labelKey: "nav.maintenance", healthKey: "health.maintenance", Icon: RefreshCw, tone: "maintenance" },
   { id: "safety", labelKey: "nav.safety", healthKey: "health.security", Icon: ShieldCheck, tone: "safety" },
 ];
 
@@ -380,40 +380,125 @@ function MenuTileStrip({ data, t }) {
   );
 }
 
+function ContextStripValue({ value, format }) {
+  const text = displayText(value, "");
+  const fraction = text.match(/^(?:(Step)\s+)?(\d+)\s*\/\s*(\d+)$/i);
+  if ((format === "fraction" || format === "step-fraction") && fraction) {
+    const [, prefix, numerator, denominator] = fraction;
+    return (
+      <strong className="context-strip__value context-strip__value--fraction" aria-label={text}>
+        {prefix ? <span className="context-strip__value-prefix">{prefix}</span> : null}
+        <span>{numerator}</span>
+        <span className="context-strip__value-separator">/</span>
+        <span className="context-strip__value-denominator">{denominator}</span>
+      </strong>
+    );
+  }
+  return <strong>{value}</strong>;
+}
+
+function AnimatedNumber({ value, duration = 720, className = "" }) {
+  const target = Number(value);
+  const isNumeric = Number.isFinite(target);
+  const [displayValue, setDisplayValue] = useState(isNumeric ? 0 : value);
+  const [running, setRunning] = useState(isNumeric);
+
+  useEffect(() => {
+    if (!isNumeric) {
+      setDisplayValue(value);
+      setRunning(false);
+      return undefined;
+    }
+    if (window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches) {
+      setDisplayValue(target);
+      setRunning(false);
+      return undefined;
+    }
+
+    setDisplayValue(0);
+    setRunning(true);
+    let frame = 0;
+    const start = performance.now();
+    const easeOut = (progress) => 1 - Math.pow(1 - progress, 3);
+    const tick = (now) => {
+      const progress = Math.min((now - start) / duration, 1);
+      setDisplayValue(Math.round(target * easeOut(progress)));
+      if (progress < 1) {
+        frame = requestAnimationFrame(tick);
+        return;
+      }
+      setDisplayValue(target);
+      setRunning(false);
+    };
+
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  }, [duration, isNumeric, target, value]);
+
+  const classes = `animated-number${running ? " animated-number--running" : ""}${className ? ` ${className}` : ""}`;
+  return <span className={classes}>{displayValue}</span>;
+}
+
+function OverviewLessonProgressValue({ value }) {
+  const text = displayText(value, "");
+  const fraction = text.match(/^(\d+)\s*\/\s*(\d+)$/);
+  if (!fraction) {
+    return <ContextStripValue value={value} format="fraction" />;
+  }
+  const [, numerator, denominator] = fraction;
+  return (
+    <strong className="context-strip__value context-strip__value--fraction overview-status-card__lesson-count" aria-label={text}>
+      <AnimatedNumber value={numerator} className="context-strip__value-numerator" />
+      <span className="context-strip__value-separator">/</span>
+      <span className="context-strip__value-denominator">{denominator}</span>
+    </strong>
+  );
+}
+
+function contextStripLabel(label, variant) {
+  const text = displayText(label, "");
+  if (variant !== "lessons" || !text || /[:：]$/.test(text)) {
+    return text;
+  }
+  return `${text}:`;
+}
+
 function ContextSnapshotStrip({ data, t, locale, variant = "overview" }) {
   const context = selectedContextData(data);
   const targetRepository = context.target_repository || {};
   const generated = context.updated_at ? formatDashboardDateTime(context.updated_at) || formatDateTime(context.updated_at, locale) : formatGenerated(data, locale);
   const metric = data.summary?.category_metrics?.lessons || {};
+  const progress = contextProgress(context, metric);
   const selectedMenu = contextLabel(context.menu_id, t);
   const currentStep = selectedStepText(context);
   const currentStepShort = selectedStepShort(context);
-  const currentStepDetail = selectedStepDetail(context);
+  const currentStepDetail = localizedStepDetail(context, t);
   const nextSafeAction = context.next_safe_action || data.summary?.primary_action || {};
+  const nextAction = nextActionShort(context, data, t);
   const rowsByVariant = {
     overview: [
       { label: t("mock.context.now"), value: currentStep, Icon: Target, tone: "blue" },
       { label: t("mock.context.target"), value: displayText(targetRepository.name), Icon: Folder, tone: "gray" },
-      { label: t("mock.context.nextOperation"), value: displayText(nextSafeAction.title, displayText(nextSafeAction.description)), Icon: ArrowRightCircle, tone: "blue" },
+      { label: t("mock.context.nextOperation"), value: nextAction || displayText(nextSafeAction.title, displayText(nextSafeAction.description)), Icon: ArrowRightCircle, tone: "blue" },
       { label: t("app.lastUpdated"), value: generated, Icon: Clock, tone: "purple" },
     ],
     lessons: [
       { label: t("mock.context.selected"), value: selectedMenu, Icon: BookOpen, tone: "blue" },
-      { label: t("mock.context.progress"), value: `${metric.healthy ?? 0} / ${metric.total ?? 0}`, Icon: CircleDashed, tone: "blue", progress: clampPercent(metric.percent) },
-      { label: t("mock.context.current"), value: currentStepShort, detail: currentStepDetail, Icon: Flag, tone: "blue" },
-      { label: t("mock.context.next"), value: displayText(nextSafeAction.title, displayText(nextSafeAction.description)), Icon: ArrowRightCircle, tone: "blue" },
+      { label: t("mock.context.progress"), value: `${progress.completed} / ${progress.total}`, Icon: CircleDashed, tone: "blue", progress: progress.percent, valueFormat: "fraction" },
+      { label: t("mock.context.current"), value: currentStepShort, detail: currentStepDetail, Icon: Flag, tone: "blue", valueFormat: "step-fraction" },
+      { label: t("mock.context.next"), value: nextAction || displayText(nextSafeAction.title, displayText(nextSafeAction.description)), Icon: ArrowRightCircle, tone: "blue" },
     ],
     workflow: [
       { label: "", value: selectedMenu, Icon: BookOpen, tone: "blue" },
       { label: t("mock.context.externalRepository"), value: displayText(targetRepository.name), Icon: Database, tone: "teal" },
       { label: currentStepShort, value: displayText(context.current_step_id), Icon: Flag, tone: "teal" },
-      { label: t("mock.context.nextStep"), value: displayText(nextSafeAction.title, displayText(nextSafeAction.description)), Icon: ArrowRightCircle, tone: "teal" },
+      { label: t("mock.context.nextStep"), value: nextAction || displayText(nextSafeAction.title, displayText(nextSafeAction.description)), Icon: ArrowRightCircle, tone: "teal" },
     ],
     maintenance: [
-      { label: t("mock.context.selectedMenu"), value: selectedMenu, Icon: BookOpen, tone: "purple", chip: true },
-      { label: t("mock.context.targetRepository"), value: displayText(targetRepository.name), Icon: Folder, tone: "purple" },
-      { label: t("mock.context.activeStep"), value: currentStepShort, Icon: Flag, tone: "purple" },
-      { label: t("mock.context.dataSource"), value: t("mock.context.dashboardSnapshot"), Icon: Database, tone: "purple" },
+      { label: t("mock.context.maintenance.selectedMenu"), value: selectedMenu, Icon: BookOpen, tone: "purple", chip: true },
+      { label: t("mock.context.maintenance.targetRepository"), value: displayText(targetRepository.name), Icon: Folder, tone: "purple" },
+      { label: t("mock.context.maintenance.activeStep"), value: currentStepShort, Icon: Flag, tone: "purple" },
+      { label: t("mock.context.maintenance.dataSource"), value: t("mock.context.dashboardSnapshot"), Icon: Database, tone: "purple" },
     ],
     safety: [
       { label: t("mock.context.selectedMenu"), value: selectedMenu, Icon: List, tone: "green" },
@@ -425,7 +510,7 @@ function ContextSnapshotStrip({ data, t, locale, variant = "overview" }) {
   const rows = rowsByVariant[variant] || rowsByVariant.overview;
   return (
     <section className={`context-strip context-strip--${variant}`} aria-label={t("context.title")}>
-      {rows.map(({ label, value, detail, Icon, tone, progress, chip, invert }, index) => (
+      {rows.map(({ label, value, valueFormat, detail, Icon, tone, progress, chip, invert }, index) => (
         <article className={`context-strip__item context-strip__item--${tone || "default"}${invert ? " context-strip__item--invert" : ""}${chip ? " context-strip__item--chip" : ""}`} key={`${label}-${value}-${index}`}>
           <span className="context-strip__icon">
             {Number.isFinite(progress) ? (
@@ -435,8 +520,8 @@ function ContextSnapshotStrip({ data, t, locale, variant = "overview" }) {
             )}
           </span>
           <div>
-            {label ? <span>{label}</span> : null}
-            <strong>{value}</strong>
+            {label ? <span>{contextStripLabel(label, variant)}</span> : null}
+            <ContextStripValue value={value} format={valueFormat} />
             {detail && detail !== value ? <small>{detail}</small> : null}
           </div>
         </article>
@@ -460,6 +545,7 @@ function OverviewStatusCard({ id, title, status, metric, value, detail, t, chipL
   const state = normalizeState(metric?.status || status);
   const valueText = value || stateLabel(state, t);
   const chipCompactClass = state === "manual_required" ? "status-chip--compact-label" : "";
+  const percentValue = id === "lessons" ? displayText(detail, "").match(/^(\d+)%$/) : null;
   return (
     <article className={`overview-status-card overview-status-card--${config.tone}`} data-overview-status-card={id}>
       <div className="overview-status-card__head">
@@ -468,13 +554,20 @@ function OverviewStatusCard({ id, title, status, metric, value, detail, t, chipL
         </span>
         <div>
           <h3>{title}</h3>
-          <strong>{valueText}</strong>
+          {id === "lessons" ? <OverviewLessonProgressValue value={valueText} /> : <strong>{valueText}</strong>}
         </div>
       </div>
       {metric ? (
         <div className="overview-status-card__progress-row">
           <HorizontalProgress percent={metric.percent} />
-          <strong className="overview-status-card__progress-value">{detail}</strong>
+          <strong className="overview-status-card__progress-value">
+            {percentValue ? (
+              <>
+                <AnimatedNumber value={percentValue[1]} className="overview-status-card__progress-number" />
+                %
+              </>
+            ) : detail}
+          </strong>
         </div>
       ) : null}
       {detail && !metric ? <p>{detail}</p> : null}
@@ -529,7 +622,7 @@ function GitOperationRail({ operations, t, variant = "workflow" }) {
             <span className="operation-chip__icon">
               <Icon aria-hidden="true" size={18} />
             </span>
-            <strong>{displayText(row.label)}</strong>
+            <strong>{gitOperationDisplayLabel(row.id, row.label, t)}</strong>
             <span className={`mode-pill mode-pill--${mode}`}>{gitOperationModeLabel(row.mode, t)}</span>
           </article>
         );
@@ -632,12 +725,13 @@ function CommonStatusPanel({ data, partialFailures, t }) {
 function WorkflowStatusCards({ data, t }) {
   const context = selectedContextData(data);
   const productAuthority = data.development?.product_authority || {};
+  const nextAction = nextActionShort(context, data, t);
   const cards = [
-    { id: "git-sync", title: t("workflow.card.gitSync"), Icon: WorkflowCategoryIcon, value: statusLabelForChip(context.git_status, t), detail: workflowContextLabel(context.workflow_context, t), button: t("summary.viewDetails") },
-    { id: "ci", title: t("workflow.card.ci"), Icon: CheckCircle2, value: statusLabelForChip(context.ci_status, t), detail: displayText(context.target_repository?.name), button: t("summary.viewDetails") },
-    { id: "pr-merge", title: t("workflow.card.prMerge"), Icon: GitPullRequest, value: statusLabelForChip(data.git_workflow?.approval_status, t), detail: t("workflow.card.prMergeDetail"), button: t("summary.viewDetails") },
-    { id: "product-evidence", title: t("workflow.card.productEvidence"), Icon: Folder, value: statusLabelForChip(productAuthority.status, t), detail: t("workflow.card.productEvidenceDetail", `${asArray(productAuthority.evidence_summary?.items).length} ${t("summary.items")}`), button: t("workflow.card.collectEvidence") },
-    { id: "next-step", title: t("workflow.card.nextStep"), Icon: Flag, value: displayText(context.current_step_id), detail: displayText(context.next_safe_action?.title || context.next_safe_action?.description), button: t("workflow.card.stepDetail") },
+    { id: "git-sync", title: t("workflow.card.gitSync"), Icon: RefreshCw, value: workflowStatusLabel(context.git_status, t), detail: normalizeState(context.git_status) === "passed" || normalizeState(context.git_status) === "ready" ? t("workflow.card.gitSyncDetail") : t("workflow.card.gitSyncReviewDetail"), button: t("summary.viewDetails") },
+    { id: "ci", title: t("workflow.card.ci"), Icon: CheckCircle2, value: workflowStatusLabel(context.ci_status, t), detail: normalizeState(context.ci_status) === "passed" || normalizeState(context.ci_status) === "ready" ? displayText(context.target_repository?.name) : t("workflow.card.ciReviewDetail"), button: t("summary.viewDetails") },
+    { id: "pr-merge", title: t("workflow.card.prMerge"), Icon: GitPullRequest, value: workflowStatusLabel(data.git_workflow?.approval_status, t), detail: t("workflow.card.prMergeDetail"), button: t("summary.viewDetails") },
+    { id: "product-evidence", title: t("workflow.card.productEvidence"), Icon: Folder, value: productEvidenceStatusLabel(productAuthority, t), detail: productEvidenceDetail(productAuthority, t), button: t("workflow.card.collectEvidence") },
+    { id: "next-step", title: t("workflow.card.nextStep"), Icon: Flag, value: displayText(context.current_step_id), detail: nextAction || localizedStepDetail(context, t), button: workflowStepDetailLabel(context, t) },
   ];
   return (
     <section className="workflow-card-grid" aria-label={t("workflow.currentEvidence")}>
@@ -661,6 +755,7 @@ function WorkflowStatusCards({ data, t }) {
 
 function WorkflowRecentTable({ rows: recentRows, data, t }) {
   const rows = asArray(recentRows).slice(0, 5);
+  const context = selectedContextData(data);
   if (!rows.length) {
     return null;
   }
@@ -678,12 +773,14 @@ function WorkflowRecentTable({ rows: recentRows, data, t }) {
         </div>
         {rows.map((row) => (
           <article className="mock-table-row mock-table-row--workflow" key={displayText(row.id)}>
-            <span>{formatDashboardDateTime(row.time) || displayText(row.time)}</span>
-            <strong>{displayText(row.type)}</strong>
-            <span>{displayText(row.target)}</span>
-            <p>{displayText(row.detail)}</p>
-            <StatusPill value={row.status} t={t} label={statusLabelForChip(row.status, t)} />
-            <a className="mock-table-link" href="#workflow">{displayText(row.reference, t("summary.viewDetails"))} <ExternalLink aria-hidden="true" size={13} /></a>
+            <span data-label={t("workflow.table.time")}>{formatDashboardDateTime(row.time) || displayText(row.time)}</span>
+            <strong data-label={t("workflow.table.type")}>{workflowRunTypeLabel(row.type, t)}</strong>
+            <span data-label={t("workflow.table.target")}>{displayText(row.target)}</span>
+            <p data-label={t("workflow.table.detail")}>{workflowRunDetail(row, context, t)}</p>
+            <span className="mock-table-row__status" data-label={t("workflow.table.status")}>
+              <StatusPill value={row.status} t={t} label={workflowStatusLabel(row.status, t)} />
+            </span>
+            <a className="mock-table-link" href="#workflow" data-label={t("workflow.table.reference")}>{workflowRunReferenceLabel(row.reference, t)} <ExternalLink aria-hidden="true" size={13} /></a>
           </article>
         ))}
       </div>
@@ -709,20 +806,41 @@ function EvidenceRowsTable({ rows, t }) {
         {items.map((row) => (
           <article className="evidence-row" key={displayText(row.id)}>
             <div className="evidence-row__title">
-              <FileCheck2 aria-hidden="true" size={20} />
-              <strong>{displayText(row.label)}</strong>
+              {(() => {
+                const Icon = maintenanceEvidenceIcon(row.id);
+                return <Icon aria-hidden="true" size={20} />;
+              })()}
+              <strong>{maintenanceEvidenceLabel(row, t)}</strong>
             </div>
             <p>{maintenanceEvidenceWhy(row.id, t)}</p>
-            <StatusPill value={row.status} t={t} label={statusLabelForChip(row.status, t)} />
+            <StatusPill value={row.status} t={t} label={maintenanceStatusLabel(row.id, row.status, t)} />
             <div className="evidence-row__reference">
-              {technicalChip(row.reference)}
-              <ExternalLink aria-hidden="true" size={14} />
+              {maintenanceReferenceValues(row).map((reference) => (
+                <span className="evidence-row__reference-chip" key={reference} tabIndex={0} data-tooltip={reference}>
+                  {technicalChip(reference)}
+                  <button className="evidence-row__reference-copy" type="button" aria-label={`${t("maintenance.copyReference")}: ${reference}`} title={t("maintenance.copyReference")} onClick={() => copyTextToClipboard(reference)}>
+                    <Copy aria-hidden="true" size={14} />
+                  </button>
+                </span>
+              ))}
             </div>
           </article>
         ))}
       </div>
     </section>
   );
+}
+
+function maintenanceEvidenceIcon(id) {
+  const map = {
+    dashboard_data_schema: FileJson,
+    product_authority_evidence: FileSearch,
+    git_workflow_settings: GitBranch,
+    security_policy: ShieldCheck,
+    developer_memory: Brain,
+    workflow_pair: Waypoints,
+  };
+  return map[displayText(id, "")] || FileCheck2;
 }
 
 function SecurityStatusCards({ security, partialFailures, data, t }) {
@@ -732,8 +850,8 @@ function SecurityStatusCards({ security, partialFailures, data, t }) {
   const lastChecked = formatDashboardTime(approvals[0]?.last_checked || dangerous[0]?.last_checked || data.generated_at);
   const cards = [
     { id: "gate", title: t("security.item.gate"), Icon: ShieldCheck, status: security?.gate_status, value: statusLabelForChip(security?.gate_status, t), detail: securityGateDetail(security, failures, t) },
-    { id: "approval", title: t("security.approvals"), Icon: UserCheck, status: approvals[0]?.status || security?.dangerous_action_approval, value: approvals.length ? statusLabelForChip(approvals[0]?.status || security?.dangerous_action_approval, t) : t("security.card.noApprovalWaiting"), detail: displayText(approvals[0]?.detail, stateDetail(security?.dangerous_action_approval, t)) },
-    { id: "dangerous", title: t("security.dangerousOperations"), Icon: AlertTriangle, status: dangerous[0]?.status || "ready", value: dangerous.length ? `${dangerous.length}` : t("summary.none"), detail: displayText(dangerous[0]?.detail, t("security.card.dangerousNone")) },
+    { id: "approval", title: t("security.approvals"), Icon: UserCheck, status: approvals[0]?.status || security?.dangerous_action_approval, value: approvals.length ? statusLabelForChip(approvals[0]?.status || security?.dangerous_action_approval, t) : t("security.card.noApprovalWaiting"), detail: securityApprovalDetail(approvals[0], security?.dangerous_action_approval, t) },
+    { id: "dangerous", title: t("security.dangerousOperations"), Icon: AlertTriangle, status: dangerous[0]?.status || "ready", value: dangerous.length ? `${dangerous.length}` : t("summary.none"), detail: securityDangerousOperationDetail(dangerous[0], t) },
     { id: "partial", title: t("summary.partialFailures"), Icon: CircleMinus, status: failures.length ? failures[0].status : "ready", value: failures.length ? `${failures.length}` : t("summary.none"), detail: securityPartialDetail(failures, t) },
   ];
   return (
@@ -889,19 +1007,55 @@ function technicalChip(value) {
   return text ? <code className="technical-chip">{text}</code> : null;
 }
 
-function compactTechnicalChips(values, t, limit = 3) {
+function copyTextToClipboard(value) {
+  const text = displayText(value, "");
+  if (!text) {
+    return;
+  }
+  if (navigator.clipboard?.writeText) {
+    void navigator.clipboard.writeText(text);
+    return;
+  }
+  const textarea = document.createElement("textarea");
+  textarea.value = text;
+  textarea.setAttribute("readonly", "");
+  textarea.style.position = "fixed";
+  textarea.style.opacity = "0";
+  document.body.appendChild(textarea);
+  textarea.select();
+  document.execCommand("copy");
+  document.body.removeChild(textarea);
+}
+
+function showMoreItemsLabel(remaining, t) {
+  const prefix = t("app.showMoreItemsPrefix", "");
+  const suffix = t("app.showMoreItemsSuffix", "");
+  return `${prefix ? `${prefix} ` : ""}${remaining} ${t("summary.moreItems")}${suffix}`;
+}
+
+function SourceBoundaryChips({ values, t, limit = 3, variant = "default" }) {
+  const [expanded, setExpanded] = useState(false);
   const normalized = asArray(values).map((value) => displayText(value, "")).filter(Boolean);
   if (!normalized.length) {
     return <span>{t("summary.none")}</span>;
   }
-  const visible = normalized.slice(0, limit);
-  const remaining = normalized.length - visible.length;
+  const visible = expanded ? normalized : normalized.slice(0, limit);
+  const remaining = Math.max(0, normalized.length - limit);
   return (
-    <div className="source-boundary__chips">
-      {visible.map((value) => (
-        <code className="technical-chip" key={value}>{value}</code>
+    <div className={`source-boundary__chips source-boundary__chips--${variant}${expanded ? " source-boundary__chips--expanded" : ""}`}>
+      {visible.map((value, index) => (
+        <span className="source-boundary__chip" key={`${value}-${index}`} tabIndex={0} data-tooltip={value}>
+          {technicalChip(value)}
+          <button className="source-boundary__chip-copy" type="button" aria-label={`${t("app.copyItem")}: ${value}`} title={t("app.copyItem")} onClick={() => copyTextToClipboard(value)}>
+            <Copy aria-hidden="true" size={14} />
+          </button>
+        </span>
       ))}
-      {remaining > 0 ? <span className="small-badge small-badge--soft">{remaining} {t("summary.moreItems")}</span> : null}
+      {remaining > 0 ? (
+        <button className="source-boundary__expand" type="button" aria-expanded={expanded} onClick={() => setExpanded((current) => !current)}>
+          {expanded ? t("app.hideExtraItems") : showMoreItemsLabel(remaining, t)}
+        </button>
+      ) : null}
     </div>
   );
 }
@@ -931,36 +1085,112 @@ function formatDashboardTime(value) {
   return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
 }
 
-function selectedStepText(context, { includeId = false } = {}) {
+function normalizedStepCountLabel(value) {
+  const text = displayText(value, "");
+  const match = text.match(/step\s*(\d+)\s*\/\s*(\d+)/i);
+  return match ? `Step ${match[1]} / ${match[2]}` : "";
+}
+
+function stepTitleFromSlug(value) {
+  return displayText(value, "")
+    .split(".")
+    .slice(1)
+    .join(".")
+    .replace(/[-_.]+/g, " ")
+    .replace(/\b\w/g, (character) => character.toUpperCase());
+}
+
+function selectedStepParts(context) {
+  const label = displayText(context.current_step_label || "", "");
+  const id = displayText(context.current_step_id, "");
+  const explicitStep = normalizedStepCountLabel(label);
+  if (explicitStep) {
+    const detail = label
+      .replace(/step\s*\d+\s*\/\s*\d+/i, "")
+      .replace(/^(\s*[-:]\s*)+/, "")
+      .trim();
+    return { short: explicitStep, detail: detail || (label === id ? stepTitleFromSlug(id) : displayText(id, "")), id };
+  }
+
+  const dayMatch = id.match(/^day(\d+)\./i);
+  if (dayMatch) {
+    const menuId = displayText(context.menu_id, "");
+    const total = menuId === "step_1_7" ? 7 : 14;
+    return { short: `Step ${dayMatch[1]} / ${total}`, detail: label && label !== id ? label : stepTitleFromSlug(id), id };
+  }
+
   const index = Number.isInteger(context.current_step_index) ? context.current_step_index : null;
   const total = Number.isInteger(context.current_step_total) ? context.current_step_total : null;
-  const prefix = index && total ? `Step ${index} / ${total}` : displayText(context.current_step_label || context.current_step_id);
-  const label = displayText(context.current_step_label || "", "");
-  const detail = label.includes("-") ? label.split("-").slice(1).join("-").trim() : label.replace(prefix, "").trim();
-  const id = displayText(context.current_step_id, "");
+  const short = index && total ? `Step ${index} / ${total}` : displayText(label || id);
+  const detail = label && label !== short && label !== id ? label : stepTitleFromSlug(id);
+  return { short, detail, id };
+}
+
+function selectedStepText(context, { includeId = false } = {}) {
+  const { short, detail, id } = selectedStepParts(context);
   if (includeId && id) {
-    return detail ? `${prefix} ${id}` : `${prefix} ${id}`;
+    return `${short} ${id}`;
   }
-  return detail ? `${prefix} ${detail}` : prefix;
+  return detail ? `${short} ${detail}` : short;
 }
 
 function selectedStepShort(context) {
-  const index = Number.isInteger(context.current_step_index) ? context.current_step_index : null;
-  const total = Number.isInteger(context.current_step_total) ? context.current_step_total : null;
-  return index && total ? `Step ${index} / ${total}` : displayText(context.current_step_label || context.current_step_id);
+  return selectedStepParts(context).short;
 }
 
 function selectedStepDetail(context) {
-  const label = displayText(context.current_step_label || "", "");
-  if (label.includes("-")) {
-    return label.split("-").slice(1).join("-").trim();
-  }
-  return displayText(context.current_step_id, "");
+  return selectedStepParts(context).detail;
 }
 
-function nextActionShort(context, data) {
+function localizedStepDetail(context, t) {
+  const id = displayText(context.current_step_id, "");
+  const translated = id ? t(`lesson.step.${id}`, "") : "";
+  return translated || selectedStepDetail(context);
+}
+
+function localizedLessonAction(value, context, t) {
+  const text = displayText(value, "");
+  if (!text) {
+    return "";
+  }
+  const currentStepId = displayText(context?.current_step_id, "");
+  if (text === "Review selected context" && currentStepId === "day12.subagents-plan") {
+    return t("lesson.nextAction.reviewSubagentsPlan");
+  }
+  const knownActions = {
+    "Review selected context": "lesson.nextAction.reviewSelectedContext",
+    "Restore the lesson state source before continuing.": "lesson.nextAction.reviewLearningSettings",
+    "Select missing lesson settings before passing the next lesson step.": "lesson.nextAction.reviewLearningSettings",
+    "Review the current step and obtain the required approval before passing it.": "lesson.nextAction.reviewCurrentStep",
+    "Request learner approval before starting the applied lesson workflow.": "lesson.nextAction.requestAppliedApproval",
+  };
+  return knownActions[text] ? t(knownActions[text]) : text;
+}
+
+function contextProgress(context, fallbackMetric = {}) {
+  const total = Number(context?.current_step_total);
+  const index = Number(context?.current_step_index);
+  if (Number.isInteger(total) && total > 0 && Number.isInteger(index) && index >= 0) {
+    const completed = Math.min(total, Math.max(0, index > 0 ? index - 1 : 0));
+    return {
+      completed,
+      total,
+      percent: clampPercent((completed / total) * 100),
+      source: "context",
+    };
+  }
+  return {
+    completed: Number.isInteger(fallbackMetric?.healthy) ? fallbackMetric.healthy : 0,
+    total: Number.isInteger(fallbackMetric?.total) ? fallbackMetric.total : 0,
+    percent: clampPercent(fallbackMetric?.percent),
+    source: "metric",
+  };
+}
+
+function nextActionShort(context, data, t) {
   const action = context.next_safe_action || data.summary?.primary_action || {};
-  return displayText(action.title || action.description, "");
+  const text = displayText(action.title || action.description, "");
+  return t ? localizedLessonAction(text, context, t) : text;
 }
 
 function statusLabelForChip(value, t) {
@@ -979,6 +1209,175 @@ function statusLabelForChip(value, t) {
     manual_required: "mock.status.manualRequired",
   };
   return t(mockLabels[state] || `state.${state}`, displayText(state));
+}
+
+function workflowStatusLabel(value, t) {
+  const state = normalizeState(value);
+  const labels = {
+    ready: "workflow.status.ready",
+    passed: "workflow.status.passed",
+    failed: "workflow.status.failed",
+    blocked: "workflow.status.needsConfirmation",
+    unknown: "workflow.status.needsConfirmation",
+    optional: "workflow.status.needsConfirmation",
+    cached: "workflow.status.needsConfirmation",
+    not_run: "workflow.status.notCollected",
+    stale: "workflow.status.stale",
+    missing: "workflow.status.notCollected",
+    approval_required: "workflow.status.needsApproval",
+    manual_required: "workflow.status.needsConfirmation",
+  };
+  return t(labels[state] || `state.${state}`, displayText(state));
+}
+
+function productEvidenceStatusLabel(productAuthority, t) {
+  const state = normalizeState(productAuthority?.status);
+  if (state === "blocked" || state === "missing" || state === "not_run" || state === "unknown") {
+    return t("workflow.status.evidenceMissing");
+  }
+  return workflowStatusLabel(state, t);
+}
+
+function productEvidenceDetail(productAuthority, t) {
+  const summary = productAuthority?.manifest_summary || {};
+  const ready = Number(summary.required_ready);
+  const total = Number(summary.required_total);
+  if (Number.isInteger(ready) && Number.isInteger(total) && total > 0) {
+    return `${t("workflow.card.requiredDocs")}: ${ready} / ${total} ${t("workflow.card.readyUnit")}`;
+  }
+  const evidenceItems = asArray(productAuthority?.evidence_summary?.items);
+  if (evidenceItems.length) {
+    const collected = evidenceItems.filter((item) => ["ready", "passed"].includes(normalizeState(item.status))).length;
+    return `${t("workflow.card.evidence")}: ${collected} / ${evidenceItems.length} ${t("workflow.card.collectedUnit")}`;
+  }
+  return t("workflow.card.productEvidenceDetail");
+}
+
+function currentStepNumber(context) {
+  const short = selectedStepShort(context);
+  const match = displayText(short, "").match(/Step\s+(\d+)/i);
+  return match ? match[1] : "";
+}
+
+function workflowStepDetailLabel(context, t) {
+  const step = currentStepNumber(context);
+  return step ? `${t("workflow.card.stepLabel")} ${step} ${t("workflow.card.stepDetailSuffix")}` : t("workflow.card.stepDetail");
+}
+
+function workflowRunTypeLabel(value, t) {
+  const key = displayText(value, "");
+  const map = {
+    "CI run": "workflow.run.ci",
+    "Git sync": "workflow.run.gitSync",
+    "Product evidence": "workflow.run.productEvidence",
+    "Security gate": "workflow.run.securityGate",
+    "Next step": "workflow.run.nextStep",
+  };
+  return map[key] ? t(map[key]) : displayText(value);
+}
+
+function workflowRunDetail(row, context, t) {
+  const detail = displayText(row.detail, "");
+  const map = {
+    "Current snapshot CI evidence": "workflow.runDetail.ci",
+    "Current snapshot Git synchronization evidence": "workflow.runDetail.gitSync",
+    "Product authority and manifest evidence": "workflow.runDetail.productEvidence",
+    "Product security gate snapshot": "workflow.runDetail.securityGate",
+  };
+  if (detail === displayText(context.current_step_id, "")) {
+    return localizedStepDetail(context, t);
+  }
+  return map[detail] ? t(map[detail]) : detail;
+}
+
+function workflowRunReferenceLabel(value, t) {
+  const key = displayText(value, "");
+  const map = {
+    "CI evidence": "workflow.reference.ci",
+    "Git sync evidence": "workflow.reference.gitSync",
+    "Product authority": "workflow.reference.productAuthority",
+    "Security gate": "workflow.reference.securityGate",
+    "Selected context": "workflow.reference.selectedContext",
+  };
+  return map[key] ? t(map[key]) : displayText(value, t("summary.viewDetails"));
+}
+
+function workflowDecisionValueLines(context, t) {
+  const workflowText = t("detail.workflow.checks");
+  if (workflowText === "開発を進めてよい Git/CI 状態かを判断します。") {
+    return ["開発を進めてよい", "Git/CI 状態かを判断します。"];
+  }
+  if (workflowText === "Whether Git/CI is ready to continue") {
+    return ["Whether Git/CI is ready", "to continue"];
+  }
+  return [workflowText || workflowContextLabel(context.workflow_context, t)];
+}
+
+function workflowMustReviewPoints(t) {
+  return [
+    t("detail.workflow.mustReview.gitSync"),
+    t("detail.workflow.mustReview.ci"),
+    t("detail.workflow.mustReview.prMerge"),
+    t("detail.workflow.mustReview.evidence"),
+  ];
+}
+
+function maintenanceStatusLabel(id, status, t) {
+  const state = normalizeState(status);
+  if (state === "unknown" || state === "manual_required" || state === "optional" || state === "cached") {
+    return t("maintenance.status.unconfirmed");
+  }
+  if (state === "blocked" || state === "missing" || state === "not_run") {
+    return t("maintenance.status.notCollected");
+  }
+  if (state === "failed" || state === "stale") {
+    return statusLabelForChip(status, t);
+  }
+  const labels = {
+    as_built_sync_status: "maintenance.status.synced",
+    workflow_pair_status: "maintenance.status.synced",
+    developer_memory_status: "maintenance.status.recorded",
+    skills_status: "maintenance.status.normal",
+    git_workflow_settings: "maintenance.status.enabled",
+    security_policy: "maintenance.status.compliant",
+    dashboard_data_schema: "maintenance.status.normal",
+    product_authority_evidence: "maintenance.status.notCollected",
+  };
+  return t(labels[id] || "maintenance.status.ready", statusLabelForChip(status, t));
+}
+
+function maintenanceCardCopy(id, t) {
+  const map = {
+    as_built_sync_status: "maintenance.card.asBuilt",
+    workflow_pair_status: "maintenance.card.workflowPair",
+    developer_memory_status: "maintenance.card.developerMemory",
+    skills_status: "maintenance.card.skills",
+    git_workflow_settings: "maintenance.card.gitWorkflowSettings",
+    security_policy: "maintenance.card.securityPolicy",
+  };
+  return t(map[id] || "maintenance.note.default");
+}
+
+function maintenanceEvidenceLabel(row, t) {
+  const id = displayText(row?.id, "");
+  return t(`maintenance.evidenceLabel.${id}`, displayText(row?.label));
+}
+
+function maintenanceReferenceValues(row) {
+  const id = displayText(row?.id, "");
+  if (id === "workflow_pair") {
+    return ["docs/workflow/TASK_TRACKER.md", "docs/workflow/HANDOFF.md"];
+  }
+  return [displayText(row?.reference, "")].filter(Boolean);
+}
+
+function maintenanceReviewPoints(t) {
+  return [
+    t("maintenance.review.asBuilt"),
+    t("maintenance.review.workflowPair"),
+    t("maintenance.review.developerMemory"),
+    t("maintenance.review.evidence"),
+  ];
 }
 
 function stateDetail(value, t) {
@@ -1022,6 +1421,9 @@ function aggregateLessonSettingsStatus(lesson) {
 }
 
 function lessonSettingsDetail(lesson, t) {
+  if (aggregateLessonSettingsStatus(lesson) === "ready") {
+    return t("lesson.live.settingsDetail");
+  }
   return [
     `${t("field.learningMode")}: ${statusLabelForChip(lesson?.learning_mode_status, t)}`,
     `${t("field.workflowLanguage")}: ${statusLabelForChip(lesson?.workflow_language_status, t)}`,
@@ -1035,13 +1437,34 @@ function dashboardReflectionStatus(data) {
 
 function dashboardReflectionDetail(data, t) {
   const identity = displayText(data.snapshot_id || data.content_hash, "");
-  return identity ? `${t("app.snapshot")}: ${identity}` : stateDetail("unknown", t);
+  return identity ? t("lesson.live.dashboardDisplayDetail") : stateDetail("unknown", t);
+}
+
+function gitCiLiveStatus(context, t) {
+  const gitState = normalizeState(context.git_status);
+  const ciState = normalizeState(context.ci_status);
+  if (gitState === "manual_required" && ciState === "manual_required") {
+    return {
+      status: t("lesson.live.gitCiNeedsReview"),
+      detail: t("lesson.live.gitCiNeedsReviewDetail"),
+    };
+  }
+  if (gitState === ciState) {
+    return {
+      status: statusLabelForChip(gitState, t),
+      detail: t("lesson.live.gitCiDetail"),
+    };
+  }
+  return {
+    status: `${t("lesson.live.gitLabel")}: ${statusLabelForChip(gitState, t)} / ${t("lesson.live.ciLabel")}: ${statusLabelForChip(ciState, t)}`,
+    detail: t("lesson.live.gitCiDetail"),
+  };
 }
 
 function securityGateDetail(security, failures, t) {
   const firstFailure = failures[0];
   if (firstFailure?.reason) {
-    return displayText(firstFailure.reason);
+    return localizedSecurityDetail(firstFailure.reason, t);
   }
   const state = normalizeState(security?.gate_status);
   if (isReviewState(state)) {
@@ -1050,9 +1473,50 @@ function securityGateDetail(security, failures, t) {
   return t("security.card.gateReady");
 }
 
+function localizedSecurityDetail(detail, t) {
+  const text = displayText(detail, "");
+  const detailKeys = {
+    "Dangerous operations require explicit approval before execution.": "security.detail.dangerousApprovalRequired",
+    "Push, PR, and merge approval states are tracked separately.": "security.detail.gitWorkflowApprovalTracked",
+    "Merge is gated and must stay outside the dashboard UI.": "security.detail.mergeGated",
+    "Cleanup is preview-only until an explicit external approval path is used.": "security.detail.cleanupApprovalRequired",
+  };
+  return detailKeys[text] ? t(detailKeys[text]) : text;
+}
+
+function securityApprovalDetail(approval, fallbackState, t) {
+  const id = displayText(approval?.id, "");
+  const idKeys = {
+    dangerous_action_approval: "security.detail.dangerousApprovalRequired",
+    git_workflow_approval: "security.detail.gitWorkflowApprovalTracked",
+  };
+  if (idKeys[id]) {
+    return t(idKeys[id]);
+  }
+  if (approval?.detail) {
+    return localizedSecurityDetail(approval.detail, t);
+  }
+  return stateDetail(fallbackState, t);
+}
+
+function securityDangerousOperationDetail(operation, t) {
+  const id = displayText(operation?.id, "");
+  const idKeys = {
+    merge: "security.detail.mergeGated",
+    cleanup: "security.detail.cleanupApprovalRequired",
+  };
+  if (idKeys[id]) {
+    return t(idKeys[id]);
+  }
+  if (operation?.detail) {
+    return localizedSecurityDetail(operation.detail, t);
+  }
+  return t("security.card.dangerousNone");
+}
+
 function securityPartialDetail(failures, t) {
   if (failures.length) {
-    return displayText(failures[0].reason);
+    return localizedSecurityDetail(failures[0].reason, t);
   }
   return t("security.card.partialNone");
 }
@@ -1147,17 +1611,43 @@ function DetailPageHeader({ tone, Icon, title, subtitle, data, locale, t, action
   );
 }
 
+function lessonSummaryLines(text) {
+  const value = displayText(text, "");
+  if (!value) {
+    return [];
+  }
+  if (value.includes("、")) {
+    const [first, ...rest] = value.split("、");
+    return [`${first}、`, rest.join("、")].filter(Boolean);
+  }
+  if (value.includes(" Git/CI ")) {
+    return value.replace(" Git/CI ", "\nGit/CI ").split("\n");
+  }
+  if (value.includes(" and what ")) {
+    return value.replace(" and what ", "\nand what ").split("\n");
+  }
+  return [value];
+}
+
 function DetailDecisionSummary({ tone, items, t }) {
   return (
     <section className={`decision-summary decision-summary--${tone}`} aria-label={t("detail.summaryAria")}>
-      {items.map(({ Icon, label, value, detail, points = [], badge, cta, tone: itemTone }) => (
+      {items.map(({ Icon, label, value, valueLines, detail, points = [], badge, cta, tone: itemTone }) => (
         <article className={itemTone ? `decision-summary__item decision-summary__item--${itemTone}` : "decision-summary__item"} key={label}>
           <span className="decision-summary__icon">
             <Icon aria-hidden="true" size={24} />
           </span>
           <div>
             <span>{label}</span>
-            <strong>{value}</strong>
+            {valueLines?.length ? (
+              <p className="decision-summary__value-lines">
+                {valueLines.map((line, index) => (
+                  <span key={`${displayText(line)}-${index}`}>{line}</span>
+                ))}
+              </p>
+            ) : displayText(value, "") ? (
+              <strong>{value}</strong>
+            ) : null}
             {badge ? <em>{badge}</em> : null}
             {detail ? <p>{detail}</p> : null}
             {points.length ? (
@@ -1577,6 +2067,7 @@ function OverviewSection({ data, t, locale }) {
       ? `${context.current_step_index} / ${context.current_step_total}`
       : displayText(context.current_step_label || context.current_step_id);
   const lessonMetric = metrics.lessons || {};
+  const selectedLessonProgress = contextProgress(context, lessonMetric);
 
   return (
     <section className="view-surface" id="overview" aria-labelledby="overview-heading">
@@ -1588,9 +2079,9 @@ function OverviewSection({ data, t, locale }) {
           id="lessons"
           title={t("overview.status.lessonProgress")}
           status={lessonMetric.status}
-          metric={lessonMetric}
-          value={`${lessonMetric.healthy ?? 0} / ${lessonMetric.total ?? 0}`}
-          detail={`${clampPercent(lessonMetric.percent)}%`}
+          metric={{ percent: selectedLessonProgress.percent, status: lessonMetric.status }}
+          value={`${selectedLessonProgress.completed} / ${selectedLessonProgress.total}`}
+          detail={`${selectedLessonProgress.percent}%`}
           chipLabel={selectedStepShort(context)}
           t={t}
         />
@@ -1704,20 +2195,34 @@ function statusToneFromReview(count, fallback) {
   return count > 0 ? "approval_required" : normalizeState(fallback);
 }
 
+function hasReviewState(value) {
+  return value !== undefined && value !== null && value !== "" && isReviewState(value);
+}
+
 function lessonPrimaryAttentionText(lesson, t) {
-  if (isReviewState(lesson.learning_mode_status)) {
+  if (hasReviewState(lesson.learning_mode_status)) {
     return t("detail.lesson.learningModeMissing");
   }
-  if (isReviewState(lesson.workflow_language_status)) {
+  if (hasReviewState(lesson.workflow_language_status)) {
     return t("detail.lesson.workflowLanguageMissing");
   }
-  if (isReviewState(lesson.product_language_status)) {
+  if (hasReviewState(lesson.product_language_status)) {
     return t("detail.lesson.productLanguageMissing");
   }
-  if (isReviewState(lesson.status)) {
+  if (hasReviewState(lesson.learner_approval_status)) {
+    return t("detail.lesson.learnerApprovalRequired");
+  }
+  if (hasReviewState(lesson.status)) {
     return t("detail.lesson.stateMissing");
   }
   return t("detail.lesson.warningCallout");
+}
+
+function lessonAttentionDetailText(lesson, t) {
+  if (hasReviewState(lesson.learner_approval_status)) {
+    return t("detail.lesson.reviewApproval");
+  }
+  return t("detail.lesson.reviewSettings");
 }
 
 function lessonReviewPoints(lessonEntries, t) {
@@ -1780,6 +2285,23 @@ function CommandChip({ command }) {
   );
 }
 
+function CommandPreviewCommand({ command, t }) {
+  const text = displayText(command, "");
+  if (!text) {
+    return null;
+  }
+  return (
+    <span className="command-preview__command-chip" tabIndex={0} data-tooltip={text}>
+      <code className="command-chip command-chip--preview">
+        <span>{text}</span>
+      </code>
+      <button className="command-preview__command-copy" type="button" aria-label={`${t("app.copyItem")}: ${text}`} title={t("app.copyItem")} onClick={() => copyTextToClipboard(text)}>
+        <Copy aria-hidden="true" size={14} />
+      </button>
+    </span>
+  );
+}
+
 function ReadOnlyBanner({ t, tone = "default" }) {
   return (
     <div className={`read-only-banner read-only-banner--${tone}`}>
@@ -1803,6 +2325,21 @@ function MockNotice({ tone = "info", Icon = Info, title, detail, cta }) {
           <ArrowRightCircle aria-hidden="true" size={15} />
         </a>
       ) : null}
+    </div>
+  );
+}
+
+function LessonHealthNotice({ t }) {
+  return (
+    <div className="mock-notice mock-notice--lessons-warning lesson-health-notice">
+      <AlertTriangle aria-hidden="true" size={18} />
+      <div>
+        <strong>{t("lesson.healthWarning")}</strong>
+      </div>
+      <a className="mock-notice__button lesson-health-notice__button" href="#maintenance">
+        {t("lesson.healthWarningCta")}
+        <ChevronRight aria-hidden="true" size={16} />
+      </a>
     </div>
   );
 }
@@ -1861,7 +2398,7 @@ function LessonCard({ id, lesson, t }) {
           <AlertTriangle aria-hidden="true" size={17} />
           <div>
             <strong>{lessonPrimaryAttentionText(lesson, t)}</strong>
-            <span>{t("detail.lesson.reviewSettings")}</span>
+            <span>{lessonAttentionDetailText(lesson, t)}</span>
           </div>
           <ChevronRight aria-hidden="true" size={17} />
         </div>
@@ -1898,11 +2435,13 @@ function resolveLessonCards(lessons, data, t) {
   const entries = objectEntries(lessons);
   const foundation = entries.find(([id]) => id.includes("foundation") || id.includes("step_1_7")) || entries[0] || ["step_1_7", {}];
   const practical = entries.find(([id]) => id.includes("extended") || id.includes("14") || id.includes("practical")) || entries[1] || ["step_1_14", {}];
+  const applied = entries.find(([id]) => id.includes("advanced") || id.includes("applied")) || ["advanced", lessons?.advanced || {}];
   const selected = displayText(selectedContextData(data).menu_id, "step_1_14");
   const metric = data.summary?.category_metrics?.lessons || {};
   return [
     { id: "step_1_7", sourceId: foundation[0], lesson: foundation[1] || {}, title: t("lesson.card.step7"), tone: "warning", selected: selected === "step_1_7" },
     { id: "step_1_14", sourceId: practical[0], lesson: practical[1] || {}, title: t("lesson.card.step14"), tone: "active", selected: selected === "step_1_14" },
+    { id: "advanced", sourceId: applied[0], lesson: applied[1] || {}, title: t("lesson.card.advanced"), tone: "advanced", selected: selected === "advanced" },
   ].map((card) => ({
     ...card,
     percent: lessonProgressPercent(card.lesson, metric, card.selected),
@@ -1914,10 +2453,17 @@ function LessonProgressCard({ card, data, t }) {
   const context = selectedContextData(data);
   const cardContext = contextDataForMenu(data, card.id) || {};
   const metric = data.summary?.category_metrics?.lessons || {};
-  const total = card.selected ? metric.total ?? 0 : Number.isInteger(cardContext.current_step_total) ? cardContext.current_step_total : metric.total ?? 0;
-  const completed = card.selected ? metric.healthy ?? 0 : normalizeState(card.lesson.status) === "passed" ? total : Number.isInteger(cardContext.current_step_index) ? cardContext.current_step_index : 0;
-  const current = card.selected ? selectedStepText(context) : displayText(card.lesson.current_step, "");
-  const nextAction = card.selected ? nextActionShort(context, data) : displayText(card.lesson.next_learning_action || card.lesson.next_action, t("detail.lesson.reviewSettings"));
+  const progress = contextProgress(card.selected ? context : cardContext, card.selected ? metric : {});
+  const total = progress.total || (normalizeState(card.lesson.status) === "passed" ? progress.total : 0);
+  const completed = progress.total ? progress.completed : normalizeState(card.lesson.status) === "passed" ? total : 0;
+  const percent = progress.total ? progress.percent : card.percent;
+  const currentParts = card.selected ? selectedStepParts(context) : selectedStepParts(cardContext);
+  const current = card.selected ? selectedStepText(context) : displayText(card.lesson.current_step || currentParts.id || currentParts.short, "");
+  const currentId = displayText(card.selected ? context.current_step_id : cardContext.current_step_id, "");
+  const currentDetail = card.selected ? localizedStepDetail(context, t) : displayText(cardContext.current_step_label || card.lesson.current_step, "");
+  const nextAction = card.selected
+    ? nextActionShort(context, data, t)
+    : localizedLessonAction(card.lesson.next_learning_action || card.lesson.next_action || t("detail.lesson.reviewSettings"), cardContext, t);
   return (
     <article className={`lesson-progress-card lesson-progress-card--${card.tone}`} data-lesson-card={card.id}>
       <div className="lesson-progress-card__head">
@@ -1935,18 +2481,26 @@ function LessonProgressCard({ card, data, t }) {
         <div className="lesson-progress-card__warning">
           <AlertTriangle aria-hidden="true" size={18} />
           <div>
-            <strong>{t("lesson.card.warningTitle")}</strong>
-            <span>{t("lesson.card.warningDetail")}</span>
+            <strong>{lessonPrimaryAttentionText(card.lesson, t)}</strong>
+            <span>{lessonAttentionDetailText(card.lesson, t)}</span>
           </div>
           <ChevronRight aria-hidden="true" size={16} />
         </div>
       ) : null}
       <div className="lesson-progress-card__progress">
-        <span>{t("mock.context.progress")}: {completed} / {total}</span>
-        <strong>{card.percent}%</strong>
-        <HorizontalProgress percent={card.percent} />
+        <span>{t("mock.context.progress")}: <AnimatedNumber value={completed} className="lesson-progress-card__progress-number" /> / {total}</span>
+        <strong><AnimatedNumber value={percent} className="lesson-progress-card__percent-number" />%</strong>
+        <HorizontalProgress percent={percent} />
       </div>
-      <p><strong>{t("mock.context.current")}</strong> {current}</p>
+      {card.selected && currentId ? (
+        <p className="lesson-progress-card__step">
+          <strong>{t("lesson.card.currentStep")}</strong>
+          <code>{currentId}</code>
+          {currentDetail ? <span>{currentDetail}</span> : null}
+        </p>
+      ) : (
+        <p><strong>{t("mock.context.current")}</strong> {current}</p>
+      )}
       <p><strong>{t("lesson.nextLearningAction")}</strong> {nextAction}</p>
     </article>
   );
@@ -1955,17 +2509,20 @@ function LessonProgressCard({ card, data, t }) {
 function LessonLiveStatusTable({ data, t }) {
   const context = selectedContextData(data);
   const metric = data.summary?.category_metrics?.lessons || {};
+  const progress = contextProgress(context, metric);
   const lesson = selectedLessonObject(data, context);
   const generated = data.generated_at ? formatDashboardDateTime(data.generated_at) : t("app.snapshot");
   const settingsStatus = aggregateLessonSettingsStatus(lesson);
   const repositoryStatus = repositoryPathStateToStatus(context.target_repository?.path_state);
   const reflectionStatus = dashboardReflectionStatus(data);
+  const progressStatus = progress.total && progress.completed >= progress.total ? t("detail.lesson.completed") : t("detail.lesson.inProgress");
+  const gitCiStatus = gitCiLiveStatus(context, t);
   const rows = [
-    { id: "lesson-progress", Icon: FileCheck2, item: t("lesson.live.progress"), status: `${statusLabelForChip(metric.status, t)} (${t("lesson.live.live")})`, detail: `${contextLabel(context.menu_id, t)} / ${selectedStepShort(context)}` },
+    { id: "lesson-progress", Icon: FileCheck2, item: t("lesson.live.progress"), status: `${progressStatus} (${t("lesson.live.live")})`, statusTone: "blue", detail: `${contextLabel(context.menu_id, t)} / ${selectedStepShort(context)}` },
     { id: "settings", Icon: Settings, item: t("lesson.live.settings"), status: statusLabelForChip(settingsStatus, t), detail: lessonSettingsDetail(lesson, t) },
-    { id: "repository", Icon: Database, item: t("lesson.live.repository"), status: statusLabelForChip(repositoryStatus, t), detail: `${displayText(context.target_repository?.name)} (${t("mock.context.externalRepository")})` },
-    { id: "git-ci", Icon: RefreshCw, item: t("lesson.live.gitCi"), status: `${statusLabelForChip(context.git_status, t)} / ${statusLabelForChip(context.ci_status, t)}`, detail: t("lesson.live.gitCiDetail") },
-    { id: "dashboard", Icon: FileJson, item: t("lesson.live.dashboard"), status: statusLabelForChip(reflectionStatus, t), detail: dashboardReflectionDetail(data, t) },
+    { id: "repository", Icon: Database, item: t("lesson.live.repository"), status: statusLabelForChip(repositoryStatus, t), detail: `${displayText(context.target_repository?.name)} (${t("lesson.live.productRepositoryLabel")})` },
+    { id: "git-ci", Icon: RefreshCw, item: t("lesson.live.gitCi"), status: gitCiStatus.status, detail: gitCiStatus.detail },
+    { id: "dashboard", Icon: FileJson, item: t("lesson.live.dashboard"), status: reflectionStatus === "passed" ? t("lesson.live.dashboardShowing") : statusLabelForChip(reflectionStatus, t), statusTone: reflectionStatus === "passed" ? "" : "orange", detail: dashboardReflectionDetail(data, t) },
   ];
   return (
     <section className="lesson-live-table-section" aria-labelledby="lesson-live-heading">
@@ -1980,10 +2537,10 @@ function LessonLiveStatusTable({ data, t }) {
           <span>{t("lesson.live.detail")}</span>
           <span>{t("lesson.live.updated")}</span>
         </div>
-        {rows.map(({ id, Icon, item, status, detail }) => (
+        {rows.map(({ id, Icon, item, status, statusTone = "green", detail }) => (
           <article className="lesson-live-row" key={id}>
             <span className="lesson-live-row__item"><Icon aria-hidden="true" size={19} />{item}</span>
-            <span>{status}</span>
+            <span className={`lesson-live-row__status lesson-live-row__status--${statusTone}`}>{status}</span>
             <span>{detail}</span>
             <span>{generated}</span>
           </article>
@@ -1994,11 +2551,10 @@ function LessonLiveStatusTable({ data, t }) {
 }
 
 function LessonSection({ lessons, data, locale, t }) {
-  const lessonEntries = objectEntries(lessons);
-  const metric = data.summary?.category_metrics?.lessons;
-  const attentionCount = lessonEntries.reduce((sum, [, lesson]) => sum + lessonAttentionCount(lesson || {}), 0);
-  const nextAction = attentionCount ? t("detail.lessons.nextSafe") : firstLessonNextAction(lessonEntries) || t("detail.lessons.nextSafe");
-  const reviewPoints = lessonReviewPoints(lessonEntries, t);
+  const context = selectedContextData(data);
+  const metric = data.summary?.category_metrics?.lessons || {};
+  const progress = contextProgress(context, metric);
+  const isComplete = progress.total > 0 && progress.completed >= progress.total;
   const lessonCards = resolveLessonCards(lessons, data, t);
   return (
     <section className="view-surface view-surface--lessons" id="lessons" aria-labelledby="lesson-heading">
@@ -2008,10 +2564,10 @@ function LessonSection({ lessons, data, locale, t }) {
         tone="lessons"
         t={t}
         items={[
-          { Icon: Target, label: t("detail.checks"), value: t("detail.lessons.checks"), detail: t("detail.lessons.checksDetail") },
-          { Icon: CheckCircle2, label: t("detail.currentJudgment"), value: attentionCount ? t("detail.judgment.needsReview") : t("detail.judgment.ready"), detail: attentionCount ? t("detail.lessons.notReadyDetail") : t("detail.noRequiredReview"), badge: statusSummaryBadge(attentionCount, t("detail.itemsNeedReview"), t), tone: attentionCount ? "warning" : "ready" },
-          { Icon: Eye, label: t("detail.mustReview"), value: attentionCount ? t("detail.lessons.mustReview") : t("summary.none"), points: reviewPoints },
-          { Icon: ArrowRightCircle, label: t("detail.nextSafeCheck"), value: nextAction, detail: t("detail.lessons.nextSafeDetail"), cta: { href: "#workflow", label: t("detail.openWorkflowPage") } },
+          { Icon: Target, label: t("detail.checks"), valueLines: lessonSummaryLines(t("detail.lessons.checks")) },
+          { Icon: CheckCircle2, label: t("detail.currentJudgment"), value: isComplete ? t("detail.lesson.completed") : t("detail.lesson.inProgress"), detail: progress.total ? `${progress.completed} of ${progress.total} completed` : metricStatusText(metric, t), tone: "progress" },
+          { Icon: Eye, label: t("detail.mustReview"), points: [t("detail.lessons.review.currentStep"), t("detail.lessons.review.nextAction"), t("detail.lessons.review.unsyncedWarnings")] },
+          { Icon: ArrowRightCircle, label: t("detail.nextSafeCheck"), valueLines: lessonSummaryLines(t("detail.lessons.nextWorkflowCheck")) },
         ]}
       />
       <div className="lesson-grid">
@@ -2020,12 +2576,7 @@ function LessonSection({ lessons, data, locale, t }) {
         ))}
       </div>
       <LessonLiveStatusTable data={data} t={t} />
-      <MockNotice
-        tone="warning"
-        Icon={AlertTriangle}
-        title={t("lesson.healthWarning")}
-        cta={{ href: "#maintenance", label: t("lesson.healthWarningCta") }}
-      />
+      <LessonHealthNotice t={t} />
     </section>
   );
 }
@@ -2051,7 +2602,8 @@ function StatusObjectCard({ id, value, t, Icon = CircleDashed }) {
 function WorkflowSection({ development, gitWorkflow, data, locale, t }) {
   const workflowItems = collectWorkflowItems({ development, gitWorkflow, t });
   const reviewItems = workflowItems.filter((item) => isReviewState(item.state));
-  const approvalItems = workflowItems.filter((item) => normalizeState(item.state) === "approval_required").length;
+  const context = selectedContextData(data);
+  const step = currentStepNumber(context);
   return (
     <section className="view-surface view-surface--workflow" id="workflow" aria-labelledby="workflow-heading">
       <PageTitleHeader viewId="workflow" Icon={WorkflowCategoryIcon} title={t("workflow.title")} subtitle={t("workflow.description")} data={data} locale={locale} t={t} actionLabel={t("detail.refreshDisplayOnly")} headingId="workflow-heading" />
@@ -2060,10 +2612,10 @@ function WorkflowSection({ development, gitWorkflow, data, locale, t }) {
         tone="workflow"
         t={t}
         items={[
-          { Icon: WorkflowCategoryIcon, label: t("detail.checks"), value: t("detail.workflow.checks"), detail: t("detail.workflow.checksDetail") },
-          { Icon: CheckCircle2, label: t("detail.currentJudgment"), value: reviewItems.length ? t("detail.judgment.conditional") : t("detail.judgment.ready"), detail: reviewItems.length ? t("detail.workflow.reviewDetail") : t("detail.workflow.noReviewDetail"), badge: statusSummaryBadge(reviewItems.length, t("detail.itemsNeedReview"), t), tone: reviewItems.length ? "warning" : "ready" },
-          { Icon: ListChecks, label: t("detail.mustReview"), value: approvalItems ? `${approvalItems} ${t("detail.approvals")}` : `${reviewItems.length} ${t("detail.items")}`, detail: t("detail.workflow.mustReview"), points: itemTitles(reviewItems, t("detail.noRequiredReview")) },
-          { Icon: WorkflowCategoryIcon, label: t("detail.nextSafeCheck"), value: t("detail.workflow.nextSafe"), detail: t("detail.workflow.nextSafeDetail"), cta: { href: "#safety", label: t("detail.openSafetyPage") } },
+          { Icon: Target, label: t("detail.checks"), valueLines: workflowDecisionValueLines(context, t), points: [t("detail.workflow.checksPoint.gitCi"), t("detail.workflow.checksPoint.prMerge"), t("detail.workflow.checksPoint.evidence")] },
+          { Icon: CheckCircle2, label: t("detail.currentJudgment"), value: reviewItems.length ? t("detail.judgment.needsReviewShort") : t("detail.judgment.readyShort"), detail: reviewItems.length ? t("detail.workflow.reviewDetail") : t("detail.workflow.noReviewDetail"), badge: statusSummaryBadge(reviewItems.length, t("detail.itemsNeedReview"), t), tone: reviewItems.length ? "warning" : "ready" },
+          { Icon: Eye, label: t("detail.mustReview"), value: t("detail.workflow.mustReview"), points: reviewItems.length ? workflowMustReviewPoints(t) : [t("detail.noRequiredReview")] },
+          { Icon: ArrowRightCircle, label: t("detail.nextSafeCheck"), value: step ? `${t("workflow.card.stepLabel")} ${step} ${t("detail.workflow.nextSafe")}` : t("detail.workflow.nextSafe"), detail: nextActionShort(context, data, t), cta: { href: "#lessons", label: workflowStepDetailLabel(context, t) } },
         ]}
       />
       <GitOperationRail operations={development.git_operations} t={t} />
@@ -2154,12 +2706,12 @@ function maintenanceEvidenceWhy(id, t) {
 
 function MaintenanceStatusCards({ maintenance, data, t }) {
   const cards = [
-    { id: "as_built_sync_status", title: t("maintenance.item.asBuilt"), Icon: RefreshCw, status: maintenance.as_built_sync_status, detail: maintenanceCardDetail(maintenance, ["dashboard_data_schema"], maintenance.as_built_sync_status, t) },
-    { id: "workflow_pair_status", title: t("maintenance.item.workflowPair"), Icon: Waypoints, status: maintenance.workflow_pair_status, detail: maintenanceCardDetail(maintenance, ["workflow_pair"], maintenance.workflow_pair_status, t) },
-    { id: "developer_memory_status", title: t("maintenance.item.developerMemory"), Icon: Brain, status: maintenance.developer_memory_status, detail: maintenanceCardDetail(maintenance, ["developer_memory"], maintenance.developer_memory_status, t) },
-    { id: "skills_status", title: t("maintenance.item.skills"), Icon: BookOpen, status: maintenance.skills_status, detail: stateDetail(maintenance.skills_status, t) },
-    { id: "git_workflow_settings", title: t("maintenance.item.gitWorkflowSettings"), Icon: GitBranch, status: data.git_workflow?.settings_status, detail: maintenanceCardDetail(maintenance, ["git_workflow_settings"], data.git_workflow?.settings_status, t) },
-    { id: "security_policy", title: t("maintenance.item.securityPolicy"), Icon: ShieldCheck, status: data.security?.policy_status, detail: maintenanceCardDetail(maintenance, ["security_policy"], data.security?.policy_status, t) },
+    { id: "as_built_sync_status", title: t("maintenance.item.asBuilt"), Icon: RefreshCw, status: maintenance.as_built_sync_status, detail: maintenanceCardCopy("as_built_sync_status", t) },
+    { id: "workflow_pair_status", title: t("maintenance.item.workflowPair"), Icon: Waypoints, status: maintenance.workflow_pair_status, detail: maintenanceCardCopy("workflow_pair_status", t) },
+    { id: "developer_memory_status", title: t("maintenance.item.developerMemory"), Icon: Brain, status: maintenance.developer_memory_status, detail: maintenanceCardCopy("developer_memory_status", t) },
+    { id: "skills_status", title: t("maintenance.item.skills"), Icon: BookOpen, status: maintenance.skills_status, detail: maintenanceCardCopy("skills_status", t) },
+    { id: "git_workflow_settings", title: t("maintenance.item.gitWorkflowSettings"), Icon: GitBranch, status: data.git_workflow?.settings_status, detail: maintenanceCardCopy("git_workflow_settings", t) },
+    { id: "security_policy", title: t("maintenance.item.securityPolicy"), Icon: ShieldCheck, status: data.security?.policy_status, detail: maintenanceCardCopy("security_policy", t) },
   ];
   return (
     <section className="maintenance-card-grid" aria-label={t("maintenance.statusCards")}>
@@ -2169,7 +2721,7 @@ function MaintenanceStatusCards({ maintenance, data, t }) {
             <Icon aria-hidden="true" size={24} />
           </span>
           <h3>{title}</h3>
-          <StatusPill value={status} t={t} label={statusLabelForChip(status, t)} />
+          <StatusPill value={status} t={t} label={maintenanceStatusLabel(id, status, t)} />
           <p>{detail}</p>
         </article>
       ))}
@@ -2205,14 +2757,21 @@ function MaintenanceSection({ maintenance, data, locale, t }) {
         t={t}
         items={[
           { Icon: Target, label: t("detail.checks"), value: t("detail.maintenance.checks"), detail: t("detail.maintenance.checksDetail") },
-          { Icon: Scale, label: t("detail.currentJudgment"), value: reviewCount ? t("detail.judgment.usableWithFollowup") : t("detail.judgment.ready"), detail: t("detail.maintenance.reviewDetail"), badge: statusSummaryBadge(manualFollowups.length, t("summary.manualFollowups"), t), tone: reviewCount ? "warning" : "ready" },
-          { Icon: Eye, label: t("detail.mustReview"), value: `${reviewCount} ${t("detail.items")}`, detail: t("detail.maintenance.mustReview"), points: itemTitles(maintenanceItems, t("summary.none")) },
-          { Icon: ChevronsRight, label: t("detail.nextSafeCheck"), value: t("detail.maintenance.nextSafe"), detail: t("detail.maintenance.nextSafeDetail") },
+          { Icon: Scale, label: t("detail.currentJudgment"), value: reviewCount ? t("detail.maintenance.usableWithFollowup") : t("detail.judgment.readyShort"), detail: t("detail.maintenance.reviewDetail"), tone: reviewCount ? "warning" : "ready" },
+          { Icon: Eye, label: t("detail.mustReview"), points: maintenanceReviewPoints(t) },
+          { Icon: ArrowRightCircle, label: t("detail.nextSafeCheck"), value: t("detail.maintenance.nextSafe"), detail: t("detail.maintenance.nextSafeDetail") },
         ]}
       />
       <MaintenanceStatusCards maintenance={maintenance} data={data} t={t} />
       <EvidenceRowsTable rows={maintenance.evidence_rows} t={t} />
       <SourceBoundary data={data} t={t} />
+      <MockNotice
+        tone="maintenance-warning"
+        Icon={Info}
+        title={t("maintenance.warning.title")}
+        detail={t("maintenance.warning.detail")}
+        cta={{ href: "#evidence-table-heading", label: t("maintenance.warning.cta") }}
+      />
     </section>
   );
 }
@@ -2278,13 +2837,10 @@ function SafetyFailuresTable({ items, t }) {
             <div className="failure-row__severity">
               <Info aria-hidden="true" size={18} />
             </div>
-            <div className="failure-row__item">
+            <div className="failure-row__empty-message">
               <strong>{t("summary.none")}</strong>
+              <span>{t("detail.security.noFailures")}</span>
             </div>
-            <div>{t("summary.none")}</div>
-            <div><p>{t("detail.security.noFailures")}</p></div>
-            <div><StatusPill value="ready" t={t} label={t("summary.none")} /></div>
-            <div>{t("summary.none")}</div>
           </article>
         )}
       </div>
@@ -2304,7 +2860,6 @@ function SecuritySection({ security, partialFailures, data, locale, t }) {
       ...meta,
     };
   });
-  const approvalCount = securityItems.filter((item) => normalizeState(item.state) === "approval_required").length;
   const failureCount = asArray(partialFailures).length;
   return (
     <section className="view-surface view-surface--safety" id="safety" aria-labelledby="security-heading">
@@ -2316,7 +2871,7 @@ function SecuritySection({ security, partialFailures, data, locale, t }) {
         items={[
           { Icon: Target, label: t("detail.checks"), value: t("detail.security.checks"), detail: t("detail.security.checksDetail") },
           { Icon: failureCount ? BadgeAlert : CheckCircle2, label: t("detail.currentJudgment"), value: failureCount ? t("detail.judgment.blocked") : t("detail.judgment.ready"), detail: failureCount ? t("detail.security.blockedDetail") : t("detail.noRequiredReview"), badge: statusSummaryBadge(failureCount, t("summary.partialFailures"), t), tone: failureCount ? "danger" : "ready" },
-          { Icon: FileSearch, label: t("detail.mustReview"), value: approvalCount ? `${approvalCount} ${t("detail.approvals")}` : `${failureCount} ${t("detail.items")}`, detail: t("detail.security.mustReview"), points: [t("summary.partialFailures"), t("security.item.approval"), t("actions.title")] },
+          { Icon: FileSearch, label: t("detail.mustReview"), points: [t("summary.partialFailures"), t("security.item.approval"), t("actions.title")] },
           { Icon: ArrowRightCircle, label: t("detail.nextSafeCheck"), value: t("detail.security.nextSafe"), detail: t("detail.security.nextSafeDetail"), cta: { href: "#partial-failures-heading", label: t("detail.openPartialFailures") } },
         ]}
       />
@@ -2351,7 +2906,7 @@ function CommandPreviews({ actions, t }) {
                 <h3>{commandIntentLabel(preview.intent, t)}</h3>
               </div>
             </div>
-            <CommandChip command={preview.command_text} />
+            <CommandPreviewCommand command={preview.command_text} t={t} />
             <div className="command-preview__badges">
               <span className="display-only-badge">{t("actions.displayOnly")}</span>
               <span className="display-only-badge">{preview.non_executable === true ? t("actions.notExecutable") : t("field.unknown")}</span>
@@ -2405,7 +2960,13 @@ function SafetySection({ security, actions, partialFailures, data, locale, t }) 
         <CommandPreviews actions={actions} t={t} />
         <SecurityPolicyPanel security={security} data={data} t={t} />
       </div>
-      <ReadOnlyBanner t={t} tone="safety" />
+      <MockNotice
+        tone="safety-warning"
+        Icon={ShieldAlert}
+        title={t("security.warning.title")}
+        detail={t("security.warning.detail")}
+        cta={{ href: "#action-heading", label: t("security.warning.cta") }}
+      />
     </>
   );
 }
@@ -2427,14 +2988,14 @@ function SourceBoundary({ data, t }) {
           <FileText aria-hidden="true" size={20} />
           <div>
             <strong>{t("app.sourceFiles")}</strong>
-            {compactTechnicalChips(files, t, 3)}
+            <SourceBoundaryChips values={files} t={t} limit={3} variant="files" />
           </div>
         </div>
         <div>
-          <TerminalSquare aria-hidden="true" size={20} />
+          <Copy aria-hidden="true" size={20} />
           <div>
             <strong>{t("app.sourceCommands")}</strong>
-            {compactTechnicalChips(commands, t, 2)}
+            <SourceBoundaryChips values={commands} t={t} limit={2} variant="commands" />
           </div>
         </div>
         <div>
@@ -2450,10 +3011,6 @@ function SourceBoundary({ data, t }) {
 }
 
 function Sidebar({ activeView, t, data, locale, loaded }) {
-  const generated = loaded && data.generated_at ? formatDateTime(data.generated_at, locale) : "";
-  const showRepositoryGroup = activeView === "overview" || activeView === "maintenance";
-  const showReadOnlyGroup = activeView === "safety";
-  const showSimpleSupport = activeView === "lessons" || activeView === "workflow";
   return (
     <aside className={`app-sidebar app-sidebar--${activeView}`} aria-label={t("aria.categories")}>
       <div className="brand">
@@ -2467,61 +3024,28 @@ function Sidebar({ activeView, t, data, locale, loaded }) {
         {navigation.map(({ id, labelKey, Icon }) => (
           <a className={activeView === id ? "category-nav__link is-active" : "category-nav__link"} href={`#${id}`} aria-current={activeView === id ? "page" : undefined} key={id}>
             <Icon aria-hidden="true" size={18} />
-            <span>{activeView !== "overview" && id === "overview" ? t("nav.overviewDetail") : t(labelKey)}</span>
+            <span>{id === "overview" ? t("nav.overviewDetail") : t(labelKey)}</span>
           </a>
         ))}
       </nav>
-      {showRepositoryGroup ? (
-        <nav className="support-nav" aria-label={t("nav.repositoryGroup")}>
-          <h3>{t("nav.repositoryGroup")}</h3>
-          {repositoryNavigation.map(({ id, labelKey, Icon }) => (
-            <span className="category-nav__link category-nav__link--subtle" aria-disabled="true" key={id}>
-              <Icon aria-hidden="true" size={18} />
-              <span>{t(labelKey)}</span>
-            </span>
-          ))}
-        </nav>
-      ) : null}
-      {showSimpleSupport ? (
-        <nav className="support-nav support-nav--plain" aria-label={t("nav.otherGroup")}>
-          {[repositoryNavigation[2], supportNavigation[0]].map(({ id, labelKey, Icon }) => (
-            <span className="category-nav__link category-nav__link--subtle" aria-disabled="true" key={id}>
-              <Icon aria-hidden="true" size={18} />
-              <span>{t(labelKey)}</span>
-            </span>
-          ))}
-        </nav>
-      ) : null}
-      {showReadOnlyGroup ? (
-        <>
-          <nav className="support-nav support-nav--plain" aria-label={t("nav.settings")}>
-            <span className="category-nav__link category-nav__link--subtle" aria-disabled="true">
-              <Settings aria-hidden="true" size={18} />
-              <span>{t("nav.settings")}</span>
-            </span>
-          </nav>
-          <nav className="support-nav" aria-label={t("nav.readOnlyGroup")}>
-            <h3>{t("nav.readOnlyGroup")}</h3>
-            {supportNavigation.map(({ id, labelKey, Icon }) => (
-              <span className="category-nav__link category-nav__link--subtle" aria-disabled="true" key={id}>
-                <Icon aria-hidden="true" size={18} />
-                <span>{t(labelKey)}</span>
-              </span>
-            ))}
-          </nav>
-        </>
-      ) : null}
-      {showRepositoryGroup ? (
-        <nav className="support-nav" aria-label={t("nav.otherGroup")}>
-          <h3>{t("nav.otherGroup")}</h3>
-          {supportNavigation.map(({ id, labelKey, Icon }) => (
-            <span className="category-nav__link category-nav__link--subtle" aria-disabled="true" key={id}>
-              <Icon aria-hidden="true" size={18} />
-              <span>{t(labelKey)}</span>
-            </span>
-          ))}
-        </nav>
-      ) : null}
+      <nav className="support-nav" aria-label={t("nav.repositoryGroup")}>
+        <h3>{t("nav.repositoryGroup")}</h3>
+        {repositoryNavigation.map(({ id, labelKey, Icon }) => (
+          <span className="category-nav__link category-nav__link--subtle" aria-disabled="true" key={id}>
+            <Icon aria-hidden="true" size={18} />
+            <span>{t(labelKey)}</span>
+          </span>
+        ))}
+      </nav>
+      <nav className="support-nav" aria-label={t("nav.otherGroup")}>
+        <h3>{t("nav.otherGroup")}</h3>
+        {supportNavigation.map(({ id, labelKey, Icon }) => (
+          <span className="category-nav__link category-nav__link--subtle" aria-disabled="true" key={id}>
+            <Icon aria-hidden="true" size={18} />
+            <span>{t(labelKey)}</span>
+          </span>
+        ))}
+      </nav>
       <div className="sidebar-meta">
         <div className="sidebar-note">
           <Info aria-hidden="true" size={16} />

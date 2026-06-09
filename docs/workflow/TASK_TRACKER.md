@@ -1325,10 +1325,10 @@ STATUS: implemented
 ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/DASHBOARD_DATA_SCHEMA.tsv,docs/workflow/PRODUCT_REPOSITORY_STRUCTURE.tsv,docs/workflow/PRODUCT_GATE_EVIDENCE_SCHEMA.tsv,docs/workflow/TEST_PLAN_MANIFEST.tsv,docs/workflow/GIT_HOOK_CHECKS.tsv,docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv,docs/workflow/FINAL_GATE_COVERAGE.tsv,free-development/FREE_DEVELOPMENT_MODE.md,templates/TEMPLATES.md,lesson/SYNC_GATES_14_DAYS.tsv,tools/lib/dashboard_data.sh,tools/dashboard-data,tools/lib/product_repository_authority.sh,tools/free-development,tools/product-improvement,tools/external-integration,tools/product-scaffold-check,tools/product-launch-check,dashboard-control-center/mocks/mock-context-overview.png,dashboard-control-center/mocks/mock-context-lessons.png,dashboard-control-center/mocks/mock-context-workflow.png,dashboard-control-center/mocks/mock-context-maintenance.png,dashboard-control-center/mocks/mock-context-safety.png,dashboard-control-center/src/App.jsx,dashboard-control-center/src/dashboardData.js,dashboard-control-center/src/i18n.js,dashboard-control-center/src/styles.css,tests/fixtures/dashboard-control-center.json,tests/fixtures/dashboard-control-center-live-update.json,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/test_dashboard_control_center.sh,tools/test_product_repository_authority.sh,tools/test_product_scaffold_check.sh,tools/test_product_launch_check.sh,tools/test_product_gate_tools.sh,tools/check_lesson14_sync.sh,tools/test_lesson14.sh,tools/check_test_plan_coverage.sh,tools/check_ci_workflow_structure.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh
 TESTS: tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/test_dashboard_control_center.sh,tools/test_product_repository_authority.sh,tools/test_product_scaffold_check.sh,tools/test_product_launch_check.sh,tools/test_product_gate_tools.sh,tools/check_lesson14_sync.sh,tools/test_lesson14.sh,tools/check_test_plan_coverage.sh,tools/test_test_plan.sh,tools/test_git_hooks.sh,tools/test_git_hooks_parallel.sh,tools/test_ci_final_gate.sh,tools/check_ci_workflow_structure.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh
 
-## Planned Dashboard Lessons Page Exact Mock Alignment
+## Implemented Dashboard Lessons Page Exact Mock Alignment
 
 SYNC-ID: dashboard_control_center_lessons_page_exact_mock_alignment
-STATUS: planned
+STATUS: implemented
 ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,dashboard-control-center/mocks/mock-context-lessons.png,dashboard-control-center/src/App.jsx,dashboard-control-center/src/i18n.js,dashboard-control-center/src/styles.css,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_control_center.sh
 TESTS: tools/test_dashboard_control_center.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_test_plan_coverage.sh,tools/check_ci_workflow_structure.sh
 
@@ -1336,8 +1336,27 @@ Current task state:
 
 - [x] Record the next dashboard design task as a separate planned sync ID.
 - [x] Preserve the current implemented dashboard context and product authority sync records.
-- [ ] Inspect the current Lessons page against `dashboard-control-center/mocks/mock-context-lessons.png`.
-- [ ] Implement exact mock-backed Lessons page visual corrections.
-- [ ] Confirm desktop and responsive screenshots before developer visual approval.
-- [ ] Run targeted dashboard and synchronization checks after developer visual approval or explicit Git/CI closure request.
-- [ ] Promote the sync ID to `implemented` after implementation and verification pass.
+- [x] Inspect the current Lessons page against `dashboard-control-center/mocks/mock-context-lessons.png`.
+- [x] Implement exact mock-backed Lessons page visual corrections.
+- [x] Confirm desktop and responsive screenshots before developer visual approval.
+- [x] Run targeted dashboard and synchronization checks after developer visual approval or explicit Git/CI closure request.
+- [x] Promote the sync ID to `implemented` after implementation and verification pass.
+
+## Implemented Dashboard Control Center Visual Refinement Follow-up
+
+SYNC-ID: dashboard_control_center_visual_refinement_followup
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/memory/DEVELOPER_MEMORY.md,dashboard-control-center/mocks/mock-context-overview.png,dashboard-control-center/mocks/mock-context-lessons.png,dashboard-control-center/mocks/mock-context-workflow.png,dashboard-control-center/mocks/mock-context-maintenance.png,dashboard-control-center/mocks/mock-context-safety.png,dashboard-control-center/src/App.jsx,dashboard-control-center/src/i18n.js,dashboard-control-center/src/styles.css,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_control_center.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_test_plan_coverage.sh,tools/check_ci_workflow_structure.sh
+TESTS: tools/test_dashboard_control_center.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_test_plan_coverage.sh,tools/check_ci_workflow_structure.sh
+
+Current task state:
+
+- [x] Align Lessons and dashboard lesson-progress typography, progress display, animation restraint, and three-card responsive behavior.
+- [x] Align Development Workflow detail styling, bottom notice, icon language, and narrow-width behavior.
+- [x] Align Maintenance Sync status/evidence layout, copy controls, ellipsis fields, source-boundary tooltips, and labels for non-engineer comprehension.
+- [x] Align Safety Confirmation icons, localized detail text, failure wording, Partial Failures, command previews, copy controls, and Security policy checklist.
+- [x] Unify the left sidebar menu structure and active styling across all pages.
+- [x] Reset and repopulate Developer Memory with the active dashboard and maintenance follow-ups.
+- [x] Update Playwright coverage for the three lesson cards.
+- [x] Run the minimal local verification requested for Git/CI closure.
+- [ ] Commit, push, CI-check, merge, and sync local/remote state.

@@ -1627,15 +1627,15 @@ Verification contract:
 - The sync contract and all five synchronized blocks carry the same targeted runtime `TESTS` list for the implemented state.
 - Future changes remain governed by AGENTS.MD local-verification scope and must run only the checks required by changed surfaces and the active workflow contract.
 
-## Planned Dashboard Lessons Page Exact Mock Alignment Specification
+## Implemented Dashboard Lessons Page Exact Mock Alignment Specification
 
 SYNC-ID: dashboard_control_center_lessons_page_exact_mock_alignment
-STATUS: planned
+STATUS: implemented
 ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,dashboard-control-center/mocks/mock-context-lessons.png,dashboard-control-center/src/App.jsx,dashboard-control-center/src/i18n.js,dashboard-control-center/src/styles.css,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_control_center.sh
 TESTS: tools/test_dashboard_control_center.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_test_plan_coverage.sh,tools/check_ci_workflow_structure.sh
 
 The Lessons page remains a read-only renderer of producer-owned dashboard data for the selected workflow context.
-`dashboard-control-center/mocks/mock-context-lessons.png` is the visual and content-quantity source of truth for the next implementation pass.
+`dashboard-control-center/mocks/mock-context-lessons.png` was the visual and content-quantity source of truth for this implemented pass.
 
 Required behavior:
 
@@ -1651,3 +1651,46 @@ Implementation boundary:
 - Runtime changes should stay in `dashboard-control-center/src/App.jsx`, `dashboard-control-center/src/i18n.js`, `dashboard-control-center/src/styles.css`, and the related Playwright coverage unless a missing producer field is discovered.
 - If a missing producer field is discovered, stop and plan the schema and producer change instead of filling the UI with fixed text.
 - Do not turn mock image equality into an automated oracle. Use Playwright and screenshots for human visual inspection, and use tests for structural and behavior regressions.
+
+## Implemented Dashboard Control Center Visual Refinement Follow-up Specification
+
+SYNC-ID: dashboard_control_center_visual_refinement_followup
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/memory/DEVELOPER_MEMORY.md,dashboard-control-center/mocks/mock-context-overview.png,dashboard-control-center/mocks/mock-context-lessons.png,dashboard-control-center/mocks/mock-context-workflow.png,dashboard-control-center/mocks/mock-context-maintenance.png,dashboard-control-center/mocks/mock-context-safety.png,dashboard-control-center/src/App.jsx,dashboard-control-center/src/i18n.js,dashboard-control-center/src/styles.css,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_control_center.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_test_plan_coverage.sh,tools/check_ci_workflow_structure.sh
+TESTS: tools/test_dashboard_control_center.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_test_plan_coverage.sh,tools/check_ci_workflow_structure.sh
+
+This specification defines the post-review visual refinement layer for the dashboard control center.
+The browser remains a read-only renderer, and the refinement is limited to UI hierarchy, localized fixed labels, copy affordances, animation behavior, and responsive layout.
+
+Sidebar contract:
+
+- Every implemented page uses the same sidebar items and groups.
+- The active item, sidebar brand color, and support-group spacing must not vary by page.
+- Links for repository information, documents, settings, help, and changelog remain navigation placeholders until a later mock-backed runtime page exists.
+
+Animation and progress contract:
+
+- Lesson progress animation is decorative and must not change state semantics.
+- Number count-up runs only on first render and completes within one second.
+- Progress cards, progress bars, icons, and percentage labels use solid colors and white card backgrounds.
+- Fractions may style denominator text smaller than the numerator, but numerator digits must remain uniform.
+
+Copy and tooltip contract:
+
+- Source, reference, and command-preview fields keep values on one line with ellipsis when they overflow.
+- Copy controls sit outside the value field and use a copy icon, not a file-open icon.
+- Hover and keyboard focus on the value field or copy control show the full value in a compact tooltip bubble with a visible pointer.
+- Copy behavior must copy the underlying full value, not the truncated display string.
+
+Localization and data contract:
+
+- Fixed control-center labels use `i18n.js` and may adapt to the user environment.
+- Known English producer details may be mapped to localized fixed labels only when the meaning is controlled by this dashboard contract.
+- File paths, command text, source ids, evidence ids, and repository facts remain sanitized producer data.
+- React must not invent healthier Git, CI, Security, lesson, evidence, or blocker state.
+
+Responsive contract:
+
+- Cards, tables, source fields, command previews, and sidebar surfaces must avoid horizontal overflow on desktop, narrow desktop, tablet, and phone widths.
+- Lesson cards and dense status grids must stack before labels or key values become cramped.
+- Safety command previews use a vertical layout so the command and policy panels keep readable width.
