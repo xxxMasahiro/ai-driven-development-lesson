@@ -48,8 +48,8 @@ case "$COMMAND" in
   start|開始)
     lesson_menu_require_start_approval "Product Improvement" "${2:-}"
     lesson_menu_require_settings "Product Improvement"
-    lesson_product_profile_require 5 "Product Improvement"
     "$LESSON_ROOT/tools/check_repository_boundary.sh" --product-required >/dev/null
+    lesson_product_profile_require 5 "Product Improvement"
     cat <<'PROMPT'
 Product Improvement start prompt:
 
@@ -64,8 +64,8 @@ PROMPT
     ;;
   gate|確認)
     lesson_menu_require_settings "Product Improvement"
-    lesson_product_profile_require 5 "Product Improvement"
     "$LESSON_ROOT/tools/check_repository_boundary.sh" --product-required >/dev/null
+    lesson_product_profile_require 5 "Product Improvement"
     check_scope_docs
     "$LESSON_ROOT/tools/product-scaffold-check" check --context product-improvement
     product_repository_authority_gate "$(lesson_product_repo_root)" product-improvement all

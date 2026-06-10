@@ -43,9 +43,9 @@ case "$COMMAND" in
     ;;
   gate|確認)
     lesson_menu_require_settings "Applied Lesson"
-    lesson_product_profile_require 3 "Applied Lesson"
     [[ -f "$GUIDE" ]] || { printf 'missing: %s\n' "$GUIDE" >&2; exit 1; }
     "$LESSON_ROOT/tools/check_repository_boundary.sh" --product-required >/dev/null
+    lesson_product_profile_require 3 "Applied Lesson"
     "$LESSON_ROOT/tools/check_workflow_pair_sync.sh" --product
     "$LESSON_ROOT/tools/check_git_sync.sh" --product --required
     "$LESSON_ROOT/tools/check_ci_status.sh" --product --required
