@@ -52,6 +52,60 @@ assert_contains "$status_output" "main CI monitoring: manual"
 assert_contains "$status_output" "sync monitoring: manual"
 assert_contains "$status_output" "Repository context: lesson"
 
+assert_fails "$ROOT/tools/git-workflow" set branch_allowed false
+
+RECOVERY_SETTINGS="$TMP_DIR/recovery-settings.tsv"
+cat >"$RECOVERY_SETTINGS" <<'DOC'
+# key	value
+branch_allowed	false
+worktree_allowed	false
+main_direct_work_allowed	false
+pr_creation	auto
+pr_ci_monitoring	auto
+merge_execution	after_approval
+DOC
+if GIT_WORKFLOW_SETTINGS_FILE="$RECOVERY_SETTINGS" "$ROOT/tools/git-workflow" set sync_monitoring manual >/dev/null 2>&1; then
+  printf 'Git workflow must reject unrelated writes while persisted settings remain inconsistent.\n' >&2
+  exit 1
+fi
+assert_fails env GIT_WORKFLOW_SETTINGS_FILE="$RECOVERY_SETTINGS" "$ROOT/tools/git-workflow" allow pr-ci
+GIT_WORKFLOW_SETTINGS_FILE="$RECOVERY_SETTINGS" "$ROOT/tools/git-workflow" set pr_creation manual >/dev/null
+grep $'pr_creation\tmanual' "$RECOVERY_SETTINGS" >/dev/null
+GIT_WORKFLOW_SETTINGS_FILE="$RECOVERY_SETTINGS" "$ROOT/tools/git-workflow" set branch_allowed true >/dev/null
+grep $'branch_allowed\ttrue' "$RECOVERY_SETTINGS" >/dev/null
+
+BLOCKED_ALLOW_SETTINGS="$TMP_DIR/blocked-allow-settings.tsv"
+cat >"$BLOCKED_ALLOW_SETTINGS" <<'DOC'
+# key	value
+branch_allowed	false
+worktree_allowed	true
+main_direct_work_allowed	true
+pr_creation	manual
+pr_ci_monitoring	manual
+merge_execution	manual
+DOC
+assert_fails env GIT_WORKFLOW_SETTINGS_FILE="$BLOCKED_ALLOW_SETTINGS" "$ROOT/tools/git-workflow" allow worktree
+cat >"$BLOCKED_ALLOW_SETTINGS" <<'DOC'
+# key	value
+branch_allowed	false
+worktree_allowed	false
+main_direct_work_allowed	true
+pr_creation	manual
+pr_ci_monitoring	auto
+merge_execution	manual
+DOC
+assert_fails env GIT_WORKFLOW_SETTINGS_FILE="$BLOCKED_ALLOW_SETTINGS" "$ROOT/tools/git-workflow" allow pr-ci
+cat >"$BLOCKED_ALLOW_SETTINGS" <<'DOC'
+# key	value
+branch_allowed	false
+worktree_allowed	false
+main_direct_work_allowed	true
+pr_creation	manual
+pr_ci_monitoring	manual
+merge_execution	after_approval
+DOC
+assert_fails env GIT_WORKFLOW_SETTINGS_FILE="$BLOCKED_ALLOW_SETTINGS" "$ROOT/tools/git-workflow" allow merge
+
 "$ROOT/tools/git-workflow" set automation_level pr_ci >/dev/null
 assert_contains "$("$ROOT/tools/git-workflow" status --repo "$ROOT")" "automation_level: pr_ci"
 "$ROOT/tools/git-workflow" allow commit >/dev/null

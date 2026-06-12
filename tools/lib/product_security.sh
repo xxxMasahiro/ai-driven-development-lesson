@@ -121,6 +121,7 @@ product_security_repo_inside_lesson() {
 
 product_security_check_repository() {
   local repo="$1"
+  local git_required="${2:-true}"
   if [[ ! -d "$repo" ]]; then
     printf 'product-security block: product repository does not exist: %s\n' "$repo" >&2
     return 1
@@ -129,7 +130,7 @@ product_security_check_repository() {
     printf 'product-security block: refusing to inspect a product repository inside the lesson repository: %s\n' "$repo" >&2
     return 1
   fi
-  if [[ ! -d "$repo/.git" ]]; then
+  if [[ "$git_required" == "true" && ! -d "$repo/.git" ]]; then
     printf 'product-security block: product repository is not a Git repository: %s\n' "$repo" >&2
     return 1
   fi
@@ -237,6 +238,7 @@ product_security_print_safety_summary() {
 product_security_check_context() {
   local context="$1"
   local repo="$2"
+  local git_required="${3:-true}"
   local failed=0
 
   product_security_validate_policy || failed=1
@@ -245,7 +247,7 @@ product_security_check_context() {
     return 1
   }
 
-  product_security_check_repository "$repo" || failed=1
+  product_security_check_repository "$repo" "$git_required" || failed=1
   if [[ "$failed" -eq 0 ]]; then
     product_security_scan_secret_like_data "$repo" || failed=1
     product_security_warn_env_files "$repo" >/dev/null || true

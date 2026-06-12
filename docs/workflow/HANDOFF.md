@@ -20,20 +20,23 @@ The current implemented CI timing and approved auto-improvement cycle is documen
 The current implemented CI aggregate and full-hooks split is documented as `ci_aggregate_full_hooks_split`; it runs main `CI` lesson aggregate and full/no-cache Git hook verification as separate jobs with a strict final gate while preserving cache policy and full/no-cache semantics.
 The current implemented dashboard control center data layer is documented as `dashboard_control_center_data_layer`; it provides a read-only JSON source behind an AI-driven development control center while preserving the existing CLI dashboard.
 The current implemented dashboard control center React UI is documented as `dashboard_control_center_react_ui_plan`; it provides a read-only browser control-center scope with maintained entry tooling, standalone/aggregate browser checks, and no UI action execution.
-The current implemented dashboard control center information architecture is documented as `dashboard_control_center_information_architecture`; it provides category navigation, Overview-first presentation, `en`/`ja` fixed-label localization, snapshot freshness display, and Safety Actions command-preview isolation while preserving read-only behavior.
+The current implemented dashboard control center information architecture is documented as `dashboard_control_center_information_architecture`; it provides category navigation, Overview-first presentation, the original `en`/`ja` fixed-label localization layer, snapshot freshness display, and Safety Actions command-preview isolation while preserving read-only behavior. Full standard Dashboard UI locale support is implemented separately as `dashboard_control_center_full_locale_ui_support`.
 The current implemented dashboard control center visual polish is documented as `dashboard_control_center_visual_polish`; that layer brings the categorized read-only UI closer to `dashboard-control-center/mocks/archive/mock-categorized-dashboard.png` without itself adding automatic refresh, live CI/Git authority, or UI command execution.
 The current implemented dashboard control center mock parity is documented as `dashboard_control_center_mock_parity`; it brings the Overview structure closer to `mock-categorized-dashboard.png` with producer-owned metrics, compact issue preview expansion, central percentage rings, and Explore Pages metrics without fixed mock values.
 The latest implemented dashboard control center live snapshot sync is documented as `dashboard_control_center_live_snapshot_sync`; it adds atomic schema-validated snapshot publication plus read-only browser polling and last-known-good behavior without browser command execution or live CI/Git authority.
 The current implemented dashboard control center mock-aligned Overview is documented as `dashboard_control_center_mock_aligned_overview`; it keeps the Overview closer to the mock, makes empty Partial Failures explicit, separates manual follow-ups, avoids layout-changing Overview expansion, and preserves the read-only browser boundary.
 The current implemented dashboard control center detail-page mock parity follow-up is documented as `dashboard_control_center_detail_mock_parity`; it uses the four approved detail mock images as UI/UX source references to make category pages explain what they check, what judgment they support, and what must be reviewed next while preserving the read-only browser boundary.
 The current dashboard control center exact mock alignment correction is implemented as `dashboard_control_center_mock_exact_alignment_correction`; it records the corrective implementation pass that aligns the dashboard runtime with the approved mock family while preserving producer-owned state and read-only browser behavior.
+The current implemented dashboard control center Settings safe change is documented as `dashboard_control_center_settings_safe_change_plan`; it now includes guarded Settings edits, Settings-driven Dashboard fixed UI locale resolution, and immediate post-apply snapshot refresh without a page reload.
 
 ## Key Implemented Capabilities
 
 - 14-day approval enforcement.
 - Learning mode A/B/C selection and switching for 7-day and 14-day lessons.
 - Workflow display language and product development language selection for 7-day and 14-day lessons.
+- Dashboard Control Center fixed UI labels follow the Settings workflow display language for every standard language, with immediate no-reload refresh after apply.
 - Standard language choices: `ja`, `en`, `ko`, `zh-CN`, `zh-TW`, `es`, `pt-BR`, `fr`, `de`, `id`, `vi`, `th`, `hi`, and `ar`.
+- Dashboard fixed-label dictionaries now exist for the full standard language set. Unsupported custom language values remain workflow data unless a later locale policy promotes them.
 - Backward compatibility: `zh` remains accepted and is recorded as `zh-CN`; non-empty unsupported values remain available as `custom`.
 - Entry-step gates requiring learning mode, workflow display language, and product development language before passing `setup.index` in both structured lesson versions.
 - Learner-selected start positions.
@@ -1432,3 +1435,362 @@ Verification expectation:
 ./tools/check_as_built_docs.sh
 ./tools/check_agents_skills.sh
 ```
+
+## Implemented Dashboard Control Center Settings Safe Change Handoff
+
+SYNC-ID: dashboard_control_center_settings_safe_change_plan
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/DASHBOARD_DATA_SCHEMA.tsv,docs/workflow/TEST_PLAN_MANIFEST.tsv,docs/workflow/GIT_HOOK_CHECKS.tsv,docs/workflow/FINAL_GATE_COVERAGE.tsv,.github/workflows/ci.yml,.github/workflows/lesson14-ci.yml,tools/lib/dashboard_data.sh,tools/lib/git_workflow_policy.sh,tools/dashboard-data,tools/dashboard-settings,tools/dashboard-control-center,vite.config.mjs,dashboard-control-center/src/App.jsx,dashboard-control-center/src/dashboardData.js,dashboard-control-center/src/i18n.js,dashboard-control-center/src/styles.css,tests/fixtures/dashboard-control-center.json,tests/fixtures/dashboard-control-center-live-update.json,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_settings.sh,tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/test_dashboard_control_center.sh
+TESTS: tools/test_dashboard_settings.sh,tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/test_dashboard_control_center.sh,tools/test_git_workflow_policy.sh,tools/test_lesson.sh,tools/test_lesson14.sh,tools/test_menu_prerequisites.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_test_plan_coverage.sh,tools/check_workflow_pair_sync.sh
+
+Restart context:
+
+- Runtime implementation for the Settings update surface is present and this sync ID is implemented.
+- The implemented direction is a non-engineer-readable Settings page that shows current selected menu, target repository, current setting values, status, source, changeability, and related page from producer-owned dashboard data.
+- Settings rows open a large review popup that explains current value, proposed value, impact, source file, required confirmation, validation state, allowed values, safe update preview, plan result, and apply result; the popup moves focus inside on open, traps Tab navigation, supports Escape close, and returns focus to the initiating row.
+- The workflow display language row controls lesson guidance, workflow display text, and Dashboard fixed UI labels for all standard Dashboard UI locales.
+- `tools/dashboard-data` emits `summary.workflow_language`, `summary.display_locale`, and `summary.ui_locale`; validators check the locale summary and Settings row match when the fields are present.
+- After a successful browser apply response with `snapshot_regenerated: true`, React refetches the regenerated snapshot immediately and updates fixed UI labels without losing a reload marker.
+- Browser runtime remains read-only outside the implemented Settings mutation boundary. Settings writes go only through same-origin `application/json` POSTs to `/dashboard-settings/plan` and `/dashboard-settings/apply`, which call `tools/dashboard-settings`.
+- The settings catalog is emitted by `tools/dashboard-data` from existing lesson settings, Git workflow policy/settings, selected context, product authority, and security status sources. React must not parse TSV files or maintain a fixed settings source of truth.
+- `tools/dashboard-settings` owns writes with allowlisted setting ids, value validation, explicit `--confirm`, same-directory temporary-file writes, atomic rename, dashboard snapshot regeneration, and snapshot output restricted to `.dashboard-control-center/` outside isolated test mode.
+- Product/work target naming, approval-state mutation, security gates, evidence, Git/CI execution, external product repository mutation, push, merge, cleanup, deletion, OAuth, and credentials remain outside editable Settings rows.
+
+Implementation reminders:
+
+- Continue from the implemented runtime files: `DASHBOARD_DATA_SCHEMA.tsv`, `tools/lib/dashboard_data.sh`, `tools/lib/git_workflow_policy.sh`, `tools/dashboard-data`, `tools/dashboard-settings`, `tools/dashboard-control-center`, `vite.config.mjs`, `dashboard-control-center/src/dashboardData.js`, `dashboard-control-center/src/App.jsx`, `dashboard-control-center/src/i18n.js`, and `dashboard-control-center/src/styles.css`.
+- Keep fields generic and reusable: group id, setting id, scope, current value, current label, status, safe source file, allowed values, editability, reviewability, risk level, confirmation requirement, disabled reason, related page, update action id, and review metadata.
+- Reuse existing lesson setting normalization and Git workflow policy validation; do not duplicate TSV parsing or add UI-only branches.
+- Keep product or work target naming display-only in this sync ID; any future naming writer must use product-profile policy, product repository boundary checks when product-scoped, and a separate approved write contract.
+- Keep fixed display labels in `i18n.js`; keep file paths, ids, setting values, and repository facts as sanitized producer data.
+- Keep fixed-label dictionaries, layout support, and Playwright coverage aligned when changing Dashboard UI localization; do not change locale fallback logic alone.
+- Use row layouts and dialog patterns that remain readable on desktop, narrow desktop, tablet, and phone widths.
+- If malformed settings catalog data appears, fail validation; if catalog data is missing, show a safe incomplete state; do not invent readiness or source files in React.
+
+Verification expectations after implementation:
+
+```bash
+./tools/test_dashboard_schema.sh
+./tools/test_dashboard_data.sh
+./tools/test_dashboard_settings.sh
+./tools/test_dashboard_control_center.sh
+./tools/test_git_workflow_policy.sh
+./tools/test_lesson.sh
+./tools/test_lesson14.sh
+./tools/test_menu_prerequisites.sh
+./tools/test_lesson_repository.sh
+./tools/check_as_built_sync_contract.sh
+./tools/check_as_built_docs.sh
+./tools/check_test_plan_coverage.sh
+./tools/check_workflow_pair_sync.sh
+```
+
+`npm run dashboard:build` is required after React/Vite changes.
+Use escalated execution from the first attempt for Playwright/Chromium verification, per AGENTS.MD.
+Sub-agent review must find no unresolved major issues before the completion report.
+Final implementation verification included multiple sub-agent reviews; no unresolved major issues remained after the Settings language-flow, safety, UI, and test fixes.
+
+Stop and ask before:
+
+- Browser command execution beyond `tools/dashboard-settings`, POST/PUT/PATCH/DELETE fetches beyond `/dashboard-settings/plan` and `/dashboard-settings/apply`, live Git/GitHub/CI/API polling, evidence writing, settings mutation outside allowlisted Settings rows, external repository mutation, push, merge, cleanup, remote deletion, OAuth, token handling, destructive operations, dependency changes, or approval-state mutation.
+- Removing or weakening the existing read-only dashboard guards outside Settings, no command execution checks, mutation fetch checks, display-only command preview contract, STEP 1-7, STEP 1-14, existing checks, CI, Git hooks, pre-commit, repo-local skills, localization boundaries, or document routes.
+- Accepting any existing-feature tradeoff to make Settings writes easier.
+
+Recovery notes:
+
+- If schema or producer tests fail, fix the producer contract before changing UI.
+- If the Settings update tool writes invalid data, restore from the temporary or backup path and add a regression before retrying.
+- If 7-day or 14-day behavior regresses, revert the Settings update surface rather than changing lesson behavior to fit the new UI.
+- If a responsive or popup issue appears, fix layout constraints and dialog behavior instead of adding language-specific branches.
+
+## Implemented Dashboard Control Center Full Locale UI Support Handoff
+
+SYNC-ID: dashboard_control_center_full_locale_ui_support
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/DASHBOARD_DATA_SCHEMA.tsv,docs/workflow/TEST_PLAN_MANIFEST.tsv,docs/workflow/GIT_HOOK_CHECKS.tsv,docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv,docs/workflow/FINAL_GATE_COVERAGE.tsv,.github/workflows/ci.yml,.github/workflows/lesson14-ci.yml,tools/lib/lesson_common.sh,tools/lib/dashboard_data.sh,tools/dashboard-data,tools/dashboard-settings,tools/dashboard-control-center,tools/test_dashboard_i18n.sh,tools/test_dashboard_settings.sh,tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/test_dashboard_control_center.sh,tools/check_ci_workflow_structure.sh,tools/test_lesson_repository.sh,vite.config.mjs,dashboard-control-center/src/App.jsx,dashboard-control-center/src/dashboardData.js,dashboard-control-center/src/i18n.js,dashboard-control-center/src/styles.css,tests/fixtures/dashboard-control-center.json,tests/fixtures/dashboard-control-center-live-update.json,tests/playwright/dashboard-control-center.spec.js
+TESTS: tools/test_dashboard_i18n.sh,tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/test_dashboard_settings.sh,tools/test_dashboard_control_center.sh,tools/check_ci_workflow_structure.sh,tools/test_git_hooks.sh,tools/test_git_hooks_parallel.sh,tools/test_ci_final_gate.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_test_plan_coverage.sh,tools/check_workflow_pair_sync.sh
+
+Current State:
+
+- This sync ID is implemented. The existing Settings safe-change implementation is extended so Dashboard fixed-label dictionaries cover the full standard language set.
+- The Settings-selected workflow display language drives the Dashboard fixed UI language for `ja`, `en`, `ko`, `zh-CN`, `zh-TW`, `es`, `pt-BR`, `fr`, `de`, `id`, `vi`, `th`, `hi`, and `ar`.
+- Product development language remains separate from Dashboard UI language and must not become the Dashboard locale resolver.
+- The existing safe Settings writer and Vite endpoints remain the only mutation boundary: same-origin `application/json` POSTs to `/dashboard-settings/plan` and `/dashboard-settings/apply`, calling `tools/dashboard-settings` through `execFile`.
+- The interaction is a server-confirmed instant UI update: after apply succeeds, React updates active locale from validated response metadata, then immediately refetches the regenerated snapshot as authoritative data.
+- A short Settings-page notice explains that setting changes can take a moment and that the Dashboard updates automatically after successful application.
+- Arabic uses RTL chrome plus LTR isolation for technical values such as file paths, command strings, ids, hashes, and branch names.
+
+Document sync verification state:
+
+- The implemented sync is recorded across requirements, specification, implementation plan, task tracker, handoff, and `AS_BUILT_SYNC_CONTRACT.tsv`.
+- Final sync checks passed: `tools/check_as_built_sync_contract.sh`, `tools/check_as_built_docs.sh`, `tools/check_test_plan_coverage.sh`, and `tools/check_workflow_pair_sync.sh`.
+- Related Dashboard checks passed: `tools/test_dashboard_i18n.sh`, `tools/test_dashboard_schema.sh`, `tools/test_dashboard_data.sh`, `tools/test_dashboard_settings.sh`, and `tools/test_dashboard_control_center.sh`.
+- `tools/test_dashboard_i18n.sh` now fails broad English fallback for supported non-English locales and validates locale policy, aliases, direction metadata, and dictionary completeness.
+- `tools/test_dashboard_data.sh` now verifies legacy raw `zh` workflow-language files emit canonical `zh-CN` in Dashboard summary and the Settings row.
+- `npm run dashboard:build`, `tools/check_ci_workflow_structure.sh`, `tools/test_git_hooks.sh`, `tools/test_git_hooks_parallel.sh`, `tools/test_ci_final_gate.sh`, and `tools/test_lesson_repository.sh` passed after the final fixes.
+- `git diff --check` passed.
+- Multiple read-only sub-agent reviews completed. One dictionary-completeness finding was fixed by removing broad English base fallback for supported locales, adding an English-match threshold test, and canonicalizing legacy `zh`; follow-up review confirmed no unresolved major findings.
+
+Implementation notes:
+
+- Start from `dashboard-control-center/src/i18n.js`; make it the single source for Dashboard locale policy, aliases, direction metadata, fixed-label dictionaries, and testable completeness helpers.
+- Keep the policy aligned with `tools/lib/lesson_common.sh` and AGENTS.MD standard languages; do not create unconnected language lists.
+- Update `DASHBOARD_DATA_SCHEMA.tsv`, `tools/lib/dashboard_data.sh`, `tools/dashboard-data`, `dashboardData.js`, fixtures, and tests together when expanding `summary.ui_locale`.
+- Update `tools/dashboard-settings` only inside the existing allowlisted writer boundary and return canonical locale metadata after successful locale-affecting apply.
+- Update `App.jsx` to apply locale state after server success and refetch the snapshot without reloading the page.
+- Update `styles.css` with reusable RTL and technical-value isolation support rather than page-specific language branches.
+- `tools/test_dashboard_i18n.sh` is wired into `TEST_PLAN_MANIFEST.tsv`, `GIT_HOOK_CHECKS.tsv`, aggregate dashboard tests, and the as-built sync contract.
+- Keep regular checks fast by combining static all-language dictionary validation with representative Playwright coverage; reserve full all-language browser smoke for release readiness or explicit final-gate scope.
+
+Verification expectations:
+
+```bash
+./tools/test_dashboard_i18n.sh
+./tools/test_dashboard_schema.sh
+./tools/test_dashboard_data.sh
+./tools/test_dashboard_settings.sh
+./tools/test_dashboard_control_center.sh
+npm run dashboard:build
+./tools/check_as_built_sync_contract.sh
+./tools/check_as_built_docs.sh
+./tools/check_test_plan_coverage.sh
+./tools/check_workflow_pair_sync.sh
+```
+
+Run `./tools/test_lesson.sh`, `./tools/test_lesson14.sh`, and `./tools/test_menu_prerequisites.sh` if language normalization, setting-file handling, or menu prerequisite behavior changes.
+Run `./tools/test_lesson_repository.sh` only when required by changed-file policy, final-gate scope, or developer approval.
+Use escalated browser execution from the first attempt for Playwright visual inspection when the implementation reaches browser verification.
+
+Stop and ask before:
+
+- Runtime automatic translation, external translation APIs, dependency changes, new browser mutation routes, mutation outside allowlisted Settings rows, any Settings writer beyond `tools/dashboard-settings`, external repository writes, evidence writes, Git/GitHub/CI execution, approval-state mutation, OAuth, credentials, cleanup, deletion, push, merge, destructive operations, or weakening schema and same-origin guards.
+- Reducing pre-commit, CI, aggregate, final-gate, or dictionary-completeness coverage.
+- Changing the AGENTS.MD standard language list or promoting unsupported custom values into Dashboard UI locales.
+- Accepting any tradeoff against STEP 1-7, STEP 1-14, existing checks, existing document routes, repo-local skills, localization boundaries, or security gates.
+
+Next Step:
+
+- Ready for completion report. Future release-readiness work may add human translation QA or explicit all-language browser smoke without changing routine CI.
+
+## Implemented Dashboard Control Center Settings Apply Feedback Handoff
+
+SYNC-ID: dashboard_control_center_settings_apply_feedback
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,dashboard-control-center/src/App.jsx,dashboard-control-center/src/i18n.js,dashboard-control-center/src/styles.css,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_i18n.sh,tools/test_dashboard_settings.sh,tools/test_dashboard_control_center.sh
+TESTS: tools/test_dashboard_i18n.sh,tools/test_dashboard_settings.sh,tools/test_dashboard_control_center.sh,tools/check_ci_workflow_structure.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_test_plan_coverage.sh,tools/check_workflow_pair_sync.sh
+
+Restart context:
+
+- Runtime implementation is complete for this sync ID.
+- The implemented Settings writer, Vite same-origin JSON plan/apply endpoints, dictionary policy, snapshot refetch, and no-reload locale update remain the baseline.
+- Settings save success and Dashboard snapshot reflection confirmation are separated in the browser UI.
+- The feedback surface is independent from the selected row and confirmation dialog state so it can continue after the dialog closes.
+- Normal progress uses a delayed non-modal accessible status surface, not a nested modal over the existing Settings dialog focus trap.
+- The refetched snapshot remains authoritative. Apply-response locale metadata may provide immediate feedback after server success, but it does not override a conflicting snapshot as final state.
+- Row-level `確認のみ` and `ここで変更可能` chips were removed; the right-end row action and accessible row label carry the changeability meaning instead.
+- The Settings confirmation eyebrow text is slightly larger through a targeted style rule.
+
+Implemented entry points:
+
+- Continue from `dashboard-control-center/src/App.jsx`, `dashboard-control-center/src/i18n.js`, `dashboard-control-center/src/styles.css`, and `tests/playwright/dashboard-control-center.spec.js` if follow-up work is needed.
+- Do not change `tools/dashboard-settings`, Vite mutation endpoints, dashboard-data schema, producer behavior, CI, hooks, or Settings editability unless implementation proves the existing contract cannot satisfy the UX safely and the developer approves.
+- Named state and timing policy constants are used rather than scattered magic numbers or setting-specific branches.
+- Ordinary settings reconcile through the Settings row `id/current_value`; `workflow_language` reconciles through summary locale fields, direction, and the Settings row.
+- Use stable roles, state keys, and metadata in tests. Do not rely only on exact Japanese or English text.
+
+Verification expectations after implementation:
+
+```bash
+./tools/test_dashboard_i18n.sh
+./tools/test_dashboard_settings.sh
+./tools/test_dashboard_control_center.sh
+./tools/check_ci_workflow_structure.sh
+./tools/check_as_built_sync_contract.sh
+./tools/check_as_built_docs.sh
+./tools/check_test_plan_coverage.sh
+./tools/check_workflow_pair_sync.sh
+```
+
+Run `npm run dashboard:build` after React or CSS runtime changes.
+Run broader lesson, repository, hook, or final-gate checks only when changed files or workflow policy require them.
+Use escalated execution from the first attempt for Playwright/Chromium verification when real browser inspection is required.
+
+Implementation verification completed:
+
+- `npm run dashboard:build` passed after runtime changes.
+- `tools/test_dashboard_i18n.sh` passed after adding apply feedback locale keys.
+- `tools/test_dashboard_settings.sh` passed after runtime changes.
+- `tools/test_dashboard_control_center.sh` passed with 13 Playwright tests, including fast path, delayed feedback, stale snapshot authority, chip removal, action labels, eyebrow sizing, RTL, and no-overflow.
+- `tools/test_lesson_repository.sh` passed after runtime and documentation updates, covering 7-day, 14-day, dashboard, Git/CI, product gate, and security guard paths.
+- Final structure, sync, test-plan, workflow-pair, and sub-agent close-out verification passed with no unresolved major findings.
+
+Stop and ask before:
+
+- Adding browser mutation endpoints, adding writers beyond `tools/dashboard-settings`, changing the Settings allowlist, changing snapshot schema, adding dependencies, weakening CI/pre-commit coverage, or reducing existing Settings editability.
+- Treating existing safe Git workflow settings as display-only inside this sync ID; that may be an existing-feature tradeoff and requires a separate approved contract.
+- Accepting apply-response metadata as final when the refetched snapshot disagrees.
+
+Recovery notes:
+
+- If writer apply fails, stay in the existing dialog error path and do not show saved progress.
+- If snapshot refetch fails or times out after writer success, show saved-but-not-confirmed feedback and keep polling or manual refresh paths available.
+- If a valid snapshot is stale or mismatched, do not mark reflection complete.
+- If long translated row-action labels overflow, fix responsive layout or wrapping instead of adding language-specific branches.
+
+## Implemented Dashboard Control Center Settings Consistency Gate Handoff
+
+SYNC-ID: dashboard_control_center_settings_consistency_gate
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/DASHBOARD_DATA_SCHEMA.tsv,docs/workflow/TEST_PLAN_MANIFEST.tsv,tools/lib/git_workflow_policy.sh,tools/git-workflow,tools/dashboard-settings,tools/lib/dashboard_data.sh,tools/dashboard-data,dashboard-control-center/src/App.jsx,dashboard-control-center/src/dashboardData.js,dashboard-control-center/src/i18n.js,dashboard-control-center/src/styles.css,tests/fixtures/dashboard-control-center.json,tests/fixtures/dashboard-control-center-live-update.json,tests/playwright/dashboard-control-center.spec.js,tools/test_git_workflow_policy.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_settings.sh,tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/test_dashboard_control_center.sh
+TESTS: tools/test_git_workflow_policy.sh,tools/test_dashboard_settings.sh,tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_test_plan_coverage.sh,tools/check_workflow_pair_sync.sh
+
+Restart context:
+
+- This sync ID now has runtime implementation in the owner layer, Settings writer, Dashboard data producer, browser validator, Settings UI, fixtures, and related tests.
+- The fixed issue was that Settings could expose combinations that were individually valid but collectively inconsistent, such as disallowing normal branches and disallowing direct work on `main`.
+- The fix is a reusable owner-layer consistency gate, not React-only validation or one-off text warnings.
+- `tools/lib/git_workflow_policy.sh` owns candidate full-state validation. `tools/git-workflow` and `tools/dashboard-settings` call the same validation path.
+- `tools/git-workflow allow` rejects runtime action permission while the persisted Git workflow settings have blocking consistency rows, so existing inconsistent files cannot authorize an unsafe or misleading action.
+- `tools/dashboard-data` emits effective status, reason, and next action for Dashboard rows so the browser renders producer-owned policy.
+- `not_applicable` is now in the schema, producer, and browser status vocabulary before producer output uses it.
+- Blocked or rejected Settings policy results return structured JSON with `applied:false` and reason metadata; ordinary policy feedback does not rely on non-zero Vite middleware failures.
+- The current Settings writer, Vite same-origin JSON endpoints, full-locale UI behavior, no-reload apply feedback, and centered progress window remain baseline behavior.
+
+Implementation notes:
+
+- Hard reject candidate states that leave no approved write path, especially `branch_allowed=false` with `main_direct_work_allowed=false`.
+- Do not count `worktree_allowed=true` as an independent write path unless a later approved policy defines detached or external worktree semantics.
+- Treat branch-dependent automation with `branch_allowed=false` as blocked unless an approved policy explicitly models existing external PR monitoring.
+- Preserve `automation_level` compatibility and existing detailed-action behavior until the developer approves a stricter maximum model.
+- Do not silently change runtime precedence for `merge_execution=manual` versus `developer_auto_merge_allowed=true`; preserve current precedence unless approved, but Dashboard display must be qualified non-ready rather than unqualified ready automation.
+- Treat `pr_creation=auto`, `pr_ci_monitoring=auto`, and `merge_execution=after_approval` with `branch_allowed=false` as write-time errors in this sync ID. If a file is already persisted that way, display it as blocked and allow recovery changes.
+- Let users recover from invalid persisted settings by accepting candidate writes that produce a valid full state.
+- Keep product repository, lesson repository improvement, external integration, and learner approval statuses context-aware so they do not show misleading ready states.
+
+Verification expectations:
+
+```bash
+./tools/test_git_workflow_policy.sh
+./tools/test_dashboard_settings.sh
+./tools/test_dashboard_schema.sh
+./tools/test_dashboard_data.sh
+./tools/test_dashboard_i18n.sh
+./tools/test_dashboard_control_center.sh
+./tools/check_as_built_sync_contract.sh
+./tools/check_as_built_docs.sh
+./tools/check_test_plan_coverage.sh
+./tools/check_workflow_pair_sync.sh
+```
+
+Run `npm run dashboard:build` after React, Vite, or CSS changes.
+Run `./tools/check_lesson_structure.sh` and `./tools/check_lesson14_structure.sh` as related structure checks when promoting the implemented state.
+Run `tools/test_lesson_repository.sh` only when changed-file policy, final-gate scope, or developer approval requires it.
+Use multiple read-only xhigh sub-agent reviews before and after runtime implementation changes when promoting this sync ID.
+
+Current document-sync verification state:
+
+- Implemented sync content is recorded across requirements, specification, implementation plan, task tracker, handoff, and `AS_BUILT_SYNC_CONTRACT.tsv`.
+- Document and structure checks passed: `tools/check_as_built_sync_contract.sh`, `tools/check_as_built_docs.sh`, `tools/check_test_plan_coverage.sh`, `tools/check_workflow_pair_sync.sh`, `tools/check_lesson_structure.sh`, `tools/check_lesson14_structure.sh`, and `tools/check_ci_workflow_structure.sh`.
+- Related non-browser checks passed: `tools/test_git_workflow_policy.sh`, `tools/test_dashboard_settings.sh`, `tools/test_dashboard_schema.sh`, `tools/test_dashboard_data.sh`, and `tools/test_dashboard_i18n.sh`.
+- `npm run dashboard:build` passed after React, Vite, i18n, and CSS changes.
+- `tools/test_dashboard_control_center.sh` passed after runtime fixes for stale workflow-language labels, representative locale row overflow, and blocked apply-feedback display.
+- `tools/test_lesson_repository.sh` passed after runtime and documentation updates.
+- Multiple read-only xhigh sub-agent reviews passed after clarifying branch-dependent automation, merge-precedence display, `not_applicable` vocabulary handling, structured `applied:false` policy responses, runtime `allow` gating, schema/i18n/UI corrections, and sync-contract TESTS correction. No unresolved major findings remain.
+
+Stop and ask before:
+
+- Reducing existing Settings editability, changing `automation_level` semantics, defining detached-worktree behavior, changing runtime merge precedence, allowing branch-dependent automation without branches, changing approval receipt security semantics, adding dependencies, adding writers, adding mutation endpoints, weakening CI/pre-commit, external repository mutation, Git/GitHub/CI execution, evidence writing, approval-state mutation, push, merge, cleanup, deletion, OAuth, credentials, or accepting any existing-feature tradeoff.
+
+Recovery notes:
+
+- If validation blocks all paths from an inconsistent current file, add a recovery path and fixture instead of weakening validation.
+- If CLI and Dashboard validation disagree, fix the shared owner-layer validator first.
+- If Dashboard row status and writer rejection disagree, fix producer/writer reason-code mapping before changing React.
+- If layout breaks for long translated status or action labels, fix reusable row constraints and translations rather than adding language-specific UI branches.
+
+## Implemented Product Workflow Git Usage Modes Handoff
+
+SYNC-ID: product_workflow_git_usage_modes
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/DASHBOARD_DATA_SCHEMA.tsv,docs/workflow/PRODUCT_GATE_EVIDENCE_SCHEMA.tsv,docs/workflow/MENU_PRODUCT_PROFILE_POLICY.tsv,docs/workflow/PRODUCT_WORKFLOW_GIT_USAGE_POLICY.tsv,docs/workflow/TEST_PLAN_MANIFEST.tsv,docs/workflow/GIT_HOOK_CHECKS.tsv,docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv,docs/workflow/FINAL_GATE_COVERAGE.tsv,learning/PRODUCT_WORKFLOW_GIT_USAGE_SETTINGS.tsv,learning/context/WORKFLOW_CONTEXT_MAP.tsv,.github/workflows/ci.yml,.github/workflows/lesson14-ci.yml,tools/lib/product_workflow_git_usage.sh,tools/free-development,tools/product-improvement,tools/external-integration,tools/check_repository_boundary.sh,tools/product-scaffold-check,tools/lib/product_security.sh,tools/product-security,tools/lib/product_repository_authority.sh,tools/product-repository-authority,tools/dashboard-data,tools/dashboard-settings,tools/lib/dashboard_data.sh,dashboard-control-center/src/App.jsx,dashboard-control-center/src/dashboardData.js,dashboard-control-center/src/i18n.js,dashboard-control-center/src/styles.css,vite.config.mjs,tests/fixtures/dashboard-control-center.json,tests/fixtures/dashboard-control-center-live-update.json,tools/test_product_git_usage_modes.sh,tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/test_dashboard_settings.sh,tools/test_dashboard_control_center.sh,tools/check_ci_workflow_structure.sh
+TESTS: tools/test_product_git_usage_modes.sh,tools/test_product_gate_tools.sh,tools/test_product_scaffold_check.sh,tools/test_product_security.sh,tools/test_product_repository_authority.sh,tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/test_dashboard_settings.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/check_ci_workflow_structure.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_test_plan_coverage.sh,tools/check_workflow_pair_sync.sh,tools/check_lesson_structure.sh
+
+Restart context:
+
+- This sync ID is implemented. Runtime product workflow Git usage modes have been added under this sync ID.
+- The problem was that Free Development, Product Improvement, and External Integration were modeled as always requiring product Git remote sync and CI, which was too strict for small local LPs, prototypes, or one-off static pages.
+- The implemented direction adds product workflow Git usage modes while keeping `ci` as the default existing-compatible behavior.
+- The implemented modes are `none`, `local`, `remote_sync`, and `ci`.
+- `none` means Git, remote sync, and CI are not applicable. It does not waive product workspace, canonical documents, scaffold, product-security, secret scanning, external-integration approval, or local checks.
+- Existing Git workflow action settings remain the policy for how Git may be used when a mode requires Git. They are not the setting for whether Git is used.
+- Dashboard must receive mode and applicability from producer-owned data. React must not infer this from menu labels or hard-coded strings.
+- `.git`-less authoritative evidence storage was not introduced. Non-Git and non-CI evidence is represented as `not_applicable`; any future replacement evidence store, freshness model, or product-head binding still requires developer approval.
+
+Implementation notes:
+
+- The owner-layer policy and helper were implemented before UI changes.
+- Preserve strict current behavior when no explicit mode is selected.
+- `tools/free-development`, `tools/product-improvement`, and `tools/external-integration` call the shared helper rather than hard-coding Git sync and CI.
+- `check_repository_boundary.sh`, `product-scaffold-check`, `product_security.sh`, and `product_repository_authority.sh` were updated together because they contained Git worktree assumptions that could block non-Git product work.
+- Do not make product-security pass by skipping checks. Every mode still needs boundary protection, secret scanning, safe output metadata, and integration-specific approval when applicable.
+- Do not claim authoritative product Git or CI evidence when the mode marks Git or CI not applicable.
+- If `.git`-less authoritative evidence is needed later, define its storage path, freshness semantics, and product-head replacement only after developer approval.
+- Dashboard schema, producer output, browser validation, Settings catalog, Settings writer, UI labels, command previews, fixtures, and tests were updated as one contract.
+
+Verification commands for this implemented sync:
+
+```bash
+./tools/test_product_git_usage_modes.sh
+./tools/test_product_gate_tools.sh
+./tools/test_product_scaffold_check.sh
+./tools/test_product_security.sh
+./tools/test_product_repository_authority.sh
+./tools/test_dashboard_schema.sh
+./tools/test_dashboard_data.sh
+./tools/test_dashboard_settings.sh
+./tools/test_dashboard_i18n.sh
+./tools/test_dashboard_control_center.sh
+./tools/check_ci_workflow_structure.sh
+./tools/check_as_built_sync_contract.sh
+./tools/check_as_built_docs.sh
+./tools/check_test_plan_coverage.sh
+./tools/check_workflow_pair_sync.sh
+./tools/check_lesson_structure.sh
+./tools/check_lesson14_structure.sh
+./tools/test_lesson_repository.sh
+```
+
+Current verification state:
+
+- `bash -n` passed for the changed shell tools and test scripts during implementation.
+- `tools/test_product_git_usage_modes.sh` passed.
+- `tools/test_product_gate_tools.sh` passed.
+- `tools/test_product_scaffold_check.sh` passed.
+- `tools/test_product_security.sh` passed.
+- `tools/test_product_repository_authority.sh` passed.
+- `tools/test_dashboard_schema.sh` passed.
+- `tools/test_dashboard_data.sh` passed.
+- `tools/test_dashboard_settings.sh` passed.
+- `tools/test_dashboard_i18n.sh` passed.
+- `tools/test_dashboard_control_center.sh` passed.
+- `tools/test_lesson_repository.sh` passed as the aggregate repository test for this sync ID.
+- Final sync and structure checks passed after the implemented documentation state was recorded.
+- `git diff --check` passed after implementation and document updates.
+- Sub-agent verification completed with no unresolved major findings after review fixes.
+
+Stop and ask before:
+
+- Designing or accepting `.git`-less authoritative evidence storage, freshness, or product-head replacement.
+- Changing default strict Git/CI behavior, STEP 1-7, STEP 1-14, existing CI, existing checks, document routes, repo-local skills, product-security guarantees, or product authority guarantees.
+- Adding dependencies, external services, runtime translation, browser mutation routes, writers beyond `tools/dashboard-settings`, evidence writers, dashboard Git/GitHub/CI execution, product repository mutation, push, merge, cleanup, deletion, OAuth, credentials, destructive operations, or any existing-feature tradeoff.
+
+Recovery notes:
+
+- If `ci` mode stops matching current behavior, fix that before continuing with lighter modes.
+- If Dashboard and gate behavior disagree, repair the owner-layer helper or producer before changing React.
+- If non-Git mode bypasses security or documentation requirements, treat it as a blocker, not an acceptable lightweight path.
+- If repeated failures or specification conflict appear, stop after the third repeated failure and request developer direction.
+
+Next Step:
+
+- This implementation step is closed. Continue future product workflow Git usage mode changes through a new synced task or explicit developer direction.

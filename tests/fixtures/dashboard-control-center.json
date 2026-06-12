@@ -1,5 +1,5 @@
 {
-  "schema_version": "0.8.0",
+  "schema_version": "0.9.0",
   "generated_at": "2026-06-05T00:00:00Z",
   "snapshot_id": "2026-06-05T00:00:00Z-aaaaaaaaaaaa",
   "content_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
@@ -46,7 +46,10 @@
         "reason": "Required product evidence has not run.",
         "required_command": "./tools/product-repository-authority status --json"
       }
-    ]
+    ],
+    "git_usage_mode": "not_applicable",
+    "git_requirement": "not_applicable",
+    "ci_requirement": "not_applicable"
   },
   "available_contexts": [
     {
@@ -955,7 +958,10 @@
         "status": "missing",
         "source": "contexts_by_menu"
       },
-      "blockers": []
+      "blockers": [],
+      "git_usage_mode": "not_applicable",
+      "git_requirement": "not_applicable",
+      "ci_requirement": "not_applicable"
     },
     "step_1_14": {
       "menu_id": "step_1_14",
@@ -990,7 +996,10 @@
           "reason": "Required product evidence has not run.",
           "required_command": "./tools/product-repository-authority status --json"
         }
-      ]
+      ],
+      "git_usage_mode": "not_applicable",
+      "git_requirement": "not_applicable",
+      "ci_requirement": "not_applicable"
     },
     "advanced": {
       "menu_id": "advanced",
@@ -1018,7 +1027,10 @@
         "status": "manual_required",
         "source": "contexts_by_menu"
       },
-      "blockers": []
+      "blockers": [],
+      "git_usage_mode": "not_applicable",
+      "git_requirement": "not_applicable",
+      "ci_requirement": "not_applicable"
     },
     "free-development": {
       "menu_id": "free-development",
@@ -1053,7 +1065,10 @@
           "reason": "Required product evidence has not run.",
           "required_command": "./tools/product-repository-authority status --json"
         }
-      ]
+      ],
+      "git_usage_mode": "ci",
+      "git_requirement": "required",
+      "ci_requirement": "required"
     },
     "product-improvement": {
       "menu_id": "product-improvement",
@@ -1081,7 +1096,10 @@
         "status": "unknown",
         "source": "contexts_by_menu"
       },
-      "blockers": []
+      "blockers": [],
+      "git_usage_mode": "ci",
+      "git_requirement": "required",
+      "ci_requirement": "required"
     },
     "external-integration": {
       "menu_id": "external-integration",
@@ -1109,7 +1127,10 @@
         "status": "unknown",
         "source": "contexts_by_menu"
       },
-      "blockers": []
+      "blockers": [],
+      "git_usage_mode": "ci",
+      "git_requirement": "required",
+      "ci_requirement": "required"
     },
     "lesson-repository-improvement": {
       "menu_id": "lesson-repository-improvement",
@@ -1137,7 +1158,1051 @@
         "status": "unknown",
         "source": "contexts_by_menu"
       },
-      "blockers": []
+      "blockers": [],
+      "git_usage_mode": "not_applicable",
+      "git_requirement": "not_applicable",
+      "ci_requirement": "not_applicable"
     }
+  },
+  "settings": {
+    "status": "not_run",
+    "groups": [
+      {
+        "id": "context",
+        "label_key": "settingsPage.group.context",
+        "description_key": "settingsPage.groupDetail.context",
+        "status": "ready",
+        "order": 1
+      },
+      {
+        "id": "learning",
+        "label_key": "settingsPage.group.learning",
+        "description_key": "settingsPage.groupDetail.learning",
+        "status": "approval_required",
+        "order": 2
+      },
+      {
+        "id": "workflow",
+        "label_key": "settingsPage.group.workflow",
+        "description_key": "settingsPage.groupDetail.workflow",
+        "status": "unknown",
+        "order": 3
+      },
+      {
+        "id": "security",
+        "label_key": "settingsPage.group.security",
+        "description_key": "settingsPage.groupDetail.security",
+        "status": "not_run",
+        "order": 4
+      }
+    ],
+    "items": [
+      {
+        "id": "selected_menu",
+        "group_id": "context",
+        "scope": "selected_context",
+        "label_key": "settingsPage.item.selectedMenu",
+        "description_key": "settingsPage.itemDetail.selectedMenu",
+        "current_value": "step_1_14",
+        "current_label": "STEP 1-14: 実践レッスン",
+        "status": "ready",
+        "source_file": "learning/context/WORKFLOW_CONTEXT_MAP.tsv",
+        "allowed_values": [
+          "step_1_7",
+          "step_1_14",
+          "advanced",
+          "free-development",
+          "product-improvement",
+          "external-integration",
+          "lesson-repository-improvement"
+        ],
+        "editable": false,
+        "reviewable": true,
+        "risk_level": "low",
+        "requires_confirmation": true,
+        "disabled_reason_key": "settingsPage.disabled.previewOnly",
+        "related_page": "#overview",
+        "update_action_id": "selected_context.menu_id",
+        "review": {
+          "impact_key": "settingsPage.impact.selectedMenu",
+          "target_file": "learning/context/WORKFLOW_CONTEXT_MAP.tsv",
+          "validation_status": "ready",
+          "update_preview_key": "settingsPage.preview.selectedMenu"
+        },
+        "consistency": {
+          "status": "ready",
+          "severity": "info",
+          "reason_code": "none",
+          "reason_key": "settingsPage.consistency.none",
+          "next_action_key": "settingsPage.consistency.next.none",
+          "effective_mode": "step_1_14",
+          "affected_setting_ids": []
+        }
+      },
+      {
+        "id": "target_repository",
+        "group_id": "context",
+        "scope": "repository",
+        "label_key": "settingsPage.item.targetRepository",
+        "description_key": "settingsPage.itemDetail.targetRepository",
+        "current_value": "task-tracker-repository",
+        "current_label": "task-tracker-repository",
+        "status": "ready",
+        "source_file": "lesson/LESSON_CONFIG_14_DAYS.tsv",
+        "allowed_values": [],
+        "editable": false,
+        "reviewable": true,
+        "risk_level": "low",
+        "requires_confirmation": true,
+        "disabled_reason_key": "settingsPage.disabled.previewOnly",
+        "related_page": "#repository-info",
+        "update_action_id": "selected_context.target_repository",
+        "review": {
+          "impact_key": "settingsPage.impact.targetRepository",
+          "target_file": "lesson/LESSON_CONFIG_14_DAYS.tsv",
+          "validation_status": "ready",
+          "update_preview_key": "settingsPage.preview.targetRepository"
+        },
+        "consistency": {
+          "status": "ready",
+          "severity": "info",
+          "reason_code": "none",
+          "reason_key": "settingsPage.consistency.none",
+          "next_action_key": "settingsPage.consistency.next.none",
+          "effective_mode": "task-tracker-repository",
+          "affected_setting_ids": []
+        }
+      },
+      {
+        "id": "product_name",
+        "group_id": "context",
+        "scope": "repository",
+        "label_key": "settingsPage.item.productName",
+        "description_key": "settingsPage.itemDetail.productName",
+        "current_value": "タスク管理表",
+        "current_label": "タスク管理表",
+        "status": "ready",
+        "source_file": "product:ops/PRODUCT_PROFILE.json",
+        "allowed_values": [],
+        "editable": false,
+        "reviewable": true,
+        "risk_level": "low",
+        "requires_confirmation": true,
+        "disabled_reason_key": "settingsPage.disabled.previewOnly",
+        "related_page": "#repository-info",
+        "update_action_id": "product_profile.display_name",
+        "review": {
+          "impact_key": "settingsPage.impact.productName",
+          "target_file": "product:ops/PRODUCT_PROFILE.json",
+          "validation_status": "ready",
+          "update_preview_key": "settingsPage.preview.productName"
+        },
+        "consistency": {
+          "status": "ready",
+          "severity": "info",
+          "reason_code": "none",
+          "reason_key": "settingsPage.consistency.none",
+          "next_action_key": "settingsPage.consistency.next.none",
+          "effective_mode": "タスク管理表",
+          "affected_setting_ids": []
+        }
+      },
+      {
+        "id": "product_type",
+        "group_id": "context",
+        "scope": "repository",
+        "label_key": "settingsPage.item.productType",
+        "description_key": "settingsPage.itemDetail.productType",
+        "current_value": "web",
+        "current_label": "web",
+        "status": "ready",
+        "source_file": "product:ops/PRODUCT_MANIFEST.tsv",
+        "allowed_values": [
+          "all",
+          "web",
+          "api",
+          "cli",
+          "library",
+          "integration",
+          "custom"
+        ],
+        "editable": false,
+        "reviewable": true,
+        "risk_level": "low",
+        "requires_confirmation": true,
+        "disabled_reason_key": "settingsPage.disabled.previewOnly",
+        "related_page": "#repository-info",
+        "update_action_id": "product_manifest.product_type",
+        "review": {
+          "impact_key": "settingsPage.impact.productType",
+          "target_file": "product:ops/PRODUCT_MANIFEST.tsv",
+          "validation_status": "ready",
+          "update_preview_key": "settingsPage.preview.productType"
+        },
+        "consistency": {
+          "status": "ready",
+          "severity": "info",
+          "reason_code": "none",
+          "reason_key": "settingsPage.consistency.none",
+          "next_action_key": "settingsPage.consistency.next.none",
+          "effective_mode": "web",
+          "affected_setting_ids": []
+        }
+      },
+      {
+        "id": "learning_mode",
+        "group_id": "learning",
+        "scope": "learning",
+        "label_key": "settingsPage.item.learningMode",
+        "description_key": "settingsPage.itemDetail.learningMode",
+        "current_value": "A",
+        "current_label": "A (じっくり説明)",
+        "status": "ready",
+        "source_file": "learning/LESSON_MODE_14_DAYS.tsv",
+        "allowed_values": [
+          "A",
+          "B",
+          "C"
+        ],
+        "editable": true,
+        "reviewable": true,
+        "risk_level": "low",
+        "requires_confirmation": true,
+        "disabled_reason_key": "settingsPage.disabled.available",
+        "related_page": "#lessons",
+        "update_action_id": "lesson.learning_mode",
+        "review": {
+          "impact_key": "settingsPage.impact.learningMode",
+          "target_file": "learning/LESSON_MODE_14_DAYS.tsv",
+          "validation_status": "ready",
+          "update_preview_key": "settingsPage.preview.learningMode"
+        },
+        "consistency": {
+          "status": "ready",
+          "severity": "info",
+          "reason_code": "none",
+          "reason_key": "settingsPage.consistency.none",
+          "next_action_key": "settingsPage.consistency.next.none",
+          "effective_mode": "A",
+          "affected_setting_ids": []
+        }
+      },
+      {
+        "id": "workflow_language",
+        "group_id": "learning",
+        "scope": "learning",
+        "label_key": "settingsPage.item.workflowLanguage",
+        "description_key": "settingsPage.itemDetail.workflowLanguage",
+        "current_value": "ja",
+        "current_label": "ja (日本語)",
+        "status": "ready",
+        "source_file": "learning/WORKFLOW_DISPLAY_LANGUAGE_14_DAYS.tsv",
+        "allowed_values": [
+          "ja",
+          "en",
+          "ko",
+          "zh-CN",
+          "zh-TW",
+          "es",
+          "pt-BR",
+          "fr",
+          "de",
+          "id",
+          "vi",
+          "th",
+          "hi",
+          "ar"
+        ],
+        "editable": true,
+        "reviewable": true,
+        "risk_level": "low",
+        "requires_confirmation": true,
+        "disabled_reason_key": "settingsPage.disabled.available",
+        "related_page": "#lessons",
+        "update_action_id": "lesson.workflow_language",
+        "review": {
+          "impact_key": "settingsPage.impact.workflowLanguage",
+          "target_file": "learning/WORKFLOW_DISPLAY_LANGUAGE_14_DAYS.tsv",
+          "validation_status": "ready",
+          "update_preview_key": "settingsPage.preview.workflowLanguage"
+        },
+        "consistency": {
+          "status": "ready",
+          "severity": "info",
+          "reason_code": "none",
+          "reason_key": "settingsPage.consistency.none",
+          "next_action_key": "settingsPage.consistency.next.none",
+          "effective_mode": "ja",
+          "affected_setting_ids": []
+        }
+      },
+      {
+        "id": "product_language",
+        "group_id": "learning",
+        "scope": "learning",
+        "label_key": "settingsPage.item.productLanguage",
+        "description_key": "settingsPage.itemDetail.productLanguage",
+        "current_value": "en",
+        "current_label": "en (English)",
+        "status": "ready",
+        "source_file": "learning/PRODUCT_DEVELOPMENT_LANGUAGE_14_DAYS.tsv",
+        "allowed_values": [
+          "ja",
+          "en",
+          "ko",
+          "zh-CN",
+          "zh-TW",
+          "es",
+          "pt-BR",
+          "fr",
+          "de",
+          "id",
+          "vi",
+          "th",
+          "hi",
+          "ar"
+        ],
+        "editable": true,
+        "reviewable": true,
+        "risk_level": "low",
+        "requires_confirmation": true,
+        "disabled_reason_key": "settingsPage.disabled.available",
+        "related_page": "#lessons",
+        "update_action_id": "lesson.product_language",
+        "review": {
+          "impact_key": "settingsPage.impact.productLanguage",
+          "target_file": "learning/PRODUCT_DEVELOPMENT_LANGUAGE_14_DAYS.tsv",
+          "validation_status": "ready",
+          "update_preview_key": "settingsPage.preview.productLanguage"
+        },
+        "consistency": {
+          "status": "ready",
+          "severity": "info",
+          "reason_code": "none",
+          "reason_key": "settingsPage.consistency.none",
+          "next_action_key": "settingsPage.consistency.next.none",
+          "effective_mode": "en",
+          "affected_setting_ids": []
+        }
+      },
+      {
+        "id": "learner_approval",
+        "group_id": "learning",
+        "scope": "learning",
+        "label_key": "settingsPage.item.learnerApproval",
+        "description_key": "settingsPage.itemDetail.learnerApproval",
+        "current_value": "approval_required",
+        "current_label": "approval_required",
+        "status": "approval_required",
+        "source_file": "learning/LESSON_APPROVALS_14_DAYS.tsv",
+        "allowed_values": [],
+        "editable": false,
+        "reviewable": true,
+        "risk_level": "medium",
+        "requires_confirmation": true,
+        "disabled_reason_key": "settingsPage.disabled.approvalRequired",
+        "related_page": "#lessons",
+        "update_action_id": "lesson.learner_approval",
+        "review": {
+          "impact_key": "settingsPage.impact.learnerApproval",
+          "target_file": "learning/LESSON_APPROVALS_14_DAYS.tsv",
+          "validation_status": "approval_required",
+          "update_preview_key": "settingsPage.preview.learnerApproval"
+        },
+        "consistency": {
+          "status": "approval_required",
+          "severity": "info",
+          "reason_code": "none",
+          "reason_key": "settingsPage.consistency.none",
+          "next_action_key": "settingsPage.consistency.next.none",
+          "effective_mode": "approval_required",
+          "affected_setting_ids": []
+        }
+      },
+      {
+        "id": "git_policy",
+        "group_id": "workflow",
+        "scope": "workflow",
+        "label_key": "settingsPage.item.gitPolicy",
+        "description_key": "settingsPage.itemDetail.gitPolicy",
+        "current_value": "ready",
+        "current_label": "ready",
+        "status": "ready",
+        "source_file": "docs/workflow/GIT_WORKFLOW_POLICY.tsv",
+        "allowed_values": [],
+        "editable": false,
+        "reviewable": true,
+        "risk_level": "medium",
+        "requires_confirmation": true,
+        "disabled_reason_key": "settingsPage.disabled.previewOnly",
+        "related_page": "#workflow",
+        "update_action_id": "git_workflow.policy",
+        "review": {
+          "impact_key": "settingsPage.impact.gitPolicy",
+          "target_file": "docs/workflow/GIT_WORKFLOW_POLICY.tsv",
+          "validation_status": "ready",
+          "update_preview_key": "settingsPage.preview.gitPolicy"
+        },
+        "consistency": {
+          "status": "ready",
+          "severity": "info",
+          "reason_code": "none",
+          "reason_key": "settingsPage.consistency.none",
+          "next_action_key": "settingsPage.consistency.next.none",
+          "effective_mode": "ready",
+          "affected_setting_ids": []
+        }
+      },
+      {
+        "id": "product_git_usage_mode",
+        "group_id": "workflow",
+        "scope": "workflow",
+        "label_key": "settingsPage.item.productGitUsageMode",
+        "description_key": "settingsPage.itemDetail.productGitUsageMode",
+        "current_value": "not_applicable",
+        "current_label": "Not applicable",
+        "status": "not_applicable",
+        "source_file": "learning/PRODUCT_WORKFLOW_GIT_USAGE_SETTINGS.tsv",
+        "allowed_values": [],
+        "editable": false,
+        "reviewable": true,
+        "risk_level": "medium",
+        "requires_confirmation": true,
+        "disabled_reason_key": "settingsPage.disabled.previewOnly",
+        "related_page": "#workflow",
+        "update_action_id": "product_workflow.git_usage_mode",
+        "review": {
+          "impact_key": "settingsPage.impact.productGitUsageMode",
+          "target_file": "learning/PRODUCT_WORKFLOW_GIT_USAGE_SETTINGS.tsv",
+          "validation_status": "not_applicable",
+          "update_preview_key": "settingsPage.preview.productGitUsageMode"
+        },
+        "consistency": {
+          "status": "not_applicable",
+          "severity": "info",
+          "reason_code": "none",
+          "reason_key": "settingsPage.consistency.none",
+          "next_action_key": "settingsPage.consistency.next.none",
+          "effective_mode": "not_applicable",
+          "affected_setting_ids": []
+        }
+      },
+      {
+        "id": "git_branch_allowed",
+        "group_id": "workflow",
+        "scope": "workflow",
+        "label_key": "settingsPage.item.git.branch_allowed",
+        "description_key": "settingsPage.itemDetail.git.branch_allowed",
+        "current_value": "true",
+        "current_label": "true",
+        "status": "ready",
+        "source_file": "learning/GIT_WORKFLOW_SETTINGS.tsv",
+        "allowed_values": [
+          "true",
+          "false"
+        ],
+        "editable": true,
+        "reviewable": true,
+        "risk_level": "medium",
+        "requires_confirmation": true,
+        "disabled_reason_key": "settingsPage.disabled.available",
+        "related_page": "#workflow",
+        "update_action_id": "git_workflow.branch_allowed",
+        "review": {
+          "impact_key": "settingsPage.impact.gitSetting",
+          "target_file": "learning/GIT_WORKFLOW_SETTINGS.tsv",
+          "validation_status": "ready",
+          "update_preview_key": "settingsPage.preview.gitSetting"
+        },
+        "consistency": {
+          "status": "ready",
+          "severity": "info",
+          "reason_code": "none",
+          "reason_key": "settingsPage.consistency.none",
+          "next_action_key": "settingsPage.consistency.next.none",
+          "effective_mode": "true",
+          "affected_setting_ids": []
+        }
+      },
+      {
+        "id": "git_worktree_allowed",
+        "group_id": "workflow",
+        "scope": "workflow",
+        "label_key": "settingsPage.item.git.worktree_allowed",
+        "description_key": "settingsPage.itemDetail.git.worktree_allowed",
+        "current_value": "false",
+        "current_label": "false",
+        "status": "ready",
+        "source_file": "learning/GIT_WORKFLOW_SETTINGS.tsv",
+        "allowed_values": [
+          "true",
+          "false"
+        ],
+        "editable": true,
+        "reviewable": true,
+        "risk_level": "medium",
+        "requires_confirmation": true,
+        "disabled_reason_key": "settingsPage.disabled.available",
+        "related_page": "#workflow",
+        "update_action_id": "git_workflow.worktree_allowed",
+        "review": {
+          "impact_key": "settingsPage.impact.gitSetting",
+          "target_file": "learning/GIT_WORKFLOW_SETTINGS.tsv",
+          "validation_status": "ready",
+          "update_preview_key": "settingsPage.preview.gitSetting"
+        },
+        "consistency": {
+          "status": "ready",
+          "severity": "info",
+          "reason_code": "none",
+          "reason_key": "settingsPage.consistency.none",
+          "next_action_key": "settingsPage.consistency.next.none",
+          "effective_mode": "false",
+          "affected_setting_ids": []
+        }
+      },
+      {
+        "id": "git_main_direct_work_allowed",
+        "group_id": "workflow",
+        "scope": "workflow",
+        "label_key": "settingsPage.item.git.main_direct_work_allowed",
+        "description_key": "settingsPage.itemDetail.git.main_direct_work_allowed",
+        "current_value": "false",
+        "current_label": "false",
+        "status": "ready",
+        "source_file": "learning/GIT_WORKFLOW_SETTINGS.tsv",
+        "allowed_values": [
+          "true",
+          "false"
+        ],
+        "editable": true,
+        "reviewable": true,
+        "risk_level": "medium",
+        "requires_confirmation": true,
+        "disabled_reason_key": "settingsPage.disabled.available",
+        "related_page": "#workflow",
+        "update_action_id": "git_workflow.main_direct_work_allowed",
+        "review": {
+          "impact_key": "settingsPage.impact.gitSetting",
+          "target_file": "learning/GIT_WORKFLOW_SETTINGS.tsv",
+          "validation_status": "ready",
+          "update_preview_key": "settingsPage.preview.gitSetting"
+        },
+        "consistency": {
+          "status": "ready",
+          "severity": "info",
+          "reason_code": "none",
+          "reason_key": "settingsPage.consistency.none",
+          "next_action_key": "settingsPage.consistency.next.none",
+          "effective_mode": "false",
+          "affected_setting_ids": []
+        }
+      },
+      {
+        "id": "git_automation_level",
+        "group_id": "workflow",
+        "scope": "workflow",
+        "label_key": "settingsPage.item.git.automation_level",
+        "description_key": "settingsPage.itemDetail.git.automation_level",
+        "current_value": "sync",
+        "current_label": "sync",
+        "status": "ready",
+        "source_file": "learning/GIT_WORKFLOW_SETTINGS.tsv",
+        "allowed_values": [
+          "manual",
+          "commit",
+          "pr_ci",
+          "sync"
+        ],
+        "editable": true,
+        "reviewable": true,
+        "risk_level": "medium",
+        "requires_confirmation": true,
+        "disabled_reason_key": "settingsPage.disabled.available",
+        "related_page": "#workflow",
+        "update_action_id": "git_workflow.automation_level",
+        "review": {
+          "impact_key": "settingsPage.impact.gitSetting",
+          "target_file": "learning/GIT_WORKFLOW_SETTINGS.tsv",
+          "validation_status": "ready",
+          "update_preview_key": "settingsPage.preview.gitSetting"
+        },
+        "consistency": {
+          "status": "ready",
+          "severity": "info",
+          "reason_code": "none",
+          "reason_key": "settingsPage.consistency.none",
+          "next_action_key": "settingsPage.consistency.next.none",
+          "effective_mode": "sync",
+          "affected_setting_ids": []
+        }
+      },
+      {
+        "id": "git_commit_automation",
+        "group_id": "workflow",
+        "scope": "workflow",
+        "label_key": "settingsPage.item.git.commit_automation",
+        "description_key": "settingsPage.itemDetail.git.commit_automation",
+        "current_value": "auto",
+        "current_label": "auto",
+        "status": "ready",
+        "source_file": "learning/GIT_WORKFLOW_SETTINGS.tsv",
+        "allowed_values": [
+          "manual",
+          "auto"
+        ],
+        "editable": true,
+        "reviewable": true,
+        "risk_level": "medium",
+        "requires_confirmation": true,
+        "disabled_reason_key": "settingsPage.disabled.available",
+        "related_page": "#workflow",
+        "update_action_id": "git_workflow.commit_automation",
+        "review": {
+          "impact_key": "settingsPage.impact.gitSetting",
+          "target_file": "learning/GIT_WORKFLOW_SETTINGS.tsv",
+          "validation_status": "ready",
+          "update_preview_key": "settingsPage.preview.gitSetting"
+        },
+        "consistency": {
+          "status": "ready",
+          "severity": "info",
+          "reason_code": "none",
+          "reason_key": "settingsPage.consistency.none",
+          "next_action_key": "settingsPage.consistency.next.none",
+          "effective_mode": "auto",
+          "affected_setting_ids": []
+        }
+      },
+      {
+        "id": "git_push_automation",
+        "group_id": "workflow",
+        "scope": "workflow",
+        "label_key": "settingsPage.item.git.push_automation",
+        "description_key": "settingsPage.itemDetail.git.push_automation",
+        "current_value": "auto",
+        "current_label": "auto",
+        "status": "ready",
+        "source_file": "learning/GIT_WORKFLOW_SETTINGS.tsv",
+        "allowed_values": [
+          "manual",
+          "auto"
+        ],
+        "editable": true,
+        "reviewable": true,
+        "risk_level": "medium",
+        "requires_confirmation": true,
+        "disabled_reason_key": "settingsPage.disabled.available",
+        "related_page": "#workflow",
+        "update_action_id": "git_workflow.push_automation",
+        "review": {
+          "impact_key": "settingsPage.impact.gitSetting",
+          "target_file": "learning/GIT_WORKFLOW_SETTINGS.tsv",
+          "validation_status": "ready",
+          "update_preview_key": "settingsPage.preview.gitSetting"
+        },
+        "consistency": {
+          "status": "ready",
+          "severity": "info",
+          "reason_code": "none",
+          "reason_key": "settingsPage.consistency.none",
+          "next_action_key": "settingsPage.consistency.next.none",
+          "effective_mode": "auto",
+          "affected_setting_ids": []
+        }
+      },
+      {
+        "id": "git_pr_creation",
+        "group_id": "workflow",
+        "scope": "workflow",
+        "label_key": "settingsPage.item.git.pr_creation",
+        "description_key": "settingsPage.itemDetail.git.pr_creation",
+        "current_value": "auto",
+        "current_label": "auto",
+        "status": "ready",
+        "source_file": "learning/GIT_WORKFLOW_SETTINGS.tsv",
+        "allowed_values": [
+          "manual",
+          "auto"
+        ],
+        "editable": true,
+        "reviewable": true,
+        "risk_level": "medium",
+        "requires_confirmation": true,
+        "disabled_reason_key": "settingsPage.disabled.available",
+        "related_page": "#workflow",
+        "update_action_id": "git_workflow.pr_creation",
+        "review": {
+          "impact_key": "settingsPage.impact.gitSetting",
+          "target_file": "learning/GIT_WORKFLOW_SETTINGS.tsv",
+          "validation_status": "ready",
+          "update_preview_key": "settingsPage.preview.gitSetting"
+        },
+        "consistency": {
+          "status": "ready",
+          "severity": "info",
+          "reason_code": "none",
+          "reason_key": "settingsPage.consistency.none",
+          "next_action_key": "settingsPage.consistency.next.none",
+          "effective_mode": "auto",
+          "affected_setting_ids": []
+        }
+      },
+      {
+        "id": "git_pr_ci_monitoring",
+        "group_id": "workflow",
+        "scope": "workflow",
+        "label_key": "settingsPage.item.git.pr_ci_monitoring",
+        "description_key": "settingsPage.itemDetail.git.pr_ci_monitoring",
+        "current_value": "auto",
+        "current_label": "auto",
+        "status": "ready",
+        "source_file": "learning/GIT_WORKFLOW_SETTINGS.tsv",
+        "allowed_values": [
+          "manual",
+          "auto"
+        ],
+        "editable": true,
+        "reviewable": true,
+        "risk_level": "medium",
+        "requires_confirmation": true,
+        "disabled_reason_key": "settingsPage.disabled.available",
+        "related_page": "#workflow",
+        "update_action_id": "git_workflow.pr_ci_monitoring",
+        "review": {
+          "impact_key": "settingsPage.impact.gitSetting",
+          "target_file": "learning/GIT_WORKFLOW_SETTINGS.tsv",
+          "validation_status": "ready",
+          "update_preview_key": "settingsPage.preview.gitSetting"
+        },
+        "consistency": {
+          "status": "ready",
+          "severity": "info",
+          "reason_code": "none",
+          "reason_key": "settingsPage.consistency.none",
+          "next_action_key": "settingsPage.consistency.next.none",
+          "effective_mode": "auto",
+          "affected_setting_ids": []
+        }
+      },
+      {
+        "id": "git_merge_execution",
+        "group_id": "workflow",
+        "scope": "workflow",
+        "label_key": "settingsPage.item.git.merge_execution",
+        "description_key": "settingsPage.itemDetail.git.merge_execution",
+        "current_value": "after_approval",
+        "current_label": "after_approval",
+        "status": "ready",
+        "source_file": "learning/GIT_WORKFLOW_SETTINGS.tsv",
+        "allowed_values": [
+          "manual",
+          "after_approval"
+        ],
+        "editable": true,
+        "reviewable": true,
+        "risk_level": "medium",
+        "requires_confirmation": true,
+        "disabled_reason_key": "settingsPage.disabled.available",
+        "related_page": "#workflow",
+        "update_action_id": "git_workflow.merge_execution",
+        "review": {
+          "impact_key": "settingsPage.impact.gitSetting",
+          "target_file": "learning/GIT_WORKFLOW_SETTINGS.tsv",
+          "validation_status": "ready",
+          "update_preview_key": "settingsPage.preview.gitSetting"
+        },
+        "consistency": {
+          "status": "ready",
+          "severity": "info",
+          "reason_code": "none",
+          "reason_key": "settingsPage.consistency.none",
+          "next_action_key": "settingsPage.consistency.next.none",
+          "effective_mode": "after_approval",
+          "affected_setting_ids": []
+        }
+      },
+      {
+        "id": "git_developer_auto_merge_allowed",
+        "group_id": "workflow",
+        "scope": "workflow",
+        "label_key": "settingsPage.item.git.developer_auto_merge_allowed",
+        "description_key": "settingsPage.itemDetail.git.developer_auto_merge_allowed",
+        "current_value": "true",
+        "current_label": "true",
+        "status": "ready",
+        "source_file": "learning/GIT_WORKFLOW_SETTINGS.tsv",
+        "allowed_values": [
+          "false",
+          "true"
+        ],
+        "editable": true,
+        "reviewable": true,
+        "risk_level": "medium",
+        "requires_confirmation": true,
+        "disabled_reason_key": "settingsPage.disabled.available",
+        "related_page": "#workflow",
+        "update_action_id": "git_workflow.developer_auto_merge_allowed",
+        "review": {
+          "impact_key": "settingsPage.impact.gitSetting",
+          "target_file": "learning/GIT_WORKFLOW_SETTINGS.tsv",
+          "validation_status": "ready",
+          "update_preview_key": "settingsPage.preview.gitSetting"
+        },
+        "consistency": {
+          "status": "ready",
+          "severity": "info",
+          "reason_code": "none",
+          "reason_key": "settingsPage.consistency.none",
+          "next_action_key": "settingsPage.consistency.next.none",
+          "effective_mode": "true",
+          "affected_setting_ids": []
+        }
+      },
+      {
+        "id": "git_main_ci_monitoring",
+        "group_id": "workflow",
+        "scope": "workflow",
+        "label_key": "settingsPage.item.git.main_ci_monitoring",
+        "description_key": "settingsPage.itemDetail.git.main_ci_monitoring",
+        "current_value": "auto",
+        "current_label": "auto",
+        "status": "ready",
+        "source_file": "learning/GIT_WORKFLOW_SETTINGS.tsv",
+        "allowed_values": [
+          "manual",
+          "auto"
+        ],
+        "editable": true,
+        "reviewable": true,
+        "risk_level": "medium",
+        "requires_confirmation": true,
+        "disabled_reason_key": "settingsPage.disabled.available",
+        "related_page": "#workflow",
+        "update_action_id": "git_workflow.main_ci_monitoring",
+        "review": {
+          "impact_key": "settingsPage.impact.gitSetting",
+          "target_file": "learning/GIT_WORKFLOW_SETTINGS.tsv",
+          "validation_status": "ready",
+          "update_preview_key": "settingsPage.preview.gitSetting"
+        },
+        "consistency": {
+          "status": "ready",
+          "severity": "info",
+          "reason_code": "none",
+          "reason_key": "settingsPage.consistency.none",
+          "next_action_key": "settingsPage.consistency.next.none",
+          "effective_mode": "auto",
+          "affected_setting_ids": []
+        }
+      },
+      {
+        "id": "git_sync_monitoring",
+        "group_id": "workflow",
+        "scope": "workflow",
+        "label_key": "settingsPage.item.git.sync_monitoring",
+        "description_key": "settingsPage.itemDetail.git.sync_monitoring",
+        "current_value": "auto",
+        "current_label": "auto",
+        "status": "ready",
+        "source_file": "learning/GIT_WORKFLOW_SETTINGS.tsv",
+        "allowed_values": [
+          "manual",
+          "auto"
+        ],
+        "editable": true,
+        "reviewable": true,
+        "risk_level": "medium",
+        "requires_confirmation": true,
+        "disabled_reason_key": "settingsPage.disabled.available",
+        "related_page": "#workflow",
+        "update_action_id": "git_workflow.sync_monitoring",
+        "review": {
+          "impact_key": "settingsPage.impact.gitSetting",
+          "target_file": "learning/GIT_WORKFLOW_SETTINGS.tsv",
+          "validation_status": "ready",
+          "update_preview_key": "settingsPage.preview.gitSetting"
+        },
+        "consistency": {
+          "status": "ready",
+          "severity": "info",
+          "reason_code": "none",
+          "reason_key": "settingsPage.consistency.none",
+          "next_action_key": "settingsPage.consistency.next.none",
+          "effective_mode": "auto",
+          "affected_setting_ids": []
+        }
+      },
+      {
+        "id": "git_gate",
+        "group_id": "workflow",
+        "scope": "workflow",
+        "label_key": "settingsPage.item.gitGate",
+        "description_key": "settingsPage.itemDetail.gitGate",
+        "current_value": "unknown",
+        "current_label": "unknown",
+        "status": "unknown",
+        "source_file": "docs/workflow/GIT_WORKFLOW_POLICY.tsv",
+        "allowed_values": [],
+        "editable": false,
+        "reviewable": true,
+        "risk_level": "medium",
+        "requires_confirmation": true,
+        "disabled_reason_key": "settingsPage.disabled.approvalRequired",
+        "related_page": "#workflow",
+        "update_action_id": "git_workflow.gate",
+        "review": {
+          "impact_key": "settingsPage.impact.gitGate",
+          "target_file": "docs/workflow/GIT_WORKFLOW_POLICY.tsv",
+          "validation_status": "unknown",
+          "update_preview_key": "settingsPage.preview.gitGate"
+        },
+        "consistency": {
+          "status": "unknown",
+          "severity": "info",
+          "reason_code": "none",
+          "reason_key": "settingsPage.consistency.none",
+          "next_action_key": "settingsPage.consistency.next.none",
+          "effective_mode": "unknown",
+          "affected_setting_ids": []
+        }
+      },
+      {
+        "id": "git_approval",
+        "group_id": "workflow",
+        "scope": "workflow",
+        "label_key": "settingsPage.item.gitApproval",
+        "description_key": "settingsPage.itemDetail.gitApproval",
+        "current_value": "approval_required",
+        "current_label": "approval_required",
+        "status": "approval_required",
+        "source_file": "learning/GIT_WORKFLOW_APPROVALS.tsv",
+        "allowed_values": [],
+        "editable": false,
+        "reviewable": true,
+        "risk_level": "medium",
+        "requires_confirmation": true,
+        "disabled_reason_key": "settingsPage.disabled.approvalRequired",
+        "related_page": "#workflow",
+        "update_action_id": "git_workflow.approval",
+        "review": {
+          "impact_key": "settingsPage.impact.gitApproval",
+          "target_file": "learning/GIT_WORKFLOW_APPROVALS.tsv",
+          "validation_status": "approval_required",
+          "update_preview_key": "settingsPage.preview.gitApproval"
+        },
+        "consistency": {
+          "status": "approval_required",
+          "severity": "info",
+          "reason_code": "none",
+          "reason_key": "settingsPage.consistency.none",
+          "next_action_key": "settingsPage.consistency.next.none",
+          "effective_mode": "approval_required",
+          "affected_setting_ids": []
+        }
+      },
+      {
+        "id": "security_policy",
+        "group_id": "security",
+        "scope": "security",
+        "label_key": "settingsPage.item.securityPolicy",
+        "description_key": "settingsPage.itemDetail.securityPolicy",
+        "current_value": "ready",
+        "current_label": "ready",
+        "status": "ready",
+        "source_file": "docs/workflow/PRODUCT_SECURITY_POLICY.tsv",
+        "allowed_values": [],
+        "editable": false,
+        "reviewable": true,
+        "risk_level": "high",
+        "requires_confirmation": true,
+        "disabled_reason_key": "settingsPage.disabled.previewOnly",
+        "related_page": "#safety",
+        "update_action_id": "security.policy",
+        "review": {
+          "impact_key": "settingsPage.impact.securityPolicy",
+          "target_file": "docs/workflow/PRODUCT_SECURITY_POLICY.tsv",
+          "validation_status": "ready",
+          "update_preview_key": "settingsPage.preview.securityPolicy"
+        },
+        "consistency": {
+          "status": "ready",
+          "severity": "info",
+          "reason_code": "none",
+          "reason_key": "settingsPage.consistency.none",
+          "next_action_key": "settingsPage.consistency.next.none",
+          "effective_mode": "ready",
+          "affected_setting_ids": []
+        }
+      },
+      {
+        "id": "security_gate",
+        "group_id": "security",
+        "scope": "security",
+        "label_key": "settingsPage.item.securityGate",
+        "description_key": "settingsPage.itemDetail.securityGate",
+        "current_value": "not_run",
+        "current_label": "not_run",
+        "status": "not_run",
+        "source_file": "docs/workflow/PRODUCT_SECURITY_POLICY.tsv",
+        "allowed_values": [],
+        "editable": false,
+        "reviewable": true,
+        "risk_level": "high",
+        "requires_confirmation": true,
+        "disabled_reason_key": "settingsPage.disabled.approvalRequired",
+        "related_page": "#safety",
+        "update_action_id": "security.gate",
+        "review": {
+          "impact_key": "settingsPage.impact.securityGate",
+          "target_file": "docs/workflow/PRODUCT_SECURITY_POLICY.tsv",
+          "validation_status": "not_run",
+          "update_preview_key": "settingsPage.preview.securityGate"
+        },
+        "consistency": {
+          "status": "not_run",
+          "severity": "info",
+          "reason_code": "none",
+          "reason_key": "settingsPage.consistency.none",
+          "next_action_key": "settingsPage.consistency.next.none",
+          "effective_mode": "not_run",
+          "affected_setting_ids": []
+        }
+      },
+      {
+        "id": "dangerous_action_approval",
+        "group_id": "security",
+        "scope": "security",
+        "label_key": "settingsPage.item.dangerousActionApproval",
+        "description_key": "settingsPage.itemDetail.dangerousActionApproval",
+        "current_value": "approval_required",
+        "current_label": "approval_required",
+        "status": "approval_required",
+        "source_file": "docs/workflow/PRODUCT_SECURITY_POLICY.tsv",
+        "allowed_values": [],
+        "editable": false,
+        "reviewable": true,
+        "risk_level": "high",
+        "requires_confirmation": true,
+        "disabled_reason_key": "settingsPage.disabled.approvalRequired",
+        "related_page": "#safety",
+        "update_action_id": "security.dangerous_action_approval",
+        "review": {
+          "impact_key": "settingsPage.impact.dangerousActionApproval",
+          "target_file": "docs/workflow/PRODUCT_SECURITY_POLICY.tsv",
+          "validation_status": "approval_required",
+          "update_preview_key": "settingsPage.preview.dangerousActionApproval"
+        },
+        "consistency": {
+          "status": "approval_required",
+          "severity": "info",
+          "reason_code": "none",
+          "reason_key": "settingsPage.consistency.none",
+          "next_action_key": "settingsPage.consistency.next.none",
+          "effective_mode": "approval_required",
+          "affected_setting_ids": []
+        }
+      }
+    ]
   }
 }

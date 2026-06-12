@@ -6,6 +6,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/lib/lesson_common.sh"
 # shellcheck source=tools/lib/product_repository_authority.sh
 source "$SCRIPT_DIR/lib/product_repository_authority.sh"
+# shellcheck source=tools/lib/product_workflow_git_usage.sh
+source "$SCRIPT_DIR/lib/product_workflow_git_usage.sh"
 
 COMMAND="${1:-status}"
 
@@ -20,7 +22,7 @@ Rules:
   - This mode is optional and starts only after the learner chooses it.
   - It does not replace the 7-day or 14-day lesson flows.
   - The learner may choose the language, framework, database, payment system, and tools.
-  - Product work must follow the repository workflow: stack choice, requirements, specification, implementation plan, task tracker, handoff, Git sync, tests, and CI.
+  - Product work must follow the repository workflow: stack choice, requirements, specification, implementation plan, task tracker, handoff, local checks, and the selected Git usage mode.
 USAGE
 }
 
@@ -36,7 +38,7 @@ case "$COMMAND" in
   start|開始)
     lesson_menu_require_start_approval "Free Development Mode" "${2:-}"
     lesson_menu_require_settings "Free Development Mode"
-    "$LESSON_ROOT/tools/check_repository_boundary.sh" --product-required >/dev/null
+    product_workflow_git_usage_repository_boundary_gate free-development
     lesson_product_profile_require 4 "Free Development Mode"
     printf 'Free Development Mode start prompt:\n\n'
     sed -n '/^## Product Setup Prompt$/,/^## Completion Gate$/p' "$LESSON_ROOT/free-development/FREE_DEVELOPMENT_MODE.md" | sed '$d'
@@ -45,14 +47,9 @@ case "$COMMAND" in
     ;;
   gate|確認)
     lesson_menu_require_settings "Free Development Mode"
-    "$LESSON_ROOT/tools/check_repository_boundary.sh" --product-required >/dev/null
+    product_workflow_git_usage_repository_boundary_gate free-development
     lesson_product_profile_require 4 "Free Development Mode"
-    "$LESSON_ROOT/tools/product-scaffold-check" check --context free-development
-    product_repository_authority_gate "$(lesson_product_repo_root)" free-development all
-    "$LESSON_ROOT/tools/product-security" gate --context free-development
-    "$LESSON_ROOT/tools/check_workflow_pair_sync.sh" --product
-    "$LESSON_ROOT/tools/check_git_sync.sh" --product --required
-    "$LESSON_ROOT/tools/check_ci_status.sh" --product --required
+    product_workflow_git_usage_gate free-development all
     printf 'Free Development Mode gate passed.\n'
     ;;
   ""|-h|--help|help)

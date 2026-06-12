@@ -27,6 +27,8 @@ as_built_evidence_run_sync_contract_check	hook	check_as_built_sync_contract	Aggr
 ./tools/test_ci_timing.sh	hook	test_ci_timing	Aggregate CI timing coverage is provided by the matching Git hook row.
 ./tools/test_dashboard_schema.sh	hook	test_dashboard_schema	Aggregate dashboard schema coverage is provided by the matching Git hook row.
 ./tools/test_dashboard_data.sh	hook	test_dashboard_data	Aggregate dashboard data coverage is provided by the matching Git hook row.
+./tools/test_dashboard_settings.sh	hook	test_dashboard_settings	Aggregate dashboard Settings update-tool coverage is provided by the matching Git hook row.
+./tools/test_dashboard_i18n.sh	hook	test_dashboard_i18n	Aggregate dashboard i18n coverage is provided by the matching Git hook row.
 ./tools/test_dashboard_control_center.sh	hook	test_dashboard_control_center	Aggregate dashboard control-center browser coverage is provided by the matching Git hook row.
 ./tools/test_ci_final_gate.sh	hook	test_ci_final_gate	Aggregate CI final gate coverage is provided by the matching Git hook row.
 ./tools/test_ci_pipeline_acceleration.sh	hook	test_ci_pipeline_acceleration	Aggregate CI pipeline acceleration coverage is provided by the matching Git hook row.
@@ -53,6 +55,7 @@ as_built_evidence_run_sync_contract_check	hook	check_as_built_sync_contract	Aggr
 ./tools/test_product_repository_cleanup.sh	hook	test_product_repository_cleanup	Aggregate product repository cleanup coverage is provided by the matching Git hook row.
 ./tools/test_product_repository_authority.sh	hook	test_product_repository_authority	Aggregate product repository authority coverage is provided by the matching Git hook row.
 ./tools/test_product_security.sh	hook	test_product_security	Aggregate product security coverage is provided by the matching Git hook row.
+./tools/test_product_git_usage_modes.sh	hook	test_product_git_usage_modes	Aggregate product Git usage mode coverage is provided by the matching Git hook row.
 ./tools/test_lesson_start_position.sh	hook	test_lesson_start_position	Aggregate lesson start-position coverage is provided by the matching Git hook row.
 ./tools/test_lesson.sh	hook	test_lesson	Aggregate 7-step lesson CLI coverage is provided by the matching Git hook row.
 ./tools/test_lesson14.sh	hook	test_lesson14	Aggregate 14-step lesson CLI coverage is provided by the matching Git hook row.

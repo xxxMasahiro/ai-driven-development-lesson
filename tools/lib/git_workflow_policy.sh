@@ -94,6 +94,261 @@ git_workflow_setting_value() {
   git_workflow_policy_default_value "$key"
 }
 
+git_workflow_candidate_setting_value() {
+  local key="$1"
+  local candidate_key="${2:-}"
+  local candidate_value="${3:-}"
+
+  if [[ -n "$candidate_key" && "$key" == "$candidate_key" ]]; then
+    printf '%s\n' "$candidate_value"
+    return 0
+  fi
+
+  git_workflow_setting_value "$key"
+}
+
+git_workflow_consistency_row() {
+  local severity="$1"
+  local status="$2"
+  local reason_code="$3"
+  local affected_ids="$4"
+  local reason_key="$5"
+  local next_action_key="$6"
+
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' \
+    "$severity" "$status" "$reason_code" "$affected_ids" "$reason_key" "$next_action_key"
+}
+
+git_workflow_consistency_rows() {
+  local candidate_key="${1:-}"
+  local candidate_value="${2:-}"
+  local branch_allowed
+  local worktree_allowed
+  local main_direct_work_allowed
+  local pr_creation
+  local pr_ci_monitoring
+  local merge_execution
+  local developer_auto_merge_allowed
+
+  if [[ -n "$candidate_key" ]]; then
+    git_workflow_validate_value "$candidate_key" "$candidate_value" >/dev/null || return 1
+  fi
+
+  branch_allowed="$(git_workflow_candidate_setting_value branch_allowed "$candidate_key" "$candidate_value")" || return 1
+  worktree_allowed="$(git_workflow_candidate_setting_value worktree_allowed "$candidate_key" "$candidate_value")" || return 1
+  main_direct_work_allowed="$(git_workflow_candidate_setting_value main_direct_work_allowed "$candidate_key" "$candidate_value")" || return 1
+  pr_creation="$(git_workflow_candidate_setting_value pr_creation "$candidate_key" "$candidate_value")" || return 1
+  pr_ci_monitoring="$(git_workflow_candidate_setting_value pr_ci_monitoring "$candidate_key" "$candidate_value")" || return 1
+  merge_execution="$(git_workflow_candidate_setting_value merge_execution "$candidate_key" "$candidate_value")" || return 1
+  developer_auto_merge_allowed="$(git_workflow_candidate_setting_value developer_auto_merge_allowed "$candidate_key" "$candidate_value")" || return 1
+
+  if [[ "$branch_allowed" == "false" && "$main_direct_work_allowed" == "false" ]]; then
+    git_workflow_consistency_row \
+      "error" \
+      "blocked" \
+      "no_approved_write_path" \
+      "branch_allowed,main_direct_work_allowed" \
+      "settingsPage.consistency.noApprovedWritePath" \
+      "settingsPage.consistency.next.enableBranchOrDirectMain"
+  fi
+
+  if [[ "$branch_allowed" == "false" && "$worktree_allowed" == "true" ]]; then
+    git_workflow_consistency_row \
+      "error" \
+      "blocked" \
+      "worktree_requires_branch" \
+      "branch_allowed,worktree_allowed" \
+      "settingsPage.consistency.worktreeRequiresBranch" \
+      "settingsPage.consistency.next.enableBranchOrDisableWorktree"
+  fi
+
+  if [[ "$branch_allowed" == "false" && "$pr_creation" == "auto" ]]; then
+    git_workflow_consistency_row \
+      "error" \
+      "blocked" \
+      "pr_creation_requires_branch" \
+      "branch_allowed,pr_creation" \
+      "settingsPage.consistency.prCreationRequiresBranch" \
+      "settingsPage.consistency.next.enableBranchOrManualPr"
+  fi
+
+  if [[ "$branch_allowed" == "false" && "$pr_ci_monitoring" == "auto" ]]; then
+    git_workflow_consistency_row \
+      "error" \
+      "blocked" \
+      "pr_ci_requires_branch" \
+      "branch_allowed,pr_ci_monitoring" \
+      "settingsPage.consistency.prCiRequiresBranch" \
+      "settingsPage.consistency.next.enableBranchOrManualPrCi"
+  fi
+
+  if [[ "$branch_allowed" == "false" && "$merge_execution" == "after_approval" ]]; then
+    git_workflow_consistency_row \
+      "error" \
+      "blocked" \
+      "merge_after_approval_requires_branch" \
+      "branch_allowed,merge_execution" \
+      "settingsPage.consistency.mergeRequiresBranch" \
+      "settingsPage.consistency.next.enableBranchOrManualMerge"
+  fi
+
+  if [[ "$merge_execution" == "manual" && "$developer_auto_merge_allowed" == "true" ]]; then
+    git_workflow_consistency_row \
+      "warning" \
+      "manual_required" \
+      "developer_auto_merge_overrides_manual_when_gates_pass" \
+      "merge_execution,developer_auto_merge_allowed" \
+      "settingsPage.consistency.developerAutoMergeTakesPrecedence" \
+      "settingsPage.consistency.next.reviewDeveloperAutoMergeGates"
+  fi
+}
+
+git_workflow_consistency_has_blocking_rows() {
+  local rows="$1"
+  local severity status _reason_code _affected_ids _reason_key _next_action_key
+
+  while IFS=$'\t' read -r severity status _reason_code _affected_ids _reason_key _next_action_key; do
+    [[ -n "$severity$status" ]] || continue
+    if [[ "$severity" == "error" || "$status" == "blocked" ]]; then
+      return 0
+    fi
+  done <<<"$rows"
+
+  return 1
+}
+
+git_workflow_consistency_blocking_count() {
+  local rows="$1"
+  local severity status _reason_code _affected_ids _reason_key _next_action_key
+  local count=0
+
+  while IFS=$'\t' read -r severity status _reason_code _affected_ids _reason_key _next_action_key; do
+    [[ -n "$severity$status" ]] || continue
+    if [[ "$severity" == "error" || "$status" == "blocked" ]]; then
+      count=$((count + 1))
+    fi
+  done <<<"$rows"
+
+  printf '%d\n' "$count"
+}
+
+git_workflow_candidate_write_allowed() {
+  local candidate_key="$1"
+  local candidate_value="$2"
+  local current_rows candidate_rows
+  local current_count candidate_count
+
+  current_rows="$(git_workflow_consistency_rows)" || return 1
+  candidate_rows="$(git_workflow_consistency_rows "$candidate_key" "$candidate_value")" || return 1
+  candidate_count="$(git_workflow_consistency_blocking_count "$candidate_rows")"
+  [[ "$candidate_count" -eq 0 ]] && return 0
+
+  current_count="$(git_workflow_consistency_blocking_count "$current_rows")"
+  [[ "$current_count" -gt 0 && "$candidate_count" -lt "$current_count" ]]
+}
+
+git_workflow_current_consistency_allows_runtime() {
+  local rows
+  local severity status reason_code affected_ids _reason_key _next_action_key
+
+  rows="$(git_workflow_consistency_rows)" || return 1
+  while IFS=$'\t' read -r severity status reason_code affected_ids _reason_key _next_action_key; do
+    [[ -n "$severity$status" ]] || continue
+    if [[ "$severity" == "error" || "$status" == "blocked" ]]; then
+      printf 'Git workflow action blocked by consistency policy: %s affects %s\n' "$reason_code" "$affected_ids" >&2
+      return 1
+    fi
+  done <<<"$rows"
+}
+
+git_workflow_validate_candidate_consistency() {
+  local candidate_key="$1"
+  local candidate_value="$2"
+  local rows
+  local severity status reason_code affected_ids _reason_key _next_action_key
+  local failed=0
+
+  git_workflow_candidate_write_allowed "$candidate_key" "$candidate_value" && return 0
+
+  rows="$(git_workflow_consistency_rows "$candidate_key" "$candidate_value")" || return 1
+  while IFS=$'\t' read -r severity status reason_code affected_ids _reason_key _next_action_key; do
+    [[ -n "$severity$status" ]] || continue
+    if [[ "$severity" == "error" || "$status" == "blocked" ]]; then
+      printf 'Git workflow setting rejected by consistency policy: %s affects %s\n' "$reason_code" "$affected_ids" >&2
+      failed=1
+    fi
+  done <<<"$rows"
+
+  [[ "$failed" -eq 0 ]]
+}
+
+git_workflow_consistency_row_for_setting() {
+  local setting_key="$1"
+  local rows
+  local severity status reason_code affected_ids reason_key next_action_key
+  local best_row=""
+
+  rows="$(git_workflow_consistency_rows 2>/dev/null || true)"
+  while IFS=$'\t' read -r severity status reason_code affected_ids reason_key next_action_key; do
+    [[ -n "$severity$status" ]] || continue
+    case ",$affected_ids," in
+      *",$setting_key,"*)
+        if [[ "$status" == "blocked" ]]; then
+          printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$severity" "$status" "$reason_code" "$affected_ids" "$reason_key" "$next_action_key"
+          return 0
+        fi
+        [[ -n "$best_row" ]] || best_row="$(printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$severity" "$status" "$reason_code" "$affected_ids" "$reason_key" "$next_action_key")"
+        ;;
+    esac
+  done <<<"$rows"
+
+  if [[ -n "$best_row" ]]; then
+    printf '%s' "$best_row"
+    return 0
+  fi
+
+  return 1
+}
+
+git_workflow_consistency_status_for_setting() {
+  local setting_key="$1"
+  local row status
+  if row="$(git_workflow_consistency_row_for_setting "$setting_key" 2>/dev/null)"; then
+    status="$(awk -F '\t' '{ print $2; exit }' <<<"$row")"
+    printf '%s\n' "$status"
+  else
+    printf 'ready\n'
+  fi
+}
+
+git_workflow_settings_consistency_status() {
+  local rows
+  local _severity status _reason_code _affected_ids _reason_key _next_action_key
+  local best_status="ready"
+
+  rows="$(git_workflow_consistency_rows 2>/dev/null || true)"
+  while IFS=$'\t' read -r _severity status _reason_code _affected_ids _reason_key _next_action_key; do
+    [[ -n "$status" ]] || continue
+    case "$status" in
+      blocked)
+        printf 'blocked\n'
+        return
+        ;;
+      manual_required)
+        [[ "$best_status" == "ready" ]] && best_status="manual_required"
+        ;;
+      approval_required)
+        [[ "$best_status" == "ready" ]] && best_status="approval_required"
+        ;;
+      optional|cached|stale|not_run|missing|unknown|failed)
+        [[ "$best_status" == "ready" ]] && best_status="$status"
+        ;;
+    esac
+  done <<<"$rows"
+
+  printf '%s\n' "$best_status"
+}
+
 git_workflow_write_setting() {
   local key="$1"
   local value="$2"
@@ -102,10 +357,11 @@ git_workflow_write_setting() {
   local tmp_file
 
   git_workflow_validate_value "$key" "$value" || return 1
+  git_workflow_validate_candidate_consistency "$key" "$value" || return 1
   settings_file="$(git_workflow_settings_file)"
   settings_dir="$(dirname "$settings_file")"
   mkdir -p "$settings_dir"
-  tmp_file="$(mktemp)"
+  tmp_file="$(mktemp "$settings_dir/.git-workflow-settings.XXXXXX.tmp")"
 
   {
     printf '# key\tvalue\n'
@@ -121,6 +377,11 @@ git_workflow_write_setting() {
       printf '%s\t%s\n' "$row_key" "$selected"
     done < <(git_workflow_policy_rows)
   } >"$tmp_file"
+
+  awk -F '\t' '$1 !~ /^#/ && NF >= 2 { print $1 "\t" $2 }' "$tmp_file" |
+    while IFS=$'\t' read -r row_key row_value; do
+      git_workflow_validate_value "$row_key" "$row_value" >/dev/null
+    done
 
   mv "$tmp_file" "$settings_file"
 }
@@ -639,6 +900,8 @@ git_workflow_check_repository() {
 
 git_workflow_allow_policy() {
   local action="$1"
+
+  git_workflow_current_consistency_allows_runtime || return 1
 
   case "$action" in
     branch)

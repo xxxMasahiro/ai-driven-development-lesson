@@ -64,6 +64,8 @@ jobs:
           bash -n tools/test_ci_timing.sh
           bash -n tools/test_dashboard_schema.sh
           bash -n tools/test_dashboard_data.sh
+          bash -n tools/test_dashboard_settings.sh
+          bash -n tools/test_dashboard_i18n.sh
           bash -n tools/test_dashboard_control_center.sh
           bash -n tools/product-launch-check
           bash -n tools/test_product_launch_check.sh
@@ -77,6 +79,7 @@ jobs:
           bash -n tools/test_menu_prerequisites.sh
           bash -n tools/test_product_gate_tools.sh
           bash -n tools/lib/product_repository_authority.sh
+          bash -n tools/lib/product_workflow_git_usage.sh
           bash -n tools/product-repository-authority
           bash -n tools/product-repository-cleanup
           bash -n tools/test_product_repository_cleanup.sh
@@ -84,6 +87,7 @@ jobs:
           bash -n tools/fixture-copy
           bash -n tools/product-security
           bash -n tools/test_product_security.sh
+          bash -n tools/test_product_git_usage_modes.sh
           bash -n tools/test_lesson_repository.sh
           bash -n tools/ci-evidence
           bash -n tools/ci-timing
@@ -97,6 +101,7 @@ jobs:
           bash -n tools/resource-guard
           bash -n tools/docs-tour
           bash -n tools/dashboard-data
+          bash -n tools/dashboard-settings
           bash -n tools/dashboard-control-center
           bash -n tools/free-development
           bash -n tools/team-development
@@ -186,6 +191,8 @@ jobs:
           ./tools/test_ci_timing.sh
           ./tools/test_dashboard_schema.sh
           ./tools/test_dashboard_data.sh
+          ./tools/test_dashboard_settings.sh
+          ./tools/test_dashboard_i18n.sh
           ./tools/test_ci_final_gate.sh
           ./tools/test_ci_pipeline_acceleration.sh
           ./tools/test_menu_prerequisites.sh
@@ -197,6 +204,7 @@ jobs:
           ./tools/test_product_repository_cleanup.sh
           ./tools/test_product_repository_authority.sh
           ./tools/test_product_security.sh
+          ./tools/test_product_git_usage_modes.sh
           ./tools/check_ci_workflow_structure.sh
 
   lesson-cli-tests:

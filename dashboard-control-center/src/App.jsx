@@ -59,9 +59,10 @@ import {
   Wrench,
   Workflow,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
+  applyDashboardSettingChange,
   asArray,
   displayKey,
   displayText,
@@ -70,8 +71,9 @@ import {
   normalizeState,
   objectEntries,
   pickFirst,
+  planDashboardSettingChange,
 } from "./dashboardData.js";
-import { createTranslator, formatDateTime, formatRelativeAge, resolveLocale } from "./i18n.js";
+import { createTranslator, formatDateTime, formatRelativeAge, getDashboardIntlLocale, getDashboardLocaleDirection, resolveLocale } from "./i18n.js";
 
 const stateIcons = {
   ready: CheckCircle2,
@@ -86,6 +88,7 @@ const stateIcons = {
   stale: Clock,
   approval_required: CircleAlert,
   manual_required: UserCheck,
+  not_applicable: CircleMinus,
 };
 
 const reviewStates = new Set(["failed", "blocked", "approval_required", "manual_required", "missing", "unknown", "optional", "cached", "not_run", "stale"]);
@@ -103,6 +106,7 @@ const statePriority = {
   stale: 9,
   ready: 10,
   passed: 11,
+  not_applicable: 12,
 };
 
 function WorkflowCategoryIcon(props) {
@@ -129,6 +133,9 @@ const supportNavigation = [
 ];
 
 const allNavigation = [...navigation, ...repositoryNavigation, ...supportNavigation];
+const SETTINGS_APPLY_FEEDBACK_DELAY_MS = 350;
+const SETTINGS_APPLY_FEEDBACK_AUTO_CLOSE_MS = 1200;
+const SETTINGS_APPLY_FEEDBACK_TIMEOUT_MS = 8000;
 
 const contextMenuIcons = {
   step_1_7: BookOpen,
@@ -647,6 +654,14 @@ function gitOperationModeLabel(mode, t) {
   return t("mock.git.auto");
 }
 
+function gitOperationModeClass(mode) {
+  const normalized = displayText(mode, "auto");
+  if (normalized === "developer_auto") {
+    return "auto";
+  }
+  return normalized;
+}
+
 function gitOperationDisplayLabel(id, fallback, t) {
   const key = displayText(id, "unknown");
   return t(`mock.git.operation.${key}`, displayText(fallback, displayKey(key)));
@@ -667,7 +682,7 @@ function GitOperationRail({ operations, t, variant = "workflow" }) {
       <div className="operation-rail__items">
         {rows.map((row) => {
           const Icon = gitOperationIcon(row.id);
-          const mode = displayText(row.mode, "auto");
+          const mode = gitOperationModeClass(row.mode);
           return (
           <article className={`operation-chip operation-chip--${mode}`} key={displayText(row.id)}>
             <span className="operation-chip__icon">
@@ -725,7 +740,7 @@ function CommonStatusPanel({ data, partialFailures, t }) {
             <div className="common-status-ops">
               {visibleOperations.map((operation) => {
                 const Icon = gitOperationIcon(operation.id);
-                const mode = displayText(operation.mode, "auto");
+                const mode = gitOperationModeClass(operation.mode);
                 return (
                   <div className="common-status-op" key={displayText(operation.id)}>
                   <span className="common-status-op__label">
@@ -1258,6 +1273,7 @@ function statusLabelForChip(value, t) {
     stale: "mock.status.stale",
     approval_required: "mock.status.approvalRequired",
     manual_required: "mock.status.manualRequired",
+    not_applicable: "mock.status.notApplicable",
   };
   return t(mockLabels[state] || `state.${state}`, displayText(state));
 }
@@ -1277,6 +1293,7 @@ function workflowStatusLabel(value, t) {
     missing: "workflow.status.notCollected",
     approval_required: "workflow.status.needsApproval",
     manual_required: "workflow.status.needsConfirmation",
+    not_applicable: "workflow.status.notApplicable",
   };
   return t(labels[state] || `state.${state}`, displayText(state));
 }
@@ -1441,7 +1458,7 @@ function repositoryPathStateToStatus(value) {
     return "ready";
   }
   if (state === "not_applicable") {
-    return "manual_required";
+    return "not_applicable";
   }
   if (state === "missing") {
     return "missing";
@@ -3569,7 +3586,7 @@ function RepositoryGitFlow({ operations, t }) {
     <div className="repository-operation-grid">
       {rows.map((row) => {
         const Icon = gitOperationIcon(row.id);
-        const mode = displayText(row.mode, "auto");
+        const mode = gitOperationModeClass(row.mode);
         return (
           <article className="repository-operation-card" key={displayText(row.id)}>
             <span className="repository-operation-card__icon">
@@ -3661,6 +3678,257 @@ function repositoryProductContentLabel(authority, t, locale) {
 function productTypeLabel(value, t) {
   const id = displayText(value, "unknown");
   return t(`repositoryInfo.productType.${id}`, displayKey(id));
+}
+
+function settingsCatalogData(data) {
+  const settings = data.settings && typeof data.settings === "object" && !Array.isArray(data.settings) ? data.settings : {};
+  const groups = asArray(settings.groups).slice().sort((left, right) => (Number(left.order) || 0) - (Number(right.order) || 0));
+  const items = asArray(settings.items);
+  return { settings, groups, items };
+}
+
+function settingGroupIconFor(group) {
+  const id = displayText(group.id, "");
+  const map = {
+    context: Compass,
+    learning: GraduationCap,
+    workflow: GitBranch,
+    security: ShieldCheck,
+  };
+  return map[id] || Settings;
+}
+
+function settingItemIconFor(item) {
+  const id = displayText(item.id, "");
+  if (id.includes("language")) return Globe2;
+  if (id.includes("approval")) return UserCheck;
+  if (id.includes("security") || id.includes("dangerous")) return ShieldCheck;
+  if (id.includes("git") || id.includes("merge") || id.includes("ci")) return GitBranch;
+  if (id.includes("repository") || id.includes("product")) return Database;
+  if (id.includes("menu")) return Compass;
+  return Settings;
+}
+
+function settingGroupTitle(group, t) {
+  return t(displayText(group.label_key, ""), displayKey(group.id));
+}
+
+function settingGroupDetail(group, t) {
+  return t(displayText(group.description_key, ""), "");
+}
+
+function settingItemTitle(item, t) {
+  return t(displayText(item.label_key, ""), displayKey(item.id));
+}
+
+function settingItemDetail(item, t) {
+  return t(displayText(item.description_key, ""), "");
+}
+
+function settingValueLabel(item, t) {
+  const id = displayText(item.id, "");
+  const value = displayText(item.current_value, "");
+  if (id === "selected_menu") {
+    return contextLabel(value, t);
+  }
+  if (id === "product_type") {
+    return productTypeLabel(value, t);
+  }
+  if (id === "learning_mode") {
+    return t(`settingsPage.value.learningMode.${value}`, displayText(item.current_label, value));
+  }
+  if (id.includes("language")) {
+    return t(`settingsPage.value.language.${value}`, displayText(item.current_label, value));
+  }
+  if (value === "true" || value === "false") {
+    return t(`settingsPage.value.boolean.${value}`, value);
+  }
+  const translated = t(`settingsPage.value.${value}`, "");
+  if (translated) {
+    return translated;
+  }
+  if (normalizeState(value) === value) {
+    return statusLabelForChip(value, t);
+  }
+  return displayText(item.current_label || value, t("summary.none"));
+}
+
+function settingAllowedValueLabel(value, t) {
+  const normalized = displayText(value, "");
+  if (!normalized) {
+    return "";
+  }
+  if (normalized === "true" || normalized === "false") {
+    return t(`settingsPage.value.boolean.${normalized}`, normalized);
+  }
+  return t(`settingsPage.value.${normalized}`, t(`settingsPage.value.language.${normalized}`, normalized));
+}
+
+function settingChangeabilityLabel(item, t) {
+  if (item.editable) {
+    return t("settingsPage.change.editable");
+  }
+  if (item.reviewable) {
+    return t("settingsPage.change.previewOnly");
+  }
+  return t(displayText(item.disabled_reason_key, ""), t("settingsPage.change.disabled"));
+}
+
+function settingConsistency(item) {
+  return item?.consistency && typeof item.consistency === "object" && !Array.isArray(item.consistency) ? item.consistency : {};
+}
+
+function settingConsistencyHasNotice(item) {
+  const consistency = settingConsistency(item);
+  const reasonCode = displayText(consistency.reason_code, "none");
+  const status = normalizeState(consistency.status || item?.status || "ready");
+  return reasonCode !== "none" || ["blocked", "manual_required", "failed"].includes(status);
+}
+
+function settingConsistencyReason(item, t) {
+  const consistency = settingConsistency(item);
+  const reasonCode = displayText(consistency.reason_code, "none");
+  if (reasonCode === "none") {
+    return t("settingsPage.consistency.none");
+  }
+  return t(displayText(consistency.reason_key, ""), displayKey(reasonCode));
+}
+
+function settingConsistencyNextAction(item, t) {
+  const consistency = settingConsistency(item);
+  return t(displayText(consistency.next_action_key, ""), t("settingsPage.consistency.next.none"));
+}
+
+function settingRowActionLabel(item, t) {
+  return item.editable && settingEditableOptions(item).length ? t("settingsPage.change.editable") : t("settingsPage.modal.open");
+}
+
+function settingsSnapshotReconciles(snapshotData, settingId, requestedValue, applyResult = {}) {
+  const expectedValue = displayText(requestedValue || applyResult.requested_value || applyResult.requestedValue || applyResult.display_locale || applyResult.current_value, "");
+  const { items: snapshotItems } = settingsCatalogData(snapshotData || {});
+  const snapshotItem = snapshotItems.find((item) => displayText(item.id, "") === settingId);
+  if (!snapshotItem || displayText(snapshotItem.current_value, "") !== expectedValue) {
+    return false;
+  }
+
+  if (settingId !== "workflow_language") {
+    return true;
+  }
+
+  const summary = snapshotData?.summary && typeof snapshotData.summary === "object" ? snapshotData.summary : {};
+  const expectedDisplayLocale = displayText(applyResult.display_locale || expectedValue, "");
+  const expectedUiLocale = displayText(applyResult.ui_locale || expectedDisplayLocale, "");
+  const expectedDirection = displayText(applyResult.direction || applyResult.ui_direction || "", "");
+  if (displayText(summary.workflow_language, "") !== expectedValue) {
+    return false;
+  }
+  if (displayText(summary.display_locale, "") !== expectedDisplayLocale) {
+    return false;
+  }
+  if (displayText(summary.ui_locale, "") !== expectedUiLocale) {
+    return false;
+  }
+  return !expectedDirection || displayText(summary.ui_direction, "") === expectedDirection;
+}
+
+function withTimeout(promise, timeoutMs, errorMessage) {
+  let timeoutId = 0;
+  const timeout = new Promise((_, reject) => {
+    timeoutId = window.setTimeout(() => reject(new Error(errorMessage)), timeoutMs);
+  });
+  return Promise.race([promise, timeout]).finally(() => {
+    window.clearTimeout(timeoutId);
+  });
+}
+
+function SettingsApplyFeedback({ feedback, t, onDismiss }) {
+  if (!feedback || feedback.status === "idle" || !feedback.visible) {
+    return null;
+  }
+  const status = displayText(feedback.status, "reconciling");
+  const isAlert = ["blocked", "failed", "stale_snapshot", "timeout"].includes(status);
+  const eyebrowKey = status === "applying" ? "settingsPage.applyFeedback.applyingEyebrow" : "settingsPage.applyFeedback.eyebrow";
+  const titleKey = {
+    applying: "settingsPage.applyFeedback.applyingTitle",
+    blocked: "settingsPage.modal.planBlocked",
+    reconciled: "settingsPage.applyFeedback.reconciledTitle",
+    stale_snapshot: "settingsPage.applyFeedback.staleTitle",
+    timeout: "settingsPage.applyFeedback.timeoutTitle",
+    failed: "settingsPage.applyFeedback.failedTitle",
+  }[status] || "settingsPage.applyFeedback.reconcilingTitle";
+  const detailKey = {
+    applying: "settingsPage.applyFeedback.applyingDetail",
+    blocked: "settingsPage.modal.planBlocked",
+    reconciled: "settingsPage.applyFeedback.reconciledDetail",
+    stale_snapshot: "settingsPage.applyFeedback.staleDetail",
+    timeout: "settingsPage.applyFeedback.timeoutDetail",
+    failed: "settingsPage.applyFeedback.failedDetail",
+  }[status] || "settingsPage.applyFeedback.reconcilingDetail";
+  const pillState = status === "reconciled" ? "passed" : status === "blocked" ? "blocked" : isAlert ? "stale" : "ready";
+  const savedDone = feedback.saved === true || ["reconciling", "reconciled", "stale_snapshot", "timeout"].includes(status);
+  const savingActive = status === "applying";
+  const firstStepKey = savingActive || ((status === "failed" || status === "blocked") && feedback.saved !== true) ? "settingsPage.applyFeedback.stepApplying" : "settingsPage.applyFeedback.stepSaved";
+  const checkingDone = ["reconciled"].includes(status);
+  return (
+    <div
+      className={`settings-apply-feedback settings-apply-feedback--${status}`}
+      role={isAlert ? "alert" : "status"}
+      aria-live={isAlert ? "assertive" : "polite"}
+      data-settings-apply-feedback-status={status}
+    >
+      <div className="settings-apply-feedback__head">
+        <RefreshCw aria-hidden="true" size={18} className={["applying", "reconciling"].includes(status) ? "settings-apply-feedback__spinner" : ""} />
+        <div>
+          <span>{t(eyebrowKey)}</span>
+          <strong>{t(titleKey)}</strong>
+        </div>
+        <StatusPill value={pillState} t={t} label={t(titleKey)} />
+      </div>
+      <p>{feedback.error ? displayText(feedback.error.message, t(detailKey)) : t(detailKey)}</p>
+      <ol className="settings-apply-feedback__steps" aria-label={t("settingsPage.applyFeedback.steps")}>
+        <li className={savedDone ? "is-done" : savingActive ? "is-active" : ""}>{t(firstStepKey)}</li>
+        <li className={checkingDone ? "is-done" : status === "reconciling" ? "is-active" : ""}>{t("settingsPage.applyFeedback.stepRefreshing")}</li>
+        <li className={checkingDone ? "is-done" : ""}>{t("settingsPage.applyFeedback.stepConfirmed")}</li>
+      </ol>
+      {isAlert ? (
+        <button type="button" onClick={onDismiss}>
+          {t("settingsPage.applyFeedback.dismiss")}
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
+function settingRelatedPageLabel(href, t) {
+  const target = displayText(href, "#settings").replace(/^#/, "");
+  const item = allNavigation.find((entry) => entry.id === target);
+  return item ? t(item.labelKey) : displayKey(target);
+}
+
+function settingReviewImpact(item, t) {
+  const translated = t(displayText(item.review?.impact_key, ""), "");
+  if (translated) {
+    return translated;
+  }
+  if (displayText(item.id, "").startsWith("git_")) {
+    return t("settingsPage.impact.gitSetting");
+  }
+  return t("settingsPage.modal.impactFallback");
+}
+
+function settingReviewPreview(item, t) {
+  const translated = t(displayText(item.review?.update_preview_key, ""), "");
+  if (translated) {
+    return translated;
+  }
+  if (displayText(item.id, "").startsWith("git_")) {
+    return t("settingsPage.preview.gitSetting");
+  }
+  return t("settingsPage.modal.previewFallback");
+}
+
+function settingEditableOptions(item) {
+  return asArray(item.allowed_values).map((value) => displayText(value, "")).filter(Boolean);
 }
 
 function RepositoryInfoPage({ data, locale, t }) {
@@ -3858,44 +4126,249 @@ function DocumentsPage({ data, locale, t }) {
   );
 }
 
-function SettingsPage({ data, locale, t }) {
+function SettingsPage({ data, locale, t, onRefreshSnapshot }) {
+  const [selectedSettingId, setSelectedSettingId] = useState("");
+  const [draftValue, setDraftValue] = useState("");
+  const [confirmed, setConfirmed] = useState(false);
+  const [mutationState, setMutationState] = useState({ status: "idle", result: null, error: null });
+  const [applyFeedback, setApplyFeedback] = useState({ status: "idle", visible: false });
+  const rowRefs = useRef({});
+  const modalRef = useRef(null);
+  const closeButtonRef = useRef(null);
+  const previousSelectedSettingIdRef = useRef("");
+  const applyFeedbackRequestIdRef = useRef(0);
+  const applyFeedbackTimersRef = useRef({ show: 0, close: 0 });
   const context = selectedContextData(data);
-  const lesson = selectedLessonObject(data, context);
-  const settingsGroups = [
-    {
-      id: "lesson",
-      title: t("settingsPage.group.lesson"),
-      Icon: GraduationCap,
-      items: [
-        { title: t("field.learningMode"), detail: t("settingsPage.detail.learningMode"), status: lesson.learning_mode_status },
-        { title: t("field.workflowLanguage"), detail: t("settingsPage.detail.workflowLanguage"), status: lesson.workflow_language_status },
-        { title: t("field.productLanguage"), detail: t("settingsPage.detail.productLanguage"), status: lesson.product_language_status },
-        { title: t("field.learnerApproval"), detail: t("settingsPage.detail.learnerApproval"), status: lesson.learner_approval_status },
-      ],
-    },
-    {
-      id: "workflow",
-      title: t("settingsPage.group.workflow"),
-      Icon: GitBranch,
-      items: [
-        { title: t("workflow.item.policy"), detail: t("settingsPage.detail.gitPolicy"), status: data.git_workflow?.policy_status },
-        { title: t("workflow.item.settings"), detail: t("settingsPage.detail.gitSettings"), status: data.git_workflow?.settings_status },
-        { title: t("workflow.item.gate"), detail: t("settingsPage.detail.gitGate"), status: data.git_workflow?.gate_status },
-        { title: t("workflow.item.approval"), detail: t("settingsPage.detail.gitApproval"), status: data.git_workflow?.approval_status },
-      ],
-    },
-    {
-      id: "security",
-      title: t("settingsPage.group.security"),
-      Icon: ShieldCheck,
-      items: [
-        { title: t("security.item.policy"), detail: t("settingsPage.detail.securityPolicy"), status: data.security?.policy_status },
-        { title: t("security.item.gate"), detail: t("settingsPage.detail.securityGate"), status: data.security?.gate_status },
-        { title: t("security.item.approval"), detail: t("settingsPage.detail.securityApproval"), status: data.security?.dangerous_action_approval },
-      ],
-    },
-  ];
-  const reviewItems = settingsGroups.flatMap((group) => group.items).filter((item) => isReviewState(item.status));
+  const authority = data.development?.product_authority || {};
+  const { settings, groups, items } = settingsCatalogData(data);
+  const hasSettingsCatalog = groups.length > 0 && items.length > 0;
+  const reviewItems = items.filter((item) => isReviewState(item.status));
+  const selectedRepository = displayText(context.target_repository?.name || authority.repository?.configured_name || authority.repository?.name, t("summary.none"));
+  const selectedSetting = items.find((item) => displayText(item.id, "") === selectedSettingId) || null;
+  const selectedMenuId = displayText(context.menu_id, "step_1_14");
+  const editableOptions = selectedSetting ? settingEditableOptions(selectedSetting) : [];
+  const selectedSettingEditable = Boolean(selectedSetting?.editable && editableOptions.length);
+  const clearApplyFeedbackTimers = () => {
+    window.clearTimeout(applyFeedbackTimersRef.current.show);
+    window.clearTimeout(applyFeedbackTimersRef.current.close);
+    applyFeedbackTimersRef.current = { show: 0, close: 0 };
+  };
+  const dismissApplyFeedback = () => {
+    clearApplyFeedbackTimers();
+    setApplyFeedback({ status: "idle", visible: false });
+  };
+  const updateApplyFeedback = (requestId, updates) => {
+    setApplyFeedback((previous) => (previous.requestId === requestId ? { ...previous, ...updates } : previous));
+  };
+  const completeApplyFeedback = (requestId) => {
+    setApplyFeedback((previous) => {
+      if (previous.requestId !== requestId) {
+        return previous;
+      }
+      if (!previous.visible) {
+        return { status: "idle", visible: false };
+      }
+      return { ...previous, status: "reconciled", visible: true, error: null };
+    });
+    window.clearTimeout(applyFeedbackTimersRef.current.close);
+    applyFeedbackTimersRef.current.close = window.setTimeout(() => {
+      setApplyFeedback((previous) => (previous.requestId === requestId ? { status: "idle", visible: false } : previous));
+    }, SETTINGS_APPLY_FEEDBACK_AUTO_CLOSE_MS);
+  };
+  const startApplyFeedback = ({ settingId, requestedValue, result, settingTitle, status = "reconciling" }) => {
+    clearApplyFeedbackTimers();
+    const requestId = applyFeedbackRequestIdRef.current + 1;
+    applyFeedbackRequestIdRef.current = requestId;
+    setApplyFeedback({
+      requestId,
+      status,
+      visible: false,
+      settingId,
+      requestedValue,
+      result,
+      settingTitle,
+      baseSnapshotSignature: displayText(data.snapshot_id || data.content_hash, ""),
+      error: null,
+      saved: status !== "applying",
+    });
+    applyFeedbackTimersRef.current.show = window.setTimeout(() => {
+      setApplyFeedback((previous) => {
+        if (previous.requestId !== requestId || ["idle", "reconciled"].includes(previous.status)) {
+          return previous;
+        }
+        return { ...previous, visible: true };
+      });
+    }, SETTINGS_APPLY_FEEDBACK_DELAY_MS);
+    return requestId;
+  };
+  const closeSelectedSetting = () => {
+    const previousId = selectedSettingId;
+    setSelectedSettingId("");
+    window.setTimeout(() => rowRefs.current[previousId]?.focus(), 0);
+  };
+
+  const resetMutationState = () => {
+    setConfirmed(false);
+    setMutationState({ status: "idle", result: null, error: null });
+  };
+
+  useEffect(() => {
+    if (!selectedSetting) {
+      previousSelectedSettingIdRef.current = "";
+      setDraftValue("");
+      resetMutationState();
+      return undefined;
+    }
+    const selectedSettingChanged = previousSelectedSettingIdRef.current !== selectedSettingId;
+    previousSelectedSettingIdRef.current = selectedSettingId;
+    const currentValue = displayText(selectedSetting.current_value, "");
+    if (selectedSettingChanged || mutationState.status !== "applied") {
+      setDraftValue(editableOptions.includes(currentValue) ? currentValue : editableOptions[0] || "");
+      resetMutationState();
+    }
+    return undefined;
+  }, [selectedSettingId, selectedSetting?.current_value]);
+
+  useEffect(() => {
+    if (!selectedSetting) {
+      return undefined;
+    }
+    const focusTimer = window.setTimeout(() => {
+      closeButtonRef.current?.focus();
+    }, 0);
+    const onKeyDown = (event) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        closeSelectedSetting();
+        return;
+      }
+      if (event.key !== "Tab") {
+        return;
+      }
+      const modal = modalRef.current;
+      if (!modal) {
+        return;
+      }
+      const focusable = Array.from(
+        modal.querySelectorAll(
+          'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        ),
+      ).filter((element) => !element.hasAttribute("disabled") && element.getAttribute("aria-hidden") !== "true");
+      if (!focusable.length) {
+        event.preventDefault();
+        modal.focus();
+        return;
+      }
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      const active = document.activeElement;
+      if (event.shiftKey && (active === first || !modal.contains(active))) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && active === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      window.clearTimeout(focusTimer);
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [selectedSettingId]);
+
+  useEffect(() => () => clearApplyFeedbackTimers(), []);
+
+  useEffect(() => {
+    if (!["reconciling", "stale_snapshot", "timeout"].includes(applyFeedback.status) || !applyFeedback.settingId) {
+      return;
+    }
+    if (settingsSnapshotReconciles(data, applyFeedback.settingId, applyFeedback.requestedValue, applyFeedback.result)) {
+      completeApplyFeedback(applyFeedback.requestId);
+    }
+  }, [data, applyFeedback.status, applyFeedback.requestId]);
+
+  const handlePlanSetting = async () => {
+    if (!selectedSettingEditable || !draftValue || !selectedSetting) {
+      return;
+    }
+    setConfirmed(false);
+    setMutationState({ status: "planning", result: null, error: null });
+    try {
+      const result = await planDashboardSettingChange(displayText(selectedSetting.id), draftValue, selectedMenuId);
+      setMutationState({ status: result.status === "blocked" ? "blocked" : "planned", result, error: null });
+    } catch (error) {
+      setMutationState({ status: "error", result: null, error });
+    }
+  };
+
+  const handleApplySetting = async () => {
+    if (!selectedSettingEditable || !draftValue || !selectedSetting || !confirmed || mutationState.status !== "planned") {
+      return;
+    }
+    const settingId = displayText(selectedSetting.id);
+    const requestedValue = draftValue;
+    const settingTitle = settingItemTitle(selectedSetting, t);
+    setMutationState((previous) => ({ ...previous, status: "applying", error: null }));
+    setConfirmed(false);
+    const requestId = startApplyFeedback({ settingId, requestedValue, result: null, settingTitle, status: "applying" });
+    setSelectedSettingId("");
+    if (settingId === "workflow_language") {
+      onRefreshSnapshot?.({ localeHint: { workflow_language: requestedValue }, immediateOnly: true });
+    }
+    try {
+      const result = await applyDashboardSettingChange(settingId, requestedValue, selectedMenuId);
+      if (!result.applied) {
+        if (result.status === "blocked") {
+          const reason = t(displayText(result.reason_key, ""), t("settingsPage.modal.applyFailed"));
+          const nextAction = t(displayText(result.next_action_key, ""), "");
+          updateApplyFeedback(requestId, { status: "blocked", visible: true, result, error: new Error(nextAction ? `${reason} ${nextAction}` : reason), saved: false });
+          setMutationState({ status: "blocked", result, error: null });
+          return;
+        }
+        throw new Error(t(displayText(result.reason_key, ""), t("settingsPage.modal.applyFailed")));
+      }
+      updateApplyFeedback(requestId, { status: "reconciling", result, error: null, saved: true });
+      if (settingId === "workflow_language") {
+        onRefreshSnapshot?.({ localeHint: result, immediateOnly: true });
+      }
+      if (!result.snapshot_regenerated) {
+        if (settingId === "workflow_language") {
+          onRefreshSnapshot?.({ clearLocaleHint: true, immediateOnly: true });
+        }
+        updateApplyFeedback(requestId, { status: "failed", visible: true, error: new Error(t("settingsPage.applyFeedback.failedDetail")), saved: true });
+        return;
+      }
+      try {
+        const snapshot = await withTimeout(
+          onRefreshSnapshot?.(),
+          SETTINGS_APPLY_FEEDBACK_TIMEOUT_MS,
+          t("settingsPage.applyFeedback.timeoutDetail"),
+        );
+        if (settingsSnapshotReconciles(snapshot?.data, settingId, requestedValue, result)) {
+          completeApplyFeedback(requestId);
+        } else {
+          updateApplyFeedback(requestId, { status: "stale_snapshot", visible: true, error: null, saved: true });
+        }
+      } catch (error) {
+        if (settingId === "workflow_language") {
+          onRefreshSnapshot?.({ clearLocaleHint: true, immediateOnly: true });
+        }
+        updateApplyFeedback(requestId, {
+          status: displayText(error.message, "") === t("settingsPage.applyFeedback.timeoutDetail") ? "timeout" : "failed",
+          visible: true,
+          error,
+          saved: true,
+        });
+      }
+    } catch (error) {
+      if (settingId === "workflow_language") {
+        onRefreshSnapshot?.({ clearLocaleHint: true, immediateOnly: true });
+      }
+      updateApplyFeedback(requestId, { status: "failed", visible: true, error, saved: false });
+      setMutationState((previous) => ({ ...previous, status: "error", error }));
+    }
+  };
 
   return (
     <section className="view-surface view-surface--settings sidebar-page" id="settings" aria-labelledby="settings-heading">
@@ -3904,21 +4377,233 @@ function SettingsPage({ data, locale, t }) {
         tone="sidebar"
         t={t}
         items={[
-          { Icon: Lock, label: t("settingsPage.summary.readOnly"), value: t("app.readOnly"), detail: t("settingsPage.summary.readOnlyDetail") },
-          { Icon: Scale, label: t("detail.currentJudgment"), value: reviewItems.length ? t("detail.judgment.needsReviewShort") : t("detail.judgment.readyShort"), detail: reviewItems.length ? t("settingsPage.summary.reviewDetail") : t("settingsPage.summary.readyDetail"), tone: reviewItems.length ? "warning" : "ready" },
-          { Icon: Eye, label: t("detail.mustReview"), points: reviewItems.length ? reviewItems.slice(0, 4).map((item) => item.title) : [t("detail.noRequiredReview")] },
+          { Icon: Compass, label: t("settingsPage.summary.selectedMenu"), value: contextLabel(context.menu_id, t), detail: workflowContextLabel(context.workflow_context, t) },
+          { Icon: Database, label: t("settingsPage.summary.targetRepository"), value: selectedRepository, detail: productTypeLabel(context.product_type, t) },
+          { Icon: Scale, label: t("detail.currentJudgment"), value: reviewItems.length ? t("detail.judgment.needsReviewShort") : t("detail.judgment.readyShort"), detail: hasSettingsCatalog ? (reviewItems.length ? t("settingsPage.summary.reviewDetail") : t("settingsPage.summary.readyDetail")) : t("settingsPage.emptyDetail"), tone: reviewItems.length || !hasSettingsCatalog ? "warning" : "ready" },
           { Icon: ArrowRightCircle, label: t("detail.nextSafeCheck"), value: t("settingsPage.summary.next"), detail: t("settingsPage.summary.nextDetail"), cta: { href: "#maintenance", label: t("summary.viewDetails") } },
         ]}
       />
-      {settingsGroups.map(({ id, title, Icon, items }) => (
-        <DetailSection id={`settings-${id}`} title={title} Icon={Icon} key={id}>
-          <div className="sidebar-page-card-grid">
-            {items.map((item) => (
-              <SidebarPageCard Icon={Settings} title={item.title} detail={item.detail} status={item.status || "unknown"} t={t} key={item.title} />
-            ))}
-          </div>
+      {hasSettingsCatalog ? (
+        groups.map((group) => {
+          const groupItems = items.filter((item) => displayText(item.group_id, "") === displayText(group.id, ""));
+          const GroupIcon = settingGroupIconFor(group);
+          return (
+            <DetailSection id={`settings-${displayText(group.id)}`} title={settingGroupTitle(group, t)} Icon={GroupIcon} key={displayText(group.id)}>
+              <div className="settings-group-intro">
+                <p>{settingGroupDetail(group, t)}</p>
+                <StatusPill value={group.status || "unknown"} t={t} label={statusLabelForChip(group.status, t)} />
+              </div>
+              <div className="settings-row-list">
+                {groupItems.map((item) => {
+                  const ItemIcon = settingItemIconFor(item);
+                  const itemId = displayText(item.id);
+                  return (
+                    <button
+                      className="settings-row"
+                      type="button"
+                      data-settings-row-id={itemId}
+                      key={itemId}
+                      ref={(node) => {
+                        if (node) {
+                          rowRefs.current[itemId] = node;
+                        }
+                      }}
+                      onClick={() => setSelectedSettingId(itemId)}
+                      aria-label={`${settingItemTitle(item, t)} ${settingRowActionLabel(item, t)}. ${settingChangeabilityLabel(item, t)}`}
+                    >
+                      <span className="settings-row__icon">
+                        <ItemIcon aria-hidden="true" size={20} />
+                      </span>
+                      <span className="settings-row__main">
+                        <strong>{settingItemTitle(item, t)}</strong>
+                        <small>{settingItemDetail(item, t)}</small>
+                        {settingConsistencyHasNotice(item) ? <small className="settings-row__consistency">{settingConsistencyReason(item, t)}</small> : null}
+                      </span>
+                      <span className="settings-row__value">
+                        <small>{t("settingsPage.field.currentValue")}</small>
+                        <strong>{settingValueLabel(item, t)}</strong>
+                      </span>
+                      <span className="settings-row__meta">
+                        <small>{t("field.status")}</small>
+                        <StatusPill value={item.status || "unknown"} t={t} label={statusLabelForChip(item.status, t)} />
+                      </span>
+                      <span className="settings-row__source" title={displayText(item.source_file)}>
+                        <small>{t("settingsPage.field.sourceFile")}</small>
+                        <strong>{displayText(item.source_file)}</strong>
+                      </span>
+                      <span className="settings-row__related">
+                        <small>{t("settingsPage.field.relatedPage")}</small>
+                        <strong>{settingRelatedPageLabel(item.related_page, t)}</strong>
+                      </span>
+                      <span className="settings-row__open">
+                        <Eye aria-hidden="true" size={16} />
+                        {settingRowActionLabel(item, t)}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </DetailSection>
+          );
+        })
+      ) : (
+        <DetailSection id="settings-unavailable" title={t("settingsPage.emptyTitle")} Icon={AlertTriangle}>
+          <SidebarPageCard Icon={AlertTriangle} title={t("settingsPage.emptyTitle")} detail={t("settingsPage.emptyDetail")} status={settings.status || "unknown"} t={t} />
         </DetailSection>
-      ))}
+      )}
+      {selectedSetting ? (
+        <div className="settings-modal-backdrop" role="presentation" onClick={(event) => {
+          if (event.target === event.currentTarget) {
+            closeSelectedSetting();
+          }
+        }}>
+          <div className="settings-modal" role="dialog" aria-modal="true" aria-labelledby="settings-modal-title" ref={modalRef} tabIndex={-1}>
+            <div className="settings-modal__header">
+              <span className="settings-modal__icon">
+                {(() => {
+                  const SelectedIcon = settingItemIconFor(selectedSetting);
+                  return <SelectedIcon aria-hidden="true" size={24} />;
+                })()}
+              </span>
+              <div>
+                <small>{t("settingsPage.modal.eyebrow")}</small>
+                <h2 id="settings-modal-title">{settingItemTitle(selectedSetting, t)}</h2>
+                <p>{settingItemDetail(selectedSetting, t)}</p>
+              </div>
+              <button className="settings-modal__close" type="button" onClick={closeSelectedSetting} aria-label={t("settingsPage.modal.close")} ref={closeButtonRef}>
+                <CircleX aria-hidden="true" size={20} />
+              </button>
+            </div>
+            <div className="settings-modal__status">
+              <div>
+                <span>{t("settingsPage.field.currentValue")}</span>
+                <strong>{settingValueLabel(selectedSetting, t)}</strong>
+              </div>
+              <StatusPill value={selectedSetting.status || "unknown"} t={t} label={statusLabelForChip(selectedSetting.status, t)} />
+            </div>
+            <div className="settings-modal__body">
+              <section>
+                <h3>{t("settingsPage.modal.changeabilityTitle")}</h3>
+                <p>{settingChangeabilityLabel(selectedSetting, t)}</p>
+                <small>{t(displayText(selectedSetting.disabled_reason_key, ""), t("settingsPage.change.disabled"))}</small>
+              </section>
+              <section>
+                <h3>{t("settingsPage.modal.consistencyTitle")}</h3>
+                <StatusPill value={settingConsistency(selectedSetting).status || selectedSetting.status || "unknown"} t={t} label={statusLabelForChip(settingConsistency(selectedSetting).status || selectedSetting.status, t)} />
+                <p>{settingConsistencyReason(selectedSetting, t)}</p>
+                <small>{settingConsistencyNextAction(selectedSetting, t)}</small>
+              </section>
+              <section>
+                <h3>{t("settingsPage.modal.impactTitle")}</h3>
+                <p>{settingReviewImpact(selectedSetting, t)}</p>
+                <RiskPill value={selectedSetting.risk_level || "low"} t={t} />
+              </section>
+              <section>
+                <h3>{t("settingsPage.modal.previewTitle")}</h3>
+                <p>{settingReviewPreview(selectedSetting, t)}</p>
+                <small>{t("settingsPage.modal.updateAction")}: {displayText(selectedSetting.update_action_id)}</small>
+              </section>
+              <section>
+                <h3>{t("settingsPage.modal.sourceTitle")}</h3>
+                <p>{displayText(selectedSetting.source_file)}</p>
+                <small>{t("settingsPage.modal.targetFile")}: {displayText(selectedSetting.review?.target_file)}</small>
+              </section>
+              <section>
+                <h3>{t("settingsPage.modal.allowedValuesTitle")}</h3>
+                {asArray(selectedSetting.allowed_values).length ? (
+                  <div className="settings-modal__allowed">
+                    {asArray(selectedSetting.allowed_values).map((value) => (
+                      <span key={displayText(value)}>{settingAllowedValueLabel(value, t)}</span>
+                    ))}
+                  </div>
+                ) : (
+                  <p>{t("settingsPage.modal.noAllowedValues")}</p>
+                )}
+              </section>
+              <section className="settings-modal__change">
+                <h3>{t("settingsPage.modal.proposedValueTitle")}</h3>
+                {selectedSettingEditable ? (
+                  <>
+                    <label className="settings-value-select">
+                      <span>{t("settingsPage.field.proposedValue")}</span>
+                      <select
+                        value={draftValue}
+                        onChange={(event) => {
+                          setDraftValue(event.target.value);
+                          resetMutationState();
+                        }}
+                      >
+                        {editableOptions.map((value) => (
+                          <option value={value} key={value}>{settingAllowedValueLabel(value, t)}</option>
+                        ))}
+                      </select>
+                    </label>
+                    <div className="settings-action-row">
+                      <button type="button" onClick={handlePlanSetting} disabled={!draftValue || mutationState.status === "planning" || mutationState.status === "applying"}>
+                        <Pencil aria-hidden="true" size={16} />
+                        {mutationState.status === "planning" ? t("settingsPage.modal.planning") : t("settingsPage.modal.planChange")}
+                      </button>
+                    </div>
+                    <label className="settings-confirm-row">
+                      <input
+                        type="checkbox"
+                        checked={confirmed}
+                        disabled={mutationState.status !== "planned"}
+                        onChange={(event) => setConfirmed(event.target.checked)}
+                      />
+                      <span>{t("settingsPage.modal.confirmApply")}</span>
+                    </label>
+                    <div className="settings-action-row">
+                      <button
+                        className="settings-action-button--primary"
+                        type="button"
+                        onClick={handleApplySetting}
+                        disabled={!confirmed || mutationState.status !== "planned" || mutationState.result?.requested_value !== draftValue}
+                      >
+                        <Check aria-hidden="true" size={16} />
+                        {mutationState.status === "applying" ? t("settingsPage.modal.applying") : t("settingsPage.modal.applyChange")}
+                      </button>
+                    </div>
+                    {mutationState.result ? (
+                      <div className={`settings-result settings-result--${mutationState.status === "applied" ? "applied" : mutationState.status === "blocked" ? "blocked" : "planned"}`} role={mutationState.status === "blocked" ? "alert" : "status"}>
+                        <StatusPill value={mutationState.status === "applied" ? "passed" : mutationState.status === "blocked" ? "blocked" : "ready"} t={t} label={mutationState.status === "applied" ? t("settingsPage.modal.applied") : mutationState.status === "blocked" ? statusLabelForChip("blocked", t) : t("settingsPage.modal.planReady")} />
+                        <p>{mutationState.status === "applied" ? t("settingsPage.modal.applyResult") : mutationState.status === "blocked" ? t(displayText(mutationState.result.reason_key, ""), t("settingsPage.modal.planBlocked")) : t("settingsPage.modal.planResult")}</p>
+                        {mutationState.status === "blocked" ? <small>{t(displayText(mutationState.result.next_action_key, ""), t("settingsPage.consistency.next.none"))}</small> : null}
+                        <small>{t("settingsPage.modal.targetFile")}: {displayText(mutationState.result.target_file)}</small>
+                        <code>{displayText(mutationState.result.tool_command)}</code>
+                      </div>
+                    ) : null}
+                    {mutationState.error ? (
+                      <div className="settings-result settings-result--error" role="alert">
+                        <StatusPill value="failed" t={t} label={statusLabelForChip("failed", t)} />
+                        <p>{displayText(mutationState.error.message, t("settingsPage.modal.applyFailed"))}</p>
+                      </div>
+                    ) : null}
+                  </>
+                ) : (
+                  <>
+                    <p>{t(displayText(selectedSetting.disabled_reason_key, ""), t("settingsPage.change.disabled"))}</p>
+                    <small>{t("settingsPage.modal.displayOnlyDetail")}</small>
+                  </>
+                )}
+              </section>
+              <section>
+                <h3>{t("settingsPage.modal.validationTitle")}</h3>
+                <StatusPill value={selectedSetting.review?.validation_status || "unknown"} t={t} label={statusLabelForChip(selectedSetting.review?.validation_status, t)} />
+                <p>{selectedSetting.requires_confirmation ? t("settingsPage.modal.confirmationRequired") : t("settingsPage.modal.confirmationNotRequired")}</p>
+              </section>
+            </div>
+            <div className="settings-modal__footer">
+              <a href={displayText(selectedSetting.related_page, "#settings")} onClick={closeSelectedSetting}>
+                {t("settingsPage.modal.related")}
+                <ChevronRight aria-hidden="true" size={16} />
+              </a>
+              <button type="button" onClick={closeSelectedSetting}>{t("settingsPage.modal.close")}</button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+      <SettingsApplyFeedback feedback={applyFeedback} t={t} onDismiss={dismissApplyFeedback} />
       <MockNotice tone="settings-warning" Icon={Lock} title={t("settingsPage.notice.title")} detail={t("settingsPage.notice.detail")} />
     </section>
   );
@@ -4166,20 +4851,70 @@ function SyncBanner({ error, t }) {
   );
 }
 
+function snapshotLocaleForHint(snapshotData) {
+  const summary = snapshotData?.summary || {};
+  const configuredLocale = displayText(summary.ui_locale || summary.display_locale || summary.workflow_language, "");
+  return configuredLocale ? resolveLocale([configuredLocale, "en"]) : "";
+}
+
 export default function App() {
   const [state, setState] = useState({ status: "loading", data: null, error: null, refreshError: null, signature: "" });
   const [activeView, setActiveView] = useState(viewFromHash);
+  const [localeHint, setLocaleHint] = useState("");
   const locale = useMemo(() => {
     const summary = state.data?.summary || {};
-    return resolveLocale([
-      summary.display_locale,
-      summary.ui_locale,
-      summary.environment_locale,
-      ...(Array.isArray(navigator.languages) ? navigator.languages : [navigator.language]),
-    ]);
-  }, [state.data]);
+    const configuredLocale = displayText(localeHint || summary.ui_locale || summary.display_locale || summary.workflow_language, "");
+    if (configuredLocale) {
+      return resolveLocale([configuredLocale, "en"]);
+    }
+    return resolveLocale([summary.environment_locale, ...(Array.isArray(navigator.languages) ? navigator.languages : [navigator.language])]);
+  }, [localeHint, state.data]);
   const t = useMemo(() => createTranslator(locale), [locale]);
+  const htmlLang = useMemo(() => getDashboardIntlLocale(locale), [locale]);
+  const htmlDirection = useMemo(() => getDashboardLocaleDirection(locale), [locale]);
   const refreshIntervalMs = useMemo(() => resolveRefreshIntervalMs(), []);
+  const publishSnapshot = useCallback((snapshot) => {
+    setLocaleHint((previous) => {
+      if (!previous) {
+        return "";
+      }
+      return snapshotLocaleForHint(snapshot.data) === previous ? "" : previous;
+    });
+    setState((previous) => {
+      if (previous.signature === snapshot.signature && previous.data) {
+        return { ...previous, status: "ready", error: null, refreshError: null };
+      }
+      return { status: "ready", data: snapshot.data, error: null, refreshError: null, signature: snapshot.signature };
+    });
+  }, []);
+  const publishSnapshotError = useCallback((error) => {
+    setState((previous) => {
+      if (previous.data) {
+        return { ...previous, status: "stale", error: null, refreshError: error };
+      }
+      return { status: "failed", data: null, error, refreshError: null, signature: "" };
+    });
+  }, []);
+  const refreshSnapshotNow = useCallback(async (options = {}) => {
+    if (options.clearLocaleHint) {
+      setLocaleHint("");
+    }
+    const immediateLocale = displayText(options.localeHint?.ui_locale || options.localeHint?.display_locale || options.localeHint?.workflow_language, "");
+    if (immediateLocale) {
+      setLocaleHint(resolveLocale([immediateLocale, "en"]));
+    }
+    if (options.immediateOnly) {
+      return null;
+    }
+    try {
+      const snapshot = await fetchDashboardDataSnapshot();
+      publishSnapshot(snapshot);
+      return snapshot;
+    } catch (error) {
+      publishSnapshotError(error);
+      throw error;
+    }
+  }, [publishSnapshot, publishSnapshotError]);
 
   useEffect(() => {
     function handleHashChange() {
@@ -4206,22 +4941,12 @@ export default function App() {
         if (!active) {
           return;
         }
-        setState((previous) => {
-          if (previous.signature === snapshot.signature && previous.data) {
-            return { ...previous, status: "ready", error: null, refreshError: null };
-          }
-          return { status: "ready", data: snapshot.data, error: null, refreshError: null, signature: snapshot.signature };
-        });
+        publishSnapshot(snapshot);
       } catch (error) {
         if (!active) {
           return;
         }
-        setState((previous) => {
-          if (previous.data) {
-            return { ...previous, status: "stale", error: null, refreshError: error };
-          }
-          return { status: "failed", data: null, error, refreshError: null, signature: "" };
-        });
+        publishSnapshotError(error);
       } finally {
         inFlight = false;
       }
@@ -4233,13 +4958,13 @@ export default function App() {
       active = false;
       window.clearInterval(timerId);
     };
-  }, [refreshIntervalMs]);
+  }, [publishSnapshot, publishSnapshotError, refreshIntervalMs]);
 
   const data = state.data || {};
   const loaded = Boolean(state.data) && (state.status === "ready" || state.status === "stale");
 
   return (
-    <main className="app-shell">
+    <main className="app-shell" lang={htmlLang} dir={htmlDirection}>
       <Sidebar activeView={activeView} t={t} data={data} locale={locale} loaded={loaded} />
       <section className="app-main">
         <h1 className="sr-only">{t("app.title")}</h1>
@@ -4270,7 +4995,7 @@ export default function App() {
         {loaded && activeView === "safety" ? <SafetySection security={data.security || {}} actions={data.actions || {}} partialFailures={data.partial_failures || []} data={data} locale={locale} t={t} /> : null}
         {loaded && activeView === "repository-info" ? <RepositoryInfoPage data={data} locale={locale} t={t} /> : null}
         {loaded && activeView === "documents" ? <DocumentsPage data={data} locale={locale} t={t} /> : null}
-        {loaded && activeView === "settings" ? <SettingsPage data={data} locale={locale} t={t} /> : null}
+        {loaded && activeView === "settings" ? <SettingsPage data={data} locale={locale} t={t} onRefreshSnapshot={refreshSnapshotNow} /> : null}
         {loaded && activeView === "help" ? <HelpPage data={data} locale={locale} t={t} /> : null}
         {loaded && activeView === "history" ? <HistoryPage data={data} locale={locale} t={t} /> : null}
       </section>

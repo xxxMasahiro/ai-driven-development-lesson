@@ -1,0 +1,585 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+DASHBOARD_LESSON_CONFIG="${DASHBOARD_LESSON_CONFIG:-$ROOT/lesson/LESSON_CONFIG.tsv}"
+DASHBOARD_LESSON14_CONFIG="${DASHBOARD_LESSON14_CONFIG:-$ROOT/lesson/LESSON_CONFIG_14_DAYS.tsv}"
+export LESSON_CONFIG="${LESSON_CONFIG:-$DASHBOARD_LESSON14_CONFIG}"
+
+# shellcheck source=tools/lib/lesson_common.sh
+source "$ROOT/tools/lib/lesson_common.sh"
+# shellcheck source=tools/lib/git_workflow_policy.sh
+source "$ROOT/tools/lib/git_workflow_policy.sh"
+# shellcheck source=tools/lib/product_workflow_git_usage.sh
+source "$ROOT/tools/lib/product_workflow_git_usage.sh"
+# shellcheck source=tools/lib/dashboard_data.sh
+source "$ROOT/tools/lib/dashboard_data.sh"
+
+DEFAULT_MENU_ID="${DASHBOARD_SELECTED_MENU_ID:-step_1_14}"
+DEFAULT_SNAPSHOT_FILE="${DASHBOARD_CONTROL_CENTER_DATA_FILE:-$ROOT/.dashboard-control-center/dashboard-data.json}"
+SNAPSHOT_ROOT="$ROOT/.dashboard-control-center"
+
+usage() {
+  cat <<'USAGE'
+Usage:
+  tools/dashboard-settings catalog [--menu <menu_id>]
+  tools/dashboard-settings plan <setting_id> <value> [--menu <menu_id>]
+  tools/dashboard-settings apply <setting_id> <value> --confirm [--menu <menu_id>] [--snapshot <file>]
+
+Settings writes are limited to allowlisted lesson settings, policy-backed Git workflow settings, and product workflow Git usage settings.
+USAGE
+}
+
+dashboard_settings_validate_menu_id() {
+  case "$1" in
+    step_1_7|step_1_14|advanced|free-development|product-improvement|external-integration|lesson-repository-improvement|unknown)
+      return 0
+      ;;
+  esac
+  printf 'Invalid dashboard menu id: %s\n' "$1" >&2
+  return 1
+}
+
+dashboard_settings_safe_token() {
+  local label="$1"
+  local value="$2"
+  if [[ -z "$value" || ! "$value" =~ ^[A-Za-z0-9_.:-]+$ ]]; then
+    printf 'Invalid %s: %s\n' "$label" "$value" >&2
+    return 1
+  fi
+}
+
+dashboard_settings_config_for_menu() {
+  local menu_id="$1"
+  case "$menu_id" in
+    step_1_7) printf '%s' "$DASHBOARD_LESSON_CONFIG" ;;
+    step_1_14) printf '%s' "$DASHBOARD_LESSON14_CONFIG" ;;
+    *) printf '%s' "${LESSON_CONFIG:-$DASHBOARD_LESSON14_CONFIG}" ;;
+  esac
+}
+
+dashboard_settings_abs_dir() {
+  local dir="$1"
+  [[ -d "$dir" ]] || return 1
+  (cd "$dir" && pwd -P)
+}
+
+dashboard_settings_path_inside_dir() {
+  local file="$1"
+  local root="$2"
+  local file_dir file_abs root_abs
+  file_dir="$(dirname "$file")"
+  file_abs="$(dashboard_settings_abs_dir "$file_dir")/$(basename "$file")" || return 1
+  root_abs="$(dashboard_settings_abs_dir "$root")" || return 1
+  [[ "$file_abs" == "$root_abs"/* ]]
+}
+
+dashboard_settings_allow_file() {
+  local file="$1"
+  if dashboard_settings_path_inside_dir "$file" "$LESSON_ROOT"; then
+    return 0
+  fi
+  if [[ "${DASHBOARD_SETTINGS_TEST_MODE:-0}" == "1" && -n "${DASHBOARD_SETTINGS_TEST_ROOT:-}" ]] && dashboard_settings_path_inside_dir "$file" "$DASHBOARD_SETTINGS_TEST_ROOT"; then
+    return 0
+  fi
+  printf 'Refusing to update a settings file outside the allowed repository boundary.\n' >&2
+  return 1
+}
+
+dashboard_settings_abs_file_maybe_missing() {
+  local file="$1"
+  case "$file" in
+    /*) realpath -m -- "$file" ;;
+    *) realpath -m -- "$ROOT/$file" ;;
+  esac
+}
+
+dashboard_settings_snapshot_inside_dir() {
+  local file="$1"
+  local root="$2"
+  local file_abs root_abs
+  file_abs="$(dashboard_settings_abs_file_maybe_missing "$file")" || return 1
+  root_abs="$(dashboard_settings_abs_dir "$root")" || return 1
+  [[ "$file_abs" == "$root_abs"/* ]]
+}
+
+dashboard_settings_allow_snapshot_file() {
+  local file="$1"
+  mkdir -p "$SNAPSHOT_ROOT"
+  if dashboard_settings_snapshot_inside_dir "$file" "$SNAPSHOT_ROOT"; then
+    return 0
+  fi
+  if [[ "${DASHBOARD_SETTINGS_TEST_MODE:-0}" == "1" && -n "${DASHBOARD_SETTINGS_TEST_ROOT:-}" ]] && dashboard_settings_snapshot_inside_dir "$file" "$DASHBOARD_SETTINGS_TEST_ROOT"; then
+    return 0
+  fi
+  printf 'Refusing to write a dashboard snapshot outside the dashboard runtime boundary.\n' >&2
+  return 1
+}
+
+dashboard_settings_display_path() {
+  local file="$1"
+  case "$file" in
+    "$LESSON_ROOT"/*)
+      printf '%s' "${file#$LESSON_ROOT/}"
+      ;;
+    *)
+      printf 'settings-test-target'
+      ;;
+  esac
+}
+
+dashboard_settings_current_lesson_value() {
+  local setting="$1"
+  local file="$2"
+  case "$setting" in
+    learning_mode)
+      awk -F '\t' '$1 !~ /^#/ && $2 ~ /^[ABC]$/ { print $2; found = 1; exit } END { exit found ? 0 : 1 }' "$file" 2>/dev/null || printf 'unknown'
+      ;;
+    workflow_language|product_language)
+      local raw_language normalized_language
+      raw_language="$(awk -F '\t' '$1 !~ /^#/ && $2 != "" && $3 != "" { print $2; found = 1; exit } END { exit found ? 0 : 1 }' "$file" 2>/dev/null || printf 'unknown')"
+      if [[ "$raw_language" == "unknown" ]]; then
+        printf 'unknown'
+      else
+        normalized_language="$(lesson_normalize_language "$raw_language" 2>/dev/null || printf 'custom\t%s' "$raw_language")"
+        printf '%s' "${normalized_language%%$'\t'*}"
+      fi
+      ;;
+    *)
+      printf 'unknown'
+      ;;
+  esac
+}
+
+dashboard_settings_language_code_allowed() {
+  local code="$1"
+  case "|$(lesson_supported_language_codes)|" in
+    *"|$code|"*) return 0 ;;
+  esac
+  return 1
+}
+
+dashboard_settings_reset_policy_result() {
+  PLAN_RESULT_STATUS="ready"
+  PLAN_POLICY_BLOCKED="false"
+  PLAN_POLICY_SEVERITY="info"
+  PLAN_POLICY_REASON_CODE="none"
+  PLAN_POLICY_REASON_KEY="settingsPage.consistency.none"
+  PLAN_POLICY_NEXT_ACTION_KEY="settingsPage.consistency.next.none"
+  PLAN_POLICY_AFFECTED_IDS=""
+}
+
+dashboard_settings_set_policy_result_from_rows() {
+  local rows="$1"
+  local severity status reason_code affected_ids reason_key next_action_key
+
+  while IFS=$'\t' read -r severity status reason_code affected_ids reason_key next_action_key; do
+    [[ -n "$severity$status" ]] || continue
+    if [[ "$severity" == "error" || "$status" == "blocked" ]]; then
+      PLAN_RESULT_STATUS="blocked"
+      PLAN_POLICY_BLOCKED="true"
+      PLAN_POLICY_SEVERITY="$severity"
+      PLAN_POLICY_REASON_CODE="$reason_code"
+      PLAN_POLICY_REASON_KEY="$reason_key"
+      PLAN_POLICY_NEXT_ACTION_KEY="$next_action_key"
+      PLAN_POLICY_AFFECTED_IDS="$affected_ids"
+      return 0
+    fi
+  done <<<"$rows"
+
+  while IFS=$'\t' read -r severity status reason_code affected_ids reason_key next_action_key; do
+    [[ -n "$severity$status" ]] || continue
+    case "$status" in
+      manual_required|approval_required)
+        PLAN_RESULT_STATUS="$status"
+        ;;
+    esac
+    PLAN_POLICY_SEVERITY="$severity"
+    PLAN_POLICY_REASON_CODE="$reason_code"
+    PLAN_POLICY_REASON_KEY="$reason_key"
+    PLAN_POLICY_NEXT_ACTION_KEY="$next_action_key"
+    PLAN_POLICY_AFFECTED_IDS="$affected_ids"
+    return 0
+  done <<<"$rows"
+}
+
+dashboard_settings_set_policy_notice_from_rows() {
+  local rows="$1"
+  local severity status reason_code affected_ids reason_key next_action_key
+
+  while IFS=$'\t' read -r severity status reason_code affected_ids reason_key next_action_key; do
+    [[ -n "$severity$status" ]] || continue
+    case "$status" in
+      manual_required|approval_required)
+        PLAN_RESULT_STATUS="$status"
+        ;;
+    esac
+    PLAN_POLICY_SEVERITY="$severity"
+    PLAN_POLICY_REASON_CODE="$reason_code"
+    PLAN_POLICY_REASON_KEY="$reason_key"
+    PLAN_POLICY_NEXT_ACTION_KEY="$next_action_key"
+    PLAN_POLICY_AFFECTED_IDS="$affected_ids"
+    return 0
+  done <<<"$rows"
+}
+
+dashboard_settings_prepare_lesson_setting() {
+  local setting="$1"
+  local raw_value="$2"
+  local menu_id="$3"
+  local config_file target_file normalized
+
+  config_file="$(dashboard_settings_config_for_menu "$menu_id")"
+  target_file="$(lesson_setting_file_from_config "$config_file" "$setting")"
+  dashboard_settings_allow_file "$target_file"
+
+  case "$setting" in
+    learning_mode)
+      normalized="$(lesson_normalize_learning_mode "$raw_value")"
+      PLAN_VALUE="${normalized%%$'\t'*}"
+      PLAN_LABEL="${normalized#*$'\t'}"
+      ;;
+    workflow_language|product_language)
+      normalized="$(lesson_normalize_language "$raw_value")"
+      PLAN_VALUE="${normalized%%$'\t'*}"
+      PLAN_LABEL="${normalized#*$'\t'}"
+      if ! dashboard_settings_language_code_allowed "$PLAN_VALUE"; then
+        printf 'Unsupported language for dashboard settings: %s\n' "$raw_value" >&2
+        return 1
+      fi
+      ;;
+    *)
+      printf 'Unsupported lesson setting: %s\n' "$setting" >&2
+      return 1
+      ;;
+  esac
+
+  PLAN_KIND="lesson"
+  PLAN_SETTING="$setting"
+  PLAN_TARGET_FILE="$target_file"
+  PLAN_TARGET_DISPLAY="$(dashboard_settings_display_path "$target_file")"
+  PLAN_CURRENT_VALUE="$(dashboard_settings_current_lesson_value "$setting" "$target_file")"
+  PLAN_CURRENT_LABEL="$(lesson_setting_value_from_file "$setting" "$target_file" 2>/dev/null || printf 'Not selected')"
+}
+
+dashboard_settings_prepare_git_setting() {
+  local setting_id="$1"
+  local raw_value="$2"
+  local key="${setting_id#git_}"
+  local target_file
+  local policy_rows
+
+  git_workflow_policy_has_key "$key" || {
+    printf 'Unsupported Git workflow setting: %s\n' "$setting_id" >&2
+    return 1
+  }
+  git_workflow_validate_value "$key" "$raw_value" || return 1
+  policy_rows="$(git_workflow_consistency_rows "$key" "$raw_value")" || return 1
+  if git_workflow_candidate_write_allowed "$key" "$raw_value"; then
+    dashboard_settings_set_policy_notice_from_rows "$policy_rows"
+  else
+    dashboard_settings_set_policy_result_from_rows "$policy_rows"
+  fi
+  target_file="$(git_workflow_settings_file)"
+  dashboard_settings_allow_file "$target_file"
+
+  PLAN_KIND="git"
+  PLAN_SETTING="$key"
+  PLAN_TARGET_FILE="$target_file"
+  PLAN_TARGET_DISPLAY="$(dashboard_settings_display_path "$target_file")"
+  PLAN_VALUE="$raw_value"
+  PLAN_LABEL="$raw_value"
+  PLAN_CURRENT_VALUE="$(git_workflow_setting_value "$key" 2>/dev/null || git_workflow_policy_default_value "$key")"
+  PLAN_CURRENT_LABEL="$PLAN_CURRENT_VALUE"
+}
+
+dashboard_settings_prepare_product_git_usage_setting() {
+  local raw_value="$1"
+  local menu_id="$2"
+  local context target_file
+
+  context="$(product_workflow_git_usage_context_for_menu "$menu_id")"
+  product_workflow_git_usage_context_supported "$context" || {
+    printf 'Product workflow Git usage mode is only configurable for product workflow menus: %s\n' "$menu_id" >&2
+    return 1
+  }
+  product_workflow_git_usage_mode_allowed_for_context "$context" "$raw_value" || return 1
+  target_file="$(product_workflow_git_usage_settings_file)"
+  dashboard_settings_allow_file "$target_file"
+
+  PLAN_KIND="product_workflow_git_usage"
+  PLAN_SETTING="$context"
+  PLAN_TARGET_FILE="$target_file"
+  PLAN_TARGET_DISPLAY="$(dashboard_settings_display_path "$target_file")"
+  PLAN_VALUE="$raw_value"
+  PLAN_LABEL="$(product_workflow_git_usage_mode_label "$raw_value")"
+  PLAN_CURRENT_VALUE="$(product_workflow_git_usage_mode_for_context "$context" 2>/dev/null || product_workflow_git_usage_default_mode "$context")"
+  PLAN_CURRENT_LABEL="$(product_workflow_git_usage_mode_label "$PLAN_CURRENT_VALUE")"
+}
+
+dashboard_settings_prepare_plan() {
+  local setting_id="$1"
+  local raw_value="$2"
+  local menu_id="$3"
+
+  dashboard_settings_safe_token "setting id" "$setting_id"
+  dashboard_settings_safe_token "setting value" "$raw_value"
+  dashboard_settings_validate_menu_id "$menu_id"
+
+  dashboard_settings_reset_policy_result
+  PLAN_ID="$setting_id"
+  PLAN_MENU_ID="$menu_id"
+  case "$setting_id" in
+    learning_mode)
+      dashboard_settings_prepare_lesson_setting learning_mode "$raw_value" "$menu_id"
+      ;;
+    workflow_language)
+      dashboard_settings_prepare_lesson_setting workflow_language "$raw_value" "$menu_id"
+      ;;
+    product_language)
+      dashboard_settings_prepare_lesson_setting product_language "$raw_value" "$menu_id"
+      ;;
+    git_*)
+      dashboard_settings_prepare_git_setting "$setting_id" "$raw_value"
+      ;;
+    product_git_usage_mode)
+      dashboard_settings_prepare_product_git_usage_setting "$raw_value" "$menu_id"
+      ;;
+    *)
+      printf 'Unsupported dashboard setting: %s\n' "$setting_id" >&2
+      return 1
+      ;;
+  esac
+}
+
+dashboard_settings_json_result() {
+  local result_status="$1"
+  local applied="$2"
+  local snapshot_file="${3:-}"
+  local ui_locale ui_direction
+  local -a affected_ids=()
+
+  printf '{'
+  printf '"status":'
+  dashboard_json_string "$result_status"
+  printf ',"severity":'
+  dashboard_json_string "${PLAN_POLICY_SEVERITY:-info}"
+  printf ',"reason_code":'
+  dashboard_json_string "${PLAN_POLICY_REASON_CODE:-none}"
+  printf ',"reason_key":'
+  dashboard_json_string "${PLAN_POLICY_REASON_KEY:-settingsPage.consistency.none}"
+  printf ',"next_action_key":'
+  dashboard_json_string "${PLAN_POLICY_NEXT_ACTION_KEY:-settingsPage.consistency.next.none}"
+  printf ',"affected_setting_ids":'
+  if [[ -n "${PLAN_POLICY_AFFECTED_IDS:-}" ]]; then
+    IFS=',' read -r -a affected_ids <<<"$PLAN_POLICY_AFFECTED_IDS"
+    dashboard_json_string_array "${affected_ids[@]}"
+  else
+    dashboard_json_string_array
+  fi
+  printf ',"setting_id":'
+  dashboard_json_string "$PLAN_ID"
+  printf ',"menu_id":'
+  dashboard_json_string "$PLAN_MENU_ID"
+  printf ',"setting_kind":'
+  dashboard_json_string "$PLAN_KIND"
+  printf ',"requested_value":'
+  dashboard_json_string "$PLAN_VALUE"
+  printf ',"requested_label":'
+  dashboard_json_string "$PLAN_LABEL"
+  printf ',"current_value":'
+  dashboard_json_string "$PLAN_CURRENT_VALUE"
+  printf ',"current_label":'
+  dashboard_json_string "$PLAN_CURRENT_LABEL"
+  printf ',"target_file":'
+  dashboard_json_string "$PLAN_TARGET_DISPLAY"
+  printf ',"requires_confirmation":true'
+  printf ',"applied":'
+  dashboard_json_bool "$applied"
+  printf ',"snapshot_regenerated":'
+  if [[ -n "$snapshot_file" ]]; then
+    dashboard_json_bool true
+    printf ',"snapshot_file":'
+    dashboard_json_string "$(dashboard_settings_display_path "$snapshot_file")"
+  else
+    dashboard_json_bool false
+  fi
+  printf ',"tool_command":'
+  dashboard_json_string "tools/dashboard-settings apply $PLAN_ID $PLAN_VALUE --menu $PLAN_MENU_ID --confirm"
+  if [[ "$PLAN_ID" == "workflow_language" ]]; then
+    ui_locale="$(dashboard_ui_locale_for_workflow_language "$PLAN_VALUE")"
+    ui_direction="$(dashboard_ui_direction_for_locale "$ui_locale")"
+    printf ',"workflow_language":'
+    dashboard_json_string "$PLAN_VALUE"
+    printf ',"display_locale":'
+    dashboard_json_string "$PLAN_VALUE"
+    printf ',"ui_locale":'
+    dashboard_json_string "$ui_locale"
+    printf ',"direction":'
+    dashboard_json_string "$ui_direction"
+  fi
+  printf '}'
+}
+
+dashboard_settings_atomic_write_lesson() {
+  local setting="$1"
+  local target_file="$2"
+  local value="$3"
+  local label="$4"
+  local target_dir tmp stamp
+
+  target_dir="$(dirname "$target_file")"
+  mkdir -p "$target_dir"
+  dashboard_settings_allow_file "$target_file"
+  stamp="$(date '+%Y-%m-%d %H:%M:%S')"
+  tmp="$(mktemp "$target_dir/.dashboard-settings.XXXXXX.tmp")"
+  case "$setting" in
+    learning_mode)
+      printf '# selected_at\tmode\tdescription\n%s\t%s\t%s\n' "$stamp" "$value" "$label" >"$tmp"
+      lesson_learning_mode_file_has_value "$tmp" >/dev/null
+      ;;
+    workflow_language|product_language)
+      printf '# selected_at\tcode\tlabel\n%s\t%s\t%s\n' "$stamp" "$value" "$label" >"$tmp"
+      lesson_language_file_has_value "$tmp" >/dev/null
+      ;;
+    *)
+      rm -f "$tmp"
+      printf 'Unsupported lesson setting: %s\n' "$setting" >&2
+      return 1
+      ;;
+  esac
+  mv "$tmp" "$target_file"
+}
+
+dashboard_settings_apply_plan() {
+  case "$PLAN_KIND" in
+    lesson)
+      dashboard_settings_atomic_write_lesson "$PLAN_SETTING" "$PLAN_TARGET_FILE" "$PLAN_VALUE" "$PLAN_LABEL"
+      ;;
+    git)
+      git_workflow_write_setting "$PLAN_SETTING" "$PLAN_VALUE"
+      ;;
+    product_workflow_git_usage)
+      product_workflow_git_usage_write_setting "$PLAN_SETTING" "$PLAN_VALUE"
+      ;;
+    *)
+      printf 'Unsupported settings plan kind: %s\n' "$PLAN_KIND" >&2
+      return 1
+      ;;
+  esac
+}
+
+dashboard_settings_regenerate_snapshot() {
+  local snapshot_file="$1"
+  [[ "${DASHBOARD_SETTINGS_SKIP_SNAPSHOT:-0}" == "1" ]] && return 0
+  "$ROOT/tools/dashboard-control-center" snapshot --output "$snapshot_file" >/dev/null
+}
+
+dashboard_settings_catalog() {
+  local menu_id="$1"
+  DASHBOARD_SELECTED_MENU_ID="$menu_id" "$ROOT/tools/dashboard-data" | node -e '
+const fs = require("node:fs");
+const data = JSON.parse(fs.readFileSync(0, "utf8"));
+process.stdout.write(`${JSON.stringify(data.settings || {}, null, 2)}\n`);
+'
+}
+
+cmd="${1:-}"
+[[ $# -gt 0 ]] && shift || true
+
+case "$cmd" in
+  catalog)
+    menu_id="$DEFAULT_MENU_ID"
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --menu)
+          [[ $# -ge 2 ]] || { printf '%s\n' '--menu requires a value.' >&2; exit 1; }
+          menu_id="$2"
+          shift 2
+          ;;
+        *)
+          usage >&2
+          exit 1
+          ;;
+      esac
+    done
+    dashboard_settings_validate_menu_id "$menu_id"
+    dashboard_settings_catalog "$menu_id"
+    ;;
+  plan)
+    [[ $# -ge 2 ]] || { usage >&2; exit 1; }
+    setting_id="$1"
+    raw_value="$2"
+    shift 2
+    menu_id="$DEFAULT_MENU_ID"
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --menu)
+          [[ $# -ge 2 ]] || { printf '%s\n' '--menu requires a value.' >&2; exit 1; }
+          menu_id="$2"
+          shift 2
+          ;;
+        *)
+          usage >&2
+          exit 1
+          ;;
+      esac
+    done
+    dashboard_settings_prepare_plan "$setting_id" "$raw_value" "$menu_id"
+    dashboard_settings_json_result "$PLAN_RESULT_STATUS" false
+    printf '\n'
+    ;;
+  apply)
+    [[ $# -ge 2 ]] || { usage >&2; exit 1; }
+    setting_id="$1"
+    raw_value="$2"
+    shift 2
+    menu_id="$DEFAULT_MENU_ID"
+    snapshot_file="$DEFAULT_SNAPSHOT_FILE"
+    confirmed="false"
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --menu)
+          [[ $# -ge 2 ]] || { printf '%s\n' '--menu requires a value.' >&2; exit 1; }
+          menu_id="$2"
+          shift 2
+          ;;
+        --snapshot)
+          [[ $# -ge 2 ]] || { printf '%s\n' '--snapshot requires a value.' >&2; exit 1; }
+          snapshot_file="$2"
+          shift 2
+          ;;
+        --confirm)
+          confirmed="true"
+          shift
+          ;;
+        *)
+          usage >&2
+          exit 1
+          ;;
+      esac
+    done
+    [[ "$confirmed" == "true" ]] || {
+      printf 'Refusing to apply without --confirm.\n' >&2
+      exit 1
+    }
+    dashboard_settings_prepare_plan "$setting_id" "$raw_value" "$menu_id"
+    dashboard_settings_allow_snapshot_file "$snapshot_file"
+    if [[ "${PLAN_POLICY_BLOCKED:-false}" == "true" ]]; then
+      dashboard_settings_json_result blocked false
+      printf '\n'
+      exit 0
+    fi
+    dashboard_settings_apply_plan
+    dashboard_settings_regenerate_snapshot "$snapshot_file"
+    dashboard_settings_json_result passed true "$snapshot_file"
+    printf '\n'
+    ;;
+  -h|--help|help)
+    usage
+    ;;
+  *)
+    usage >&2
+    exit 1
+    ;;
+esac

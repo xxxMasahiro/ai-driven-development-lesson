@@ -1795,3 +1795,256 @@ Safety boundary:
 - This policy does not apply to authentication, OAuth, token or secret handling, dependency installation or updates, external service writes, product repository writes, evidence writes, push, merge, cleanup, delete, destructive Git operations, CI failure overrides, or gate weakening.
 - Existing AGENTS.MD rules for dangerous operations, security-first implementation, minimum necessary tests, repository boundaries, and no existing-feature tradeoff remain higher-priority boundaries.
 - Dashboard and browser pages remain read-only; escalated Playwright inspection is an external verification activity, not a dashboard runtime capability.
+
+## Implemented Dashboard Control Center Settings Safe Change Specification
+
+SYNC-ID: dashboard_control_center_settings_safe_change_plan
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/DASHBOARD_DATA_SCHEMA.tsv,docs/workflow/TEST_PLAN_MANIFEST.tsv,docs/workflow/GIT_HOOK_CHECKS.tsv,docs/workflow/FINAL_GATE_COVERAGE.tsv,.github/workflows/ci.yml,.github/workflows/lesson14-ci.yml,tools/lib/dashboard_data.sh,tools/lib/git_workflow_policy.sh,tools/dashboard-data,tools/dashboard-settings,tools/dashboard-control-center,vite.config.mjs,dashboard-control-center/src/App.jsx,dashboard-control-center/src/dashboardData.js,dashboard-control-center/src/i18n.js,dashboard-control-center/src/styles.css,tests/fixtures/dashboard-control-center.json,tests/fixtures/dashboard-control-center-live-update.json,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_settings.sh,tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/test_dashboard_control_center.sh
+TESTS: tools/test_dashboard_settings.sh,tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/test_dashboard_control_center.sh,tools/test_git_workflow_policy.sh,tools/test_lesson.sh,tools/test_lesson14.sh,tools/test_menu_prerequisites.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_test_plan_coverage.sh,tools/check_workflow_pair_sync.sh
+
+Settings data contract:
+
+- `tools/dashboard-data` remains the producer for Settings page state.
+- The producer exposes a generic `settings` catalog before React renders setting groups or editable rows.
+- The planned catalog shape includes `settings.status`, `settings.groups[]`, and `settings.items[]`.
+- Each settings group has a stable id, localized label key, localized description key, display order, and status summary.
+- Each settings item has a stable id, group id, scope, localized label key, localized description key, current value, current display label, structured status, safe relative source file, allowed value list when applicable, editability flag, risk level, confirmation requirement, disabled reason when not editable, related dashboard page, and a preview update action id.
+- Lesson settings are sourced from existing lesson config, lesson state, and shared lesson helpers.
+- Workflow settings are sourced from `docs/workflow/GIT_WORKFLOW_POLICY.tsv`, `learning/GIT_WORKFLOW_SETTINGS.tsv`, and existing Git workflow helpers.
+- Safety settings are sourced from existing security policy and approval state, but dangerous operations and approval states remain display-only.
+- The producer emits `summary.workflow_language`, `summary.display_locale`, and `summary.ui_locale` from the selected workflow language setting. `summary.display_locale` preserves the selected language code, while `summary.ui_locale` is the currently supported dashboard fixed-label dictionary key.
+- The producer includes the selected workflow language and resolved dashboard UI locale in the content hash seed so a language-only Settings change publishes a distinct dashboard snapshot.
+- The settings catalog participates in dashboard schema validation, dashboard data tests, fixture validation, content hash generation, Vite snapshot validation, and browser data validation before UI reliance.
+
+Settings UI contract:
+
+- `SettingsPage` renders rows from producer-owned `settings.groups[]` and `settings.items[]`; it must not use a React-only fixed settings array as the source of truth.
+- The first page section identifies the selected menu, workflow context, target repository, product type, and snapshot freshness.
+- The main settings area uses readable row layouts rather than narrow multi-column cards so desktop, narrow desktop, tablet, and phone widths do not split labels into vertical letters.
+- Each row shows the setting name, current value, status, changeability, source or owner, and related page.
+- Clicking a row opens a large review popup when a setting has review details. The popup must be keyboard accessible, move focus into the dialog on open, trap Tab/Shift+Tab inside the dialog, use dialog semantics, support Escape/close behavior, and return focus to the initiating row.
+- The popup presents current value, proposed value selector for editable rows, plain-language impact, target file, required confirmation, validation state, update preview, plan result, apply confirmation, and apply result.
+- Final confirmation is available only for editable rows whose catalog item exposes allowed values, `editable: true`, `reviewable: true`, a repo-local source file, and `requires_confirmation: true`.
+- Approval-only or display-only rows remain visible, but their popup explains why they cannot be changed from Settings.
+- React resolves fixed UI labels from `summary.ui_locale` or `summary.display_locale` before using browser language. If those summary fields are missing in a legacy snapshot, the previous browser-language fallback remains in effect.
+- Dashboard fixed-label dictionaries support all standard lesson language settings through `dashboard_control_center_full_locale_ui_support`. Unsupported custom language settings remain selectable and are preserved as workflow-language data, but they do not become Dashboard UI dictionary keys unless a later locale policy adds them with matching tests.
+
+Settings update boundary:
+
+- Browser runtime remains GET/read-only for all data surfaces except the implemented `/dashboard-settings/plan` and `/dashboard-settings/apply` middleware endpoints.
+- The dedicated repo-local tool `tools/dashboard-settings` owns update behavior with allowlisted commands: `catalog`, `plan <setting_id> <value>`, and `apply <setting_id> <value> --confirm`.
+- The update tool never accepts arbitrary paths, shell command text, arbitrary keys, untrusted command fragments, or product-stack-specific branches.
+- The Vite middleware accepts same-origin `application/json` POSTs only, rejects cross-origin or non-JSON browser mutation attempts before tool execution, restricts fields to setting id, value, menu id, and confirmation, and calls `tools/dashboard-settings` through `execFile` without shell execution.
+- The update tool reuses existing lesson setting normalization, Git workflow policy validation, and repo-local file boundaries; React does not parse TSV files or build file paths.
+- Writes must use a temporary file, validate the result, and atomically rename only after validation passes.
+- After a successful apply, the tool regenerates the dashboard snapshot through `tools/dashboard-control-center snapshot`; the snapshot output path is limited to the dashboard runtime directory, with a separate test-root exception only for isolated regression tests.
+- After a successful browser apply response with `snapshot_regenerated: true`, `SettingsPage` asks the top-level app to refetch `dashboard-data.json` immediately. The top-level app updates the validated snapshot state without reloading the page, and the normal polling loop remains only as a background recovery path.
+- Product or work target naming remains display-only in this sync ID. A future naming write path must use the existing product-profile policy, external repository boundary checks when product-scoped, and a separate approved write contract.
+
+Safety and compatibility contract:
+
+- The Settings page must not execute Git, GitHub, CI, shell, product-security, product-authority, evidence writers, merge, push, cleanup, remote deletion, OAuth, token handling, or destructive operations.
+- The Settings page must not alter approval states, security gates, product evidence, CI authority, live Git state, or external product repository content.
+- Existing Documents, Repository Information, Development Workflow, Maintenance Sync, Safety Confirmation, Help, Update History, docs-tour, `tools/dashboard docs`, STEP 1-7, STEP 1-14, Git hooks, pre-commit, and CI behavior remain intact.
+- Missing or malformed settings catalog data renders as a safe incomplete state or fails validation; React must not invent setting values, readiness, approval state, source files, or dashboard locale decisions.
+- Browser and Vite validators reject malformed locale summaries when present, including mismatches between `summary.workflow_language` and the Settings `workflow_language` row.
+
+## Implemented Dashboard Control Center Full Locale UI Support Specification
+
+SYNC-ID: dashboard_control_center_full_locale_ui_support
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/DASHBOARD_DATA_SCHEMA.tsv,docs/workflow/TEST_PLAN_MANIFEST.tsv,docs/workflow/GIT_HOOK_CHECKS.tsv,docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv,docs/workflow/FINAL_GATE_COVERAGE.tsv,.github/workflows/ci.yml,.github/workflows/lesson14-ci.yml,tools/lib/lesson_common.sh,tools/lib/dashboard_data.sh,tools/dashboard-data,tools/dashboard-settings,tools/dashboard-control-center,tools/test_dashboard_i18n.sh,tools/test_dashboard_settings.sh,tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/test_dashboard_control_center.sh,tools/check_ci_workflow_structure.sh,tools/test_lesson_repository.sh,vite.config.mjs,dashboard-control-center/src/App.jsx,dashboard-control-center/src/dashboardData.js,dashboard-control-center/src/i18n.js,dashboard-control-center/src/styles.css,tests/fixtures/dashboard-control-center.json,tests/fixtures/dashboard-control-center-live-update.json,tests/playwright/dashboard-control-center.spec.js
+TESTS: tools/test_dashboard_i18n.sh,tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/test_dashboard_settings.sh,tools/test_dashboard_control_center.sh,tools/check_ci_workflow_structure.sh,tools/test_git_hooks.sh,tools/test_git_hooks_parallel.sh,tools/test_ci_final_gate.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_test_plan_coverage.sh,tools/check_workflow_pair_sync.sh
+
+Locale policy contract:
+
+- Define one reusable Dashboard locale policy that is derived from the standard lesson language list and consumed by the producer, browser validator, locale resolver, Settings value labels, fixtures, and tests.
+- The policy entry for each standard language contains at least `code`, `aliases`, `intlLocale`, `direction`, `nativeName`, and `englishName`.
+- Standard codes are `ja`, `en`, `ko`, `zh-CN`, `zh-TW`, `es`, `pt-BR`, `fr`, `de`, `id`, `vi`, `th`, `hi`, and `ar`.
+- `zh` remains a compatibility alias for `zh-CN`; the canonical value emitted to Dashboard summary and Settings rows is `zh-CN`.
+- `direction` is `rtl` only for `ar` in the standard set and `ltr` for the other standard languages.
+- Unsupported custom workflow language values remain valid lesson workflow records but do not become Dashboard fixed UI dictionary keys unless a later policy explicitly promotes them.
+
+Dashboard data contract:
+
+- `summary.workflow_language` remains the selected workflow display language from existing lesson settings.
+- `summary.display_locale` remains the canonical locale requested by Settings, after alias normalization.
+- `summary.ui_locale` is an enum of the full standard Dashboard dictionary set instead of `ja|en`.
+- `summary.ui_direction` is emitted as `ltr` or `rtl` from the resolved Dashboard UI locale. Validators reject unknown locale keys, missing direction metadata, and locale/direction mismatches before rendering.
+- The content hash includes the canonical workflow language, UI locale, and direction fields so a language-only Settings change publishes a distinct snapshot.
+- `DASHBOARD_DATA_SCHEMA.tsv`, `tools/test_dashboard_schema.sh`, `tools/test_dashboard_data.sh`, fixtures, and browser validation must agree on the same locale field vocabulary.
+- Malformed snapshots must fail validation before UI reliance if they contain an unsupported standard code, unknown dictionary key, missing required locale field, direction mismatch, or mismatch between `summary.workflow_language` and the Settings `workflow_language` row.
+
+React localization contract:
+
+- `dashboard-control-center/src/i18n.js` owns fixed Dashboard labels and exports the locale policy, locale resolver, dictionaries, and any dictionary-completeness helpers used by tests.
+- Every standard Dashboard UI locale has a complete dictionary for fixed chrome, navigation, page titles, Settings labels, dialogs, status labels, empty states, validation messages, notices, and known control-center labels.
+- The translator must fail predictably in tests when a fixed label key is missing for any standard UI locale; runtime must not hide missing supported translations by falling back to English for standard codes.
+- Repository facts, file paths, command strings, branch names, hashes, ids, setting values, and external evidence remain data and are not translated by dictionary lookup.
+- React chooses the active locale from the authoritative app state set after apply success, then from validated snapshot summary fields, then from legacy browser hints only for older snapshots that lack summary locale fields.
+- The root Dashboard element sets `lang` and `dir` from the active locale policy. Arabic uses right-to-left chrome; technical values use LTR isolation through reusable CSS or components.
+- Layout uses CSS logical properties where practical so RTL support does not require language-specific component branches.
+
+Settings apply contract:
+
+- `tools/dashboard-settings plan` continues to be read-only and must validate requested values through the same locale policy used by the producer.
+- `tools/dashboard-settings apply ... --confirm` remains the only writer and returns JSON that includes the applied setting id, canonical value, `workflow_language`, `display_locale`, `ui_locale`, and direction when the setting affects Dashboard locale.
+- React updates its active locale only after a successful same-origin JSON apply response. It then refetches `dashboard-data.json` immediately to reconcile with the regenerated snapshot.
+- If the immediate response and refetched snapshot disagree, the snapshot wins and a safe visible error state must be available; do not keep an unverified optimistic locale.
+- Settings includes a concise localized notice that applying settings can take a moment and that the Dashboard refreshes automatically after successful application.
+
+Verification and CI contract:
+
+- `tools/test_dashboard_i18n.sh` verifies the standard locale policy, alias normalization, dictionary completeness, direction metadata, and absence of unsupported hardcoded UI labels.
+- The localization check is wired so it can run standalone and through aggregate dashboard, repository, hook, and final-gate commands.
+- Regular CI uses static all-language dictionary checks plus representative Playwright coverage for at least Japanese, English, one CJK locale, one longer Latin locale, and Arabic RTL.
+- Full all-language browser smoke is reserved for release readiness, explicit final-gate runs, or a developer-approved broader verification scope.
+- Browser assertions must verify behavior through stable roles, locale keys, direction metadata, and selected representative text, not through one exact phrase per language as the only guarantee.
+
+## Implemented Dashboard Control Center Settings Apply Feedback Specification
+
+SYNC-ID: dashboard_control_center_settings_apply_feedback
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,dashboard-control-center/src/App.jsx,dashboard-control-center/src/i18n.js,dashboard-control-center/src/styles.css,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_i18n.sh,tools/test_dashboard_settings.sh,tools/test_dashboard_control_center.sh
+TESTS: tools/test_dashboard_i18n.sh,tools/test_dashboard_settings.sh,tools/test_dashboard_control_center.sh,tools/check_ci_workflow_structure.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_test_plan_coverage.sh,tools/check_workflow_pair_sync.sh
+
+Settings apply feedback is a browser-side reconciliation layer over the implemented Settings writer.
+It does not create a new mutation owner, data producer, schema authority, or settings source of truth.
+
+State contract:
+
+- The Settings UI tracks apply feedback independently from the selected Settings row and the confirmation dialog's local mutation state so progress can survive dialog closure.
+- Each feedback request records at least a request id, setting id, menu id, requested value, base snapshot signature when available, apply result metadata, elapsed state, and the latest reconciliation outcome.
+- Implemented states are `idle`, `reconciling`, `reconciled`, `stale_snapshot`, `timeout`, and `failed`, with writer apply progress still handled by the existing confirmation dialog's `applying` state.
+- `saved` means the allowlisted writer returned successful apply JSON. `reconciled` means a refetched valid snapshot confirms the requested setting. These states must not be collapsed into one generic success label.
+- Older feedback requests must not overwrite newer requests after a later apply begins.
+- The normal progress surface appears only after the named short delay threshold; quick reconciliation may complete without showing the surface or with only a brief completion state.
+
+Reconciliation contract:
+
+- The only mutation path remains same-origin JSON POST to `/dashboard-settings/plan` and `/dashboard-settings/apply`, which calls `tools/dashboard-settings`.
+- The only reconciliation read path is the existing dashboard snapshot fetch for `dashboard-data.json`.
+- For every editable setting, the refetched snapshot must contain a Settings row with matching `id` and canonical `current_value` before the UI treats reflection as confirmed.
+- The reconciliation target is the requested canonical value from the UI/request or apply response `requested_value`; an apply response `current_value` may describe the pre-apply value and must not override the requested target.
+- For `workflow_language`, the refetched snapshot must also match the requested canonical language through `summary.workflow_language`, `summary.display_locale`, `summary.ui_locale`, and `summary.ui_direction`.
+- A stale but valid snapshot is not a successful reconciliation. It may remain in a waiting or stale state until a later fetch matches or the timeout policy is reached.
+- A malformed snapshot, validation failure, network failure, or mismatch keeps the snapshot authoritative and exposes a visible safe warning. It must not keep an unverified optimistic locale as final state.
+
+UI and accessibility contract:
+
+- Normal feedback uses a non-modal status window or equivalent small progress surface with `role="status"` and polite live-region semantics.
+- Timeout, mismatch, and refresh failure states may use alert semantics and provide a safe dismiss or retry-refresh action without creating a new write path.
+- The existing Settings confirmation dialog remains the review and explicit-apply surface. The feedback surface must not create nested focus traps with that dialog.
+- The row-level changeability chip is removed. The Settings row keeps the existing status pill and moves changeability into the right-end action label plus the row's accessible name.
+- Editable rows use the localized equivalent of `ここで変更可能`; review-only rows use the localized equivalent of `確認`.
+- The right-end action label must wrap or resize within the existing Settings row layout across desktop, narrow desktop, mobile, and RTL layouts.
+- The Settings confirmation eyebrow label is styled separately from status labels so only the eyebrow is subtly larger.
+
+Verification contract:
+
+- Dictionary additions are covered by `tools/test_dashboard_i18n.sh`.
+- Settings apply feedback, delayed reconciliation, stale snapshot handling, timeout or mismatch state, no-reload behavior, chip removal, right-end labels, eyebrow sizing, and no-overflow behavior are covered through `tools/test_dashboard_control_center.sh` and Playwright.
+- `tools/test_dashboard_settings.sh` remains the standalone Settings writer guard. This sync ID should not require a new standalone checker unless the implementation creates a reusable check that must also run outside the aggregate dashboard test.
+
+## Implemented Dashboard Control Center Settings Consistency Gate Specification
+
+SYNC-ID: dashboard_control_center_settings_consistency_gate
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/DASHBOARD_DATA_SCHEMA.tsv,docs/workflow/TEST_PLAN_MANIFEST.tsv,tools/lib/git_workflow_policy.sh,tools/git-workflow,tools/dashboard-settings,tools/lib/dashboard_data.sh,tools/dashboard-data,dashboard-control-center/src/App.jsx,dashboard-control-center/src/dashboardData.js,dashboard-control-center/src/i18n.js,dashboard-control-center/src/styles.css,tests/fixtures/dashboard-control-center.json,tests/fixtures/dashboard-control-center-live-update.json,tests/playwright/dashboard-control-center.spec.js,tools/test_git_workflow_policy.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_settings.sh,tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/test_dashboard_control_center.sh
+TESTS: tools/test_git_workflow_policy.sh,tools/test_dashboard_settings.sh,tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_test_plan_coverage.sh,tools/check_workflow_pair_sync.sh
+
+Consistency validation contract:
+
+- `tools/lib/git_workflow_policy.sh` owns reusable full-state validation for Git workflow settings. Callers pass the current settings plus a candidate overlay and receive structured severity, code, message key, affected setting ids, and next-action metadata.
+- `tools/git-workflow set`, `tools/dashboard-settings plan`, and `tools/dashboard-settings apply --confirm` must use the same full-state validator before accepting a write.
+- The validator must distinguish `error`, `blocked`, `approval_required`, `manual_required`, `warning`, and `info`; only severities that leave the full candidate state unsafe or impossible may prevent a write.
+- The validator must be able to evaluate persisted settings, candidate settings, and isolated test fixtures without browser, GitHub, network, CI, or external product repository access.
+- Candidate writes that resolve an existing inconsistent state must be accepted when the resulting full state is valid or when the candidate strictly reduces the number of blocking consistency rows without introducing a new blocker. A previously invalid persisted file must not trap the user away from the Settings recovery path.
+
+Git workflow consistency rules:
+
+- `branch_allowed=false` and `main_direct_work_allowed=false` is a hard error because the ordinary workflow has no approved write path. `worktree_allowed=true` does not make this valid by itself.
+- `worktree_allowed=true` with `branch_allowed=false` must not be displayed as ordinary ready state. It is blocked unless a later approved policy defines detached or external worktree semantics.
+- Branch-creation, PR-creation, PR-CI, and merge automation require `branch_allowed=true` in this sync ID. Applying `pr_creation=auto`, `pr_ci_monitoring=auto`, or `merge_execution=after_approval` while `branch_allowed=false` is a write-time error; disabling `branch_allowed` while any of those settings remain enabled is also a write-time error.
+- Existing persisted states that already violate the branch-dependent automation rule must be displayed as `blocked`, but recovery writes that either re-enable branch work or set the branch-dependent automation back to manual must remain available.
+- Direct-main work and branch work may both be configured only when the Dashboard exposes the effective active path and does not imply that both strategies will be used automatically in the same run.
+- `automation_level` remains backward-compatible with the implemented Git workflow action settings: detailed action settings may provide explicit behavior. Treating `automation_level` as a strict maximum is approval-required.
+- `merge_execution=manual` with `developer_auto_merge_allowed=true` does not change runtime merge precedence in this sync. Runtime implementation must not show the combination as ready automation; it must surface a qualified non-ready state while preserving existing runtime precedence unless the developer separately approves a policy change.
+- Auto push, PR creation, CI monitoring, or merge-related settings must be displayed as awaiting approval or gate completion when the required user approval, Git gate, security gate, or CI authority is absent.
+
+Dashboard data and Settings contract:
+
+- `tools/dashboard-data` emits producer-owned consistency status for Settings rows and workflow summary surfaces. React must not infer policy from raw TSV values.
+- Schema fields for consistency status must be generic and reusable, for example `state`, `severity`, `reason_code`, `reason_label`, `next_action`, `effective_mode`, and affected setting ids.
+- The implementation must either add `not_applicable` to the shared schema, producer, and browser status vocabulary, or add a separate generic applicability field. It must not emit `not_applicable` from `tools/dashboard-data` until the browser validator and schema accept the chosen vocabulary.
+- Settings rows must keep current value, allowed values, source, related page, and review metadata, while adding consistency reason data without changing source-file authority.
+- Rows that are menu-context dependent must use `not_applicable` when the selected menu does not require the row, such as product repository settings during STEP 1-7 or lesson-repository improvement.
+- External integration rows must not show generic product readiness when the selected context requires integration-specific evidence.
+- Learner approval rows must distinguish approval required, approval missing, unknown source, stale source, and ready states.
+- The existing locale policy remains authoritative for workflow display language and Dashboard UI language; product development language remains a separate setting for generated product artifacts.
+
+UI and accessibility contract:
+
+- The Settings page displays consistency status in aligned row columns using producer-owned labels and stable status vocabularies.
+- Review popups show why a candidate is rejected or blocked before apply and identify the setting or group that must change next.
+- Blocked or rejected `plan` and `apply` responses should return structured successful JSON with `applied:false`, `status`, `severity`, `reason_code`, affected setting ids, and no file write. Non-zero tool failures remain reserved for malformed requests, unexpected tool failures, or boundary violations so ordinary policy feedback is not collapsed into an unstructured Vite middleware error.
+- The UI must remain no-reload for successful safe changes, must keep the existing apply-feedback reconciliation behavior, and must not introduce a second mutation path.
+- Long translated reason labels and action labels must wrap or constrain within the existing responsive Settings row layout, including RTL locales.
+
+Verification contract:
+
+- `tools/test_git_workflow_policy.sh` covers the reusable full-state Git workflow validator, including no-write-path, branch-dependent automation, recovery from invalid persisted settings, and compatibility-preserving warnings.
+- `tools/test_dashboard_settings.sh` covers plan/apply rejection, recovery writes, same-origin writer boundaries through existing fixtures, and JSON response reason metadata.
+- `tools/test_dashboard_schema.sh` and `tools/test_dashboard_data.sh` cover new generic consistency fields, context-dependent `not_applicable` rows, learner-approval source separation, and locale/product-language separation.
+- `tools/test_dashboard_control_center.sh` and Playwright cover aligned Settings rows, blocked candidate feedback, no-reload successful apply behavior, representative standard locales, and no-overflow layout.
+- This sync does not require a new standalone command unless implementation creates one; if one is added, it must be callable directly and from the aggregate dashboard or repository tests.
+
+## Implemented Product Workflow Git Usage Modes Specification
+
+SYNC-ID: product_workflow_git_usage_modes
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/DASHBOARD_DATA_SCHEMA.tsv,docs/workflow/PRODUCT_GATE_EVIDENCE_SCHEMA.tsv,docs/workflow/MENU_PRODUCT_PROFILE_POLICY.tsv,docs/workflow/PRODUCT_WORKFLOW_GIT_USAGE_POLICY.tsv,docs/workflow/TEST_PLAN_MANIFEST.tsv,docs/workflow/GIT_HOOK_CHECKS.tsv,docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv,docs/workflow/FINAL_GATE_COVERAGE.tsv,learning/PRODUCT_WORKFLOW_GIT_USAGE_SETTINGS.tsv,learning/context/WORKFLOW_CONTEXT_MAP.tsv,.github/workflows/ci.yml,.github/workflows/lesson14-ci.yml,tools/lib/product_workflow_git_usage.sh,tools/free-development,tools/product-improvement,tools/external-integration,tools/check_repository_boundary.sh,tools/product-scaffold-check,tools/lib/product_security.sh,tools/product-security,tools/lib/product_repository_authority.sh,tools/product-repository-authority,tools/dashboard-data,tools/dashboard-settings,tools/lib/dashboard_data.sh,dashboard-control-center/src/App.jsx,dashboard-control-center/src/dashboardData.js,dashboard-control-center/src/i18n.js,dashboard-control-center/src/styles.css,vite.config.mjs,tests/fixtures/dashboard-control-center.json,tests/fixtures/dashboard-control-center-live-update.json,tools/test_product_git_usage_modes.sh,tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/test_dashboard_settings.sh,tools/test_dashboard_control_center.sh,tools/check_ci_workflow_structure.sh
+TESTS: tools/test_product_git_usage_modes.sh,tools/test_product_gate_tools.sh,tools/test_product_scaffold_check.sh,tools/test_product_security.sh,tools/test_product_repository_authority.sh,tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/test_dashboard_settings.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/check_ci_workflow_structure.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_test_plan_coverage.sh,tools/check_workflow_pair_sync.sh,tools/check_lesson_structure.sh
+
+Product workflow Git usage modes are a product-workflow applicability contract, not a Git action-permission contract.
+The implementation introduces an owner-layer policy, setting source, and shared helper that resolve the selected workflow context to Git, remote-sync, and CI applicability before gates, dashboard data, or Settings UI consume it.
+
+Mode contract:
+
+- `none`: product workspace is required; Git worktree, remote sync, and CI are not applicable. Product documents, scaffold authority, product-security, secret scanning, external-integration approval, and required local checks remain applicable.
+- `local`: product workspace and local Git worktree are required; remote sync and CI are not applicable.
+- `remote_sync`: product workspace, local Git worktree, and remote/upstream sync are required; CI is not applicable unless another approved policy requires it.
+- `ci`: product workspace, local Git worktree, remote/upstream sync, and CI are required. This is the default and preserves current behavior.
+
+Owner-layer data contract:
+
+- The mode policy is stored separately from `docs/workflow/GIT_WORKFLOW_POLICY.tsv` and `learning/GIT_WORKFLOW_SETTINGS.tsv` in `docs/workflow/PRODUCT_WORKFLOW_GIT_USAGE_POLICY.tsv`.
+- The selected product workflow mode setting is stored in `learning/PRODUCT_WORKFLOW_GIT_USAGE_SETTINGS.tsv`; missing settings resolve to `ci`.
+- `tools/lib/product_workflow_git_usage.sh` exposes reusable requirement fields for product workspace, Git worktree, remote sync, CI, Git status applicability, and CI status applicability.
+- The selected mode setting is validated through the shared shell helper before `tools/dashboard-settings` accepts a plan or apply request.
+- Dashboard data emits selected-context `git_usage_mode`, `git_requirement`, `ci_requirement`, and per-row applicability before React renders mode-specific labels.
+- `DASHBOARD_DATA_SCHEMA.tsv`, `dashboardData.js`, `vite.config.mjs`, and fixtures accept the selected mode and `not_applicable` status vocabulary before producer output depends on it.
+- Command previews and manual follow-ups reflect the mode. They do not show `check_git_sync.sh --product --required` or `check_ci_status.sh --product --required` as required when the mode marks those checks not applicable.
+
+Gate contract:
+
+- `tools/free-development`, `tools/product-improvement`, and `tools/external-integration` call the shared product workflow mode helper instead of hard-coding Git sync and CI requirements in each script.
+- `check_repository_boundary.sh` now distinguishes product workspace existence from Git worktree existence with `--product-workspace-required` while preserving existing strict `--product-required` behavior.
+- `tools/product-scaffold-check`, `tools/product-security`, and `tools/product-repository-authority` support `--git-optional` paths for non-Git modes while keeping strict Git behavior as the default.
+- Product-security continues to reject unsafe repository boundaries, secrets, missing external-integration approvals, and unsafe output metadata in every mode.
+- Product authority and product-gate evidence do not claim authoritative Git or CI evidence when the mode marks those checks not applicable; they use `not_applicable` status rather than writing a new `.git`-less evidence store.
+- Any future `.git`-less evidence index, freshness model, or `product_head` replacement remains approval-required.
+
+Settings and UI contract:
+
+- Settings exposes the product workflow Git usage mode only for supported product-scoped workflow contexts through the existing guarded `tools/dashboard-settings` writer.
+- Existing Git workflow action rows remain policy-backed settings for Git use. When the selected product workflow mode is `none`, those rows render as not applicable or display-only rather than blocked.
+- Development Workflow and Overview surfaces render Git/CI applicability from producer-owned rows and never infer it from fixed menu labels.
+- UI labels must make clear that `none` still keeps documents, security, approval, and local checks.
+
+Verification contract:
+
+- `tools/test_product_git_usage_modes.sh` covers the mode matrix, Settings writer path, non-Git workspace behavior, and strict default preservation, and is wired into `tools/test_lesson_repository.sh`.
+- Required coverage includes `free-development`, `product-improvement`, and `external-integration` across `none`, `local`, `remote_sync`, and `ci`, with `ci` proving current strict behavior is preserved.
+- Dashboard tests cover Settings rows, workflow operation rows, command previews, schema validation, and representative localized labels without relying on one exact phrase or one product stack.
