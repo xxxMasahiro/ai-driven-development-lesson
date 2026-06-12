@@ -15,7 +15,7 @@ Usage:
   ./tools/dashboard-control-center check
   ./tools/dashboard-control-center open
 
-Maintained entry point for the read-only browser dashboard control center.
+Maintained entry point for the browser dashboard control center with a guarded Settings update path.
 USAGE
 }
 
@@ -35,7 +35,7 @@ write_snapshot() {
   tmp="$(mktemp "$output_dir/.dashboard-data.XXXXXX.tmp")"
   if "$ROOT/tools/dashboard-data" >"$tmp" && (cd "$ROOT" && node --input-type=module - "$tmp" <<'NODE'
 import fs from "node:fs";
-import { validateDashboardData } from "./vite.config.mjs";
+import { dashboardDataValidationError, validateDashboardData } from "./vite.config.mjs";
 
 const file = process.argv[2];
 const body = fs.readFileSync(file, "utf8");
@@ -46,7 +46,7 @@ try {
   process.exit(1);
 }
 if (!validateDashboardData(body)) {
-  console.error("dashboard-data snapshot failed schema validation");
+  console.error(`dashboard-data snapshot failed schema validation: ${dashboardDataValidationError() || "unknown"}`);
   process.exit(1);
 }
 NODE

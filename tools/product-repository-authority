@@ -14,11 +14,13 @@ REPO=""
 CONTEXT="product-improvement"
 PRODUCT_TYPE="all"
 JSON="false"
+GIT_REQUIRED="true"
+CI_REQUIRED="true"
 
 usage() {
   cat <<'USAGE'
 Usage:
-  tools/product-repository-authority status [--repo <path>] [--context <context>] [--product-type <type>] [--json]
+  tools/product-repository-authority status [--repo <path>] [--context <context>] [--product-type <type>] [--json] [--git-optional] [--ci-optional]
 
 This command is read-only. It reads existing product manifests and evidence only.
 It does not create evidence, fetch remotes, call GitHub, run CI, run product checks, or mutate repositories.
@@ -43,6 +45,14 @@ while [[ "$#" -gt 0 ]]; do
       JSON="true"
       shift
       ;;
+    --git-optional)
+      GIT_REQUIRED="false"
+      shift
+      ;;
+    --ci-optional)
+      CI_REQUIRED="false"
+      shift
+      ;;
     -h|--help|help)
       usage
       exit 0
@@ -62,10 +72,10 @@ fi
 case "$COMMAND" in
   status|現在地)
     if [[ "$JSON" == "true" ]]; then
-      product_repository_authority_json "$REPO" "$CONTEXT" "$PRODUCT_TYPE"
+      product_repository_authority_json "$REPO" "$CONTEXT" "$PRODUCT_TYPE" "$GIT_REQUIRED" "$CI_REQUIRED"
       printf '\n'
     else
-      product_repository_authority_status_text "$REPO" "$CONTEXT" "$PRODUCT_TYPE"
+      product_repository_authority_status_text "$REPO" "$CONTEXT" "$PRODUCT_TYPE" "$GIT_REQUIRED" "$CI_REQUIRED"
     fi
     ;;
   ""|-h|--help|help)

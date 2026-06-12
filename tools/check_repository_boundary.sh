@@ -6,10 +6,15 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/lib/lesson_common.sh"
 
 product_required=0
+product_workspace_required=0
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --product-required)
       product_required=1
+      shift
+      ;;
+    --product-workspace-required)
+      product_workspace_required=1
       shift
       ;;
     *)
@@ -70,9 +75,19 @@ if [[ "$product_required" -eq 1 ]]; then
     printf '\nERROR: expected product repository does not exist:\n%s\n' "$PRODUCT_REPO" >&2
     exit 1
   fi
+elif [[ "$product_workspace_required" -eq 1 ]]; then
+  if [[ ! -d "$PRODUCT_REPO" ]]; then
+    printf '\nERROR: expected product workspace does not exist:\n%s\n' "$PRODUCT_REPO" >&2
+    exit 1
+  fi
+fi
+
+if [[ "$product_required" -eq 1 ]]; then
   if ! git -C "$PRODUCT_REPO" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
     printf '\nERROR: expected product repository is not a Git worktree:\n%s\n' "$PRODUCT_REPO" >&2
     exit 1
   fi
   printf '\nProduct repository exists and is a Git worktree.\n'
+elif [[ "$product_workspace_required" -eq 1 ]]; then
+  printf '\nProduct workspace exists. Git worktree is not required for the selected product workflow Git usage mode.\n'
 fi

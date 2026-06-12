@@ -1,3 +1,5 @@
+import { DASHBOARD_LOCALE_CODES } from "./i18n.js";
+
 export const ALLOWED_STATES = new Set([
   "missing",
   "ready",
@@ -11,12 +13,15 @@ export const ALLOWED_STATES = new Set([
   "not_run",
   "stale",
   "manual_required",
+  "not_applicable",
 ]);
 
 export const RISK_LEVELS = new Set(["low", "medium", "high", "critical"]);
 export const MANUAL_FOLLOWUP_STATES = new Set(["optional", "cached", "unknown"]);
 export const PARTIAL_FAILURE_STATES = new Set(["failed", "blocked", "unknown"]);
 export const PRODUCT_OPERATION_BLOCKER_STATES = new Set(["missing", "failed", "blocked", "unknown", "stale", "not_run"]);
+export const DASHBOARD_UI_LOCALES = new Set(DASHBOARD_LOCALE_CODES);
+export const DASHBOARD_UI_DIRECTIONS = new Set(["ltr", "rtl"]);
 
 const SECRET_PATTERN =
   /(SECRET|TOKEN|API_KEY|PASSWORD|PRIVATE_KEY)\s*[:=]\s*[^\s#]{8,}|gh[pousr]_[A-Za-z0-9_]{20,}|sk-[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16}|BEGIN (RSA |OPENSSH |EC |DSA )?PRIVATE KEY/i;
@@ -45,8 +50,13 @@ const WORKFLOW_CONTEXTS = new Set([
 
 const REPOSITORY_PATH_STATES = new Set(["configured", "missing", "not_applicable", "unknown"]);
 const PRODUCT_TYPES = new Set(["all", "web", "api", "cli", "library", "integration", "custom", "unknown"]);
+const PRODUCT_GIT_USAGE_MODES = new Set(["none", "local", "remote_sync", "ci", "not_applicable"]);
+const PRODUCT_GIT_REQUIREMENTS = new Set(["required", "not_applicable", "unknown"]);
 const DOCUMENT_AUDIENCES = new Set(["non_engineer", "engineer", "all"]);
 const DOCUMENT_RELATED_PAGES = new Set(["#documents", "#maintenance", "#workflow", "#safety", "#repository-info", "#history"]);
+const SETTING_SCOPES = new Set(["selected_context", "learning", "workflow", "security", "repository", "dashboard"]);
+const SETTINGS_RELATED_PAGES = new Set(["#overview", "#lessons", "#workflow", "#maintenance", "#safety", "#repository-info", "#documents", "#settings", "#history", "#help"]);
+const LANGUAGE_CODE_PATTERN = /^[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8})?$|^custom$/;
 
 function safeRelativePath(value) {
   if (typeof value !== "string") {
@@ -248,6 +258,34 @@ function validateCategoryMetrics(summary) {
   }
 }
 
+function validateSummaryLocale(summary) {
+  const workflowLanguage = displayText(summary.workflow_language, "");
+  const displayLocale = displayText(summary.display_locale, "");
+  const uiLocale = displayText(summary.ui_locale, "");
+  const uiDirection = displayText(summary.ui_direction, "");
+  if (!workflowLanguage && !displayLocale && !uiLocale && !uiDirection) {
+    return;
+  }
+  if (!workflowLanguage || !displayLocale || !uiLocale || !uiDirection) {
+    throw new Error("dashboard summary locale fields must be emitted together");
+  }
+  if (!LANGUAGE_CODE_PATTERN.test(workflowLanguage) || !LANGUAGE_CODE_PATTERN.test(displayLocale)) {
+    throw new Error("dashboard summary locale code is invalid");
+  }
+  if (displayLocale !== workflowLanguage) {
+    throw new Error("dashboard display_locale must match workflow_language");
+  }
+  if (!DASHBOARD_UI_LOCALES.has(uiLocale)) {
+    throw new Error("dashboard ui_locale is unsupported");
+  }
+  if (!DASHBOARD_UI_DIRECTIONS.has(uiDirection)) {
+    throw new Error("dashboard ui_direction is unsupported");
+  }
+  if ((uiLocale === "ar") !== (uiDirection === "rtl")) {
+    throw new Error("dashboard ui_direction does not match ui_locale");
+  }
+}
+
 function validateIssues(data) {
   for (const failure of asArray(data.partial_failures)) {
     if (!failure || typeof failure !== "object" || Array.isArray(failure)) {
@@ -363,6 +401,9 @@ function validateContextObject(contextValue, label) {
       "workflow_context",
       "target_repository",
       "product_type",
+      "git_usage_mode",
+      "git_requirement",
+      "ci_requirement",
       "current_step_id",
       "current_step_label",
       "current_step_index",
@@ -393,6 +434,14 @@ function validateContextObject(contextValue, label) {
   }
   if (!PRODUCT_TYPES.has(displayText(context.product_type, ""))) {
     throw new Error(`${label} product_type is invalid`);
+  }
+  if (!PRODUCT_GIT_USAGE_MODES.has(displayText(context.git_usage_mode, ""))) {
+    throw new Error(`${label} git_usage_mode is invalid`);
+  }
+  for (const key of ["git_requirement", "ci_requirement"]) {
+    if (!PRODUCT_GIT_REQUIREMENTS.has(displayText(context[key], ""))) {
+      throw new Error(`${label} ${key} is invalid`);
+    }
   }
   for (const key of ["current_step_id", "current_step_label", "updated_at"]) {
     if (!displayText(context[key], "")) {
@@ -654,6 +703,259 @@ function validateDocuments(data) {
   }
 }
 
+function validateSettings(data) {
+  if (data.settings === undefined || data.settings === null) {
+    return;
+  }
+  const settings = asObject(data.settings, "dashboard settings");
+  assertAllowedKeys(settings, new Set(["status", "groups", "items"]), "dashboard settings");
+  if (settings.status !== undefined && !ALLOWED_STATES.has(displayText(settings.status, ""))) {
+    throw new Error("dashboard settings status is invalid");
+  }
+
+  const groupIds = new Set();
+  for (const group of asArray(settings.groups)) {
+    if (!group || typeof group !== "object" || Array.isArray(group)) {
+      throw new Error("dashboard settings group must be an object");
+    }
+    assertAllowedKeys(group, new Set(["id", "label_key", "description_key", "status", "order"]), "dashboard settings group");
+    for (const key of ["id", "label_key", "description_key"]) {
+      if (!displayText(group[key], "")) {
+        throw new Error(`dashboard settings group ${key} is missing`);
+      }
+    }
+    if (!ALLOWED_STATES.has(displayText(group.status, ""))) {
+      throw new Error("dashboard settings group status is invalid");
+    }
+    if (!Number.isInteger(group.order) || group.order <= 0) {
+      throw new Error("dashboard settings group order is invalid");
+    }
+    const groupId = displayText(group.id, "");
+    if (groupIds.has(groupId)) {
+      throw new Error("dashboard settings group id is duplicated");
+    }
+    groupIds.add(groupId);
+  }
+
+  const itemIds = new Set();
+  let workflowLanguageValue = "";
+  for (const item of asArray(settings.items)) {
+    if (!item || typeof item !== "object" || Array.isArray(item)) {
+      throw new Error("dashboard settings item must be an object");
+    }
+    assertAllowedKeys(
+      item,
+      new Set([
+        "id",
+        "group_id",
+        "scope",
+        "label_key",
+        "description_key",
+        "current_value",
+        "current_label",
+        "status",
+        "source_file",
+        "allowed_values",
+        "editable",
+        "reviewable",
+        "risk_level",
+      "requires_confirmation",
+      "consistency",
+      "disabled_reason_key",
+      "related_page",
+      "update_action_id",
+      "review",
+      ]),
+      "dashboard settings item",
+    );
+    for (const key of ["id", "group_id", "scope", "label_key", "description_key", "current_value", "current_label", "source_file", "disabled_reason_key", "related_page", "update_action_id"]) {
+      if (!displayText(item[key], "")) {
+        throw new Error(`dashboard settings item ${key} is missing`);
+      }
+    }
+    const itemId = displayText(item.id, "");
+    if (itemIds.has(itemId)) {
+      throw new Error("dashboard settings item id is duplicated");
+    }
+    itemIds.add(itemId);
+    if (itemId === "workflow_language") {
+      workflowLanguageValue = displayText(item.current_value, "");
+    }
+    if (groupIds.size && !groupIds.has(displayText(item.group_id, ""))) {
+      throw new Error("dashboard settings item references an unknown group");
+    }
+    if (!SETTING_SCOPES.has(displayText(item.scope, ""))) {
+      throw new Error("dashboard settings item scope is invalid");
+    }
+    if (!ALLOWED_STATES.has(displayText(item.status, ""))) {
+      throw new Error("dashboard settings item status is invalid");
+    }
+    if (!safeScopedRelativePath(item.source_file)) {
+      throw new Error("dashboard settings item source_file must be a safe relative path");
+    }
+    for (const allowedValue of asArray(item.allowed_values)) {
+      if (!displayText(allowedValue, "")) {
+        throw new Error("dashboard settings item allowed value is invalid");
+      }
+    }
+    if (typeof item.editable !== "boolean" || typeof item.reviewable !== "boolean") {
+      throw new Error("dashboard settings item editability flags are invalid");
+    }
+    const itemScope = displayText(item.scope, "");
+    if (item.editable === true) {
+      if (!item.reviewable || !["learning", "workflow"].includes(itemScope)) {
+        throw new Error("dashboard settings item editable scope is invalid");
+      }
+      if (displayText(item.source_file, "").startsWith("product:")) {
+        throw new Error("dashboard settings item editable source_file must stay repo-local");
+      }
+      if (!asArray(item.allowed_values).length || item.requires_confirmation !== true) {
+        throw new Error("dashboard settings item editable contract is incomplete");
+      }
+    }
+    if (!RISK_LEVELS.has(displayText(item.risk_level, ""))) {
+      throw new Error("dashboard settings item risk level is invalid");
+    }
+    if (typeof item.requires_confirmation !== "boolean") {
+      throw new Error("dashboard settings item confirmation flag is invalid");
+    }
+    const consistency = asObject(item.consistency, "dashboard settings item consistency");
+    assertAllowedKeys(
+      consistency,
+      new Set(["status", "severity", "reason_code", "reason_key", "next_action_key", "effective_mode", "affected_setting_ids"]),
+      "dashboard settings item consistency",
+    );
+    for (const key of ["status", "severity", "reason_code", "reason_key", "next_action_key", "affected_setting_ids"]) {
+      if (consistency[key] === undefined) {
+        throw new Error(`dashboard settings item consistency ${key} is missing`);
+      }
+    }
+    if (!ALLOWED_STATES.has(displayText(consistency.status, ""))) {
+      throw new Error("dashboard settings item consistency status is invalid");
+    }
+    if (!["info", "warning", "error"].includes(displayText(consistency.severity, ""))) {
+      throw new Error("dashboard settings item consistency severity is invalid");
+    }
+    if (!displayText(consistency.reason_code, "") || !displayText(consistency.reason_key, "") || !displayText(consistency.next_action_key, "")) {
+      throw new Error("dashboard settings item consistency reason fields are invalid");
+    }
+    for (const affectedId of asArray(consistency.affected_setting_ids)) {
+      if (!displayText(affectedId, "")) {
+        throw new Error("dashboard settings item consistency affected id is invalid");
+      }
+    }
+    if (!SETTINGS_RELATED_PAGES.has(displayText(item.related_page, ""))) {
+      throw new Error("dashboard settings item related_page is invalid");
+    }
+    const review = asObject(item.review, "dashboard settings item review");
+    assertAllowedKeys(review, new Set(["impact_key", "target_file", "validation_status", "update_preview_key"]), "dashboard settings item review");
+    for (const key of ["impact_key", "target_file", "validation_status", "update_preview_key"]) {
+      if (!displayText(review[key], "")) {
+        throw new Error(`dashboard settings item review ${key} is missing`);
+      }
+    }
+    if (!safeScopedRelativePath(review.target_file)) {
+      throw new Error("dashboard settings item review target_file must be a safe relative path");
+    }
+    if (!ALLOWED_STATES.has(displayText(review.validation_status, ""))) {
+      throw new Error("dashboard settings item review validation_status is invalid");
+    }
+  }
+  const summaryWorkflowLanguage = displayText(data.summary?.workflow_language, "");
+  if (workflowLanguageValue && summaryWorkflowLanguage && workflowLanguageValue !== summaryWorkflowLanguage) {
+    throw new Error("dashboard summary workflow_language must match the Settings workflow_language row");
+  }
+}
+
+function validateSettingsMutationResponse(value, label) {
+  const result = asObject(value, label);
+  assertAllowedKeys(
+    result,
+    new Set([
+      "status",
+      "severity",
+      "reason_code",
+      "reason_key",
+      "next_action_key",
+      "affected_setting_ids",
+      "setting_id",
+      "menu_id",
+      "setting_kind",
+      "requested_value",
+      "requested_label",
+      "current_value",
+      "current_label",
+      "target_file",
+      "requires_confirmation",
+      "applied",
+      "snapshot_regenerated",
+      "snapshot_file",
+      "tool_command",
+      "workflow_language",
+      "display_locale",
+      "ui_locale",
+      "direction",
+    ]),
+    label,
+  );
+  if (!["ready", "passed", "blocked", "manual_required", "approval_required"].includes(displayText(result.status, ""))) {
+    throw new Error(`${label} status is invalid`);
+  }
+  if (!["info", "warning", "error"].includes(displayText(result.severity, ""))) {
+    throw new Error(`${label} severity is invalid`);
+  }
+  for (const key of ["reason_code", "reason_key", "next_action_key"]) {
+    if (!displayText(result[key], "")) {
+      throw new Error(`${label} ${key} is missing`);
+    }
+  }
+  for (const affectedId of asArray(result.affected_setting_ids)) {
+    if (!displayText(affectedId, "")) {
+      throw new Error(`${label} affected_setting_ids is invalid`);
+    }
+  }
+  for (const key of ["setting_id", "menu_id", "setting_kind", "requested_value", "requested_label", "current_value", "current_label", "target_file", "tool_command"]) {
+    if (!displayText(result[key], "")) {
+      throw new Error(`${label} ${key} is missing`);
+    }
+  }
+  if (!["lesson", "git", "product_workflow_git_usage"].includes(displayText(result.setting_kind, ""))) {
+    throw new Error(`${label} setting_kind is invalid`);
+  }
+  if (!safeScopedRelativePath(result.target_file)) {
+    throw new Error(`${label} target_file is invalid`);
+  }
+  if (result.snapshot_file !== undefined && !safeScopedRelativePath(result.snapshot_file)) {
+    throw new Error(`${label} snapshot_file is invalid`);
+  }
+  if (typeof result.requires_confirmation !== "boolean" || typeof result.applied !== "boolean" || typeof result.snapshot_regenerated !== "boolean") {
+    throw new Error(`${label} boolean fields are invalid`);
+  }
+  if (displayText(result.status, "") === "blocked" && (result.applied !== false || result.snapshot_regenerated !== false)) {
+    throw new Error(`${label} blocked responses must not apply or regenerate snapshots`);
+  }
+  if (!safeDisplayCommand(result.tool_command)) {
+    throw new Error(`${label} tool command is invalid`);
+  }
+  if (result.setting_id === "workflow_language") {
+    for (const key of ["workflow_language", "display_locale", "ui_locale", "direction"]) {
+      if (!displayText(result[key], "")) {
+        throw new Error(`${label} ${key} is missing`);
+      }
+    }
+    if (result.workflow_language !== result.requested_value || result.display_locale !== result.workflow_language) {
+      throw new Error(`${label} locale metadata is inconsistent`);
+    }
+    if (!DASHBOARD_UI_LOCALES.has(result.ui_locale) || !DASHBOARD_UI_DIRECTIONS.has(result.direction)) {
+      throw new Error(`${label} locale metadata is unsupported`);
+    }
+    if ((result.ui_locale === "ar") !== (result.direction === "rtl")) {
+      throw new Error(`${label} locale direction is inconsistent`);
+    }
+  }
+  return result;
+}
+
 function validateMaintenanceEvidence(maintenance) {
   for (const row of asArray(maintenance.evidence_rows)) {
     if (!row || typeof row !== "object" || Array.isArray(row)) {
@@ -728,6 +1030,7 @@ export function validateDashboardData(data) {
   if (!["learning", "development", "maintenance", "unknown"].includes(displayText(data.summary.mode, "unknown"))) {
     throw new Error("dashboard mode is invalid");
   }
+  validateSummaryLocale(data.summary);
   validatePrimaryAction(data.summary);
   validateCategoryMetrics(data.summary);
   validateIssues(data);
@@ -736,6 +1039,7 @@ export function validateDashboardData(data) {
   validateOperationRows(data.development);
   validateProductAuthority(data.development);
   validateDocuments(data);
+  validateSettings(data);
   validateMaintenanceEvidence(data.maintenance);
   validateSecurityRows(data.security);
   validateCommandPreviews(data.actions);
@@ -758,6 +1062,54 @@ export async function fetchDashboardDataSnapshot() {
     data,
     signature: `${data.snapshot_id}:${data.content_hash}`,
   };
+}
+
+async function postDashboardSettingMutation(endpoint, payload, label) {
+  const response = await fetch(endpoint, {
+    method: "POST",
+    cache: "no-store",
+    credentials: "same-origin",
+    headers: {
+      "content-type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+  const raw = await response.text();
+  let parsed;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    throw new Error(`${label} returned invalid JSON`);
+  }
+  if (!response.ok) {
+    throw new Error(displayText(parsed.error || parsed.message, `${label} failed`));
+  }
+  return validateSettingsMutationResponse(parsed, label);
+}
+
+export async function planDashboardSettingChange(settingId, value, menuId) {
+  return postDashboardSettingMutation(
+    "/dashboard-settings/plan",
+    {
+      setting_id: settingId,
+      value,
+      menu_id: menuId,
+    },
+    "dashboard settings plan",
+  );
+}
+
+export async function applyDashboardSettingChange(settingId, value, menuId) {
+  return postDashboardSettingMutation(
+    "/dashboard-settings/apply",
+    {
+      setting_id: settingId,
+      value,
+      menu_id: menuId,
+      confirm: true,
+    },
+    "dashboard settings apply",
+  );
 }
 
 export async function fetchDashboardData() {

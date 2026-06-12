@@ -681,7 +681,7 @@ NODE
 
 product_repository_authority_validate_evidence_status() {
   case "$1" in
-    not_run|passed|failed|blocked|unknown|optional|cached|stale) return 0 ;;
+    not_run|passed|failed|blocked|unknown|optional|cached|stale|not_applicable) return 0 ;;
   esac
   return 1
 }
@@ -913,7 +913,8 @@ product_repository_authority_missing_expected_evidence_items() {
   local context="$2"
   local product_type="$3"
   local product_root_label="$4"
-  shift 4 || true
+  local ci_required="${5:-true}"
+  shift 5 || true
   local evidence_items=("$@")
   local manifest rows row source_id required_mode contexts product_types source_artifacts next_command
   local emitted_expected_sources=""
@@ -968,7 +969,7 @@ product_repository_authority_missing_expected_evidence_items() {
   fi
 
   manifest="$repo/ops/CI_MANIFEST.tsv"
-  if [[ -s "$manifest" ]]; then
+  if [[ "$ci_required" == "true" && -s "$manifest" ]]; then
     if rows="$(product_repository_authority_manifest_rows_with_columns "$manifest" 8 "product CI manifest")"; then
       while IFS= read -r row; do
         [[ -n "$row" ]] || continue
@@ -1081,6 +1082,8 @@ product_repository_authority_json() {
   local repo="${1:-$(lesson_product_repo_root)}"
   local context="${2:-product-improvement}"
   local product_type="${3:-all}"
+  local git_required="${4:-true}"
+  local ci_required="${5:-true}"
   local product_name
   local repo_status="ready"
   local authority_status="ready"
@@ -1114,7 +1117,7 @@ product_repository_authority_json() {
     authority_status="missing"
     blocker_scope="product_operations"
     blockers+=("$(product_repository_authority_blocker_json "repositories.product" "missing" "Configured product repository is missing." "./tools/product-repository-authority status --json")")
-  elif [[ ! -d "$repo/.git" ]]; then
+  elif [[ "$git_required" == "true" && ! -d "$repo/.git" ]]; then
     repo_status="failed"
     authority_status="blocked"
     blocker_scope="product_operations"
@@ -1180,7 +1183,13 @@ product_repository_authority_json() {
     done < <(product_repository_authority_product_manifest_semantic_blockers "$repo" "$context" "$product_type")
 
     local evidence_output evidence_line
-    if evidence_output="$(product_repository_authority_evidence_items "$repo" "$context" "$product_root_label")"; then
+    if [[ "$git_required" == "false" && ! -d "$repo/.git" ]]; then
+      evidence_items+=("$(product_repository_authority_evidence_item_json \
+        "product.gates.evidence_index" "$context" "not_applicable" "not_collected" "false" "not_collected" \
+        "not_collected" "0" "$product_root_label" "not_collected" \
+        "docs/workflow/PRODUCT_GATE_EVIDENCE_SCHEMA.tsv" "" \
+        "not_applicable")")
+    elif evidence_output="$(product_repository_authority_evidence_items "$repo" "$context" "$product_root_label")"; then
       evidence_items=()
       while IFS= read -r evidence_line; do
         [[ -n "$evidence_line" ]] || continue
@@ -1204,13 +1213,21 @@ product_repository_authority_json() {
     while IFS= read -r expected_evidence_line; do
       [[ -n "$expected_evidence_line" ]] || continue
       evidence_items+=("$expected_evidence_line")
-    done < <(product_repository_authority_missing_expected_evidence_items "$repo" "$context" "$product_type" "$product_root_label" "${evidence_items[@]}")
+    done < <(product_repository_authority_missing_expected_evidence_items "$repo" "$context" "$product_type" "$product_root_label" "$ci_required" "${evidence_items[@]}")
 
     local evidence_item evidence_source evidence_status evidence_freshness evidence_required evidence_command evidence_reason blocker_status
     for evidence_item in "${evidence_items[@]}"; do
       evidence_required="$(product_repository_authority_json_bool_field "$evidence_item" "required_in_context")"
       [[ "$evidence_required" == "true" ]] || continue
       evidence_source="$(product_repository_authority_json_field "$evidence_item" "source_id")"
+      case "$evidence_source" in
+        product.git|product.git.*)
+          [[ "$git_required" == "true" ]] || continue
+          ;;
+        product.ci|product.ci.*)
+          [[ "$ci_required" == "true" ]] || continue
+          ;;
+      esac
       evidence_status="$(product_repository_authority_json_field "$evidence_item" "status")"
       evidence_freshness="$(product_repository_authority_json_field "$evidence_item" "freshness_state")"
       evidence_command="$(product_repository_authority_json_field "$evidence_item" "next_command")"
@@ -1270,7 +1287,9 @@ product_repository_authority_json() {
   printf ',"conflicts":'
   product_repository_authority_json_array "${conflicts[@]}"
   printf '},"evidence_summary":{"index_status":'
-  if [[ -d "$repo/.git" && -f "$(product_repository_authority_evidence_index "$repo")" ]]; then
+  if [[ "$git_required" == "false" && ! -d "$repo/.git" ]]; then
+    product_repository_authority_json_string "not_applicable"
+  elif [[ -d "$repo/.git" && -f "$(product_repository_authority_evidence_index "$repo")" ]]; then
     product_repository_authority_json_string "ready"
   else
     product_repository_authority_json_string "not_run"
@@ -1286,8 +1305,10 @@ product_repository_authority_status_text() {
   local repo="${1:-$(lesson_product_repo_root)}"
   local context="${2:-product-improvement}"
   local product_type="${3:-all}"
+  local git_required="${4:-true}"
+  local ci_required="${5:-true}"
   local json
-  json="$(product_repository_authority_json "$repo" "$context" "$product_type")"
+  json="$(product_repository_authority_json "$repo" "$context" "$product_type" "$git_required" "$ci_required")"
   printf 'Product Repository Authority\n'
   printf 'Context: %s\n' "$context"
   printf 'Product type: %s\n' "$product_type"
@@ -1300,8 +1321,10 @@ product_repository_authority_gate() {
   local repo="${1:-$(lesson_product_repo_root)}"
   local context="${2:-product-improvement}"
   local product_type="${3:-all}"
+  local git_required="${4:-true}"
+  local ci_required="${5:-true}"
   local json
-  json="$(product_repository_authority_json "$repo" "$context" "$product_type")"
+  json="$(product_repository_authority_json "$repo" "$context" "$product_type" "$git_required" "$ci_required")"
   PRODUCT_REPOSITORY_AUTHORITY_GATE_JSON="$json" node <<'NODE'
 const data = JSON.parse(process.env.PRODUCT_REPOSITORY_AUTHORITY_GATE_JSON);
 const blockingStatuses = new Set(["missing", "failed", "blocked", "unknown", "stale", "not_run"]);

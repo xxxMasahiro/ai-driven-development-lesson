@@ -6,6 +6,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/lib/lesson_common.sh"
 # shellcheck source=tools/lib/product_repository_authority.sh
 source "$SCRIPT_DIR/lib/product_repository_authority.sh"
+# shellcheck source=tools/lib/product_workflow_git_usage.sh
+source "$SCRIPT_DIR/lib/product_workflow_git_usage.sh"
 
 COMMAND="${1:-status}"
 
@@ -48,7 +50,7 @@ case "$COMMAND" in
   start|開始)
     lesson_menu_require_start_approval "External Integration" "${2:-}"
     lesson_menu_require_settings "External Integration"
-    "$LESSON_ROOT/tools/check_repository_boundary.sh" --product-required >/dev/null
+    product_workflow_git_usage_repository_boundary_gate external-integration
     lesson_product_profile_require 6 "External Integration"
     cat <<'PROMPT'
 External Integration start prompt:
@@ -65,15 +67,10 @@ PROMPT
     ;;
   gate|確認)
     lesson_menu_require_settings "External Integration"
-    "$LESSON_ROOT/tools/check_repository_boundary.sh" --product-required >/dev/null
+    product_workflow_git_usage_repository_boundary_gate external-integration
     lesson_product_profile_require 6 "External Integration"
     check_scope_docs
-    "$LESSON_ROOT/tools/product-scaffold-check" check --context external-integration --product-type integration
-    product_repository_authority_gate "$(lesson_product_repo_root)" external-integration integration
-    "$LESSON_ROOT/tools/product-security" gate --context external-integration
-    "$LESSON_ROOT/tools/check_workflow_pair_sync.sh" --product
-    "$LESSON_ROOT/tools/check_git_sync.sh" --product --required
-    "$LESSON_ROOT/tools/check_ci_status.sh" --product --required
+    product_workflow_git_usage_gate external-integration integration
     printf 'External Integration gate passed.\n'
     ;;
   ""|-h|--help|help)

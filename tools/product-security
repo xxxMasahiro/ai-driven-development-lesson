@@ -11,15 +11,16 @@ COMMAND="${1:-status}"
 shift || true
 CONTEXT="free-development"
 REPO=""
+GIT_REQUIRED="true"
 
 usage() {
   cat <<'USAGE'
 Usage:
-  tools/product-security status [--context <context>] [--repo <path>]
-  tools/product-security preflight [--context <context>] [--repo <path>]
+  tools/product-security status [--context <context>] [--repo <path>] [--git-optional]
+  tools/product-security preflight [--context <context>] [--repo <path>] [--git-optional]
   tools/product-security advise [--context <context>] [--repo <path>]
-  tools/product-security check [--context <context>] [--repo <path>]
-  tools/product-security gate [--context <context>] [--repo <path>]
+  tools/product-security check [--context <context>] [--repo <path>] [--git-optional]
+  tools/product-security gate [--context <context>] [--repo <path>] [--git-optional]
 
 Contexts:
   free-development
@@ -38,6 +39,10 @@ while [[ "$#" -gt 0 ]]; do
     --repo)
       REPO="${2:-}"
       shift 2
+      ;;
+    --git-optional)
+      GIT_REQUIRED="false"
+      shift
       ;;
     -h|--help|help)
       usage
@@ -63,6 +68,8 @@ case "$COMMAND" in
     printf 'Product repository: %s\n' "$PRODUCT_REPO"
     if [[ -d "$PRODUCT_REPO/.git" ]]; then
       printf 'Product repository status: present\n'
+    elif [[ "$GIT_REQUIRED" == "false" && -d "$PRODUCT_REPO" ]]; then
+      printf 'Product repository status: workspace present, Git not required\n'
     else
       printf 'Product repository status: not ready\n'
     fi
@@ -75,18 +82,18 @@ case "$COMMAND" in
   preflight|事前確認)
     product_security_validate_policy
     product_security_context_exists "$CONTEXT" || { printf 'unknown product security context: %s\n' "$CONTEXT" >&2; exit 1; }
-    product_security_check_repository "$PRODUCT_REPO"
+    product_security_check_repository "$PRODUCT_REPO" "$GIT_REQUIRED"
     printf 'Product security preflight passed: %s\n' "$CONTEXT"
     ;;
   check|確認)
-    if product_security_check_context "$CONTEXT" "$PRODUCT_REPO"; then
+    if product_security_check_context "$CONTEXT" "$PRODUCT_REPO" "$GIT_REQUIRED"; then
       printf 'Product security check passed: %s\n' "$CONTEXT"
     else
       exit 1
     fi
     ;;
   gate|通過)
-    if product_security_check_context "$CONTEXT" "$PRODUCT_REPO"; then
+    if product_security_check_context "$CONTEXT" "$PRODUCT_REPO" "$GIT_REQUIRED"; then
       printf 'Product security gate passed: %s\n' "$CONTEXT"
     else
       exit 1

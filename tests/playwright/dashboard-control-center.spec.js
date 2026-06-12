@@ -7,6 +7,7 @@ const fixturePath = path.join(root, "tests/fixtures/dashboard-control-center.jso
 const liveUpdateFixturePath = path.join(root, "tests/fixtures/dashboard-control-center-live-update.json");
 const invalidFixturePath = path.join(root, "tests/fixtures/dashboard-control-center-invalid.json");
 const buildRoot = path.join(root, "dist/dashboard-control-center");
+const fixtureSettingsCount = JSON.parse(fs.readFileSync(fixturePath, "utf8")).settings.items.length;
 
 test.beforeAll(() => {
   const indexPath = path.join(buildRoot, "index.html");
@@ -30,6 +31,27 @@ async function routeDashboardData(page, fixtures, methods = []) {
   });
 }
 
+async function routeDashboardDataWithDelays(page, fixtures, methods = [], delays = []) {
+  const fixtureList = Array.isArray(fixtures) ? fixtures : [fixtures];
+  let requestCount = 0;
+  await page.route("**/dashboard-data.json", async (route) => {
+    methods.push(route.request().method());
+    const selectedIndex = Math.min(requestCount, fixtureList.length - 1);
+    const selected = fixtureList[selectedIndex];
+    const delayIndex = delays.length ? Math.min(selectedIndex, delays.length - 1) : -1;
+    const delayMs = delayIndex >= 0 ? Number(delays[delayIndex] || 0) : 0;
+    requestCount += 1;
+    if (delayMs > 0) {
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+    const body = typeof selected === "string" ? fs.readFileSync(selected, "utf8") : JSON.stringify(selected);
+    await route.fulfill({
+      contentType: "application/json",
+      body,
+    });
+  });
+}
+
 async function routeDashboardDataPayload(page, payload, methods = []) {
   await page.route("**/dashboard-data.json", async (route) => {
     methods.push(route.request().method());
@@ -38,6 +60,122 @@ async function routeDashboardDataPayload(page, payload, methods = []) {
       body: JSON.stringify(payload),
     });
   });
+}
+
+async function routeSettingsApi(page, calls = [], options = {}) {
+  const localeMap = new Map([
+    ["ja", { uiLocale: "ja", direction: "ltr" }],
+    ["en", { uiLocale: "en", direction: "ltr" }],
+    ["ko", { uiLocale: "ko", direction: "ltr" }],
+    ["zh-CN", { uiLocale: "zh-CN", direction: "ltr" }],
+    ["zh-TW", { uiLocale: "zh-TW", direction: "ltr" }],
+    ["es", { uiLocale: "es", direction: "ltr" }],
+    ["pt-BR", { uiLocale: "pt-BR", direction: "ltr" }],
+    ["fr", { uiLocale: "fr", direction: "ltr" }],
+    ["de", { uiLocale: "de", direction: "ltr" }],
+    ["id", { uiLocale: "id", direction: "ltr" }],
+    ["vi", { uiLocale: "vi", direction: "ltr" }],
+    ["th", { uiLocale: "th", direction: "ltr" }],
+    ["hi", { uiLocale: "hi", direction: "ltr" }],
+    ["ar", { uiLocale: "ar", direction: "rtl" }],
+  ]);
+  async function fulfill(route, command) {
+    const payload = route.request().postDataJSON();
+    calls.push({ command, payload });
+    const delayMs = command === "apply" ? Number(options.applyDelayMs || 0) : Number(options.planDelayMs || 0);
+    if (delayMs > 0) {
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+    const value = String(payload.value || "");
+    const settingId = String(payload.setting_id || "");
+    const isWorkflowLanguage = settingId === "workflow_language";
+    const isProductLanguage = settingId === "product_language";
+    const previousValue = isWorkflowLanguage ? (value === "ar" ? "en" : "ja") : settingId === "learning_mode" ? "A" : value;
+    const targetFile = isWorkflowLanguage
+      ? "learning/WORKFLOW_DISPLAY_LANGUAGE_14_DAYS.tsv"
+      : isProductLanguage
+        ? "learning/PRODUCT_DEVELOPMENT_LANGUAGE_14_DAYS.tsv"
+        : settingId.startsWith("git_")
+          ? "learning/GIT_WORKFLOW_SETTINGS.tsv"
+          : "learning/LESSON_MODE_14_DAYS.tsv";
+    const localeMetadata = isWorkflowLanguage ? localeMap.get(value) || localeMap.get("en") : null;
+    const blocked =
+      (command === "plan" && options.blockedPlanSettingId === settingId) ||
+      (command === "apply" && options.blockedApplySettingId === settingId);
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        status: blocked ? "blocked" : command === "apply" ? "passed" : "ready",
+        severity: blocked ? "error" : "info",
+        reason_code: blocked ? "no_approved_write_path" : "none",
+        reason_key: blocked ? "settingsPage.consistency.noApprovedWritePath" : "settingsPage.consistency.none",
+        next_action_key: blocked ? "settingsPage.consistency.next.enableBranchOrDirectMain" : "settingsPage.consistency.next.none",
+        affected_setting_ids: blocked ? ["branch_allowed", "main_direct_work_allowed"] : [],
+        setting_id: settingId,
+        menu_id: String(payload.menu_id || "step_1_14"),
+        setting_kind: settingId.startsWith("git_") ? "git" : "lesson",
+        requested_value: value,
+        requested_label: value,
+        current_value: previousValue,
+        current_label: isWorkflowLanguage || isProductLanguage ? `${previousValue} (${previousValue})` : `${previousValue}: Detailed guidance`,
+        target_file: targetFile,
+        requires_confirmation: true,
+        applied: command === "apply" && !blocked,
+        snapshot_regenerated: command === "apply" && !blocked,
+        snapshot_file: command === "apply" && !blocked ? ".dashboard-control-center/dashboard-data.json" : undefined,
+        tool_command: `tools/dashboard-settings apply ${settingId} ${value} --menu ${payload.menu_id || "step_1_14"} --confirm`,
+        ...(localeMetadata
+          ? {
+              workflow_language: value,
+              display_locale: value,
+              ui_locale: localeMetadata.uiLocale,
+              direction: localeMetadata.direction,
+            }
+          : {}),
+      }),
+    });
+  }
+  await page.route("**/dashboard-settings/plan", (route) => fulfill(route, "plan"));
+  await page.route("**/dashboard-settings/apply", (route) => fulfill(route, "apply"));
+}
+
+function dashboardLocaleFixture(language, uiLocale, hashCharacter) {
+  const data = JSON.parse(fs.readFileSync(fixturePath, "utf8"));
+  const languageLabels = {
+    ja: "ja (日本語)",
+    en: "en (English)",
+    "zh-CN": "zh-CN (简体中文)",
+    de: "de (Deutsch)",
+    ar: "ar (العربية)",
+  };
+  const contentHash = hashCharacter.repeat(64);
+  data.content_hash = contentHash;
+  data.snapshot_id = `${data.generated_at}-${contentHash.slice(0, 12)}`;
+  data.summary.workflow_language = language;
+  data.summary.display_locale = language;
+  data.summary.ui_locale = uiLocale;
+  data.summary.ui_direction = uiLocale === "ar" ? "rtl" : "ltr";
+  const workflowLanguageItem = data.settings.items.find((item) => item.id === "workflow_language");
+  if (!workflowLanguageItem) {
+    throw new Error("fixture is missing workflow_language setting");
+  }
+  workflowLanguageItem.current_value = language;
+  workflowLanguageItem.current_label = languageLabels[language] || `${language} (${language})`;
+  return data;
+}
+
+function dashboardSettingFixture(settingId, value, hashCharacter) {
+  const data = JSON.parse(fs.readFileSync(fixturePath, "utf8"));
+  const contentHash = hashCharacter.repeat(64);
+  data.content_hash = contentHash;
+  data.snapshot_id = `${data.generated_at}-${contentHash.slice(0, 12)}`;
+  const item = data.settings.items.find((candidate) => candidate.id === settingId);
+  if (!item) {
+    throw new Error(`fixture is missing ${settingId} setting`);
+  }
+  item.current_value = value;
+  item.current_label = settingId === "learning_mode" ? `${value}: Detailed guidance` : String(value);
+  return data;
 }
 
 async function expectCenteredSvg(locator, tolerance = 1) {
@@ -83,7 +221,7 @@ test.describe("English dashboard control center", () => {
 
   test("renders the mock-source overview and detail surfaces from producer data", async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 980 });
-    await page.goto("http://lesson.local/dashboard-control-center/index.html");
+    await page.goto("http://lesson.local/dashboard-control-center/index.html?refresh_ms=60000");
     const navigation = page.getByRole("navigation", { name: "Dashboard categories" });
     const repositoryNavigation = page.getByRole("navigation", { name: "Repository" });
 
@@ -95,7 +233,7 @@ test.describe("English dashboard control center", () => {
     await expect(navigation.getByRole("link", { name: /Safety Actions/ })).toBeVisible();
     await expect(repositoryNavigation.locator(".category-nav__link")).toHaveCount(3);
     await expect(page.getByRole("navigation", { name: "Other" }).locator(".category-nav__link")).toHaveCount(2);
-    await expect(page.getByText("This dashboard is read-only.")).toBeVisible();
+    await expect(page.getByText("Read-only outside Settings.")).toBeVisible();
 
     await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible();
     await expect(page.getByText("Category Health")).toHaveCount(0);
@@ -218,6 +356,250 @@ test.describe("English dashboard control center", () => {
     await expect(page.getByText("Information sources for this view")).toHaveCount(0);
     await expect(documentsView.locator("#documents-related a[href='#maintenance']")).toBeVisible();
     await expect(documentsView.locator("#documents-related .sidebar-page-link-card")).toHaveCount(3);
+
+    const settingsCalls = [];
+    await routeSettingsApi(page, settingsCalls);
+    await repositoryNavigation.getByRole("link", { name: /Settings/ }).click();
+    const settingsView = page.locator("#settings");
+    await expect(settingsView).toBeVisible();
+    await expect(settingsView.locator(".settings-row")).toHaveCount(fixtureSettingsCount);
+    await expect(settingsView.locator(".settings-change-chip")).toHaveCount(0);
+    const learningModeRow = settingsView.locator(".settings-row", { hasText: "Learning mode" });
+    await expect(learningModeRow.locator(".settings-row__open")).toContainText("Editable here");
+    await expect(learningModeRow.locator(".settings-row__meta")).not.toContainText("Editable here");
+    await expect(learningModeRow).toContainText("Lessons");
+    const productNameRow = settingsView.locator(".settings-row", { hasText: "Product name" });
+    await expect(productNameRow.locator(".settings-row__open")).toContainText("Review");
+    await expect(productNameRow.locator(".settings-row__meta")).not.toContainText("Review only");
+    await expect(productNameRow).toContainText("Repository Info");
+    await expect(settingsView.locator(".settings-row[data-settings-row-id='git_push_automation']").locator(".settings-row__open")).toContainText("Editable here");
+    await expect(settingsView.locator(".settings-row[data-settings-row-id='git_merge_execution']").locator(".settings-row__open")).toContainText("Editable here");
+    await learningModeRow.click();
+    await expect(page.locator(".settings-modal")).toBeVisible();
+    await expect(page.locator(".settings-modal__close")).toBeFocused();
+    const modalEyebrowSize = await page.locator(".settings-modal__header small").evaluate((element) => Number.parseFloat(getComputedStyle(element).fontSize));
+    const modalStatusSize = await page.locator(".settings-modal__status > div > span").evaluate((element) => Number.parseFloat(getComputedStyle(element).fontSize));
+    expect(modalEyebrowSize).toBeGreaterThan(modalStatusSize);
+    await page.keyboard.press("Shift+Tab");
+    await expect(page.locator(".settings-modal__footer button")).toBeFocused();
+    await page.keyboard.press("Tab");
+    await expect(page.locator(".settings-modal__close")).toBeFocused();
+    await expect(page.locator(".settings-modal")).toContainText("Proposed value");
+    await page.locator(".settings-value-select select").selectOption("B");
+    await page.getByRole("button", { name: /Review change/ }).click();
+    await expect(page.locator(".settings-result")).toContainText("Plan ready");
+    await page.getByLabel("I confirm this settings update.").check();
+    await page.unroute("**/dashboard-data.json");
+    await routeDashboardDataPayload(page, dashboardSettingFixture("learning_mode", "B", "6"));
+    await page.getByRole("button", { name: /Apply setting/ }).click();
+    await expect(page.locator(".settings-modal")).toHaveCount(0);
+    await expect(page.locator(".settings-apply-feedback")).toHaveCount(0);
+    await expect(learningModeRow).toContainText("B: Short guidance");
+    expect(settingsCalls.map((call) => call.command)).toEqual(["plan", "apply"]);
+    expect(settingsCalls[1].payload).toMatchObject({ setting_id: "learning_mode", value: "B", menu_id: "step_1_14", confirm: true });
+  });
+
+  test("shows structured policy feedback when apply returns blocked", async ({ page }) => {
+    const settingsCalls = [];
+    await routeSettingsApi(page, settingsCalls, { blockedApplySettingId: "learning_mode" });
+
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.goto("http://lesson.local/dashboard-control-center/index.html?refresh_ms=60000#settings");
+    const settingsView = page.locator("#settings");
+    const learningModeRow = settingsView.locator(".settings-row", { hasText: "Learning mode" });
+    await learningModeRow.click();
+    await page.locator(".settings-value-select select").selectOption("B");
+    await page.getByRole("button", { name: /Review change/ }).click();
+    await expect(page.locator(".settings-result")).toContainText("Plan ready");
+    await page.getByLabel("I confirm this settings update.").check();
+    await page.getByRole("button", { name: /Apply setting/ }).click();
+
+    const feedback = page.locator(".settings-apply-feedback");
+    await expect(page.locator(".settings-modal")).toHaveCount(0);
+    await expect(feedback).toBeVisible();
+    await expect(feedback).toHaveAttribute("data-settings-apply-feedback-status", "blocked");
+    await expect(feedback).toContainText("No approved write path");
+    await expect(feedback).toContainText("Enable branch work");
+    expect(settingsCalls.map((call) => call.command)).toEqual(["plan", "apply"]);
+  });
+
+  test("applies the workflow display language to the fixed UI without reloading", async ({ page }) => {
+    const methods = [];
+    const settingsCalls = [];
+    const jaSnapshot = dashboardLocaleFixture("ja", "ja", "b");
+    const enSnapshot = dashboardLocaleFixture("en", "en", "c");
+    await page.unroute("**/dashboard-data.json");
+    await routeDashboardData(page, [jaSnapshot, enSnapshot], methods);
+    await routeSettingsApi(page, settingsCalls);
+
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.goto("http://lesson.local/dashboard-control-center/index.html?refresh_ms=60000#settings");
+    await expect(page.getByRole("navigation", { name: "ダッシュボードカテゴリ" })).toBeVisible();
+    await expect(page.locator("#settings-heading")).toHaveText("設定");
+    await page.evaluate(() => {
+      window.__dashboardReloadMarker = "kept";
+    });
+
+    const settingsView = page.locator("#settings");
+    await settingsView.locator(".settings-row[data-settings-row-id='workflow_language']").click();
+    await expect(page.locator(".settings-modal")).toBeVisible();
+    await page.locator(".settings-value-select select").selectOption("en");
+    await page.getByRole("button", { name: /変更を確認/ }).click();
+    await expect(page.locator(".settings-result")).toContainText("確認済み");
+    await page.getByLabel("この設定更新を確認しました。").check();
+    await page.getByRole("button", { name: /設定を適用/ }).click();
+
+    await expect(page.getByRole("navigation", { name: "Dashboard categories" })).toBeVisible();
+    await expect(page.getByRole("navigation", { name: "Repository" }).getByRole("link", { name: /Settings/ })).toBeVisible();
+    await expect(page.locator(".settings-modal")).toHaveCount(0);
+    await expect(page.locator(".settings-apply-feedback")).toHaveCount(0);
+    await expect(settingsView.locator(".settings-row[data-settings-row-id='workflow_language']")).toContainText("English");
+    await expect.poll(() => page.evaluate(() => window.__dashboardReloadMarker)).toBe("kept");
+    expect(methods).toEqual(["GET", "GET"]);
+    expect(settingsCalls.map((call) => call.command)).toEqual(["plan", "apply"]);
+    expect(settingsCalls[1].payload).toMatchObject({ setting_id: "workflow_language", value: "en", menu_id: "step_1_14", confirm: true });
+  });
+
+  test("shows applying feedback and switches workflow language while slow apply is running", async ({ page }) => {
+    const methods = [];
+    const settingsCalls = [];
+    const jaSnapshot = dashboardLocaleFixture("ja", "ja", "1");
+    const enSnapshot = dashboardLocaleFixture("en", "en", "2");
+    await page.unroute("**/dashboard-data.json");
+    await routeDashboardData(page, [jaSnapshot, enSnapshot], methods);
+    await routeSettingsApi(page, settingsCalls, { applyDelayMs: 1200 });
+
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.goto("http://lesson.local/dashboard-control-center/index.html?refresh_ms=60000#settings");
+    await expect(page.getByRole("navigation", { name: "ダッシュボードカテゴリ" })).toBeVisible();
+    const settingsView = page.locator("#settings");
+    await settingsView.locator(".settings-row[data-settings-row-id='workflow_language']").click();
+    await page.locator(".settings-value-select select").selectOption("en");
+    await page.getByRole("button", { name: /変更を確認/ }).click();
+    await page.getByLabel("この設定更新を確認しました。").check();
+    await page.getByRole("button", { name: /設定を適用/ }).click();
+
+    await expect(page.locator(".settings-modal")).toHaveCount(0);
+    await expect(page.getByRole("navigation", { name: "Dashboard categories" })).toBeVisible();
+    const feedback = page.locator(".settings-apply-feedback");
+    await expect(feedback).toBeVisible();
+    await expect(feedback).toHaveAttribute("data-settings-apply-feedback-status", "applying");
+    await expect(feedback).toContainText("Applying setting");
+    expect(methods).toEqual(["GET"]);
+    await expect(feedback).toHaveCount(0, { timeout: 5000 });
+    await expect(settingsView.locator(".settings-row[data-settings-row-id='workflow_language']")).toContainText("English");
+    expect(methods).toEqual(["GET", "GET"]);
+    expect(settingsCalls.map((call) => call.command)).toEqual(["plan", "apply"]);
+  });
+
+  test("shows delayed apply feedback until workflow language snapshot reconciles", async ({ page }) => {
+    const methods = [];
+    const settingsCalls = [];
+    const jaSnapshot = dashboardLocaleFixture("ja", "ja", "7");
+    const enSnapshot = dashboardLocaleFixture("en", "en", "8");
+    await page.unroute("**/dashboard-data.json");
+    await routeDashboardDataWithDelays(page, [jaSnapshot, enSnapshot], methods, [0, 1200]);
+    await routeSettingsApi(page, settingsCalls);
+
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.goto("http://lesson.local/dashboard-control-center/index.html?refresh_ms=60000#settings");
+    const settingsView = page.locator("#settings");
+    await settingsView.locator(".settings-row[data-settings-row-id='workflow_language']").click();
+    await page.locator(".settings-value-select select").selectOption("en");
+    await page.getByRole("button", { name: /変更を確認/ }).click();
+    await page.getByLabel("この設定更新を確認しました。").check();
+    await page.getByRole("button", { name: /設定を適用/ }).click();
+
+    const feedback = page.locator(".settings-apply-feedback");
+    await expect(page.locator(".settings-modal")).toHaveCount(0);
+    await expect(feedback).toBeVisible();
+    await expect(feedback).toHaveAttribute("data-settings-apply-feedback-status", "reconciling");
+    await expect(feedback).toContainText("Updating display");
+    await expect(settingsView.locator(".settings-row[data-settings-row-id='workflow_language']")).toContainText("English");
+    await expect(feedback).toHaveCount(0, { timeout: 4000 });
+    expect(methods).toEqual(["GET", "GET"]);
+    expect(settingsCalls.map((call) => call.command)).toEqual(["plan", "apply"]);
+  });
+
+  test("keeps optimistic chrome while stale snapshot remains authoritative for setting values", async ({ page }) => {
+    const methods = [];
+    const settingsCalls = [];
+    const jaSnapshot = dashboardLocaleFixture("ja", "ja", "9");
+    const staleJaSnapshot = dashboardLocaleFixture("ja", "ja", "a");
+    await page.unroute("**/dashboard-data.json");
+    await routeDashboardData(page, [jaSnapshot, staleJaSnapshot], methods);
+    await routeSettingsApi(page, settingsCalls);
+
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.goto("http://lesson.local/dashboard-control-center/index.html?refresh_ms=60000#settings");
+    const settingsView = page.locator("#settings");
+    await settingsView.locator(".settings-row[data-settings-row-id='workflow_language']").click();
+    await page.locator(".settings-value-select select").selectOption("en");
+    await page.getByRole("button", { name: /変更を確認/ }).click();
+    await page.getByLabel("この設定更新を確認しました。").check();
+    await page.getByRole("button", { name: /設定を適用/ }).click();
+
+    const feedback = page.locator(".settings-apply-feedback");
+    await expect(feedback).toBeVisible();
+    await expect(feedback).toHaveAttribute("data-settings-apply-feedback-status", "stale_snapshot");
+    await expect(page.getByRole("navigation", { name: "Dashboard categories" })).toBeVisible();
+    await expect(settingsView.locator(".settings-row[data-settings-row-id='workflow_language']")).toContainText("Japanese");
+    expect(methods).toEqual(["GET", "GET"]);
+    expect(settingsCalls[1].payload).toMatchObject({ setting_id: "workflow_language", value: "en", menu_id: "step_1_14", confirm: true });
+  });
+
+  test("applies Arabic RTL locale metadata after settings success", async ({ page }) => {
+    const methods = [];
+    const settingsCalls = [];
+    const enSnapshot = dashboardLocaleFixture("en", "en", "d");
+    const arSnapshot = dashboardLocaleFixture("ar", "ar", "e");
+    await page.unroute("**/dashboard-data.json");
+    await routeDashboardData(page, [enSnapshot, arSnapshot], methods);
+    await routeSettingsApi(page, settingsCalls);
+
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.goto("http://lesson.local/dashboard-control-center/index.html?refresh_ms=60000#settings");
+    await expect(page.locator(".app-shell")).toHaveAttribute("dir", "ltr");
+    await page.evaluate(() => {
+      window.__dashboardReloadMarker = "kept";
+    });
+
+    const settingsView = page.locator("#settings");
+    await settingsView.locator(".settings-row[data-settings-row-id='workflow_language']").click();
+    await page.locator(".settings-value-select select").selectOption("ar");
+    await page.getByRole("button", { name: /Review change/ }).click();
+    await page.getByLabel("I confirm this settings update.").check();
+    await page.getByRole("button", { name: /Apply setting/ }).click();
+
+    await expect(page.locator(".app-shell")).toHaveAttribute("dir", "rtl");
+    await expect(page.locator(".category-nav__link[href='#settings']")).toContainText("الإعدادات");
+    await expect(page.locator(".settings-modal")).toHaveCount(0);
+    await expect(page.locator(".settings-apply-feedback")).toHaveCount(0);
+    await expect(settingsView.locator(".settings-row[data-settings-row-id='workflow_language']")).toContainText("العربية");
+    await expect.poll(() => page.evaluate(() => window.__dashboardReloadMarker)).toBe("kept");
+    const hasHorizontalOverflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
+    expect(hasHorizontalOverflow).toBe(false);
+    expect(methods).toEqual(["GET", "GET"]);
+    expect(settingsCalls[1].payload).toMatchObject({ setting_id: "workflow_language", value: "ar", menu_id: "step_1_14", confirm: true });
+  });
+
+  test("renders representative non-English locale chrome without per-language browser loops", async ({ page }) => {
+    await page.unroute("**/dashboard-data.json");
+    await routeDashboardDataPayload(page, dashboardLocaleFixture("zh-CN", "zh-CN", "f"));
+    await page.goto("http://lesson.local/dashboard-control-center/index.html#settings");
+    await expect(page.locator(".app-shell")).toHaveAttribute("dir", "ltr");
+    await expect(page.locator("#settings-heading")).toHaveText("设置");
+    await expect(page.locator(".category-nav__link[href='#documents']")).toContainText("文档");
+    let hasHorizontalOverflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
+    expect(hasHorizontalOverflow).toBe(false);
+
+    await page.unroute("**/dashboard-data.json");
+    await routeDashboardDataPayload(page, dashboardLocaleFixture("de", "de", "a"));
+    await page.reload();
+    await expect(page.locator("#settings-heading")).toHaveText("Einstellungen");
+    await expect(page.locator(".category-nav__link[href='#workflow']")).toContainText("Entwicklungsworkflow");
+    hasHorizontalOverflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
+    expect(hasHorizontalOverflow).toBe(false);
   });
 
   test("keeps unsafe text as data across desktop and mobile layout", async ({ page }) => {
@@ -242,6 +624,11 @@ test.describe("English dashboard control center", () => {
       const hasDetailOverflow = await page.locator(".app-shell").evaluate((element) => element.scrollWidth > element.clientWidth);
       expect(hasDetailOverflow).toBe(false);
     }
+    await page.getByRole("button", { name: /^(Menu|メニュー)$/ }).click();
+    await page.getByRole("navigation", { name: "Repository" }).getByRole("link", { name: /Settings/ }).click();
+    await expect(page.getByLabel("Detail page decision summary")).toBeVisible();
+    const hasSettingsOverflow = await page.locator(".app-shell").evaluate((element) => element.scrollWidth > element.clientWidth);
+    expect(hasSettingsOverflow).toBe(false);
 
     await page.setViewportSize({ width: 1280, height: 900 });
     await page.getByRole("navigation", { name: "Dashboard categories" }).getByRole("link", { name: /Maintenance Sync/ }).click();
@@ -299,6 +686,27 @@ test.describe("English dashboard control center", () => {
     await expect(page.getByText("Dashboard Data Unavailable")).toHaveCount(0);
     await expect(documentsView.locator("#documents-brief .sidebar-page-card")).toHaveCount(1);
     await expect(documentsView.locator("#documents-related .sidebar-page-link-card")).toHaveCount(0);
+  });
+
+  test("shows an incomplete Settings state for legacy snapshots and rejects malformed settings catalogs", async ({ page }) => {
+    const legacySnapshot = JSON.parse(fs.readFileSync(fixturePath, "utf8"));
+    delete legacySnapshot.settings;
+
+    await page.unroute("**/dashboard-data.json");
+    await routeDashboardData(page, legacySnapshot);
+    await page.goto("http://lesson.local/dashboard-control-center/index.html#settings");
+
+    const settingsView = page.locator("#settings");
+    await expect(settingsView).toBeVisible();
+    await expect(page.getByText("Dashboard Data Unavailable")).toHaveCount(0);
+    await expect(settingsView.locator("#settings-unavailable .sidebar-page-card")).toHaveCount(1);
+
+    const invalidSettings = JSON.parse(fs.readFileSync(fixturePath, "utf8"));
+    invalidSettings.settings.items[0].source_file = "/tmp/unsafe-settings.tsv";
+    await page.unroute("**/dashboard-data.json");
+    await routeDashboardDataPayload(page, invalidSettings);
+    await page.goto("http://lesson.local/dashboard-control-center/index.html?invalid_settings=1#settings");
+    await expect(page.getByText("Dashboard Data Unavailable")).toBeVisible();
   });
 
   test("does not duplicate ready workflow items in the must-review section", async ({ page }) => {
@@ -375,7 +783,7 @@ test.describe("Japanese dashboard control center", () => {
     await expect(navigation.getByRole("link", { name: /開発ワークフロー/ })).toBeVisible();
     await expect(navigation.getByRole("link", { name: /保守・同期/ })).toBeVisible();
     await expect(navigation.getByRole("link", { name: /安全確認/ })).toBeVisible();
-    await expect(page.getByText("このダッシュボードは読み取り専用です。")).toBeVisible();
+    await expect(page.getByText("設定以外は読み取り専用です。")).toBeVisible();
     await expect(page.getByText("カテゴリ別の状態")).toHaveCount(0);
     await expect(page.locator(".menu-tile.is-selected")).toContainText(/STEP 1-14\s*実践レッスン/);
     await expect(page.locator("[data-overview-status-card='lessons']")).toContainText(/11\s*\/\s*14/);

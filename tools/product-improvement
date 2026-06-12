@@ -6,6 +6,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/lib/lesson_common.sh"
 # shellcheck source=tools/lib/product_repository_authority.sh
 source "$SCRIPT_DIR/lib/product_repository_authority.sh"
+# shellcheck source=tools/lib/product_workflow_git_usage.sh
+source "$SCRIPT_DIR/lib/product_workflow_git_usage.sh"
 
 COMMAND="${1:-status}"
 
@@ -19,7 +21,7 @@ Usage:
 Rules:
   - This path improves an existing product after Free Development Mode or a structured lesson product.
   - It does not replace Free Development Mode, external integration, or structured lessons.
-  - Product-facing changes require product development language, workflow documents, Git sync, tests, and CI.
+  - Product-facing changes require product development language, workflow documents, local checks, and the selected Git usage mode.
 USAGE
 }
 
@@ -48,7 +50,7 @@ case "$COMMAND" in
   start|開始)
     lesson_menu_require_start_approval "Product Improvement" "${2:-}"
     lesson_menu_require_settings "Product Improvement"
-    "$LESSON_ROOT/tools/check_repository_boundary.sh" --product-required >/dev/null
+    product_workflow_git_usage_repository_boundary_gate product-improvement
     lesson_product_profile_require 5 "Product Improvement"
     cat <<'PROMPT'
 Product Improvement start prompt:
@@ -64,15 +66,10 @@ PROMPT
     ;;
   gate|確認)
     lesson_menu_require_settings "Product Improvement"
-    "$LESSON_ROOT/tools/check_repository_boundary.sh" --product-required >/dev/null
+    product_workflow_git_usage_repository_boundary_gate product-improvement
     lesson_product_profile_require 5 "Product Improvement"
     check_scope_docs
-    "$LESSON_ROOT/tools/product-scaffold-check" check --context product-improvement
-    product_repository_authority_gate "$(lesson_product_repo_root)" product-improvement all
-    "$LESSON_ROOT/tools/product-security" gate --context product-improvement
-    "$LESSON_ROOT/tools/check_workflow_pair_sync.sh" --product
-    "$LESSON_ROOT/tools/check_git_sync.sh" --product --required
-    "$LESSON_ROOT/tools/check_ci_status.sh" --product --required
+    product_workflow_git_usage_gate product-improvement all
     printf 'Product Improvement gate passed.\n'
     ;;
   ""|-h|--help|help)

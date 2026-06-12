@@ -82,6 +82,7 @@ const allowedStates = new Set([
   'not_run',
   'stale',
   'manual_required',
+  'not_applicable',
 ]);
 
 if (!/^[0-9]+\.[0-9]+\.[0-9]+$/.test(requireField('schema_version'))) {
@@ -106,6 +107,11 @@ for (const seedToken of [
   '"${documents_groups[*]}"',
   '"${documents_catalog[*]}"',
   '"${documents_related_commands[*]}"',
+  '"$summary_workflow_language"',
+  '"$summary_ui_locale"',
+  '"$settings_status"',
+  '"${settings_groups[*]}"',
+  '"${settings_items[*]}"',
 ]) {
   if (!producerRaw.includes(seedToken)) {
     fail(`content_hash seed must include document payload token: ${seedToken}`);
@@ -212,6 +218,23 @@ if (![
 ].includes(selectedContext.workflow_context)) {
   fail(`invalid selected workflow context: ${selectedContext.workflow_context}`);
 }
+if (!['none', 'local', 'remote_sync', 'ci', 'not_applicable'].includes(selectedContext.git_usage_mode)) {
+  fail(`invalid selected context Git usage mode: ${selectedContext.git_usage_mode}`);
+}
+if (!['required', 'optional', 'not_applicable', 'unknown'].includes(selectedContext.git_requirement)) {
+  fail(`invalid selected context Git requirement: ${selectedContext.git_requirement}`);
+}
+if (!['required', 'optional', 'not_applicable', 'unknown'].includes(selectedContext.ci_requirement)) {
+  fail(`invalid selected context CI requirement: ${selectedContext.ci_requirement}`);
+}
+if (!['free-development', 'product-improvement', 'external-integration'].includes(selectedContext.workflow_context)) {
+  if (selectedContext.git_usage_mode !== 'not_applicable') {
+    fail(`non-product selected context must report Git usage mode not_applicable, got ${selectedContext.git_usage_mode}`);
+  }
+  if (data.development.git_sync_status === 'not_applicable' || data.development.ci_status === 'not_applicable') {
+    fail('non-product selected context must not downgrade top-level development Git/CI status to not_applicable');
+  }
+}
 const targetRepository = requireField('selected_context.target_repository');
 if (typeof targetRepository.name !== 'string' || targetRepository.name.length === 0) {
   fail('selected context target repository name is required');
@@ -301,6 +324,11 @@ for (const context of availableContexts) {
       fail(`contexts_by_menu.${context.menu_id} missing ${field}`);
     }
   }
+  for (const field of ['git_usage_mode', 'git_requirement', 'ci_requirement']) {
+    if (!(field in fullContext)) {
+      fail(`contexts_by_menu.${context.menu_id} missing ${field}`);
+    }
+  }
   for (const field of ['git_status', 'ci_status', 'security_status', 'evidence_status']) {
     if (!allowedStates.has(fullContext[field])) {
       fail(`invalid contexts_by_menu.${context.menu_id}.${field}: ${fullContext[field]}`);
@@ -325,6 +353,22 @@ if (stableStringify(selectedContext) !== stableStringify(contextsByMenu[selected
 
 if (!['learning', 'development', 'maintenance', 'unknown'].includes(data.summary.mode)) {
   fail(`invalid summary mode: ${data.summary.mode}`);
+}
+if (typeof data.summary.workflow_language !== 'string' || data.summary.workflow_language.length === 0) {
+  fail('summary.workflow_language must be a selected language code');
+}
+if (data.summary.display_locale !== data.summary.workflow_language) {
+  fail('summary.display_locale must follow the selected workflow language');
+}
+const dashboardUiLocales = ['ja', 'en', 'ko', 'zh-CN', 'zh-TW', 'es', 'pt-BR', 'fr', 'de', 'id', 'vi', 'th', 'hi', 'ar'];
+if (!dashboardUiLocales.includes(data.summary.ui_locale)) {
+  fail(`summary.ui_locale must be a supported dashboard UI locale, got ${data.summary.ui_locale}`);
+}
+if (!['ltr', 'rtl'].includes(data.summary.ui_direction)) {
+  fail(`summary.ui_direction must be ltr or rtl, got ${data.summary.ui_direction}`);
+}
+if ((data.summary.ui_locale === 'ar') !== (data.summary.ui_direction === 'rtl')) {
+  fail('summary.ui_direction must match the resolved dashboard UI locale');
 }
 if (!Array.isArray(data.summary.blocking_items)) {
   fail('summary.blocking_items must be an array');
@@ -637,6 +681,155 @@ for (const expectedCommand of ['tools/docs-tour all', 'tools/dashboard docs']) {
   }
 }
 
+const settings = requireField('settings');
+if (!settings || typeof settings !== 'object' || Array.isArray(settings)) {
+  fail('settings must be an object');
+}
+if (!allowedStates.has(settings.status)) {
+  fail(`invalid settings status: ${settings.status}`);
+}
+if (!Array.isArray(settings.groups) || settings.groups.length < 4) {
+  fail('settings.groups must contain context, learning, workflow, and security groups');
+}
+if (!Array.isArray(settings.items) || settings.items.length < 10) {
+  fail('settings.items must contain producer-owned setting rows');
+}
+function isSafeScopedPath(pathValue) {
+  if (typeof pathValue !== 'string' || !pathValue) {
+    return false;
+  }
+  const path = pathValue.startsWith('product:') ? pathValue.slice('product:'.length) : pathValue;
+  return !path.startsWith('/') && !path.startsWith('\\') && !/^[A-Za-z]:[\\/]/.test(path) && !path.split(/[\\/]+/).includes('..');
+}
+const settingsGroupIds = new Set();
+for (const group of settings.groups) {
+  for (const field of ['id', 'label_key', 'description_key', 'status', 'order']) {
+    if (!(field in group)) {
+      fail(`settings group missing ${field}`);
+    }
+  }
+  if (settingsGroupIds.has(group.id)) {
+    fail(`duplicate settings group: ${group.id}`);
+  }
+  settingsGroupIds.add(group.id);
+  requireI18nKey(group.label_key);
+  requireI18nKey(group.description_key);
+  if (!allowedStates.has(group.status)) {
+    fail(`invalid settings group status: ${group.status}`);
+  }
+  if (!Number.isInteger(group.order) || group.order <= 0) {
+    fail(`settings group order is invalid: ${group.order}`);
+  }
+}
+const settingScopes = new Set(['selected_context', 'learning', 'workflow', 'security', 'repository', 'dashboard']);
+const settingsRelatedPages = new Set(['#overview', '#lessons', '#workflow', '#maintenance', '#safety', '#repository-info', '#documents', '#settings', '#history', '#help']);
+const settingIds = new Set();
+const editableSettingIds = new Set();
+for (const item of settings.items) {
+  for (const field of ['id', 'group_id', 'scope', 'label_key', 'description_key', 'current_value', 'current_label', 'status', 'source_file', 'allowed_values', 'editable', 'reviewable', 'risk_level', 'requires_confirmation', 'consistency', 'disabled_reason_key', 'related_page', 'update_action_id', 'review']) {
+    if (!(field in item)) {
+      fail(`settings item missing ${field}`);
+    }
+  }
+  if (settingIds.has(item.id)) {
+    fail(`duplicate settings item: ${item.id}`);
+  }
+  settingIds.add(item.id);
+  if (!settingsGroupIds.has(item.group_id)) {
+    fail(`settings item references unknown group: ${item.group_id}`);
+  }
+  if (!settingScopes.has(item.scope)) {
+    fail(`invalid settings item scope: ${item.scope}`);
+  }
+  if (!allowedStates.has(item.status)) {
+    fail(`invalid settings item status: ${item.status}`);
+  }
+  if (!isSafeScopedPath(item.source_file) || !isSafeScopedPath(item.review.target_file)) {
+    fail(`settings item path must be safe and scoped: ${item.id}`);
+  }
+  if (!Array.isArray(item.allowed_values)) {
+    fail(`settings item allowed_values must be an array: ${item.id}`);
+  }
+  if (typeof item.editable !== 'boolean' || typeof item.reviewable !== 'boolean' || typeof item.requires_confirmation !== 'boolean') {
+    fail(`settings item boolean contract is invalid: ${item.id}`);
+  }
+  const consistency = item.consistency;
+  if (!consistency || typeof consistency !== 'object' || Array.isArray(consistency)) {
+    fail(`settings item consistency must be an object: ${item.id}`);
+  }
+  for (const field of ['status', 'severity', 'reason_code', 'reason_key', 'next_action_key', 'effective_mode', 'affected_setting_ids']) {
+    if (!(field in consistency)) {
+      fail(`settings item consistency missing ${field}: ${item.id}`);
+    }
+  }
+  if (!allowedStates.has(consistency.status)) {
+    fail(`settings item consistency status is invalid: ${item.id}`);
+  }
+  if (!['info', 'warning', 'error'].includes(consistency.severity)) {
+    fail(`settings item consistency severity is invalid: ${item.id}`);
+  }
+  requireI18nKey(consistency.reason_key);
+  requireI18nKey(consistency.next_action_key);
+  if (!Array.isArray(consistency.affected_setting_ids)) {
+    fail(`settings item consistency affected_setting_ids must be an array: ${item.id}`);
+  }
+  if (!['low', 'medium', 'high', 'critical'].includes(item.risk_level)) {
+    fail(`settings item risk is invalid: ${item.id}`);
+  }
+  if (!settingsRelatedPages.has(item.related_page)) {
+    fail(`settings item related_page is invalid: ${item.id}`);
+  }
+  requireI18nKey(item.label_key);
+  requireI18nKey(item.description_key);
+  requireI18nKey(item.disabled_reason_key);
+  requireI18nKey(item.review.impact_key);
+  requireI18nKey(item.review.update_preview_key);
+  if (!allowedStates.has(item.review.validation_status)) {
+    fail(`settings item review validation status is invalid: ${item.id}`);
+  }
+  if (item.editable) {
+    editableSettingIds.add(item.id);
+    if (!item.reviewable || !['learning', 'workflow'].includes(item.scope)) {
+      fail(`editable settings item has invalid scope: ${item.id}`);
+    }
+    if (!item.allowed_values.length || item.requires_confirmation !== true) {
+      fail(`editable settings item must expose allowed values and require confirmation: ${item.id}`);
+    }
+    if (item.source_file.startsWith('product:') || item.review.target_file.startsWith('product:')) {
+      fail(`editable settings item must stay inside the lesson repository: ${item.id}`);
+    }
+  }
+}
+for (const expectedEditable of ['learning_mode', 'workflow_language', 'product_language', 'git_push_automation']) {
+  if (!editableSettingIds.has(expectedEditable)) {
+    fail(`missing expected editable settings row: ${expectedEditable}`);
+  }
+}
+const workflowLanguageItem = settings.items.find((item) => item.id === 'workflow_language');
+if (!workflowLanguageItem) {
+  fail('settings.items must include workflow_language');
+}
+const productGitUsageItem = settings.items.find((item) => item.id === 'product_git_usage_mode');
+if (!productGitUsageItem) {
+  fail('settings.items must include product_git_usage_mode');
+}
+if (!['free-development', 'product-improvement', 'external-integration'].includes(selectedContext.workflow_context)) {
+  if (productGitUsageItem.editable !== false || productGitUsageItem.current_value !== 'not_applicable' || productGitUsageItem.allowed_values.length !== 0) {
+    fail('product_git_usage_mode must be display-only and not_applicable outside product workflow contexts');
+  }
+}
+if (data.summary.workflow_language !== workflowLanguageItem.current_value) {
+  fail('summary.workflow_language must match the Settings workflow_language current value');
+}
+if (settings.items.some((item) => item.consistency.reason_code !== 'none' && item.consistency.status === 'ready')) {
+  fail('settings item consistency must not hide a recorded conflict as ready');
+}
+for (const displayOnly of ['product_name', 'product_type', 'learner_approval', 'git_gate', 'git_approval', 'security_gate', 'dangerous_action_approval']) {
+  if (editableSettingIds.has(displayOnly)) {
+    fail(`display-only settings row must not be editable: ${displayOnly}`);
+  }
+}
+
 const productAuthority = requireField('development.product_authority');
 if (!productAuthority || typeof productAuthority !== 'object' || Array.isArray(productAuthority)) {
   fail('development.product_authority must be an object');
@@ -790,6 +983,50 @@ if (/\/home\/|\/tmp\/|gh[pousr]_[A-Za-z0-9_]{20,}|sk-[A-Za-z0-9]{20,}|AKIA[0-9A-
 }
 NODE
 
+LEGACY_LANG_DIR="$TMP_DIR/legacy-language"
+mkdir -p "$LEGACY_LANG_DIR"
+cat >"$LEGACY_LANG_DIR/LESSON_CONFIG_14_DAYS.tsv" <<EOF
+# key	value
+learning_mode_file	$LEGACY_LANG_DIR/LESSON_MODE.tsv
+workflow_language_file	$LEGACY_LANG_DIR/WORKFLOW_DISPLAY_LANGUAGE_14_DAYS.tsv
+product_language_file	$LEGACY_LANG_DIR/PRODUCT_DEVELOPMENT_LANGUAGE_14_DAYS.tsv
+approval_file	$LEGACY_LANG_DIR/LESSON_APPROVALS_14_DAYS.tsv
+state_file	$ROOT/learning/LESSON_STATE_14_DAYS.tsv
+flow_file	$ROOT/lesson/LESSON_FLOW_14_DAYS.tsv
+EOF
+cat >"$LEGACY_LANG_DIR/LESSON_MODE.tsv" <<'EOF'
+# selected_at	mode	label
+2026-06-05 00:00:00	A	じっくり説明
+EOF
+cat >"$LEGACY_LANG_DIR/WORKFLOW_DISPLAY_LANGUAGE_14_DAYS.tsv" <<'EOF'
+# selected_at	code	label
+2026-06-05 00:00:00	zh	Legacy Chinese alias
+EOF
+cat >"$LEGACY_LANG_DIR/PRODUCT_DEVELOPMENT_LANGUAGE_14_DAYS.tsv" <<'EOF'
+# selected_at	code	label
+2026-06-05 00:00:00	en	English
+EOF
+cat >"$LEGACY_LANG_DIR/LESSON_APPROVALS_14_DAYS.tsv" <<'EOF'
+# timestamp	step_id	action	status	note
+EOF
+LEGACY_LANG_JSON="$TMP_DIR/dashboard-data-legacy-zh.json"
+DASHBOARD_DATA_GENERATED_AT="2026-06-05T00:00:00Z" DASHBOARD_LESSON14_CONFIG="$LEGACY_LANG_DIR/LESSON_CONFIG_14_DAYS.tsv" DASHBOARD_SELECTED_MENU_ID="step_1_14" "$ROOT/tools/dashboard-data" >"$LEGACY_LANG_JSON"
+node - "$LEGACY_LANG_JSON" <<'NODE'
+const fs = require('fs');
+const data = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
+function fail(message) {
+  console.error(message);
+  process.exit(1);
+}
+if (data.summary.workflow_language !== 'zh-CN' || data.summary.display_locale !== 'zh-CN' || data.summary.ui_locale !== 'zh-CN') {
+  fail(`legacy zh must be emitted as canonical zh-CN in summary, got ${JSON.stringify(data.summary)}`);
+}
+const workflowLanguage = data.settings?.items?.find((item) => item.id === 'workflow_language');
+if (!workflowLanguage || workflowLanguage.current_value !== 'zh-CN') {
+  fail('legacy zh workflow_language setting row must be emitted as canonical zh-CN');
+}
+NODE
+
 redacted="$(
   # shellcheck source=tools/lib/dashboard_data.sh
   source "$ROOT/tools/lib/dashboard_data.sh"
@@ -854,8 +1091,50 @@ if (['step_1_7', 'advanced', 'lesson-repository-improvement'].includes(menuId)) 
     fail(`${menuId} selected context leaked product-operation blockers`);
   }
 }
+if (['step_1_7', 'lesson-repository-improvement'].includes(menuId)) {
+  const productName = data.settings?.items?.find((item) => item.id === 'product_name');
+  const productType = data.settings?.items?.find((item) => item.id === 'product_type');
+  if (productName?.status !== 'not_applicable' || productType?.status !== 'not_applicable') {
+    fail(`${menuId} product Settings rows must be not_applicable`);
+  }
+}
 NODE
 done
+
+INCONSISTENT_GIT_SETTINGS="$TMP_DIR/inconsistent-git-settings.tsv"
+INCONSISTENT_GIT_JSON="$TMP_DIR/dashboard-data-inconsistent-git.json"
+cat >"$INCONSISTENT_GIT_SETTINGS" <<'DOC'
+# key	value
+branch_allowed	false
+worktree_allowed	false
+main_direct_work_allowed	false
+pr_creation	auto
+pr_ci_monitoring	auto
+merge_execution	after_approval
+DOC
+DASHBOARD_DATA_GENERATED_AT="2026-06-05T00:00:00Z" GIT_WORKFLOW_SETTINGS_FILE="$INCONSISTENT_GIT_SETTINGS" "$ROOT/tools/dashboard-data" >"$INCONSISTENT_GIT_JSON"
+node - "$INCONSISTENT_GIT_JSON" <<'NODE'
+const fs = require('fs');
+const data = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
+function fail(message) {
+  console.error(message);
+  process.exit(1);
+}
+if (data.git_workflow.settings_status !== 'blocked') {
+  fail(`persisted inconsistent Git settings must surface as blocked, got ${data.git_workflow.settings_status}`);
+}
+const branch = data.settings.items.find((item) => item.id === 'git_branch_allowed');
+const prCreation = data.settings.items.find((item) => item.id === 'git_pr_creation');
+if (branch?.status !== 'blocked' || branch.consistency.reason_code !== 'no_approved_write_path') {
+  fail('branch_allowed row must expose the no-write-path consistency blocker');
+}
+if (prCreation?.status !== 'blocked' || prCreation.consistency.reason_code !== 'pr_creation_requires_branch') {
+  fail('pr_creation row must expose the branch-dependent automation blocker');
+}
+if (!data.development.git_operations.some((row) => row.status === 'blocked' && row.mode !== 'auto')) {
+  fail('Git operation rows must reflect effective modes and blocked settings status');
+}
+NODE
 
 product_project_root="$TMP_DIR/projects"
 product_repo="$product_project_root/dashboard-product"
@@ -990,6 +1269,23 @@ if (data.selected_context.git_status !== 'passed') {
 }
 if (data.selected_context.ci_status !== 'failed') {
   fail(`expected selected_context.ci_status to propagate product.ci evidence, got ${data.selected_context.ci_status}`);
+}
+if (data.selected_context.git_usage_mode !== 'ci') {
+  fail(`product-improvement must use default ci Git usage mode, got ${data.selected_context.git_usage_mode}`);
+}
+if (data.selected_context.git_requirement !== 'required' || data.selected_context.ci_requirement !== 'required') {
+  fail(`ci mode must require Git and CI, got ${data.selected_context.git_requirement}/${data.selected_context.ci_requirement}`);
+}
+const productGitUsageItem = data.settings.items.find((item) => item.id === 'product_git_usage_mode');
+if (!productGitUsageItem) {
+  fail('settings.items must include product_git_usage_mode for product contexts');
+}
+if (productGitUsageItem.editable !== true || productGitUsageItem.current_value !== 'ci') {
+  fail(`product_git_usage_mode must be editable with current ci value in product-improvement, got editable=${productGitUsageItem.editable} value=${productGitUsageItem.current_value}`);
+}
+const allowedProductModes = productGitUsageItem.allowed_values.slice().sort().join(',');
+if (allowedProductModes !== 'ci,local,none,remote_sync') {
+  fail(`product_git_usage_mode allowed values are wrong: ${allowedProductModes}`);
 }
 if (data.selected_context.security_status !== 'passed') {
   fail(`expected selected_context.security_status to propagate product.security evidence, got ${data.selected_context.security_status}`);

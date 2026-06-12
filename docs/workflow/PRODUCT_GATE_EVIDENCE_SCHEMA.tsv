@@ -8,7 +8,7 @@ evidence	product_root	implemented	path	sanitized-path	Each evidence item records
 evidence	product_head	implemented	git-sha|none	sha1|sha256|none	Each evidence item binds the result to the product repository HEAD where applicable.
 evidence	observed_at	implemented	string	iso8601|not_collected	Each evidence item records when the observation was made.
 evidence	max_age_seconds	implemented	integer	non-negative|0-for-no-expiry	Each evidence item records freshness expectations without hard-coding them in the UI.
-evidence	status	implemented	enum	not_run|passed|failed|blocked|unknown|optional|cached|stale	Status uses a fixed vocabulary that can distinguish not-run and stale evidence from unknown state.
+evidence	status	implemented	enum	not_run|passed|failed|blocked|unknown|optional|cached|stale|not_applicable	Status uses a fixed vocabulary that can distinguish not-run, stale, and not-applicable evidence from unknown state.
 evidence	freshness_state	implemented	enum	current|stale|not_collected|unknown	Freshness is explicit so dashboard can separate current evidence from old evidence.
 evidence	required_in_context	implemented	boolean	true|false	Each evidence item records whether the workflow context requires it.
 evidence	authority	implemented	enum	authoritative|manual_required|advisory|not_collected	Each evidence item records whether the value is authoritative, manual_required, advisory, or not collected.

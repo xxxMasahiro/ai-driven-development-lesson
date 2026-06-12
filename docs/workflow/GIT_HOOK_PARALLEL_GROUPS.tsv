@@ -29,6 +29,7 @@ test_ci_evidence	regression	parallel	Same-run evidence regression uses fixtures 
 test_ci_timing	regression	parallel	CI timing regression uses fixtures and can run in parallel.
 test_dashboard_schema	regression	parallel	Dashboard schema regression validates repository-local TSV schema and can run in parallel.
 test_dashboard_data	regression	parallel	Dashboard data regression validates repository-local JSON output and can run in parallel.
+test_dashboard_i18n	regression	parallel	Dashboard i18n static regression validates locale policy and dictionaries and can run in parallel.
 test_dashboard_control_center	heavy	heavy	React/Vite dashboard control-center regression uses browser tooling and its own resource controls.
 test_ci_final_gate	regression	parallel	Final-gate regression uses fixtures and can run in parallel.
 test_ci_pipeline_acceleration	regression	parallel	CI pipeline acceleration regression is read-only and can run in parallel.
@@ -40,6 +41,7 @@ test_product_scaffold_check	regression	parallel	Product scaffold regression uses
 test_product_repository_cleanup	regression	parallel	Product repository cleanup regression uses fixtures and can run in parallel.
 test_product_repository_authority	regression	parallel	Product repository authority regression uses temporary repositories and can run in parallel.
 test_product_security	regression	parallel	Product security regression uses fixtures and can run in parallel.
+test_product_git_usage_modes	regression	parallel	Product Git usage mode regression uses temporary repositories and can run in parallel.
 test_lesson_playwright	heavy	heavy	Playwright is browser-heavy and uses its own resource guard profile.
 test_lesson_start_position	lesson-cli	parallel	Lesson start-position regression mutates only fixture lesson state and can run in parallel.
 test_lesson	lesson-cli	parallel	Lesson CLI regression mutates only fixture lesson state and can run in parallel.

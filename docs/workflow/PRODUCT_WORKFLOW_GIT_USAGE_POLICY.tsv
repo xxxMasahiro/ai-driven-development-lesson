@@ -1,0 +1,4 @@
+# context	allowed_modes	default_mode	label	description
+free-development	none|local|remote_sync|ci	ci	Free Development Git usage	Selects whether Free Development product work uses no Git, local Git, remote sync, or CI-backed Git.
+product-improvement	none|local|remote_sync|ci	ci	Product Improvement Git usage	Selects whether Product Improvement work uses no Git, local Git, remote sync, or CI-backed Git.
+external-integration	none|local|remote_sync|ci	ci	External Integration Git usage	Selects whether External Integration work uses no Git, local Git, remote sync, or CI-backed Git.

@@ -17,7 +17,38 @@ if ! declare -F product_security_policy_file >/dev/null 2>&1; then
 fi
 
 dashboard_data_schema_version() {
-  printf '0.8.0'
+  printf '0.9.0'
+}
+
+dashboard_standard_ui_locale_codes() {
+  printf 'ja|en|ko|zh-CN|zh-TW|es|pt-BR|fr|de|id|vi|th|hi|ar'
+}
+
+dashboard_ui_locale_for_workflow_language() {
+  case "$1" in
+    ja|ja-*) printf 'ja' ;;
+    en|en-*) printf 'en' ;;
+    ko|ko-*) printf 'ko' ;;
+    zh|zh-CN|zh-cn|zh_CN|zh-Hans|zh-hans|zh-Hans-*|zh-hans-*) printf 'zh-CN' ;;
+    zh-TW|zh-tw|zh_TW|zh-Hant|zh-hant|zh-Hant-*|zh-hant-*) printf 'zh-TW' ;;
+    es|es-*) printf 'es' ;;
+    pt|pt-*|pt_BR|pt-BR|pt-br) printf 'pt-BR' ;;
+    fr|fr-*) printf 'fr' ;;
+    de|de-*) printf 'de' ;;
+    id|id-*) printf 'id' ;;
+    vi|vi-*) printf 'vi' ;;
+    th|th-*) printf 'th' ;;
+    hi|hi-*) printf 'hi' ;;
+    ar|ar-*) printf 'ar' ;;
+    *) printf 'en' ;;
+  esac
+}
+
+dashboard_ui_direction_for_locale() {
+  case "$1" in
+    ar) printf 'rtl' ;;
+    *) printf 'ltr' ;;
+  esac
 }
 
 dashboard_data_generated_at() {
@@ -152,7 +183,7 @@ if (typeof value === "object") {
 
 dashboard_data_allowed_state() {
   case "$1" in
-    missing|ready|passed|failed|blocked|unknown|approval_required|optional|cached|not_run|stale|manual_required) return 0 ;;
+    missing|ready|passed|failed|blocked|unknown|approval_required|optional|cached|not_run|stale|manual_required|not_applicable) return 0 ;;
   esac
   return 1
 }
@@ -501,6 +532,165 @@ dashboard_json_evidence_row() {
   printf '}'
 }
 
+dashboard_data_validate_setting_scope() {
+  case "$1" in
+    selected_context|learning|workflow|security|repository|dashboard) return 0 ;;
+  esac
+  printf 'invalid dashboard setting scope: %s\n' "$1" >&2
+  return 1
+}
+
+dashboard_data_validate_settings_related_page() {
+  case "$1" in
+    \#overview|\#lessons|\#workflow|\#maintenance|\#safety|\#repository-info|\#documents|\#settings|\#history|\#help) return 0 ;;
+  esac
+  printf 'invalid dashboard setting related page: %s\n' "$1" >&2
+  return 1
+}
+
+dashboard_json_setting_group() {
+  local id="$1"
+  local label_key="$2"
+  local description_key="$3"
+  local status="$4"
+  local order="$5"
+
+  dashboard_data_validate_state "$status"
+
+  printf '{"id":'
+  dashboard_json_string "$id"
+  printf ',"label_key":'
+  dashboard_json_string "$label_key"
+  printf ',"description_key":'
+  dashboard_json_string "$description_key"
+  printf ',"status":'
+  dashboard_json_string "$status"
+  printf ',"order":%d}' "$order"
+}
+
+dashboard_setting_consistency_reset() {
+  unset DASHBOARD_SETTING_CONSISTENCY_STATUS
+  unset DASHBOARD_SETTING_CONSISTENCY_SEVERITY
+  unset DASHBOARD_SETTING_CONSISTENCY_REASON_CODE
+  unset DASHBOARD_SETTING_CONSISTENCY_REASON_KEY
+  unset DASHBOARD_SETTING_CONSISTENCY_NEXT_ACTION_KEY
+  unset DASHBOARD_SETTING_CONSISTENCY_EFFECTIVE_MODE
+  unset DASHBOARD_SETTING_CONSISTENCY_AFFECTED_IDS
+}
+
+dashboard_json_setting_consistency() {
+  local fallback_status="$1"
+  local status="${DASHBOARD_SETTING_CONSISTENCY_STATUS:-$fallback_status}"
+  local severity="${DASHBOARD_SETTING_CONSISTENCY_SEVERITY:-info}"
+  local reason_code="${DASHBOARD_SETTING_CONSISTENCY_REASON_CODE:-none}"
+  local reason_key="${DASHBOARD_SETTING_CONSISTENCY_REASON_KEY:-settingsPage.consistency.none}"
+  local next_action_key="${DASHBOARD_SETTING_CONSISTENCY_NEXT_ACTION_KEY:-settingsPage.consistency.next.none}"
+  local effective_mode="${DASHBOARD_SETTING_CONSISTENCY_EFFECTIVE_MODE:-}"
+  local affected_ids="${DASHBOARD_SETTING_CONSISTENCY_AFFECTED_IDS:-}"
+  local -a affected_array=()
+
+  dashboard_data_validate_state "$status"
+
+  printf '{"status":'
+  dashboard_json_string "$status"
+  printf ',"severity":'
+  dashboard_json_string "$severity"
+  printf ',"reason_code":'
+  dashboard_json_string "$reason_code"
+  printf ',"reason_key":'
+  dashboard_json_string "$reason_key"
+  printf ',"next_action_key":'
+  dashboard_json_string "$next_action_key"
+  printf ',"effective_mode":'
+  dashboard_json_string "$effective_mode"
+  printf ',"affected_setting_ids":'
+  if [[ -n "$affected_ids" ]]; then
+    IFS=',' read -r -a affected_array <<<"$affected_ids"
+    dashboard_json_string_array "${affected_array[@]}"
+  else
+    dashboard_json_string_array
+  fi
+  printf '}'
+}
+
+dashboard_json_setting_item() {
+  local id="$1"
+  local group_id="$2"
+  local scope="$3"
+  local label_key="$4"
+  local description_key="$5"
+  local current_value="$6"
+  local current_label="$7"
+  local status="$8"
+  local source_file="$9"
+  local editable="${10}"
+  local reviewable="${11}"
+  local risk_level="${12}"
+  local requires_confirmation="${13}"
+  local disabled_reason_key="${14}"
+  local related_page="${15}"
+  local update_action_id="${16}"
+  local impact_key="${17}"
+  local target_file="${18}"
+  local validation_status="${19}"
+  local update_preview_key="${20}"
+  shift 20
+
+  dashboard_data_validate_setting_scope "$scope"
+  dashboard_data_validate_state "$status"
+  dashboard_data_validate_risk_level "$risk_level"
+  dashboard_data_validate_settings_related_page "$related_page"
+  dashboard_data_validate_state "$validation_status"
+
+  printf '{"id":'
+  dashboard_json_string "$id"
+  printf ',"group_id":'
+  dashboard_json_string "$group_id"
+  printf ',"scope":'
+  dashboard_json_string "$scope"
+  printf ',"label_key":'
+  dashboard_json_string "$label_key"
+  printf ',"description_key":'
+  dashboard_json_string "$description_key"
+  printf ',"current_value":'
+  dashboard_json_string "$current_value"
+  printf ',"current_label":'
+  dashboard_json_string "$current_label"
+  printf ',"status":'
+  dashboard_json_string "$status"
+  printf ',"source_file":'
+  dashboard_json_string "$source_file"
+  printf ',"allowed_values":'
+  dashboard_json_string_array "$@"
+  printf ',"editable":'
+  dashboard_json_bool "$editable"
+  printf ',"reviewable":'
+  dashboard_json_bool "$reviewable"
+  printf ',"risk_level":'
+  dashboard_json_string "$risk_level"
+  printf ',"requires_confirmation":'
+  dashboard_json_bool "$requires_confirmation"
+  printf ',"consistency":'
+  dashboard_json_setting_consistency "$status"
+  printf ',"disabled_reason_key":'
+  dashboard_json_string "$disabled_reason_key"
+  printf ',"related_page":'
+  dashboard_json_string "$related_page"
+  printf ',"update_action_id":'
+  dashboard_json_string "$update_action_id"
+  printf ',"review":{"impact_key":'
+  dashboard_json_string "$impact_key"
+  printf ',"target_file":'
+  dashboard_json_string "$target_file"
+  printf ',"validation_status":'
+  dashboard_json_string "$validation_status"
+  printf ',"update_preview_key":'
+  dashboard_json_string "$update_preview_key"
+  printf '}'
+  printf '}'
+  dashboard_setting_consistency_reset
+}
+
 dashboard_json_security_item() {
   local id="$1"
   local label="$2"
@@ -733,7 +923,7 @@ dashboard_data_git_settings_status() {
       return
     fi
   done <<<"$rows"
-  printf 'ready'
+  git_workflow_settings_consistency_status
 }
 
 dashboard_data_product_security_policy_status() {
