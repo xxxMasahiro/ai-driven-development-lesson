@@ -1,0 +1,357 @@
+{
+  "name": "dashboard-design-studio-orchestration",
+  "version": "2026-06-14.orchestration-foundation",
+  "syncId": "dashboard_design_studio_orchestration_foundation",
+  "source": "docs/design-system/dashboard-control-center/DESIGN_SYSTEM.md",
+  "model": [
+    "design-intent",
+    "mock-or-template",
+    "candidate-envelope",
+    "ai-or-manual-proposal",
+    "preview-diff",
+    "plan-token",
+    "explicit-approval",
+    "owner-tool-apply",
+    "verification",
+    "rollback-ready-evidence"
+  ],
+  "states": {
+    "request": [
+      "draft",
+      "queued",
+      "manual_required",
+      "blocked",
+      "cancelled"
+    ],
+    "job": [
+      "queued",
+      "running",
+      "waiting_for_agent",
+      "manual_required",
+      "dead_letter",
+      "cancelled",
+      "completed"
+    ],
+    "proposal": [
+      "proposal_only",
+      "preview_ready",
+      "approval_required",
+      "rejected",
+      "stale",
+      "verified"
+    ],
+    "apply": [
+      "plan_only",
+      "target_locked",
+      "applying",
+      "verified",
+      "rollback_ready",
+      "blocked"
+    ]
+  },
+  "schemas": [
+    {
+      "id": "DesignIntentRequest",
+      "status": "ready",
+      "purpose": "Capture the user's natural-language, mock, or template request without granting write authority.",
+      "requiredFields": [
+        "request_id",
+        "target_ref",
+        "intent_text",
+        "request_kind",
+        "provider_mode",
+        "base_snapshot_hash",
+        "idempotency_key",
+        "writes_allowed",
+        "purpose"
+      ],
+      "forbiddenFields": [
+        "raw_api_key",
+        "shell_command",
+        "direct_apply"
+      ]
+    },
+    {
+      "id": "DesignChangeProposal",
+      "status": "ready",
+      "purpose": "Normalize AI, manual, mock, and template output into one proposal-only change packet.",
+      "requiredFields": [
+        "proposal_id",
+        "request_id",
+        "operations",
+        "affected_source_files",
+        "affected_generated_files",
+        "risk_assessment",
+        "accessibility_notes",
+        "check_plan",
+        "confidence",
+        "manual_decision_points",
+        "rollback_outline",
+        "proposal_only"
+      ],
+      "forbiddenFields": [
+        "approval_decision",
+        "apply_token",
+        "credential_value"
+      ]
+    },
+    {
+      "id": "CandidateEnvelope",
+      "status": "ready",
+      "purpose": "Isolate untrusted natural language, OCR, image analysis, imagegen, external documents, and AI output.",
+      "requiredFields": [
+        "candidate_id",
+        "source_kind",
+        "provenance",
+        "payload_ref",
+        "confidence",
+        "redaction_state",
+        "expires_at",
+        "instruction_denial"
+      ],
+      "forbiddenFields": [
+        "trusted_instruction",
+        "owner_write_path",
+        "secret_value"
+      ]
+    },
+    {
+      "id": "MockArtifact",
+      "status": "ready",
+      "purpose": "Track generated or edited mock images as versioned references, not as design-system source.",
+      "requiredFields": [
+        "mock_id",
+        "relative_path",
+        "content_hash",
+        "prompt_hash",
+        "source_kind",
+        "lineage",
+        "mime",
+        "dimensions",
+        "redaction_state",
+        "approval_state",
+        "retention_state"
+      ],
+      "forbiddenFields": [
+        "absolute_path",
+        "secret_prompt",
+        "trusted_instruction"
+      ]
+    },
+    {
+      "id": "MockAnalysisProposal",
+      "status": "ready",
+      "purpose": "Convert mock observations into explicit accept, adjust, reject, or hold design candidates.",
+      "requiredFields": [
+        "analysis_id",
+        "mock_id",
+        "observations",
+        "candidate_tokens",
+        "candidate_components",
+        "evidence",
+        "confidence",
+        "unknowns",
+        "manual_decisions"
+      ],
+      "forbiddenFields": [
+        "auto_apply",
+        "css_patch",
+        "script_patch"
+      ]
+    },
+    {
+      "id": "TemplateDefinition",
+      "status": "ready",
+      "purpose": "Store reusable design decisions as safe manifests with compatibility and forbidden-operation rules.",
+      "requiredFields": [
+        "template_id",
+        "version",
+        "product_type",
+        "supported_targets",
+        "required_tokens",
+        "components",
+        "patterns",
+        "allowed_outputs",
+        "forbidden_operations",
+        "required_checks",
+        "lifecycle_state"
+      ],
+      "forbiddenFields": [
+        "dependency_install",
+        "network_call",
+        "credential_requirement"
+      ]
+    },
+    {
+      "id": "TemplateProposal",
+      "status": "ready",
+      "purpose": "Explain what a selected template would change before it becomes a DesignChangeProposal.",
+      "requiredFields": [
+        "template_proposal_id",
+        "template_id",
+        "target_ref",
+        "compatibility",
+        "candidate_operations",
+        "manual_decisions",
+        "check_plan"
+      ],
+      "forbiddenFields": [
+        "auto_apply",
+        "git_operation",
+        "ci_operation"
+      ]
+    },
+    {
+      "id": "ApplyEvidence",
+      "status": "ready",
+      "purpose": "Record the approval, hashes, verification, and rollback-ready evidence for owner-tool applies.",
+      "requiredFields": [
+        "transaction_id",
+        "plan_fingerprint",
+        "plan_token_ref",
+        "approval_receipt",
+        "target_snapshot",
+        "source_hash",
+        "generated_hash",
+        "verification_result",
+        "rollback_ready",
+        "redaction_state"
+      ],
+      "forbiddenFields": [
+        "raw_secret",
+        "unverified_apply",
+        "cross_repo_write_without_contract"
+      ]
+    }
+  ],
+  "providerModes": [
+    {
+      "id": "manual",
+      "status": "ready",
+      "directApplyAuthority": false,
+      "secretPolicy": "none",
+      "description": "A human or subscription-backed agent writes a proposal outside the browser, then imports structured proposal data."
+    },
+    {
+      "id": "subscription-agent",
+      "status": "manual_required",
+      "directApplyAuthority": false,
+      "secretPolicy": "redacted-context-only",
+      "description": "A subscribed CLI agent may process a request event and return proposal data through the same schema."
+    },
+    {
+      "id": "api-key",
+      "status": "blocked",
+      "directApplyAuthority": false,
+      "secretPolicy": "secret-reference-only",
+      "description": "API-key mode is contract-defined but blocked until provider policy, secret references, consent, cost, and rate limits are implemented."
+    }
+  ],
+  "targetAdapters": [
+    {
+      "id": "dashboard-control-center",
+      "status": "ready",
+      "applyMode": "owner-tool",
+      "ownerTool": "tools/dashboard-design-system",
+      "allowedOutputs": [
+        "docs/design-system/dashboard-control-center/tokens.json",
+        "docs/design-system/dashboard-control-center/components.json",
+        "dashboard-control-center/src/design-system.generated.css",
+        "dashboard-control-center/src/design-system.generated.js"
+      ],
+      "requiredChecks": [
+        "tools/check_dashboard_design_system.sh",
+        "tools/test_dashboard_control_center.sh"
+      ]
+    },
+    {
+      "id": "external-product",
+      "status": "manual_required",
+      "applyMode": "plan-only",
+      "ownerTool": "product-local-design-system-tool",
+      "allowedOutputs": [
+        "product:docs/design-system/",
+        "product:skills/",
+        "product:tools/"
+      ],
+      "requiredChecks": [
+        "product-local-design-system-check",
+        "product-local-workflow-check"
+      ]
+    }
+  ],
+  "store": {
+    "id": "request-proposal-store",
+    "status": "ready",
+    "requiredFields": [
+      "correlation_id",
+      "idempotency_key",
+      "target_ref",
+      "base_snapshot_hash",
+      "redaction_state",
+      "created_at",
+      "updated_at",
+      "lifecycle_state"
+    ],
+    "retentionPolicy": "proposal metadata is kept; raw secrets and unredacted prompt payloads are never stored"
+  },
+  "eventRunner": {
+    "id": "design-studio-event-runner",
+    "status": "ready",
+    "requiredCapabilities": [
+      "durable_job_id",
+      "status",
+      "retry",
+      "timeout",
+      "cancel",
+      "dead_letter",
+      "event_order",
+      "target_lock",
+      "audit_receipt"
+    ],
+    "forbiddenCapabilities": [
+      "arbitrary_shell",
+      "git_push",
+      "merge",
+      "main_ci_wait",
+      "external_product_apply"
+    ]
+  },
+  "mockLibrary": {
+    "status": "ready",
+    "supportedOperations": [
+      "register-mock",
+      "rectangle-region-edit-plan",
+      "circle-region-edit-plan",
+      "versioned-revert-plan",
+      "mock-to-design-candidate"
+    ],
+    "unsupportedOperations": [
+      "advanced-image-editor",
+      "unbounded-ocr-trust",
+      "auto-apply-from-image"
+    ]
+  },
+  "templateLibrary": {
+    "status": "ready",
+    "supportedOperations": [
+      "register-template",
+      "preview-template",
+      "template-to-proposal",
+      "deprecate-template"
+    ],
+    "unsupportedOperations": [
+      "dependency-install",
+      "network-call",
+      "credential-requirement",
+      "git-or-ci-operation"
+    ]
+  },
+  "checks": [
+    "tools/check_dashboard_design_system.sh",
+    "tools/test_dashboard_control_center.sh",
+    "tools/check_as_built_sync_contract.sh",
+    "tools/check_as_built_docs.sh",
+    "tools/check_workflow_pair_sync.sh"
+  ]
+}

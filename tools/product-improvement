@@ -16,6 +16,7 @@ usage() {
 Usage:
   tools/product-improvement status
   tools/product-improvement start --confirm
+  tools/product-improvement gate-plan
   tools/product-improvement gate
 
 Rules:
@@ -27,7 +28,7 @@ USAGE
 
 check_scope_docs() {
   local product_root missing file
-  product_root="$(lesson_product_repo_root)"
+  product_root="$(product_workflow_git_usage_repository_root_for_context product-improvement)"
   missing=0
   for file in REQUIREMENTS.md SPECIFICATION.md IMPLEMENTATION_PLAN.md; do
     if [[ ! -s "$product_root/docs/product/$file" ]]; then
@@ -41,7 +42,7 @@ check_scope_docs() {
 case "$COMMAND" in
   status|現在地)
     printf 'Product Improvement: optional improvement cycle\n'
-    printf 'Product repository: %s\n' "$(lesson_product_repo_root)"
+    printf 'Product repository: %s\n' "$(product_workflow_git_usage_repository_root_for_context product-improvement 2>/dev/null || printf 'not_selected')"
     printf 'Typical improvements: completion, deletion, persistence, screen copy, layout, accessibility, tests, and documentation.\n'
     "$LESSON_ROOT/tools/product-security" advise --context product-improvement || true
     lesson_menu_print_readiness "Product Improvement"
@@ -63,6 +64,9 @@ Do not implement until I approve the smallest useful improvement plan.
 PROMPT
     printf '\nProduct security guidance:\n'
     "$LESSON_ROOT/tools/product-security" advise --context product-improvement || true
+    ;;
+  gate-plan|plan)
+    product_workflow_git_usage_gate_plan product-improvement all
     ;;
   gate|確認)
     lesson_menu_require_settings "Product Improvement"

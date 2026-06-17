@@ -1,0 +1,4 @@
+interface:
+  display_name: "Decision-Driven Implementation"
+  short_description: "Tie implementation to decisions and evidence."
+  default_prompt: "Use $decision-driven-implementation to define the user decision, overview/detail depth, real evidence, and acceptance checks before implementing."

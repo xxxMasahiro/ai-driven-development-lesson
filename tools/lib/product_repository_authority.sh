@@ -275,6 +275,89 @@ process.exit(0);
 NODE
 }
 
+product_repository_authority_product_operation_mode_valid() {
+  local file="$1"
+  [[ -f "$file" && -s "$file" ]] || return 1
+  PRODUCT_OPERATION_MODE_FILE="$file" node <<'NODE' >/dev/null
+const fs = require("node:fs");
+
+const file = process.env.PRODUCT_OPERATION_MODE_FILE || "";
+const allowedModes = new Set(["parent_managed", "standalone", "reconnecting", "repair_required"]);
+
+function fail() {
+  process.exit(1);
+}
+
+function safeText(value, max = 240) {
+  const text = String(value ?? "");
+  if (/[\u0000-\u001f]/.test(text)) fail();
+  return text.replace(/\s+/g, " ").trim().slice(0, max);
+}
+
+function safeRelativeOrToken(value) {
+  const text = safeText(value);
+  if (!text || text === "none" || text === "not_collected") return text;
+  if (text.startsWith("/") || text.includes("\\") || text.includes("\0")) fail();
+  if (text.split("/").some((part) => part === ".." || part === "")) fail();
+  return text;
+}
+
+function validTimestampOrToken(value) {
+  const text = safeText(value, 80);
+  return text === "none" || text === "not_collected" || /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/.test(text);
+}
+
+let raw;
+try {
+  raw = fs.readFileSync(file, "utf8");
+} catch {
+  fail();
+}
+
+const data = new Map();
+for (const line of raw.split(/\r?\n/)) {
+  if (!line.trim() || line.startsWith("#")) continue;
+  const parts = line.split("\t");
+  if (parts.length !== 2) fail();
+  const key = safeText(parts[0], 80);
+  const value = safeText(parts[1], 240);
+  if (!/^[a-z0-9_]+$/.test(key)) fail();
+  data.set(key, value);
+}
+
+for (const key of [
+  "workflow_mode",
+  "managed_by_parent",
+  "parent_repository",
+  "parent_rules_ref",
+  "last_parent_sync",
+  "active_parent_run",
+  "local_agents_version",
+  "routing_table_version",
+]) {
+  if (!data.has(key)) fail();
+}
+
+const mode = data.get("workflow_mode");
+if (!allowedModes.has(mode)) fail();
+const managedByParent = data.get("managed_by_parent");
+if (!["true", "false"].includes(managedByParent)) fail();
+safeRelativeOrToken(data.get("parent_repository"));
+safeRelativeOrToken(data.get("parent_rules_ref"));
+if (!validTimestampOrToken(data.get("last_parent_sync"))) fail();
+safeRelativeOrToken(data.get("active_parent_run"));
+if (!/^[0-9]+$/.test(data.get("local_agents_version"))) fail();
+if (!/^[0-9]+$/.test(data.get("routing_table_version"))) fail();
+
+if (mode === "standalone" && managedByParent !== "false") fail();
+if ((mode === "parent_managed" || mode === "reconnecting") && managedByParent !== "true") fail();
+if ((mode === "parent_managed" || mode === "reconnecting") && data.get("parent_repository") === "none") fail();
+if ((mode === "parent_managed" || mode === "reconnecting") && data.get("parent_rules_ref") === "none") fail();
+
+process.exit(0);
+NODE
+}
+
 product_repository_authority_path_valid() {
   local repo="$1"
   local relpath="$2"
@@ -287,6 +370,7 @@ product_repository_authority_path_valid() {
     path_exists) [[ -e "$path" ]] ;;
     tsv_valid) product_repository_authority_tsv_valid "$path" ;;
     product_profile_valid) product_repository_authority_product_profile_valid "$path" ;;
+    product_operation_mode_valid) product_repository_authority_product_operation_mode_valid "$path" ;;
     *) return 1 ;;
   esac
 }
@@ -384,7 +468,7 @@ product_repository_authority_product_manifest_semantic_blockers() {
         ;;
     esac
     case "$validation_rule" in
-      file_exists|file_nonempty|path_exists|tsv_valid) ;;
+      file_exists|file_nonempty|path_exists|tsv_valid|product_profile_valid|product_operation_mode_valid) ;;
       *)
         printf '%s\tblocked\tProduct manifest row has unsupported validation_rule: %s\t./tools/product-scaffold-check check\n' "$authority_id" "$validation_rule"
         continue
@@ -475,7 +559,7 @@ product_repository_authority_repository_index_json() {
   local repo="$1"
   local index_file="$repo/ops/REPOSITORY_INDEX.json"
   if [[ ! -f "$index_file" ]]; then
-    printf '{"status":"not_run","path":"ops/REPOSITORY_INDEX.json","schema_version":"unknown","root_name":"","source":"external_product_repository","default_expand_depth":0,"excludes":[],"roles":{},"files":[]}'
+    printf '{"status":"not_run","path":"ops/REPOSITORY_INDEX.json","schema_version":"unknown","root_name":"","source":"external_product_repository","default_expand_depth":0,"summary":{"directories":0,"files":0,"total":0},"excludes":[],"roles":{},"files":[]}'
     return
   fi
 
@@ -679,6 +763,178 @@ process.stdout.write(JSON.stringify({
 NODE
 }
 
+product_repository_authority_operation_mode_json() {
+  local repo="$1"
+  PRODUCT_REPOSITORY_ROOT="$repo" node <<'NODE'
+const fs = require("node:fs");
+const path = require("node:path");
+
+const repo = process.env.PRODUCT_REPOSITORY_ROOT || "";
+const modeRelativePath = "ops/PRODUCT_OPERATION_MODE.tsv";
+const modePath = path.join(repo, modeRelativePath);
+const agentsPath = path.join(repo, "AGENTS.MD");
+const legacyAgentPath = path.join(repo, "AGENT.md");
+const allowedModes = new Set(["parent_managed", "standalone", "reconnecting", "repair_required"]);
+
+function safeText(value, fallback = "", max = 240) {
+  const text = String(value ?? fallback)
+    .replace(/[\u0000-\u001f]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return text.slice(0, max);
+}
+
+function safeToken(value, fallback = "none") {
+  const text = safeText(value, fallback);
+  if (!text || text.startsWith("/") || text.includes("\\") || text.includes("\0")) return fallback;
+  if (text.split("/").some((part) => part === ".." || part === "")) return fallback;
+  return text;
+}
+
+function emit(data) {
+  process.stdout.write(JSON.stringify(data));
+}
+
+function base(extra = {}) {
+  return {
+    source_path: modeRelativePath,
+    workflow_mode: "repair_required",
+    managed_by_parent: false,
+    parent_repository: "none",
+    parent_rules_ref: "none",
+    last_parent_sync: "not_collected",
+    active_parent_run: "none",
+    local_agents_version: "0",
+    routing_table_version: "0",
+    agents_path_status: fs.existsSync(agentsPath) ? "ready" : "missing",
+    legacy_agent_status: fs.existsSync(legacyAgentPath) ? "legacy_present" : "absent",
+    rule_connection_status: "repair_required",
+    repair_reason: "",
+    next_safe_action: "Run tools/product-repository-mode status --repo <product> and choose attach, detach, or reconnect.",
+    ...extra,
+  };
+}
+
+if (!fs.existsSync(modePath)) {
+  emit(base({
+    status: "missing",
+    repair_reason: "ops/PRODUCT_OPERATION_MODE.tsv is missing.",
+  }));
+  process.exit(0);
+}
+
+let raw;
+try {
+  raw = fs.readFileSync(modePath, "utf8");
+} catch {
+  emit(base({
+    status: "failed",
+    repair_reason: "ops/PRODUCT_OPERATION_MODE.tsv could not be read.",
+  }));
+  process.exit(0);
+}
+
+const data = new Map();
+for (const line of raw.split(/\r?\n/)) {
+  if (!line.trim() || line.startsWith("#")) continue;
+  const parts = line.split("\t");
+  if (parts.length !== 2) {
+    emit(base({
+      status: "failed",
+      repair_reason: "ops/PRODUCT_OPERATION_MODE.tsv must use two-column key/value TSV rows.",
+    }));
+    process.exit(0);
+  }
+  data.set(safeText(parts[0], "", 80), safeText(parts[1]));
+}
+
+const requiredKeys = [
+  "workflow_mode",
+  "managed_by_parent",
+  "parent_repository",
+  "parent_rules_ref",
+  "last_parent_sync",
+  "active_parent_run",
+  "local_agents_version",
+  "routing_table_version",
+];
+for (const key of requiredKeys) {
+  if (!data.has(key)) {
+    emit(base({
+      status: "failed",
+      repair_reason: `ops/PRODUCT_OPERATION_MODE.tsv is missing ${key}.`,
+    }));
+    process.exit(0);
+  }
+}
+
+const mode = safeText(data.get("workflow_mode"), "repair_required", 80);
+const managed = safeText(data.get("managed_by_parent"), "false", 20);
+const managedByParent = managed === "true";
+const parentRepository = safeToken(data.get("parent_repository"));
+const parentRulesRef = safeToken(data.get("parent_rules_ref"));
+const activeParentRun = safeToken(data.get("active_parent_run"));
+const lastParentSync = safeText(data.get("last_parent_sync"), "not_collected", 80);
+const localAgentsVersion = safeText(data.get("local_agents_version"), "0", 20);
+const routingTableVersion = safeText(data.get("routing_table_version"), "0", 20);
+
+let status = "ready";
+let ruleConnectionStatus = "ready";
+let repairReason = "";
+let nextSafeAction = "No operation-mode repair is required.";
+
+function repair(reason, action = "Run tools/product-repository-mode check --repo <product> and repair the reported mode fields.") {
+  status = status === "ready" ? "repair_required" : status;
+  ruleConnectionStatus = "repair_required";
+  repairReason = repairReason || reason;
+  nextSafeAction = action;
+}
+
+if (!allowedModes.has(mode)) {
+  status = "failed";
+  ruleConnectionStatus = "repair_required";
+  repairReason = "workflow_mode is not supported.";
+  nextSafeAction = "Write a supported workflow_mode: parent_managed, standalone, reconnecting, or repair_required.";
+} else if (mode === "repair_required") {
+  repair("workflow_mode is repair_required.", "Inspect product AGENTS.MD, manifest, parent connection, and active-run state before continuing.");
+} else if (mode === "standalone") {
+  ruleConnectionStatus = "not_applicable";
+  if (managedByParent) {
+    repair("standalone mode must set managed_by_parent to false.");
+  }
+} else {
+  if (!managedByParent) {
+    repair(`${mode} mode must set managed_by_parent to true.`);
+  }
+  if (parentRepository === "none" || parentRulesRef === "none") {
+    repair(`${mode} mode must record parent_repository and parent_rules_ref.`);
+  }
+}
+
+if (!fs.existsSync(agentsPath)) {
+  repair("Product AGENTS.MD is missing.", "Create product-local AGENTS.MD before product work continues.");
+}
+if (fs.existsSync(legacyAgentPath)) {
+  repair("Legacy product AGENT.md is present.", "Validate product AGENTS.MD, then plan approved deletion of legacy AGENT.md.");
+}
+
+emit(base({
+  status,
+  workflow_mode: mode,
+  managed_by_parent: managedByParent,
+  parent_repository: parentRepository,
+  parent_rules_ref: parentRulesRef,
+  last_parent_sync: lastParentSync,
+  active_parent_run: activeParentRun,
+  local_agents_version: localAgentsVersion,
+  routing_table_version: routingTableVersion,
+  rule_connection_status: ruleConnectionStatus,
+  repair_reason: repairReason,
+  next_safe_action: nextSafeAction,
+}));
+NODE
+}
+
 product_repository_authority_validate_evidence_status() {
   case "$1" in
     not_run|passed|failed|blocked|unknown|optional|cached|stale|not_applicable) return 0 ;;
@@ -702,7 +958,7 @@ product_repository_authority_validate_authority() {
 
 product_repository_authority_validate_source_namespace() {
   case "$1" in
-    repositories.product|product.docs|product.workflow|product.git|product.ci|product.security|product.approvals|product.gates|repositories.product.*|product.docs.*|product.workflow.*|product.git.*|product.ci.*|product.security.*|product.approvals.*|product.gates.*) return 0 ;;
+    repositories.product|product.docs|product.workflow|product.structure|product.git|product.ci|product.security|product.approvals|product.gates|product.tests|product.design_system|repositories.product.*|product.docs.*|product.workflow.*|product.structure.*|product.git.*|product.ci.*|product.security.*|product.approvals.*|product.gates.*|product.tests.*|product.design_system.*) return 0 ;;
   esac
   return 1
 }
@@ -730,6 +986,16 @@ product_repository_authority_validate_product_head() {
   [[ "$1" =~ ^[a-fA-F0-9]{7,64}$ ]]
 }
 
+product_repository_authority_product_head_matches_current() {
+  local evidence_head="$1"
+  local current_head="$2"
+  [[ -n "$current_head" ]] || return 0
+  case "$evidence_head" in
+    none|not_collected|"") return 0 ;;
+  esac
+  [[ "$current_head" == "$evidence_head"* || "$evidence_head" == "$current_head"* ]]
+}
+
 product_repository_authority_validate_observed_at() {
   case "$1" in
     not_collected) return 0 ;;
@@ -739,6 +1005,128 @@ product_repository_authority_validate_observed_at() {
 
 product_repository_authority_validate_nonnegative_integer() {
   [[ "$1" =~ ^[0-9]+$ ]]
+}
+
+product_repository_authority_safe_id() {
+  local value="$1"
+  value="${value//$'\t'/ }"
+  value="${value//$'\r'/ }"
+  value="${value//$'\n'/ }"
+  value="${value//[^A-Za-z0-9._-]/-}"
+  value="${value#-}"
+  value="${value%-}"
+  [[ -n "$value" ]] || value="unknown"
+  printf '%s' "$value"
+}
+
+product_repository_authority_now_epoch() {
+  local now="${PRODUCT_REPOSITORY_AUTHORITY_NOW:-}"
+  if [[ -n "$now" ]]; then
+    date -u -d "$now" '+%s' 2>/dev/null && return 0
+  fi
+  date -u '+%s'
+}
+
+product_repository_authority_observed_epoch() {
+  local observed_at="$1"
+  [[ "$observed_at" != "not_collected" ]] || return 1
+  date -u -d "$observed_at" '+%s' 2>/dev/null
+}
+
+product_repository_authority_evidence_time_stale() {
+  local observed_at="$1"
+  local max_age_seconds="$2"
+  local observed_epoch now_epoch
+  [[ "$max_age_seconds" =~ ^[0-9]+$ ]] || return 1
+  [[ "$max_age_seconds" -gt 0 ]] || return 1
+  observed_epoch="$(product_repository_authority_observed_epoch "$observed_at")" || return 1
+  now_epoch="$(product_repository_authority_now_epoch)" || return 1
+  (( now_epoch - observed_epoch > max_age_seconds ))
+}
+
+product_repository_authority_detail_manifest_fields() {
+  local repo="$1"
+  local source_id="$2"
+  local context="$3"
+  local status="$4"
+  local manifest="$repo/ops/EVIDENCE_DETAIL_MANIFEST.tsv"
+  local row required_mode contexts detail_code what_is_checked why_it_matters pass_meaning fail_meaning not_run_meaning stale_meaning next_action_key risk_level summary reason
+  [[ -s "$manifest" ]] || return 1
+  while IFS= read -r row; do
+    [[ -n "$row" ]] || continue
+    [[ "$(product_repository_authority_tsv_field "$row" 1)" == "$source_id" ]] || continue
+    required_mode="$(product_repository_authority_tsv_field "$row" 2)"
+    contexts="$(product_repository_authority_tsv_field "$row" 3)"
+    product_repository_authority_list_has "$contexts" "$context" || continue
+    detail_code="$(product_repository_authority_tsv_field "$row" 7)"
+    what_is_checked="$(product_repository_authority_tsv_field "$row" 9)"
+    why_it_matters="$(product_repository_authority_tsv_field "$row" 10)"
+    pass_meaning="$(product_repository_authority_tsv_field "$row" 11)"
+    fail_meaning="$(product_repository_authority_tsv_field "$row" 12)"
+    not_run_meaning="$(product_repository_authority_tsv_field "$row" 13)"
+    stale_meaning="$(product_repository_authority_tsv_field "$row" 14)"
+    next_action_key="$(product_repository_authority_tsv_field "$row" 15)"
+    risk_level="$(product_repository_authority_tsv_field "$row" 16)"
+    case "$risk_level" in low|medium|high|critical) ;; *) risk_level="medium" ;; esac
+    case "$status" in
+      passed) summary="$pass_meaning" ;;
+      failed|blocked) summary="$fail_meaning" ;;
+      stale|cached) summary="$stale_meaning" ;;
+      not_run|unknown) summary="$not_run_meaning" ;;
+      *) summary="$what_is_checked" ;;
+    esac
+    [[ -n "$summary" ]] || summary="$what_is_checked"
+    reason="$why_it_matters"
+    [[ -n "$reason" ]] || reason="$what_is_checked"
+    [[ -n "$detail_code" ]] || detail_code="${source_id}.detail"
+    printf '%s\t%s\t%s\t%s\t%s\t%s\n' "ops/EVIDENCE_DETAIL_MANIFEST.tsv" "$detail_code" "$summary" "$reason" "$next_action_key" "$risk_level"
+    return 0
+  done < <(awk -F '\t' '
+    /^[[:space:]]*$/ { next }
+    $1 ~ /^#/ { next }
+    NF == 18 { print }
+  ' "$manifest")
+  return 1
+}
+
+product_repository_authority_detail_artifact_fields() {
+  local repo="$1"
+  local source_id="$2"
+  local details_dir detail_file
+  details_dir="$repo/.git/product-gate-evidence/details/$(product_repository_authority_safe_id "$source_id")"
+  [[ -d "$details_dir" ]] || return 1
+  detail_file="$(find "$details_dir" -maxdepth 1 -type f -name '*.json' -printf '%T@\t%p\n' 2>/dev/null | sort -nr | awk -F '\t' 'NR == 1 { print $2 }')"
+  [[ -n "$detail_file" && -s "$detail_file" ]] || return 1
+  PRODUCT_AUTHORITY_DETAIL_FILE="$detail_file" PRODUCT_AUTHORITY_REPO="$repo" node <<'NODE'
+const fs = require("node:fs");
+const path = require("node:path");
+const file = process.env.PRODUCT_AUTHORITY_DETAIL_FILE || "";
+const repo = process.env.PRODUCT_AUTHORITY_REPO || "";
+function safeText(value, max = 500) {
+  if (typeof value !== "string") return "";
+  return value.replace(/[\t\r\n]+/g, " ").replace(/[\u0000-\u001f]/g, " ").trim().slice(0, max);
+}
+function safeRel(filePath) {
+  const rel = path.relative(repo, filePath).replace(/\\/g, "/");
+  if (!rel || rel.startsWith("..") || path.isAbsolute(rel)) return "";
+  return rel;
+}
+let data;
+try {
+  data = JSON.parse(fs.readFileSync(file, "utf8"));
+} catch {
+  process.exit(1);
+}
+const fields = [
+  safeRel(file),
+  safeText(data.safe_summary),
+  safeText(data.reason),
+  safeText(data.next_action),
+  safeText(data.detail_code, 160),
+  safeText(data.event_id, 240),
+];
+process.stdout.write(fields.join("\t"));
+NODE
 }
 
 product_repository_authority_evidence_item_json() {
@@ -755,11 +1143,25 @@ product_repository_authority_evidence_item_json() {
   local source_artifacts="${11}"
   local blocked_by="${12}"
   local next_command="${13}"
+  local detail_code="${14:-}"
+  local current_item_id="${15:-}"
+  local detail_manifest_source="${16:-}"
+  local detail_artifact_path="${17:-}"
+  local summary="${18:-}"
+  local reason="${19:-}"
+  local next_action="${20:-}"
+  local risk_level="${21:-medium}"
 
   product_repository_authority_validate_evidence_status "$status" || status="unknown"
   product_repository_authority_validate_freshness "$freshness_state" || freshness_state="unknown"
   product_repository_authority_validate_authority "$authority" || authority="not_collected"
   case "$required_in_context" in true|false) ;; *) required_in_context="false" ;; esac
+  case "$risk_level" in low|medium|high|critical) ;; *) risk_level="medium" ;; esac
+  [[ -n "$detail_code" ]] || detail_code="${source_id}.detail"
+  [[ -n "$current_item_id" ]] || current_item_id="$source_id"
+  [[ -n "$summary" ]] || summary="$source_id $status"
+  [[ -n "$reason" ]] || reason="$source_artifacts"
+  [[ -n "$next_action" ]] || next_action="$next_command"
 
   printf '{"source_id":'
   product_repository_authority_json_string "$source_id"
@@ -786,6 +1188,22 @@ product_repository_authority_evidence_item_json() {
   product_repository_authority_json_string "$blocked_by"
   printf ',"next_command":'
   product_repository_authority_json_string "$next_command"
+  printf ',"detail_code":'
+  product_repository_authority_json_string "$detail_code"
+  printf ',"current_item_id":'
+  product_repository_authority_json_string "$current_item_id"
+  printf ',"detail_manifest_source":'
+  product_repository_authority_json_string "$detail_manifest_source"
+  printf ',"detail_artifact_path":'
+  product_repository_authority_json_string "$detail_artifact_path"
+  printf ',"summary":'
+  product_repository_authority_json_string "$summary"
+  printf ',"reason":'
+  product_repository_authority_json_string "$reason"
+  printf ',"next_action":'
+  product_repository_authority_json_string "$next_action"
+  printf ',"risk_level":'
+  product_repository_authority_json_string "$risk_level"
   printf '}'
 }
 
@@ -795,6 +1213,7 @@ product_repository_authority_evidence_items() {
   local product_root_label="$3"
   local index_file
   local rows
+  local current_product_head=""
   index_file="$(product_repository_authority_evidence_index "$repo")"
 
   if [[ ! -f "$index_file" ]]; then
@@ -818,6 +1237,10 @@ product_repository_authority_evidence_items() {
     { print }
     END { exit invalid ? 1 : 0 }
   ' "$index_file")" || return 1
+
+  if [[ -d "$repo/.git" ]]; then
+    current_product_head="$(git -C "$repo" rev-parse HEAD 2>/dev/null || true)"
+  fi
 
   while IFS= read -r row; do
     [[ -n "$row" ]] || continue
@@ -877,10 +1300,59 @@ product_repository_authority_evidence_items() {
     if [[ "$evidence_context" != "$context" && "$evidence_context" != "all" ]]; then
       continue
     fi
+    if ! product_repository_authority_product_head_matches_current "$product_head" "$current_product_head"; then
+      status="stale"
+      freshness_state="stale"
+      authority="manual_required"
+      if [[ -z "$blocked_by" ]]; then
+        blocked_by="product.git.head"
+      elif [[ "$blocked_by" != *"product.git.head"* ]]; then
+        blocked_by="${blocked_by};product.git.head"
+      fi
+      [[ -n "$next_command" ]] || next_command="./tools/product-gate"
+    fi
+    local detail_manifest_fields detail_artifact_fields detail_manifest_source detail_code summary reason next_action risk_level detail_artifact_path current_item_id artifact_summary artifact_reason artifact_next_action artifact_detail_code artifact_event_id
+    detail_manifest_source=""
+    detail_code=""
+    summary=""
+    reason=""
+    next_action=""
+    risk_level="medium"
+    detail_artifact_path=""
+    current_item_id="$source_id"
+    if detail_manifest_fields="$(product_repository_authority_detail_manifest_fields "$repo" "$source_id" "$context" "$status")"; then
+      IFS=$'\t' read -r detail_manifest_source detail_code summary reason next_action risk_level <<<"$detail_manifest_fields"
+    fi
+    if detail_artifact_fields="$(product_repository_authority_detail_artifact_fields "$repo" "$source_id")"; then
+      IFS=$'\t' read -r detail_artifact_path artifact_summary artifact_reason artifact_next_action artifact_detail_code artifact_event_id <<<"$detail_artifact_fields"
+      [[ -n "$detail_artifact_path" ]] || detail_artifact_path=""
+      if [[ "$status" != "stale" ]]; then
+        [[ -n "$artifact_summary" ]] && summary="$artifact_summary"
+        [[ -n "$artifact_reason" ]] && reason="$artifact_reason"
+        [[ -n "$artifact_next_action" ]] && next_action="$artifact_next_action"
+      fi
+      [[ -n "$artifact_detail_code" ]] && detail_code="$artifact_detail_code"
+      [[ -n "$artifact_event_id" ]] && current_item_id="$artifact_event_id"
+    fi
+    if [[ "$status" == "passed" && "$freshness_state" == "current" ]] && product_repository_authority_evidence_time_stale "$observed_at" "$max_age_seconds"; then
+      status="stale"
+      freshness_state="stale"
+      authority="manual_required"
+      if [[ -z "$blocked_by" ]]; then
+        blocked_by="product.evidence.age"
+      elif [[ "$blocked_by" != *"product.evidence.age"* ]]; then
+        blocked_by="${blocked_by};product.evidence.age"
+      fi
+      [[ -n "$next_command" ]] || next_command="./tools/product-gate"
+      if detail_manifest_fields="$(product_repository_authority_detail_manifest_fields "$repo" "$source_id" "$context" "$status")"; then
+        IFS=$'\t' read -r detail_manifest_source detail_code summary reason next_action risk_level <<<"$detail_manifest_fields"
+      fi
+    fi
     product_repository_authority_evidence_item_json \
       "$source_id" "$evidence_context" "$status" "$freshness_state" "$required_in_context" "$authority" \
       "$observed_at" "$max_age_seconds" "${product_root:-$product_root_label}" "$product_head" \
-      "$source_artifacts" "$blocked_by" "$next_command"
+      "$source_artifacts" "$blocked_by" "$next_command" "$detail_code" "$current_item_id" \
+      "$detail_manifest_source" "$detail_artifact_path" "$summary" "$reason" "$next_action" "$risk_level"
     printf '\n'
   done <<<"$rows"
 }
@@ -969,7 +1441,19 @@ product_repository_authority_missing_expected_evidence_items() {
   fi
 
   manifest="$repo/ops/CI_MANIFEST.tsv"
-  if [[ "$ci_required" == "true" && -s "$manifest" ]]; then
+  if [[ "$ci_required" == "true" && ! -s "$manifest" ]]; then
+    product_repository_authority_evidence_item_json \
+      "product.ci.evidence_manifest" "$context" "not_run" "not_collected" "true" "not_collected" \
+      "not_collected" "0" "$product_root_label" "none" \
+      "ops/CI_MANIFEST.tsv" "product.ci.evidence_manifest" \
+      "./tools/product-scaffold-check check" \
+      "product.ci.evidence_manifest.detail" "product.ci.evidence_manifest" "" "" \
+      "CI evidence manifest has not been configured." \
+      "CI is required for the selected workflow mode, but ops/CI_MANIFEST.tsv is missing." \
+      "Create ops/CI_MANIFEST.tsv or change the workflow mode before treating CI as checked." \
+      "critical"
+    printf '\n'
+  elif [[ "$ci_required" == "true" && -s "$manifest" ]]; then
     if rows="$(product_repository_authority_manifest_rows_with_columns "$manifest" 8 "product CI manifest")"; then
       while IFS= read -r row; do
         [[ -n "$row" ]] || continue
@@ -1091,6 +1575,11 @@ product_repository_authority_json() {
   local product_root_label
   local repository_index_json
   local product_summary_json
+  local operation_mode_json
+  local operation_mode_status
+  local operation_mode_reason
+  local operation_mode_action
+  local operation_mode_blocker_status
   local required_total=0
   local required_ready=0
   local optional_missing=()
@@ -1106,6 +1595,7 @@ product_repository_authority_json() {
   product_root_label="$(product_repository_authority_safe_repo_label "$repo")"
   repository_index_json="$(product_repository_authority_repository_index_json "$repo" 2>/dev/null || printf '{"status":"unknown","path":"ops/REPOSITORY_INDEX.json","schema_version":"unknown","root_name":"","source":"external_product_repository","default_expand_depth":0,"excludes":[],"roles":{},"files":[]}')"
   product_summary_json="$(product_repository_authority_product_summary_json "$repo" 2>/dev/null || printf '{"status":"unknown","name":"","display_name":{"ja":"","en":""},"description":{"ja":"","en":""},"source_documents":[],"source_path":"ops/PRODUCT_PROFILE.json","source_field":""}')"
+  operation_mode_json="$(product_repository_authority_operation_mode_json "$repo" 2>/dev/null || printf '{"status":"unknown","source_path":"ops/PRODUCT_OPERATION_MODE.tsv","workflow_mode":"repair_required","managed_by_parent":false,"parent_repository":"none","parent_rules_ref":"none","last_parent_sync":"not_collected","active_parent_run":"none","local_agents_version":"0","routing_table_version":"0","agents_path_status":"unknown","legacy_agent_status":"unknown","rule_connection_status":"repair_required","repair_reason":"Product operation mode could not be inspected.","next_safe_action":"Run tools/product-repository-mode status --repo <product>."}')"
 
   if ! product_repository_authority_validate_policy_files >/dev/null 2>&1; then
     repo_status="unknown"
@@ -1172,6 +1662,20 @@ product_repository_authority_json() {
         optional_missing+=("$source_id")
       fi
     done < <(product_repository_authority_structure_rows)
+
+    operation_mode_status="$(product_repository_authority_json_field "$operation_mode_json" "status")"
+    if [[ "$operation_mode_status" != "ready" ]]; then
+      [[ "$authority_status" == "blocked" ]] || authority_status="blocked"
+      blocker_scope="product_operations"
+      conflicts+=("product_ops.operation_mode")
+      operation_mode_reason="$(product_repository_authority_json_field "$operation_mode_json" "repair_reason")"
+      operation_mode_action="$(product_repository_authority_json_field "$operation_mode_json" "next_safe_action")"
+      [[ -n "$operation_mode_reason" ]] || operation_mode_reason="Product operation mode is not ready."
+      [[ -n "$operation_mode_action" ]] || operation_mode_action="./tools/product-repository-mode status --repo <product>"
+      operation_mode_blocker_status="${operation_mode_status:-unknown}"
+      [[ "$operation_mode_blocker_status" != "repair_required" ]] || operation_mode_blocker_status="blocked"
+      blockers+=("$(product_repository_authority_blocker_json "product_ops.operation_mode" "$operation_mode_blocker_status" "$operation_mode_reason" "$operation_mode_action")")
+    fi
 
     local semantic_blocker semantic_source semantic_status semantic_reason semantic_command
     while IFS=$'\t' read -r semantic_source semantic_status semantic_reason semantic_command; do
@@ -1276,6 +1780,8 @@ product_repository_authority_json() {
   product_repository_authority_json_string "$blocker_scope"
   printf '},"product_summary":'
   printf '%s' "$product_summary_json"
+  printf ',"operation_mode":'
+  printf '%s' "$operation_mode_json"
   printf ',"repository_index":'
   printf '%s' "$repository_index_json"
   printf ',"document_paths":'

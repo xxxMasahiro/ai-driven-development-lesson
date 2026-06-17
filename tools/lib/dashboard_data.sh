@@ -77,17 +77,26 @@ dashboard_data_strip_unsafe_control_chars() {
 
 dashboard_data_safe_text() {
   local value="$1"
+  local secret_pattern
   value="$(dashboard_data_strip_unsafe_control_chars "$value")"
   value="${value//$'\r'/ }"
   value="${value//$'\n'/ }"
   value="${value//$'\t'/ }"
 
-  if grep -Eiq '(SECRET|TOKEN|API_KEY|PASSWORD|PRIVATE_KEY)[[:space:]]*[:=][[:space:]]*[^[:space:]#]{8,}|gh[pousr]_[A-Za-z0-9_]{20,}|sk-[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16}|BEGIN (RSA |OPENSSH |EC |DSA )?PRIVATE KEY' <<<"$value"; then
+  secret_pattern='([sS][eE][cC][rR][eE][tT]|[tT][oO][kK][eE][nN]|[aA][pP][iI]_[kK][eE][yY]|[pP][aA][sS][sS][wW][oO][rR][dD]|[pP][rR][iI][vV][aA][tT][eE]_[kK][eE][yY])[[:space:]]*[:=][[:space:]]*[^[:space:]#]{8,}|gh[pousr]_[A-Za-z0-9_]{20,}|sk-[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16}|BEGIN[[:space:]]+(RSA[[:space:]]+|OPENSSH[[:space:]]+|EC[[:space:]]+|DSA[[:space:]]+)?PRIVATE[[:space:]]+KEY'
+  if [[ "$value" =~ $secret_pattern ]]; then
     printf '[redacted secret-like data]'
     return
   fi
 
-  printf '%s' "$value" | sed -E 's#(^|[[:space:]])/[^[:space:]]+#\1[absolute-path]#g'
+  case "$value" in
+    /*|*[[:space:]]/*)
+      printf '%s' "$value" | sed -E 's#(^|[[:space:]])/[^[:space:]]+#\1[absolute-path]#g'
+      ;;
+    *)
+      printf '%s' "$value"
+      ;;
+  esac
 }
 
 dashboard_json_escape() {
@@ -490,6 +499,11 @@ dashboard_json_workflow_run_row() {
   local detail="$5"
   local status="$6"
   local reference="$7"
+  local source_role="${8:-workflow}"
+  local required_command="${9:-}"
+  local scope="${10:-$target}"
+  local evidence_path="${11:-}"
+  local observed_at="${12:-$time}"
 
   dashboard_data_validate_state "$status"
 
@@ -507,6 +521,16 @@ dashboard_json_workflow_run_row() {
   dashboard_json_string "$status"
   printf ',"reference":'
   dashboard_json_string "$reference"
+  printf ',"source_role":'
+  dashboard_json_string "$source_role"
+  printf ',"required_command":'
+  dashboard_json_string "$required_command"
+  printf ',"scope":'
+  dashboard_json_string "$scope"
+  printf ',"evidence_path":'
+  dashboard_json_string "$evidence_path"
+  printf ',"observed_at":'
+  dashboard_json_string "$observed_at"
   printf '}'
 }
 
@@ -516,6 +540,16 @@ dashboard_json_evidence_row() {
   local importance="$3"
   local status="$4"
   local reference="$5"
+  local target="${6:-$label}"
+  local detail="${7:-}"
+  local required_command="${8:-}"
+  local source_role="${9:-evidence}"
+  local observed_at="${10:-}"
+  local impact="${11:-}"
+  local completion_condition="${12:-}"
+  local priority="${13:-medium}"
+  local source_artifacts="${14:-$reference}"
+  local unresolved_count="${15:-0}"
 
   dashboard_data_validate_state "$status"
 
@@ -529,6 +563,26 @@ dashboard_json_evidence_row() {
   dashboard_json_string "$status"
   printf ',"reference":'
   dashboard_json_string "$reference"
+  printf ',"target":'
+  dashboard_json_string "$target"
+  printf ',"detail":'
+  dashboard_json_string "$detail"
+  printf ',"required_command":'
+  dashboard_json_string "$required_command"
+  printf ',"source_role":'
+  dashboard_json_string "$source_role"
+  printf ',"observed_at":'
+  dashboard_json_string "$observed_at"
+  printf ',"impact":'
+  dashboard_json_string "$impact"
+  printf ',"completion_condition":'
+  dashboard_json_string "$completion_condition"
+  printf ',"priority":'
+  dashboard_json_string "$priority"
+  printf ',"source_artifacts":'
+  dashboard_json_string "$source_artifacts"
+  printf ',"unresolved_count":'
+  dashboard_json_string "$unresolved_count"
   printf '}'
 }
 

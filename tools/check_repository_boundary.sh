@@ -57,7 +57,7 @@ case "$CURRENT_DIR/" in
     ;;
   "$PRODUCT_REPO/"*)
     printf 'Context: product repository\n'
-    printf 'Allowed edits: AGENT.md, requirements/spec/plan, task tracker, handoff, app files.\n'
+    printf 'Allowed edits: AGENTS.MD, requirements/spec/plan, task tracker, handoff, app files.\n'
     ;;
   *)
     printf 'Context: outside expected lesson/product repositories\n'

@@ -58,6 +58,10 @@ required_files=(
   "learning/PRODUCT_DEVELOPMENT_LANGUAGE.tsv"
   "learning/GIT_WORKFLOW_SETTINGS.tsv"
   "learning/GIT_HOOK_SETTINGS.tsv"
+  "learning/context/README.md"
+  "learning/context/AI_DRIVEN_DEVELOPMENT_FOUNDATION.md"
+  "learning/context/SECURITY_FOUNDATION.md"
+  "learning/context/LESSON_CONTEXT_MAP.tsv"
   "learning/context/WORKFLOW_CONTEXT_MAP.tsv"
   "learning/LEARNING_TASK_TRACKER.md"
   "learning/LEARNING_HANDOFF.md"
@@ -83,6 +87,7 @@ required_files=(
   "tools/product-scaffold-check"
   "tools/test_product_scaffold_check.sh"
   "tools/product-repository-authority"
+  "tools/product-repository-registry"
   "tools/product-profile"
   "tools/product-repository-cleanup"
   "tools/test_product_repository_cleanup.sh"
@@ -113,7 +118,9 @@ required_files=(
   "tools/dashboard-data"
   "tools/illustrations"
   "tools/test_lesson_playwright.sh"
+  "tools/lib/lesson_context.sh"
   "tools/lib/lesson_common.sh"
+  "tools/lib/lesson_runtime.sh"
   "tools/lib/dashboard_data.sh"
   "tools/lib/git_workflow_policy.sh"
   "tools/lib/git_hooks_policy.sh"
@@ -123,7 +130,9 @@ required_files=(
   "tools/lib/product_security.sh"
   "tools/lib/product_repository_authority.sh"
   "tools/lesson"
+  "tools/lesson-context"
   "tools/learn"
+  "tools/test_lesson_context.sh"
   "illustrations/README.md"
   "illustrations/lesson14/index.tsv"
   "illustration-review/index.html"
@@ -157,7 +166,7 @@ for file in "${misplaced_files[@]}"; do
   fi
 done
 
-for script in "tools/check_lesson_structure.sh" "tools/check_document_organization.sh" "tools/check_learner_display.sh" "tools/check_repository_boundary.sh" "tools/check_agents_skills.sh" "tools/check_as_built_docs.sh" "tools/check_as_built_sync_contract.sh" "tools/check_test_plan_coverage.sh" "tools/check_security_invariants.sh" "tools/fixture-copy" "tools/check_workflow_pair_sync.sh" "tools/check_review_protocol.sh" "tools/check_developer_memory_requirements.sh" "tools/list_non_english_docs.sh" "tools/test_lesson.sh" "tools/test_lesson_repository.sh" "tools/test_product_gate_tools.sh" "tools/product-launch-check" "tools/test_product_launch_check.sh" "tools/product-scaffold-check" "tools/test_product_scaffold_check.sh" "tools/product-repository-authority" "tools/product-profile" "tools/product-repository-cleanup" "tools/test_product_repository_cleanup.sh" "tools/test_product_repository_authority.sh" "tools/test_product_security.sh" "tools/test_menu_prerequisites.sh" "tools/test_docs_tour.sh" "tools/test_as_built_sync_contract.sh" "tools/test_test_plan.sh" "tools/test_fixture_copy.sh" "tools/test_security_invariants.sh" "tools/test_git_workflow_policy.sh" "tools/test_git_hooks.sh" "tools/test_lesson_start_position.sh" "tools/test_lesson_playwright.sh" "tools/test_dashboard_schema.sh" "tools/test_dashboard_data.sh" "tools/test_dashboard_control_center.sh" "tools/free-development" "tools/product-improvement" "tools/product-security" "tools/external-integration" "tools/team-development" "tools/menu" "tools/as-built-sync" "tools/test-plan" "tools/git-workflow" "tools/git-hooks" "tools/docs-tour" "tools/dashboard" "tools/dashboard-data" "tools/dashboard-control-center" "tools/illustrations" "tools/lesson" "tools/learn"; do
+for script in "tools/check_lesson_structure.sh" "tools/check_document_organization.sh" "tools/check_learner_display.sh" "tools/check_repository_boundary.sh" "tools/check_agents_skills.sh" "tools/check_as_built_docs.sh" "tools/check_as_built_sync_contract.sh" "tools/check_test_plan_coverage.sh" "tools/check_security_invariants.sh" "tools/fixture-copy" "tools/check_workflow_pair_sync.sh" "tools/check_review_protocol.sh" "tools/check_developer_memory_requirements.sh" "tools/list_non_english_docs.sh" "tools/test_lesson.sh" "tools/test_lesson_repository.sh" "tools/test_lesson_context.sh" "tools/test_product_gate_tools.sh" "tools/product-launch-check" "tools/test_product_launch_check.sh" "tools/product-scaffold-check" "tools/test_product_scaffold_check.sh" "tools/product-repository-authority" "tools/product-repository-mode" "tools/product-repository-registry" "tools/test_product_repository_mode.sh" "tools/product-profile" "tools/product-repository-cleanup" "tools/test_product_repository_cleanup.sh" "tools/test_product_repository_authority.sh" "tools/test_product_security.sh" "tools/test_menu_prerequisites.sh" "tools/test_docs_tour.sh" "tools/test_as_built_sync_contract.sh" "tools/test_test_plan.sh" "tools/test_fixture_copy.sh" "tools/test_security_invariants.sh" "tools/test_git_workflow_policy.sh" "tools/test_git_hooks.sh" "tools/test_lesson_start_position.sh" "tools/test_lesson_playwright.sh" "tools/test_dashboard_schema.sh" "tools/test_dashboard_data.sh" "tools/test_dashboard_control_center.sh" "tools/free-development" "tools/product-improvement" "tools/product-security" "tools/external-integration" "tools/team-development" "tools/menu" "tools/as-built-sync" "tools/test-plan" "tools/git-workflow" "tools/git-hooks" "tools/docs-tour" "tools/dashboard" "tools/dashboard-data" "tools/dashboard-control-center" "tools/illustrations" "tools/lesson" "tools/lesson-context" "tools/learn"; do
   if [[ ! -x "$ROOT/$script" ]]; then
     printf 'not executable: %s\n' "$script" >&2
     missing=1
@@ -340,6 +349,13 @@ validate_language_file() {
 validate_learning_mode_file "$ROOT/learning/LESSON_MODE.tsv"
 validate_language_file "$ROOT/learning/WORKFLOW_DISPLAY_LANGUAGE.tsv"
 validate_language_file "$ROOT/learning/PRODUCT_DEVELOPMENT_LANGUAGE.tsv"
+
+if [[ -x "$ROOT/tools/lesson-context" ]]; then
+  if ! "$ROOT/tools/lesson-context" validate >/dev/null; then
+    "$ROOT/tools/lesson-context" validate >&2 || true
+    missing=1
+  fi
+fi
 
 if [[ $missing -ne 0 ]]; then
   printf '\nLesson structure check failed.\n' >&2

@@ -1,0 +1,1568 @@
+#!/usr/bin/env node
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const designRoot = path.join(root, "docs/design-system/dashboard-control-center");
+const tokensPath = path.join(designRoot, "tokens.json");
+const componentsPath = path.join(designRoot, "components.json");
+const orchestrationPath = path.join(designRoot, "orchestration.json");
+const designSystemPath = path.join(designRoot, "DESIGN_SYSTEM.md");
+const generatedCssPath = path.join(root, "dashboard-control-center/src/design-system.generated.css");
+const generatedJsPath = path.join(root, "dashboard-control-center/src/design-system.generated.js");
+const mainPath = path.join(root, "dashboard-control-center/src/main.jsx");
+const appPath = path.join(root, "dashboard-control-center/src/App.jsx");
+const supportedInteractionValues = {
+  component: new Set(["tooltip-copy"]),
+  tooltip_trigger: new Set(["hover-only", "disabled"]),
+  tooltip_hide_policy: new Set(["pointer-leave"]),
+  tooltip_placement: new Set(["top"]),
+  copy_feedback_trigger: new Set(["hover-only", "disabled"]),
+  copy_feedback_hide_policy: new Set(["pointer-leave"]),
+  copy_feedback_placement: new Set(["top"]),
+  copy_feedback_collision: new Set(["shift"]),
+};
+const supportedFoundationValues = {
+  target_scope: new Set(["dashboard-control-center", "external-product"]),
+  theme_accent: new Set(["blue", "teal", "slate"]),
+  density: new Set(["compact", "balanced", "comfortable"]),
+  radius_scale: new Set(["compact", "standard", "soft"]),
+  typography_scale: new Set(["standard", "large"]),
+  action_control_height: new Set(["32px", "34px", "38px"]),
+  action_control_padding: new Set(["6px 10px", "8px 11px", "9px 13px"]),
+  compact_control_height: new Set(["30px", "32px", "34px"]),
+  compact_control_padding: new Set(["4px 8px", "5px 10px", "6px 12px"]),
+  form_control_height: new Set(["38px", "40px", "44px"]),
+  form_control_padding: new Set(["0 9px", "0 10px", "0 12px"]),
+  icon_button_size: new Set(["34px", "38px", "42px"]),
+  control_font_size: new Set(["0.82rem", "0.84rem", "0.9rem"]),
+  card_padding: new Set(["12px", "14px", "16px"]),
+  card_gap: new Set(["8px", "10px", "12px"]),
+  row_padding: new Set(["9px 10px", "10px 12px", "12px 14px"]),
+  row_gap: new Set(["8px", "10px", "12px"]),
+  technical_affordance_gap: new Set(["4px", "6px", "8px"]),
+  technical_source_max_width: new Set(["220px", "260px", "300px"]),
+  technical_evidence_max_width: new Set(["260px", "292px", "320px"]),
+  technical_preview_chip_max_width: new Set(["320px", "360px", "420px"]),
+  page_header_padding: new Set(["16px 18px", "18px 20px", "20px 22px"]),
+  metadata_gap: new Set(["6px", "8px", "10px"]),
+  page_icon_size: new Set(["44px", "52px", "56px"]),
+  badge_gap: new Set(["4px", "5px", "6px"]),
+  badge_height: new Set(["24px", "26px", "28px"]),
+  mode_badge_padding: new Set(["3px 10px", "4px 14px", "5px 16px"]),
+  badge_font_size: new Set(["0.72rem", "0.76rem", "0.8rem"]),
+  mode_badge_font_size: new Set(["0.74rem", "0.78rem", "0.82rem"]),
+};
+const foundationPresets = {
+  themeAccent: {
+    blue: {
+      "page-accent": "#1559c7",
+      "page-soft": "#e8f0ff",
+      "page-border": "#b8cdf7",
+    },
+    teal: {
+      "page-accent": "#0f766e",
+      "page-soft": "#e6fffb",
+      "page-border": "#99d7d0",
+    },
+    slate: {
+      "page-accent": "#334155",
+      "page-soft": "#eef2f7",
+      "page-border": "#cbd5e1",
+    },
+  },
+  density: {
+    compact: {
+      "section-gap": "12px",
+      "panel-padding": "12px",
+      "control-gap": "8px",
+    },
+    balanced: {
+      "section-gap": "16px",
+      "panel-padding": "16px",
+      "control-gap": "10px",
+    },
+    comfortable: {
+      "section-gap": "20px",
+      "panel-padding": "20px",
+      "control-gap": "12px",
+    },
+  },
+  radiusScale: {
+    compact: {
+      "default-radius": "6px",
+    },
+    standard: {
+      "default-radius": "8px",
+    },
+    soft: {
+      "default-radius": "10px",
+    },
+  },
+  typographyScale: {
+    standard: {
+      "font-size-body": "0.92rem",
+      "font-size-section-title": "1rem",
+      "font-size-page-title": "1.35rem",
+    },
+    large: {
+      "font-size-body": "0.98rem",
+      "font-size-section-title": "1.06rem",
+      "font-size-page-title": "1.45rem",
+    },
+  },
+};
+
+function readJson(file) {
+  return JSON.parse(fs.readFileSync(file, "utf8"));
+}
+
+function fail(message) {
+  console.error(message);
+  process.exitCode = 1;
+}
+
+function sortedTokenRows(tokens) {
+  return [...tokens.tokens].sort((left, right) => left.cssVariable.localeCompare(right.cssVariable));
+}
+
+function tokenValue(tokens, tokenName) {
+  return tokens.tokens.find((token) => token.name === tokenName)?.value || "";
+}
+
+function matchPreset(presetGroup, tokens, fallback) {
+  for (const [presetName, presetValues] of Object.entries(presetGroup)) {
+    const matches = Object.entries(presetValues).every(([tokenName, value]) => tokenValue(tokens, tokenName) === value);
+    if (matches) return presetName;
+  }
+  return fallback;
+}
+
+function foundationFromTokens(tokens) {
+  return {
+    targetScope: "dashboard-control-center",
+    themeAccent: matchPreset(foundationPresets.themeAccent, tokens, "blue"),
+    density: matchPreset(foundationPresets.density, tokens, "balanced"),
+    radiusScale: matchPreset(foundationPresets.radiusScale, tokens, "standard"),
+    typographyScale: matchPreset(foundationPresets.typographyScale, tokens, "standard"),
+    actionControlHeight: tokenValue(tokens, "action-control-height") || "34px",
+    actionControlPadding: tokenValue(tokens, "action-control-padding") || "8px 11px",
+    compactControlHeight: tokenValue(tokens, "compact-control-height") || "32px",
+    compactControlPadding: tokenValue(tokens, "compact-control-padding") || "5px 10px",
+    formControlHeight: tokenValue(tokens, "form-control-height") || "40px",
+    formControlPadding: tokenValue(tokens, "form-control-padding") || "0 10px",
+    iconButtonSize: tokenValue(tokens, "icon-button-size") || "38px",
+    controlFontSize: tokenValue(tokens, "control-font-size") || "0.84rem",
+    cardPadding: tokenValue(tokens, "card-padding") || "14px",
+    cardGap: tokenValue(tokens, "card-gap") || "10px",
+    rowPadding: tokenValue(tokens, "row-padding") || "10px 12px",
+    rowGap: tokenValue(tokens, "row-gap") || "10px",
+    technicalAffordanceGap: tokenValue(tokens, "technical-affordance-gap") || "4px",
+    technicalSourceMaxWidth: tokenValue(tokens, "technical-source-max-width") || "260px",
+    technicalEvidenceMaxWidth: tokenValue(tokens, "technical-evidence-max-width") || "292px",
+    technicalPreviewChipMaxWidth: tokenValue(tokens, "technical-preview-chip-max-width") || "360px",
+    pageHeaderPadding: tokenValue(tokens, "page-header-padding") || "18px 20px",
+    metadataGap: tokenValue(tokens, "metadata-gap") || "8px",
+    pageIconSize: tokenValue(tokens, "page-icon-size") || "52px",
+    badgeGap: tokenValue(tokens, "badge-gap") || "5px",
+    badgeHeight: tokenValue(tokens, "badge-height") || "26px",
+    modeBadgePadding: tokenValue(tokens, "mode-badge-padding") || "4px 14px",
+    badgeFontSize: tokenValue(tokens, "badge-font-size") || "0.76rem",
+    modeBadgeFontSize: tokenValue(tokens, "mode-badge-font-size") || "0.78rem",
+  };
+}
+
+function foundationFromOptions(tokens, options) {
+  const current = foundationFromTokens(tokens);
+  return {
+    targetScope: options.target_scope || current.targetScope,
+    themeAccent: options.theme_accent || current.themeAccent,
+    density: options.density || current.density,
+    radiusScale: options.radius_scale || current.radiusScale,
+    typographyScale: options.typography_scale || current.typographyScale,
+    actionControlHeight: options.action_control_height || current.actionControlHeight,
+    actionControlPadding: options.action_control_padding || current.actionControlPadding,
+    compactControlHeight: options.compact_control_height || current.compactControlHeight,
+    compactControlPadding: options.compact_control_padding || current.compactControlPadding,
+    formControlHeight: options.form_control_height || current.formControlHeight,
+    formControlPadding: options.form_control_padding || current.formControlPadding,
+    iconButtonSize: options.icon_button_size || current.iconButtonSize,
+    controlFontSize: options.control_font_size || current.controlFontSize,
+    cardPadding: options.card_padding || current.cardPadding,
+    cardGap: options.card_gap || current.cardGap,
+    rowPadding: options.row_padding || current.rowPadding,
+    rowGap: options.row_gap || current.rowGap,
+    technicalAffordanceGap: options.technical_affordance_gap || current.technicalAffordanceGap,
+    technicalSourceMaxWidth: options.technical_source_max_width || current.technicalSourceMaxWidth,
+    technicalEvidenceMaxWidth: options.technical_evidence_max_width || current.technicalEvidenceMaxWidth,
+    technicalPreviewChipMaxWidth: options.technical_preview_chip_max_width || current.technicalPreviewChipMaxWidth,
+    pageHeaderPadding: options.page_header_padding || current.pageHeaderPadding,
+    metadataGap: options.metadata_gap || current.metadataGap,
+    pageIconSize: options.page_icon_size || current.pageIconSize,
+    badgeGap: options.badge_gap || current.badgeGap,
+    badgeHeight: options.badge_height || current.badgeHeight,
+    modeBadgePadding: options.mode_badge_padding || current.modeBadgePadding,
+    badgeFontSize: options.badge_font_size || current.badgeFontSize,
+    modeBadgeFontSize: options.mode_badge_font_size || current.modeBadgeFontSize,
+  };
+}
+
+function applyTokenValues(tokens, values) {
+  const expected = new Set(Object.keys(values));
+  const nextTokens = tokens.tokens.map((token) => {
+    if (!Object.hasOwn(values, token.name)) {
+      return token;
+    }
+    expected.delete(token.name);
+    return { ...token, value: values[token.name] };
+  });
+  for (const missing of expected) {
+    fail(`missing foundation token: ${missing}`);
+  }
+  return { ...tokens, tokens: nextTokens };
+}
+
+function applyFoundationPresets(tokens, foundation) {
+  let next = tokens;
+  next = applyTokenValues(next, foundationPresets.themeAccent[foundation.themeAccent]);
+  next = applyTokenValues(next, foundationPresets.density[foundation.density]);
+  next = applyTokenValues(next, foundationPresets.radiusScale[foundation.radiusScale]);
+  next = applyTokenValues(next, foundationPresets.typographyScale[foundation.typographyScale]);
+  next = applyTokenValues(next, {
+    "action-control-height": foundation.actionControlHeight,
+    "action-control-padding": foundation.actionControlPadding,
+    "compact-control-height": foundation.compactControlHeight,
+    "compact-control-padding": foundation.compactControlPadding,
+    "form-control-height": foundation.formControlHeight,
+    "form-control-padding": foundation.formControlPadding,
+    "icon-button-size": foundation.iconButtonSize,
+    "control-font-size": foundation.controlFontSize,
+    "card-padding": foundation.cardPadding,
+    "card-gap": foundation.cardGap,
+    "row-padding": foundation.rowPadding,
+    "row-gap": foundation.rowGap,
+    "technical-affordance-gap": foundation.technicalAffordanceGap,
+    "technical-source-max-width": foundation.technicalSourceMaxWidth,
+    "technical-evidence-max-width": foundation.technicalEvidenceMaxWidth,
+    "technical-preview-chip-max-width": foundation.technicalPreviewChipMaxWidth,
+    "page-header-padding": foundation.pageHeaderPadding,
+    "metadata-gap": foundation.metadataGap,
+    "page-icon-size": foundation.pageIconSize,
+    "badge-gap": foundation.badgeGap,
+    "badge-height": foundation.badgeHeight,
+    "mode-badge-padding": foundation.modeBadgePadding,
+    "badge-font-size": foundation.badgeFontSize,
+    "mode-badge-font-size": foundation.modeBadgeFontSize,
+  });
+  return next;
+}
+
+function generatedCss(tokens, components) {
+  const rows = sortedTokenRows(tokens);
+  const tooltipCopy = components.components.find((component) => component.id === "tooltip-copy") || {};
+  const decisionProgressSummary = components.components.find((component) => component.id === "decision-progress-summary") || null;
+  const tooltipInteraction = tooltipCopy.interaction?.tooltip || {};
+  const copyInteraction = tooltipCopy.interaction?.copyFeedback || {};
+  const tooltipTrigger = tooltipInteraction.trigger || "hover-only";
+  const copyFeedbackTrigger = copyInteraction.trigger || "hover-only";
+  const cssLines = [
+    "/* Generated by tools/dashboard-design-system from docs/design-system/dashboard-control-center/tokens.json and components.json. */",
+    "/* Do not edit by hand; update the design-system source files and regenerate. */",
+    ":root {",
+  ];
+  for (const token of rows) {
+    cssLines.push(`  ${token.cssVariable}: ${token.value};`);
+  }
+  cssLines.push("}");
+  cssLines.push("");
+  cssLines.push('[data-dcc-design-system="dashboard-control-center"] {');
+  cssLines.push(`  --dcc-design-system-version: "${tokens.version}";`);
+  cssLines.push("  --dcc-component-count: " + components.components.length + ";");
+  cssLines.push(`  --dcc-file-tooltip-trigger: ${tooltipTrigger};`);
+  cssLines.push(`  --dcc-tooltip-trigger: ${tooltipTrigger};`);
+  cssLines.push(`  --dcc-tooltip-hide-policy: ${tooltipInteraction.hidePolicy || "pointer-leave"};`);
+  cssLines.push(`  --dcc-tooltip-placement: ${tooltipInteraction.placement || "top"};`);
+  cssLines.push(`  --dcc-tooltip-max-width: ${tooltipInteraction.maxWidth || "300px"};`);
+  cssLines.push(`  --dcc-tooltip-delay-ms: ${Number(tooltipInteraction.delayMs) || 0};`);
+  cssLines.push(`  --dcc-copy-popup-trigger: ${copyFeedbackTrigger};`);
+  cssLines.push(`  --dcc-copy-feedback-trigger: ${copyFeedbackTrigger};`);
+  cssLines.push(`  --dcc-copy-feedback-hide-policy: ${copyInteraction.hidePolicy || "pointer-leave"};`);
+  cssLines.push(`  --dcc-copy-feedback-placement: ${copyInteraction.placement || "top"};`);
+  cssLines.push(`  --dcc-copy-feedback-collision: ${copyInteraction.collision || "shift"};`);
+  cssLines.push(`  --dcc-copy-feedback-duration-ms: ${Number(copyInteraction.durationMs) || 1200}ms;`);
+  cssLines.push("}");
+  cssLines.push("");
+  cssLines.push(".page-title,");
+  cssLines.push(".detail-page-header,");
+  cssLines.push(".decision-summary,");
+  cssLines.push(".status-strip,");
+  cssLines.push(".context-panel,");
+  cssLines.push(".context-strip,");
+  cssLines.push(".menu-tile-panel,");
+  cssLines.push(".overview-status-card,");
+  cssLines.push(".common-status-card,");
+  cssLines.push(".explore-pages,");
+  cssLines.push(".explore-card,");
+  cssLines.push(".workflow-mini-card,");
+  cssLines.push(".maintenance-mini-card,");
+  cssLines.push(".security-mini-card,");
+  cssLines.push(".mock-table-section,");
+  cssLines.push(".evidence-table-section,");
+  cssLines.push(".failure-table-section,");
+  cssLines.push(".command-preview-panel,");
+  cssLines.push(".command-preview,");
+  cssLines.push(".security-policy-panel,");
+  cssLines.push(".source-boundary,");
+  cssLines.push(".sidebar-page .detail-section,");
+  cssLines.push(".sidebar-page-card,");
+  cssLines.push(".sidebar-page-link-card,");
+  cssLines.push(".documents-brief-card,");
+  cssLines.push(".documents-next-row,");
+  cssLines.push(".settings-row,");
+  cssLines.push(".lesson-progress-card,");
+  cssLines.push(".lesson-live-table-section,");
+  cssLines.push(".repository-file-tree-panel,");
+  cssLines.push(".repository-operation-card,");
+  cssLines.push(".repository-run-row,");
+  cssLines.push(".repository-workspace-card {");
+  cssLines.push("  border-color: var(--dcc-border);");
+  cssLines.push("  border-radius: var(--dcc-radius);");
+  cssLines.push("  box-shadow: var(--dcc-shadow);");
+  cssLines.push("}");
+  cssLines.push("");
+  cssLines.push(".page-title,");
+  cssLines.push(".detail-page-header,");
+  cssLines.push(".decision-summary,");
+  cssLines.push(".status-strip,");
+  cssLines.push(".context-panel,");
+  cssLines.push(".context-strip,");
+  cssLines.push(".menu-tile-panel,");
+  cssLines.push(".overview-status-card,");
+  cssLines.push(".common-status-card,");
+  cssLines.push(".explore-card,");
+  cssLines.push(".workflow-mini-card,");
+  cssLines.push(".maintenance-mini-card,");
+  cssLines.push(".security-mini-card,");
+  cssLines.push(".mock-table-row,");
+  cssLines.push(".evidence-row,");
+  cssLines.push(".failure-row,");
+  cssLines.push(".command-preview,");
+  cssLines.push(".security-policy-rule,");
+  cssLines.push(".sidebar-page-card,");
+  cssLines.push(".sidebar-page-link-card,");
+  cssLines.push(".documents-brief-card,");
+  cssLines.push(".documents-next-row,");
+  cssLines.push(".settings-row,");
+  cssLines.push(".lesson-progress-card,");
+  cssLines.push(".lesson-live-row,");
+  cssLines.push(".repository-operation-card,");
+  cssLines.push(".repository-run-row,");
+  cssLines.push(".repository-workspace-card {");
+  cssLines.push("  background-color: var(--dcc-surface);");
+  cssLines.push("}");
+  cssLines.push("");
+  cssLines.push(".explore-pages,");
+  cssLines.push(".menu-tile-panel,");
+  cssLines.push(".mock-table-section,");
+  cssLines.push(".evidence-table-section,");
+  cssLines.push(".failure-table-section,");
+  cssLines.push(".command-preview-panel,");
+  cssLines.push(".security-policy-panel,");
+  cssLines.push(".source-boundary,");
+  cssLines.push(".sidebar-page .detail-section,");
+  cssLines.push(".lesson-live-table-section,");
+  cssLines.push(".repository-file-tree-panel {");
+  cssLines.push("  border: 0;");
+  cssLines.push("  border-radius: 0;");
+  cssLines.push("  background: transparent;");
+  cssLines.push("  box-shadow: none;");
+  cssLines.push("  padding: 0;");
+  cssLines.push("  overflow: visible;");
+  cssLines.push("}");
+  cssLines.push("");
+  cssLines.push(".mock-table-section h3,");
+  cssLines.push(".lesson-live-table-section h3,");
+  cssLines.push(".failure-table-section__head {");
+  cssLines.push("  border-bottom: 0;");
+  cssLines.push("  padding-inline: 0;");
+  cssLines.push("}");
+  cssLines.push("");
+  cssLines.push(".mock-table,");
+  cssLines.push(".lesson-live-table,");
+  cssLines.push(".failure-table-section .failure-table {");
+  cssLines.push("  overflow: hidden;");
+  cssLines.push("  border: 1px solid var(--dcc-border);");
+  cssLines.push("  border-radius: var(--dcc-radius);");
+  cssLines.push("  background: var(--dcc-surface);");
+  cssLines.push("}");
+  cssLines.push("");
+  cssLines.push(".page-title,");
+  cssLines.push(".detail-page-header {");
+  cssLines.push("  --dcc-page-accent: var(--category-color, #1559c7);");
+  cssLines.push("  --dcc-page-soft: var(--category-soft, #e8f0ff);");
+  cssLines.push("  --dcc-page-border: var(--category-border, #b8cdf7);");
+  cssLines.push("  align-items: flex-start;");
+  cssLines.push("  border: 1px solid var(--dcc-page-border);");
+  cssLines.push("  background: var(--dcc-surface);");
+  cssLines.push("  box-shadow: var(--dcc-shadow-raised);");
+  cssLines.push("  padding: var(--dcc-page-header-padding);");
+  cssLines.push("}");
+  cssLines.push("");
+  cssLines.push(".page-title--overview {");
+  cssLines.push("  --dcc-page-accent: #1559c7;");
+  cssLines.push("  --dcc-page-soft: #e8f0ff;");
+  cssLines.push("  --dcc-page-border: #b8cdf7;");
+  cssLines.push("}");
+  cssLines.push("");
+  cssLines.push(".page-title__icon,");
+  cssLines.push(".detail-page-header__icon,");
+  cssLines.push(".view-surface .page-title .page-title__icon,");
+  cssLines.push(".view-surface .detail-page-header .detail-page-header__icon {");
+  cssLines.push("  width: var(--dcc-page-icon-size);");
+  cssLines.push("  height: var(--dcc-page-icon-size);");
+  cssLines.push("  border: 1px solid var(--dcc-page-accent, var(--category-color, #1559c7));");
+  cssLines.push("  border-radius: var(--dcc-radius);");
+  cssLines.push("  background: var(--dcc-page-accent, var(--category-color, #1559c7));");
+  cssLines.push("  color: #ffffff;");
+  cssLines.push("}");
+  cssLines.push("");
+  cssLines.push(".page-title h2,");
+  cssLines.push(".detail-page-header__title h2 {");
+  cssLines.push("  color: var(--dcc-text);");
+  cssLines.push("}");
+  cssLines.push("");
+  cssLines.push(".page-title p,");
+  cssLines.push(".detail-page-header__title p {");
+  cssLines.push("  color: #34434f;");
+  cssLines.push("}");
+  cssLines.push("");
+  cssLines.push(".page-title__meta span,");
+  cssLines.push(".detail-page-header__meta span,");
+  cssLines.push(".refresh-button,");
+  cssLines.push(".detail-page-header__action {");
+  cssLines.push("  border: 1px solid var(--dcc-border);");
+  cssLines.push("  border-radius: 7px;");
+  cssLines.push("  background: var(--dcc-surface);");
+  cssLines.push("  color: var(--dcc-muted);");
+  cssLines.push("  padding: 5px 10px;");
+  cssLines.push("}");
+  cssLines.push("");
+  cssLines.push(".refresh-button:hover,");
+  cssLines.push(".refresh-button:focus-visible,");
+  cssLines.push(".detail-page-header__action:hover,");
+  cssLines.push(".detail-page-header__action:focus-visible {");
+  cssLines.push("  border-color: var(--dcc-page-accent, var(--category-color, #1559c7));");
+  cssLines.push("  box-shadow: var(--dcc-focus);");
+  cssLines.push("}");
+  cssLines.push("");
+  cssLines.push(":is(");
+  cssLines.push("  .overview-status-card,");
+  cssLines.push("  .common-status-card,");
+  cssLines.push("  .explore-card,");
+  cssLines.push("  .workflow-mini-card,");
+  cssLines.push("  .maintenance-mini-card,");
+  cssLines.push("  .security-mini-card,");
+  cssLines.push("  .mock-table-row,");
+  cssLines.push("  .evidence-row,");
+  cssLines.push("  .failure-row,");
+  cssLines.push("  .command-preview,");
+  cssLines.push("  .security-policy-rule,");
+  cssLines.push("  .sidebar-page-card,");
+  cssLines.push("  .sidebar-page-link-card,");
+  cssLines.push("  .documents-brief-card,");
+  cssLines.push("  .documents-next-row,");
+  cssLines.push("  .settings-row,");
+  cssLines.push("  .lesson-progress-card,");
+  cssLines.push("  .lesson-live-row,");
+  cssLines.push("  .repository-operation-card,");
+  cssLines.push("  .repository-run-row,");
+  cssLines.push("  .repository-workspace-card");
+  cssLines.push(") {");
+  cssLines.push("  position: relative;");
+  cssLines.push("  overflow: visible;");
+  cssLines.push("}");
+  cssLines.push("");
+  cssLines.push(":is(");
+  cssLines.push("  .overview-status-card,");
+  cssLines.push("  .common-status-card,");
+  cssLines.push("  .explore-card,");
+  cssLines.push("  .workflow-mini-card,");
+  cssLines.push("  .maintenance-mini-card,");
+  cssLines.push("  .security-mini-card,");
+  cssLines.push("  .command-preview,");
+  cssLines.push("  .security-policy-rule,");
+  cssLines.push("  .sidebar-page-card,");
+  cssLines.push("  .sidebar-page-link-card,");
+  cssLines.push("  .documents-brief-card,");
+  cssLines.push("  .lesson-progress-card,");
+  cssLines.push("  .repository-operation-card,");
+  cssLines.push("  .repository-workspace-card,");
+  cssLines.push("  .design-studio-target-card,");
+  cssLines.push("  .design-studio-orchestration__card,");
+  cssLines.push("  .design-studio-preview__sample");
+  cssLines.push(") {");
+  cssLines.push("  gap: var(--dcc-card-gap);");
+  cssLines.push("  padding: var(--dcc-card-padding);");
+  cssLines.push("}");
+  cssLines.push("");
+  cssLines.push(":is(");
+  cssLines.push("  .mock-table-row,");
+  cssLines.push("  .evidence-row,");
+  cssLines.push("  .failure-row,");
+  cssLines.push("  .documents-next-row,");
+  cssLines.push("  .settings-row,");
+  cssLines.push("  .lesson-live-row,");
+  cssLines.push("  .repository-run-row,");
+  cssLines.push("  .design-studio-contract-table__row");
+  cssLines.push(") {");
+  cssLines.push("  gap: var(--dcc-row-gap);");
+  cssLines.push("  padding: var(--dcc-row-padding);");
+  cssLines.push("}");
+  cssLines.push("");
+  cssLines.push(".page-title__meta,");
+  cssLines.push(".detail-page-header__meta {");
+  cssLines.push("  gap: var(--dcc-metadata-gap);");
+  cssLines.push("}");
+  cssLines.push("");
+  cssLines.push(".design-studio-preview__sample--header .page-title__meta {");
+  cssLines.push("  font-size: max(var(--dcc-control-font-size), 0.9rem);");
+  cssLines.push("}");
+  cssLines.push("");
+  cssLines.push(".design-studio-preview__sample--header .page-title__meta span {");
+  cssLines.push("  font-weight: 850;");
+  cssLines.push("}");
+  cssLines.push("");
+  cssLines.push(".status,");
+  cssLines.push(".risk {");
+  cssLines.push("  display: inline-flex;");
+  cssLines.push("  min-width: var(--dcc-badge-height);");
+  cssLines.push("  min-height: var(--dcc-badge-height);");
+  cssLines.push("  height: var(--dcc-badge-height);");
+  cssLines.push("  box-sizing: border-box;");
+  cssLines.push("  align-items: center;");
+  cssLines.push("  justify-content: center;");
+  cssLines.push("  gap: var(--dcc-badge-gap);");
+  cssLines.push("  border-radius: 999px;");
+  cssLines.push("  padding: var(--dcc-badge-padding);");
+  cssLines.push("  font-size: var(--dcc-badge-font-size);");
+  cssLines.push("  font-weight: 750;");
+  cssLines.push("  line-height: 1;");
+  cssLines.push("  text-align: center;");
+  cssLines.push("  white-space: nowrap;");
+  cssLines.push("}");
+  cssLines.push("");
+  cssLines.push(".risk {");
+  cssLines.push("  min-width: calc(var(--dcc-badge-height) + 4px);");
+  cssLines.push("}");
+  cssLines.push("");
+  cssLines.push(".status svg,");
+  cssLines.push(".risk svg {");
+  cssLines.push("  display: block;");
+  cssLines.push("  flex: 0 0 auto;");
+  cssLines.push("  margin: 0;");
+  cssLines.push("}");
+  cssLines.push("");
+  cssLines.push(".status-chip,");
+  cssLines.push(".mode-pill {");
+  cssLines.push("  display: inline-grid;");
+  cssLines.push("  min-height: var(--dcc-badge-height);");
+  cssLines.push("  min-width: var(--dcc-badge-height);");
+  cssLines.push("  box-sizing: border-box;");
+  cssLines.push("  place-items: center;");
+  cssLines.push("  align-self: flex-start;");
+  cssLines.push("  margin-top: auto;");
+  cssLines.push("  border-radius: 999px;");
+  cssLines.push("  padding: var(--dcc-mode-badge-padding);");
+  cssLines.push("  font-size: var(--dcc-mode-badge-font-size);");
+  cssLines.push("  font-weight: 800;");
+  cssLines.push("  line-height: 1;");
+  cssLines.push("  white-space: nowrap;");
+  cssLines.push("}");
+  cssLines.push("");
+  cssLines.push(".overview-status-card > .status-chip.status-chip--compact-density {");
+  cssLines.push("  min-height: var(--dcc-common-mode-badge-height);");
+  cssLines.push("  padding: var(--dcc-common-mode-badge-padding);");
+  cssLines.push("  font-size: var(--dcc-common-mode-badge-font-size);");
+  cssLines.push("  line-height: 1;");
+  cssLines.push("}");
+  cssLines.push("");
+  if (decisionProgressSummary) {
+    cssLines.push(".decision-progress-summary {");
+    cssLines.push("  display: grid;");
+    cssLines.push("  min-width: 0;");
+    cssLines.push("  margin-top: 4px;");
+    cssLines.push("  gap: max(2px, calc(var(--dcc-card-gap) / 4));");
+    cssLines.push("  color: var(--dcc-page-accent, var(--category-color, #1559c7));");
+    cssLines.push("  font-size: 1.18rem;");
+    cssLines.push("  font-weight: 700;");
+    cssLines.push("  line-height: 1.22;");
+    cssLines.push("}");
+    cssLines.push("");
+    cssLines.push(".decision-progress-summary__row {");
+    cssLines.push("  display: flex;");
+    cssLines.push("  min-width: 0;");
+    cssLines.push("  align-items: baseline;");
+    cssLines.push("  flex-wrap: wrap;");
+    cssLines.push("  column-gap: var(--dcc-badge-gap);");
+    cssLines.push("  row-gap: 0;");
+    cssLines.push("}");
+    cssLines.push("");
+    cssLines.push(".decision-progress-summary__label {");
+    cssLines.push("  min-width: 0;");
+    cssLines.push("  overflow-wrap: anywhere;");
+    cssLines.push("}");
+    cssLines.push("");
+    cssLines.push(".overview-status-card__head .decision-progress-summary__count,");
+    cssLines.push(".decision-progress-summary .decision-progress-summary__count {");
+    cssLines.push("  display: inline;");
+    cssLines.push("  min-width: auto;");
+    cssLines.push("  margin-top: 0;");
+    cssLines.push("  color: inherit;");
+    cssLines.push("  font-size: inherit;");
+    cssLines.push("  font-weight: inherit;");
+    cssLines.push("  font-variant-numeric: tabular-nums;");
+    cssLines.push("  line-height: inherit;");
+    cssLines.push("  overflow-wrap: normal;");
+    cssLines.push("}");
+    cssLines.push("");
+  }
+  cssLines.push(".common-mode-pill {");
+  cssLines.push("  display: inline-grid;");
+  cssLines.push("  min-height: var(--dcc-common-mode-badge-height);");
+  cssLines.push("  min-width: var(--dcc-common-mode-badge-height);");
+  cssLines.push("  box-sizing: border-box;");
+  cssLines.push("  place-items: center;");
+  cssLines.push("  border-radius: 999px;");
+  cssLines.push("  padding: var(--dcc-common-mode-badge-padding);");
+  cssLines.push("  font-size: var(--dcc-common-mode-badge-font-size);");
+  cssLines.push("  font-weight: 850;");
+  cssLines.push("  line-height: 1;");
+  cssLines.push("  white-space: nowrap;");
+  cssLines.push("}");
+  cssLines.push("");
+  cssLines.push(".refresh-button,");
+  cssLines.push(".detail-page-header__action,");
+  cssLines.push(".mini-card-button,");
+  cssLines.push(".mock-table-link {");
+  cssLines.push("  min-height: var(--dcc-compact-control-height);");
+  cssLines.push("  gap: var(--dcc-badge-gap);");
+  cssLines.push("  border-radius: var(--dcc-radius);");
+  cssLines.push("  padding: var(--dcc-compact-control-padding);");
+  cssLines.push("  font-size: var(--dcc-control-font-size);");
+  cssLines.push("  line-height: 1.2;");
+  cssLines.push("}");
+  cssLines.push("");
+  cssLines.push(".settings-action-row button,");
+  cssLines.push(".settings-modal__footer button,");
+  cssLines.push(".settings-apply-feedback button,");
+  cssLines.push(".design-studio-action-row button {");
+  cssLines.push("  min-height: var(--dcc-action-control-height);");
+  cssLines.push("  gap: var(--dcc-badge-gap);");
+  cssLines.push("  border-radius: var(--dcc-radius);");
+  cssLines.push("  padding: var(--dcc-action-control-padding);");
+  cssLines.push("  font-size: var(--dcc-control-font-size);");
+  cssLines.push("  line-height: 1.2;");
+  cssLines.push("}");
+  cssLines.push("");
+  cssLines.push(".settings-value-select select,");
+  cssLines.push(".design-studio-form-grid select,");
+  cssLines.push(".design-studio-preview__control-field select {");
+  cssLines.push("  min-height: var(--dcc-form-control-height);");
+  cssLines.push("  border-radius: var(--dcc-radius);");
+  cssLines.push("  padding: var(--dcc-form-control-padding);");
+  cssLines.push("  font-size: var(--dcc-control-font-size);");
+  cssLines.push("}");
+  cssLines.push("");
+  cssLines.push(".settings-modal__close,");
+  cssLines.push(".insight-detail-modal__close {");
+  cssLines.push("  width: var(--dcc-icon-button-size);");
+  cssLines.push("  height: var(--dcc-icon-button-size);");
+  cssLines.push("  border-radius: var(--dcc-radius);");
+  cssLines.push("}");
+  cssLines.push("");
+  cssLines.push(".refresh-button:focus-visible,");
+  cssLines.push(".detail-page-header__action:focus-visible,");
+  cssLines.push(".mini-card-button:focus-visible,");
+  cssLines.push(".mock-table-link:focus-visible,");
+  cssLines.push(".settings-action-row button:focus-visible,");
+  cssLines.push(".settings-modal__footer button:focus-visible,");
+  cssLines.push(".settings-apply-feedback button:focus-visible,");
+  cssLines.push(".settings-value-select select:focus-visible,");
+  cssLines.push(".settings-modal__close:focus-visible,");
+  cssLines.push(".design-studio-action-row button:focus-visible,");
+  cssLines.push(".design-studio-form-grid select:focus-visible,");
+  cssLines.push(".insight-detail-modal__close:focus-visible {");
+  cssLines.push("  box-shadow: var(--dcc-focus);");
+  cssLines.push("  outline: 0;");
+  cssLines.push("}");
+  cssLines.push("");
+  cssLines.push(".source-boundary__chip::before,");
+  cssLines.push(".source-boundary__chip::after,");
+  cssLines.push(".source-boundary__chip:hover::before,");
+  cssLines.push(".source-boundary__chip:hover::after,");
+  cssLines.push(".source-boundary__chip:focus-visible::before,");
+  cssLines.push(".source-boundary__chip:focus-visible::after,");
+  cssLines.push(".source-boundary__chip:focus-within::before,");
+  cssLines.push(".source-boundary__chip:focus-within::after,");
+  cssLines.push(".evidence-row__reference-chip::before,");
+  cssLines.push(".evidence-row__reference-chip::after,");
+  cssLines.push(".evidence-row__reference-chip:hover::before,");
+  cssLines.push(".evidence-row__reference-chip:hover::after,");
+  cssLines.push(".evidence-row__reference-chip:focus-visible::before,");
+  cssLines.push(".evidence-row__reference-chip:focus-visible::after,");
+  cssLines.push(".evidence-row__reference-chip:focus-within::before,");
+  cssLines.push(".evidence-row__reference-chip:focus-within::after,");
+  cssLines.push(".command-preview__command-chip::before,");
+  cssLines.push(".command-preview__command-chip::after,");
+  cssLines.push(".command-preview__command-chip:hover::before,");
+  cssLines.push(".command-preview__command-chip:hover::after,");
+  cssLines.push(".command-preview__command-chip:focus-visible::before,");
+  cssLines.push(".command-preview__command-chip:focus-visible::after,");
+  cssLines.push(".command-preview__command-chip:focus-within::before,");
+  cssLines.push(".command-preview__command-chip:focus-within::after,");
+  cssLines.push(".sidebar-reference-chip::before,");
+  cssLines.push(".sidebar-reference-chip::after,");
+  cssLines.push(".sidebar-reference-chip:hover::before,");
+  cssLines.push(".sidebar-reference-chip:hover::after,");
+  cssLines.push(".sidebar-reference-chip:focus-visible::before,");
+  cssLines.push(".sidebar-reference-chip:focus-visible::after,");
+  cssLines.push(".sidebar-reference-chip:focus-within::before,");
+  cssLines.push(".sidebar-reference-chip:focus-within::after {");
+  cssLines.push("  display: none !important;");
+  cssLines.push("  opacity: 0 !important;");
+  cssLines.push("  visibility: hidden !important;");
+  cssLines.push("}");
+  cssLines.push("");
+  cssLines.push(".source-boundary__chip,");
+  cssLines.push(".evidence-row__reference-chip,");
+  cssLines.push(".command-preview__command-chip,");
+  cssLines.push(".design-studio-preview__sample .design-studio-preview__chip {");
+  cssLines.push("  display: inline-flex;");
+  cssLines.push("  min-width: 0;");
+  cssLines.push("  align-items: center;");
+  cssLines.push("  flex-wrap: nowrap;");
+  cssLines.push("  gap: var(--dcc-technical-affordance-gap);");
+  cssLines.push("}");
+  cssLines.push("");
+  cssLines.push(".source-boundary__chip,");
+  cssLines.push(".evidence-row__reference-chip,");
+  cssLines.push(".design-studio-preview__sample .design-studio-preview__chip {");
+  cssLines.push("  width: auto;");
+  cssLines.push("  max-width: 100%;");
+  cssLines.push("}");
+  cssLines.push("");
+  cssLines.push(".design-studio-preview__sample .design-studio-preview__chip {");
+  cssLines.push("  max-width: min(100%, var(--dcc-technical-preview-chip-max-width));");
+  cssLines.push("  flex: 0 1 auto;");
+  cssLines.push("  text-transform: none;");
+  cssLines.push("}");
+  cssLines.push("");
+  cssLines.push(".technical-tooltip-value {");
+  cssLines.push("  position: relative;");
+  cssLines.push("  display: inline-flex;");
+  cssLines.push("  min-width: 0;");
+  cssLines.push("  width: auto;");
+  cssLines.push("}");
+  cssLines.push("");
+  cssLines.push(".source-boundary__chip-value,");
+  cssLines.push(".evidence-row__reference-value,");
+  cssLines.push(".sidebar-reference-chip__value {");
+  cssLines.push("  display: inline-flex;");
+  cssLines.push("  flex: 0 1 auto;");
+  cssLines.push("  min-width: 0;");
+  cssLines.push("  max-width: 100%;");
+  cssLines.push("  width: auto;");
+  cssLines.push("}");
+  cssLines.push("");
+  cssLines.push(".source-boundary__chip-value {");
+  cssLines.push("  max-width: min(100%, var(--dcc-technical-source-max-width));");
+  cssLines.push("}");
+  cssLines.push("");
+  cssLines.push(".evidence-row__reference-value {");
+  cssLines.push("  max-width: min(100%, var(--dcc-technical-evidence-max-width));");
+  cssLines.push("}");
+  cssLines.push("");
+  cssLines.push(".source-boundary__chip .technical-chip,");
+  cssLines.push(".evidence-row__reference-chip .technical-chip,");
+  cssLines.push(".command-preview__command-chip .technical-chip,");
+  cssLines.push(".design-studio-preview__sample .design-studio-preview__chip .technical-chip {");
+  cssLines.push("  display: inline-flex;");
+  cssLines.push("  min-width: 0;");
+  cssLines.push("  overflow: hidden;");
+  cssLines.push("  text-overflow: ellipsis;");
+  cssLines.push("  white-space: nowrap;");
+  cssLines.push("}");
+  cssLines.push("");
+  cssLines.push(".command-preview__command-value {");
+  cssLines.push("  flex: 1 1 auto;");
+  cssLines.push("  max-width: 100%;");
+  cssLines.push("}");
+  cssLines.push("");
+  cssLines.push(".source-boundary__chip-value::before,");
+  cssLines.push(".evidence-row__reference-value::before,");
+  cssLines.push(".command-preview__command-value::before,");
+  cssLines.push(".sidebar-reference-chip__value::before {");
+  cssLines.push("  position: absolute;");
+  cssLines.push("  z-index: 42;");
+  cssLines.push("  bottom: calc(100% + 3px);");
+  cssLines.push("  left: 18px;");
+  cssLines.push("  width: 10px;");
+  cssLines.push("  height: 10px;");
+  cssLines.push("  border-right: 1px solid #c9baf4;");
+  cssLines.push("  border-bottom: 1px solid #c9baf4;");
+  cssLines.push("  background: #ffffff;");
+  cssLines.push("  content: \"\";");
+  cssLines.push("  display: none;");
+  cssLines.push("  opacity: 0;");
+  cssLines.push("  pointer-events: none;");
+  cssLines.push("  transform: translateY(4px) rotate(45deg);");
+  cssLines.push("  transition: opacity 120ms ease, transform 120ms ease;");
+  cssLines.push("  visibility: hidden;");
+  cssLines.push("}");
+  cssLines.push("");
+  cssLines.push(".source-boundary__chip-value::after,");
+  cssLines.push(".evidence-row__reference-value::after,");
+  cssLines.push(".command-preview__command-value::after,");
+  cssLines.push(".sidebar-reference-chip__value::after {");
+  cssLines.push("  position: absolute;");
+  cssLines.push("  z-index: 43;");
+  cssLines.push("  bottom: calc(100% + 8px);");
+  cssLines.push("  left: 0;");
+  cssLines.push("  width: max-content;");
+  cssLines.push("  max-width: min(var(--dcc-tooltip-max-width), calc(100vw - 40px));");
+  cssLines.push("  border: 1px solid #c9baf4;");
+  cssLines.push("  border-radius: 7px;");
+  cssLines.push("  background: #ffffff;");
+  cssLines.push("  box-shadow: 0 12px 28px rgba(38, 25, 75, 0.18);");
+  cssLines.push("  color: #241a35;");
+  cssLines.push("  content: attr(data-tooltip);");
+  cssLines.push("  display: none;");
+  cssLines.push("  font-family: inherit;");
+  cssLines.push("  font-size: 0.78rem;");
+  cssLines.push("  font-weight: 700;");
+  cssLines.push("  line-height: 1.35;");
+  cssLines.push("  opacity: 0;");
+  cssLines.push("  overflow-wrap: anywhere;");
+  cssLines.push("  padding: 8px 10px;");
+  cssLines.push("  pointer-events: none;");
+  cssLines.push("  transform: translateY(4px);");
+  cssLines.push("  transition: opacity 120ms ease, transform 120ms ease;");
+  cssLines.push("  visibility: hidden;");
+  cssLines.push("  white-space: normal;");
+  cssLines.push("}");
+  cssLines.push("");
+  if (tooltipTrigger !== "disabled") {
+    cssLines.push(".source-boundary__chip-value:hover::before,");
+    cssLines.push(".evidence-row__reference-value:hover::before,");
+    cssLines.push(".command-preview__command-value:hover::before,");
+    cssLines.push(".sidebar-reference-chip__value:hover::before {");
+    cssLines.push("  display: block;");
+    cssLines.push("  opacity: 1;");
+    cssLines.push("  transform: translateY(0) rotate(45deg);");
+    cssLines.push("  visibility: visible;");
+    cssLines.push("}");
+    cssLines.push("");
+    cssLines.push(".source-boundary__chip-value:hover::after,");
+    cssLines.push(".evidence-row__reference-value:hover::after,");
+    cssLines.push(".command-preview__command-value:hover::after,");
+    cssLines.push(".sidebar-reference-chip__value:hover::after {");
+    cssLines.push("  display: block;");
+    cssLines.push("  opacity: 1;");
+    cssLines.push("  transform: translateY(0);");
+    cssLines.push("  visibility: visible;");
+    cssLines.push("}");
+    cssLines.push("");
+  } else {
+    cssLines.push(".source-boundary__chip-value:hover::before,");
+    cssLines.push(".evidence-row__reference-value:hover::before,");
+    cssLines.push(".command-preview__command-value:hover::before,");
+    cssLines.push(".sidebar-reference-chip__value:hover::before,");
+    cssLines.push(".source-boundary__chip-value:hover::after,");
+    cssLines.push(".evidence-row__reference-value:hover::after,");
+    cssLines.push(".command-preview__command-value:hover::after,");
+    cssLines.push(".sidebar-reference-chip__value:hover::after {");
+    cssLines.push("  display: none !important;");
+    cssLines.push("  opacity: 0 !important;");
+    cssLines.push("  visibility: hidden !important;");
+    cssLines.push("}");
+    cssLines.push("");
+  }
+  cssLines.push(".source-boundary__chip-copy,");
+  cssLines.push(".evidence-row__reference-copy,");
+  cssLines.push(".command-preview__command-copy,");
+  cssLines.push(".sidebar-reference-chip__copy {");
+  cssLines.push("  position: relative;");
+  cssLines.push("  display: inline-flex;");
+  cssLines.push("  flex: 0 0 auto;");
+  cssLines.push("}");
+  cssLines.push("");
+  cssLines.push(".source-boundary__chip-copy::before,");
+  cssLines.push(".evidence-row__reference-copy::before,");
+  cssLines.push(".command-preview__command-copy::before,");
+  cssLines.push(".sidebar-reference-chip__copy::before {");
+  cssLines.push("  position: absolute;");
+  cssLines.push("  z-index: 42;");
+  cssLines.push("  bottom: calc(100% + 4px);");
+  cssLines.push("  left: 50%;");
+  cssLines.push("  width: 9px;");
+  cssLines.push("  height: 9px;");
+  cssLines.push("  border: 0;");
+  cssLines.push("  background: #111820;");
+  cssLines.push("  content: \"\";");
+  cssLines.push("  display: none;");
+  cssLines.push("  opacity: 0;");
+  cssLines.push("  pointer-events: none;");
+  cssLines.push("  transform: translate(-50%, 4px) rotate(45deg);");
+  cssLines.push("  transition: opacity var(--dcc-copy-feedback-duration-ms) ease, transform var(--dcc-copy-feedback-duration-ms) ease;");
+  cssLines.push("  visibility: hidden;");
+  cssLines.push("}");
+  cssLines.push("");
+  cssLines.push(".source-boundary__chip-copy::after,");
+  cssLines.push(".evidence-row__reference-copy::after,");
+  cssLines.push(".command-preview__command-copy::after,");
+  cssLines.push(".sidebar-reference-chip__copy::after {");
+  cssLines.push("  position: absolute;");
+  cssLines.push("  z-index: 43;");
+  cssLines.push("  bottom: calc(100% + 8px);");
+  cssLines.push("  left: 50%;");
+  cssLines.push("  width: max-content;");
+  cssLines.push("  max-width: min(var(--dcc-tooltip-max-width), calc(100vw - 44px));");
+  cssLines.push("  border: 0;");
+  cssLines.push("  border-radius: 7px;");
+  cssLines.push("  background: #111820;");
+  cssLines.push("  box-shadow: none;");
+  cssLines.push("  color: #ffffff;");
+  cssLines.push("  content: attr(data-copy-tooltip);");
+  cssLines.push("  display: none;");
+  cssLines.push("  font-family: inherit;");
+  cssLines.push("  font-size: 0.74rem;");
+  cssLines.push("  font-weight: 700;");
+  cssLines.push("  line-height: 1.35;");
+  cssLines.push("  opacity: 0;");
+  cssLines.push("  overflow-wrap: anywhere;");
+  cssLines.push("  padding: 7px 9px;");
+  cssLines.push("  pointer-events: none;");
+  cssLines.push("  transform: translate(-50%, 4px);");
+  cssLines.push("  transition: opacity var(--dcc-copy-feedback-duration-ms) ease, transform var(--dcc-copy-feedback-duration-ms) ease;");
+  cssLines.push("  visibility: hidden;");
+  cssLines.push("  white-space: normal;");
+  cssLines.push("}");
+  cssLines.push("");
+  cssLines.push(".source-boundary__chip-copy:first-child::after,");
+  cssLines.push(".evidence-row__reference-copy:first-child::after,");
+  cssLines.push(".command-preview__command-copy:first-child::after,");
+  cssLines.push(".sidebar-reference-chip__copy:first-child::after {");
+  cssLines.push("  left: 0;");
+  cssLines.push("  transform: translate(0, 4px);");
+  cssLines.push("}");
+  cssLines.push("");
+  cssLines.push(".source-boundary__chip-copy:last-child::after,");
+  cssLines.push(".evidence-row__reference-copy:last-child::after,");
+  cssLines.push(".command-preview__command-copy:last-child::after,");
+  cssLines.push(".sidebar-reference-chip__copy:last-child::after {");
+  cssLines.push("  left: auto;");
+  cssLines.push("  right: 0;");
+  cssLines.push("  transform: translate(0, 4px);");
+  cssLines.push("}");
+  cssLines.push("");
+  if (copyFeedbackTrigger !== "disabled") {
+    cssLines.push(".source-boundary__chip-copy:hover::before,");
+    cssLines.push(".evidence-row__reference-copy:hover::before,");
+    cssLines.push(".command-preview__command-copy:hover::before,");
+    cssLines.push(".sidebar-reference-chip__copy:hover::before,");
+    cssLines.push(".source-boundary__chip-copy:hover::after,");
+    cssLines.push(".evidence-row__reference-copy:hover::after,");
+    cssLines.push(".command-preview__command-copy:hover::after,");
+    cssLines.push(".sidebar-reference-chip__copy:hover::after {");
+    cssLines.push("  display: block;");
+    cssLines.push("  opacity: 1;");
+    cssLines.push("  visibility: visible;");
+    cssLines.push("}");
+    cssLines.push("");
+    cssLines.push(".source-boundary__chip-copy:hover::before,");
+    cssLines.push(".evidence-row__reference-copy:hover::before,");
+    cssLines.push(".command-preview__command-copy:hover::before,");
+    cssLines.push(".sidebar-reference-chip__copy:hover::before {");
+    cssLines.push("  transform: translate(-50%, 0) rotate(45deg);");
+    cssLines.push("}");
+    cssLines.push("");
+    cssLines.push(".source-boundary__chip-copy:hover::after,");
+    cssLines.push(".evidence-row__reference-copy:hover::after,");
+    cssLines.push(".command-preview__command-copy:hover::after,");
+    cssLines.push(".sidebar-reference-chip__copy:hover::after {");
+    cssLines.push("  transform: translate(-50%, 0);");
+    cssLines.push("}");
+    cssLines.push("");
+    cssLines.push(".source-boundary__chip-copy:first-child:hover::after,");
+    cssLines.push(".evidence-row__reference-copy:first-child:hover::after,");
+    cssLines.push(".command-preview__command-copy:first-child:hover::after,");
+    cssLines.push(".sidebar-reference-chip__copy:first-child:hover::after,");
+    cssLines.push(".source-boundary__chip-copy:last-child:hover::after,");
+    cssLines.push(".evidence-row__reference-copy:last-child:hover::after,");
+    cssLines.push(".command-preview__command-copy:last-child:hover::after,");
+    cssLines.push(".sidebar-reference-chip__copy:last-child:hover::after {");
+    cssLines.push("  transform: translate(0, 0);");
+    cssLines.push("}");
+    cssLines.push("");
+  } else {
+    cssLines.push(".source-boundary__chip-copy:hover::before,");
+    cssLines.push(".evidence-row__reference-copy:hover::before,");
+    cssLines.push(".command-preview__command-copy:hover::before,");
+    cssLines.push(".sidebar-reference-chip__copy:hover::before,");
+    cssLines.push(".source-boundary__chip-copy:hover::after,");
+    cssLines.push(".evidence-row__reference-copy:hover::after,");
+    cssLines.push(".command-preview__command-copy:hover::after,");
+    cssLines.push(".sidebar-reference-chip__copy:hover::after {");
+    cssLines.push("  display: none !important;");
+    cssLines.push("  opacity: 0 !important;");
+    cssLines.push("  visibility: hidden !important;");
+    cssLines.push("}");
+    cssLines.push("");
+  }
+  return cssLines.join("\n");
+}
+
+function generatedJs(tokens, components, orchestration) {
+  const payload = {
+    name: tokens.name,
+    version: tokens.version,
+    source: tokens.source,
+    tokens: sortedTokenRows(tokens),
+    components: components.components,
+    pipeline: components.pipeline,
+    orchestration,
+  };
+  return [
+    "// Generated by tools/dashboard-design-system from docs/design-system/dashboard-control-center/tokens.json and components.json.",
+    "// Do not edit by hand; update the design-system source files and regenerate.",
+    `export const dashboardControlCenterDesignSystem = Object.freeze(${JSON.stringify(payload, null, 2)});`,
+    "",
+    "export default dashboardControlCenterDesignSystem;",
+    "",
+  ].join("\n");
+}
+
+function validateSource(tokens, components) {
+  if (tokens.name !== "dashboard-control-center") {
+    fail(`invalid token source name: ${tokens.name}`);
+  }
+  if (components.name !== tokens.name || components.version !== tokens.version) {
+    fail("tokens and components must share name and version");
+  }
+  const seen = new Set();
+  for (const token of tokens.tokens) {
+    if (!/^--dcc-[a-z0-9-]+$/.test(token.cssVariable || "")) {
+      fail(`invalid CSS variable for token ${token.name}: ${token.cssVariable}`);
+    }
+    if (seen.has(token.cssVariable)) {
+      fail(`duplicate CSS variable: ${token.cssVariable}`);
+    }
+    seen.add(token.cssVariable);
+    if (!token.value || !token.role) {
+      fail(`token must have value and role: ${token.name}`);
+    }
+  }
+  const requiredComponents = [
+    "page-header",
+    "status-badge",
+    "operational-card",
+    "data-row",
+    "detail-surface",
+    "tooltip-copy",
+    "command-preview",
+    "interactive-control",
+    "design-studio-visual-editor",
+    "design-studio-orchestration",
+  ];
+  const componentIds = new Set(components.components.map((component) => component.id));
+  for (const required of requiredComponents) {
+    if (!componentIds.has(required)) {
+      fail(`missing required component contract: ${required}`);
+    }
+  }
+  for (const component of components.components) {
+    if (!Array.isArray(component.selectors) || !Array.isArray(component.tokens) || !Array.isArray(component.contract)) {
+      fail(`component contract is incomplete: ${component.id}`);
+    }
+  }
+  validateInteractionContract(components);
+}
+
+function requireString(value, label) {
+  if (typeof value !== "string" || !value.trim()) {
+    fail(`${label} must be a non-empty string`);
+    return "";
+  }
+  return value;
+}
+
+function requireStringArray(value, label, { min = 1 } = {}) {
+  if (!Array.isArray(value) || value.length < min) {
+    fail(`${label} must be a non-empty array`);
+    return [];
+  }
+  for (const item of value) {
+    if (typeof item !== "string" || !item.trim()) {
+      fail(`${label} contains an invalid item`);
+    }
+  }
+  return value;
+}
+
+function requireBoolean(value, label) {
+  if (typeof value !== "boolean") {
+    fail(`${label} must be a boolean`);
+  }
+}
+
+function validateNoSecretLikePayload(value, label) {
+  const text = JSON.stringify(value);
+  if (/(SECRET|TOKEN|API_KEY|PASSWORD|PRIVATE_KEY)\s*[:=]\s*[^",\s]{8,}|sk-[A-Za-z0-9]{20,}|BEGIN (RSA |OPENSSH |EC |DSA )?PRIVATE KEY/i.test(text)) {
+    fail(`${label} must not contain secret-like payloads`);
+  }
+}
+
+function validateOrchestration(orchestration) {
+  validateNoSecretLikePayload(orchestration, "orchestration contract");
+  requireString(orchestration.name, "orchestration name");
+  requireString(orchestration.version, "orchestration version");
+  if (orchestration.syncId !== "dashboard_design_studio_orchestration_foundation") {
+    fail(`invalid orchestration syncId: ${orchestration.syncId}`);
+  }
+  if (orchestration.source !== "docs/design-system/dashboard-control-center/DESIGN_SYSTEM.md") {
+    fail(`invalid orchestration source: ${orchestration.source}`);
+  }
+  requireStringArray(orchestration.model, "orchestration model", { min: 10 });
+  for (const requiredStep of ["candidate-envelope", "plan-token", "explicit-approval", "owner-tool-apply", "rollback-ready-evidence"]) {
+    if (!orchestration.model.includes(requiredStep)) {
+      fail(`orchestration model is missing ${requiredStep}`);
+    }
+  }
+  const states = orchestration.states || {};
+  for (const stateGroup of ["request", "job", "proposal", "apply"]) {
+    requireStringArray(states[stateGroup], `orchestration state group ${stateGroup}`);
+  }
+  const requiredSchemas = [
+    "DesignIntentRequest",
+    "DesignChangeProposal",
+    "CandidateEnvelope",
+    "MockArtifact",
+    "MockAnalysisProposal",
+    "TemplateDefinition",
+    "TemplateProposal",
+    "ApplyEvidence",
+  ];
+  const schemas = Array.isArray(orchestration.schemas) ? orchestration.schemas : [];
+  for (const schemaId of requiredSchemas) {
+    const schema = schemas.find((candidate) => candidate.id === schemaId);
+    if (!schema) {
+      fail(`orchestration schema is missing ${schemaId}`);
+      continue;
+    }
+    requireString(schema.status, `orchestration schema ${schemaId} status`);
+    requireString(schema.purpose, `orchestration schema ${schemaId} purpose`);
+    requireStringArray(schema.requiredFields, `orchestration schema ${schemaId} requiredFields`);
+    requireStringArray(schema.forbiddenFields, `orchestration schema ${schemaId} forbiddenFields`);
+  }
+  const providerModes = Array.isArray(orchestration.providerModes) ? orchestration.providerModes : [];
+  for (const providerId of ["manual", "subscription-agent", "api-key"]) {
+    const provider = providerModes.find((candidate) => candidate.id === providerId);
+    if (!provider) {
+      fail(`orchestration provider mode is missing ${providerId}`);
+      continue;
+    }
+    requireString(provider.status, `orchestration provider ${providerId} status`);
+    requireBoolean(provider.directApplyAuthority, `orchestration provider ${providerId} directApplyAuthority`);
+    if (provider.directApplyAuthority !== false) {
+      fail(`orchestration provider ${providerId} must not have direct apply authority`);
+    }
+    requireString(provider.secretPolicy, `orchestration provider ${providerId} secretPolicy`);
+  }
+  const apiProvider = providerModes.find((candidate) => candidate.id === "api-key");
+  if (apiProvider && apiProvider.secretPolicy !== "secret-reference-only") {
+    fail("api-key provider mode must use secret-reference-only policy");
+  }
+  const targetAdapters = Array.isArray(orchestration.targetAdapters) ? orchestration.targetAdapters : [];
+  const dashboardTarget = targetAdapters.find((target) => target.id === "dashboard-control-center");
+  const productTarget = targetAdapters.find((target) => target.id === "external-product");
+  if (!dashboardTarget || dashboardTarget.applyMode !== "owner-tool" || dashboardTarget.ownerTool !== "tools/dashboard-design-system") {
+    fail("dashboard-control-center target must apply only through tools/dashboard-design-system");
+  }
+  if (!productTarget || productTarget.applyMode !== "plan-only") {
+    fail("external product target must remain plan-only");
+  }
+  for (const target of targetAdapters) {
+    requireStringArray(target.allowedOutputs, `orchestration target ${target.id} allowedOutputs`);
+    requireStringArray(target.requiredChecks, `orchestration target ${target.id} requiredChecks`);
+  }
+  for (const group of ["store", "eventRunner", "mockLibrary", "templateLibrary"]) {
+    if (!orchestration[group] || typeof orchestration[group] !== "object" || Array.isArray(orchestration[group])) {
+      fail(`orchestration ${group} must be an object`);
+    }
+  }
+  requireStringArray(orchestration.store?.requiredFields, "orchestration store requiredFields");
+  requireStringArray(orchestration.eventRunner?.requiredCapabilities, "orchestration eventRunner requiredCapabilities");
+  requireStringArray(orchestration.eventRunner?.forbiddenCapabilities, "orchestration eventRunner forbiddenCapabilities");
+  requireStringArray(orchestration.mockLibrary?.supportedOperations, "orchestration mockLibrary supportedOperations");
+  requireStringArray(orchestration.mockLibrary?.unsupportedOperations, "orchestration mockLibrary unsupportedOperations");
+  requireStringArray(orchestration.templateLibrary?.supportedOperations, "orchestration templateLibrary supportedOperations");
+  requireStringArray(orchestration.templateLibrary?.unsupportedOperations, "orchestration templateLibrary unsupportedOperations");
+  requireStringArray(orchestration.checks, "orchestration checks");
+}
+
+function validateInteractionContract(components) {
+  const tooltipCopy = components.components.find((component) => component.id === "tooltip-copy");
+  const tooltip = tooltipCopy?.interaction?.tooltip;
+  const copyFeedback = tooltipCopy?.interaction?.copyFeedback;
+  if (!tooltip || !copyFeedback) {
+    fail("tooltip-copy component must define tooltip and copyFeedback interaction");
+    return;
+  }
+  const stringRules = [
+    [tooltip.trigger, supportedInteractionValues.tooltip_trigger, "tooltip trigger"],
+    [tooltip.hidePolicy, supportedInteractionValues.tooltip_hide_policy, "tooltip hide policy"],
+    [tooltip.placement, supportedInteractionValues.tooltip_placement, "tooltip placement"],
+    [copyFeedback.trigger, supportedInteractionValues.copy_feedback_trigger, "copy feedback trigger"],
+    [copyFeedback.hidePolicy, supportedInteractionValues.copy_feedback_hide_policy, "copy feedback hide policy"],
+    [copyFeedback.placement, supportedInteractionValues.copy_feedback_placement, "copy feedback placement"],
+    [copyFeedback.collision, supportedInteractionValues.copy_feedback_collision, "copy feedback collision"],
+  ];
+  for (const [value, allowed, label] of stringRules) {
+    if (!allowed.has(value)) {
+      fail(`invalid ${label}: ${value}`);
+    }
+  }
+  if (!/^[1-9][0-9]{1,3}px$/.test(tooltip.maxWidth || "")) {
+    fail(`invalid tooltip maxWidth: ${tooltip.maxWidth}`);
+  }
+  if (!Number.isInteger(tooltip.delayMs) || tooltip.delayMs < 0 || tooltip.delayMs > 1000) {
+    fail(`invalid tooltip delayMs: ${tooltip.delayMs}`);
+  }
+  if (!Number.isInteger(copyFeedback.durationMs) || copyFeedback.durationMs < 300 || copyFeedback.durationMs > 5000) {
+    fail(`invalid copy feedback durationMs: ${copyFeedback.durationMs}`);
+  }
+}
+
+function validateFoundation(foundation) {
+  const rules = [
+    [foundation.targetScope, supportedFoundationValues.target_scope, "target scope"],
+    [foundation.themeAccent, supportedFoundationValues.theme_accent, "theme accent"],
+    [foundation.density, supportedFoundationValues.density, "density"],
+    [foundation.radiusScale, supportedFoundationValues.radius_scale, "radius scale"],
+    [foundation.typographyScale, supportedFoundationValues.typography_scale, "typography scale"],
+    [foundation.actionControlHeight, supportedFoundationValues.action_control_height, "action control height"],
+    [foundation.actionControlPadding, supportedFoundationValues.action_control_padding, "action control padding"],
+    [foundation.compactControlHeight, supportedFoundationValues.compact_control_height, "compact control height"],
+    [foundation.compactControlPadding, supportedFoundationValues.compact_control_padding, "compact control padding"],
+    [foundation.formControlHeight, supportedFoundationValues.form_control_height, "form control height"],
+    [foundation.formControlPadding, supportedFoundationValues.form_control_padding, "form control padding"],
+    [foundation.iconButtonSize, supportedFoundationValues.icon_button_size, "icon button size"],
+    [foundation.controlFontSize, supportedFoundationValues.control_font_size, "control font size"],
+    [foundation.cardPadding, supportedFoundationValues.card_padding, "card padding"],
+    [foundation.cardGap, supportedFoundationValues.card_gap, "card gap"],
+    [foundation.rowPadding, supportedFoundationValues.row_padding, "row padding"],
+    [foundation.rowGap, supportedFoundationValues.row_gap, "row gap"],
+    [foundation.technicalAffordanceGap, supportedFoundationValues.technical_affordance_gap, "technical affordance gap"],
+    [foundation.technicalSourceMaxWidth, supportedFoundationValues.technical_source_max_width, "technical source max width"],
+    [foundation.technicalEvidenceMaxWidth, supportedFoundationValues.technical_evidence_max_width, "technical evidence max width"],
+    [foundation.technicalPreviewChipMaxWidth, supportedFoundationValues.technical_preview_chip_max_width, "technical preview chip max width"],
+    [foundation.pageHeaderPadding, supportedFoundationValues.page_header_padding, "page header padding"],
+    [foundation.metadataGap, supportedFoundationValues.metadata_gap, "metadata gap"],
+    [foundation.pageIconSize, supportedFoundationValues.page_icon_size, "page icon size"],
+    [foundation.badgeGap, supportedFoundationValues.badge_gap, "badge gap"],
+    [foundation.badgeHeight, supportedFoundationValues.badge_height, "badge height"],
+    [foundation.modeBadgePadding, supportedFoundationValues.mode_badge_padding, "mode badge padding"],
+    [foundation.badgeFontSize, supportedFoundationValues.badge_font_size, "badge font size"],
+    [foundation.modeBadgeFontSize, supportedFoundationValues.mode_badge_font_size, "mode badge font size"],
+  ];
+  for (const [value, allowed, label] of rules) {
+    if (!allowed.has(value)) {
+      fail(`invalid ${label}: ${value}`);
+    }
+  }
+  if (foundation.targetScope !== "dashboard-control-center") {
+    fail("external product design-system apply is product-workflow approval-bound and not writable from this Dashboard endpoint");
+  }
+}
+
+function checkFileMatches(file, expected, label) {
+  const actual = fs.existsSync(file) ? fs.readFileSync(file, "utf8") : "";
+  if (actual !== expected) {
+    fail(`${label} is not synchronized; run ./tools/dashboard-design-system write`);
+  }
+}
+
+function checkRuntimeWiring() {
+  const main = fs.readFileSync(mainPath, "utf8");
+  const app = fs.readFileSync(appPath, "utf8");
+  const dashboardData = fs.readFileSync(path.join(root, "dashboard-control-center/src/dashboardData.js"), "utf8");
+  const generatedCss = fs.existsSync(generatedCssPath) ? fs.readFileSync(generatedCssPath, "utf8") : "";
+  const designSystem = fs.readFileSync(designSystemPath, "utf8");
+  if (!main.includes('import "./design-system.generated.css";')) {
+    fail("main.jsx must import design-system.generated.css");
+  }
+  if (!app.includes('data-dcc-design-system="dashboard-control-center"')) {
+    fail("App shell must expose data-dcc-design-system for runtime inspection");
+  }
+  if (!app.includes('from "./design-system.generated.js"')) {
+    fail("App must import design-system.generated.js for Design Studio inspection");
+  }
+  if (!app.includes('id: "design-studio"')) {
+    fail("App must expose a Design Studio navigation route");
+  }
+  if (!app.includes("design-studio-orchestration")) {
+    fail("App must expose the Design Studio orchestration foundation panel");
+  }
+  if (!fs.readFileSync(generatedJsPath, "utf8").includes('"orchestration"')) {
+    fail("Generated JS must include the orchestration contract");
+  }
+  if (!app.includes("planToken") || !dashboardData.includes("plan_token")) {
+    fail("Design Studio apply must be bound to a server-issued plan_token");
+  }
+  if (!/--dcc-copy-feedback-duration-ms: [0-9]+ms;/.test(generatedCss) || !generatedCss.includes("transition: opacity var(--dcc-copy-feedback-duration-ms) ease")) {
+    fail("Generated copy feedback CSS must apply the configured duration");
+  }
+  if (!generatedCss.includes(".source-boundary__chip-copy:last-child::after") || !generatedCss.includes("right: 0;")) {
+    fail("Generated copy feedback CSS must include shift-style edge positioning");
+  }
+  if (!generatedCss.includes("--dcc-technical-affordance-gap") || !generatedCss.includes("gap: var(--dcc-technical-affordance-gap);")) {
+    fail("Generated tooltip-copy CSS must apply the technical affordance gap");
+  }
+  if (!generatedCss.includes(".design-studio-preview__sample .design-studio-preview__chip")) {
+    fail("Generated tooltip-copy CSS must include Design Studio preview chip layout");
+  }
+  if (!generatedCss.includes("--dcc-page-header-padding") || !generatedCss.includes(".page-title,\n.detail-page-header {")) {
+    fail("Generated page-header CSS must apply the page header contract");
+  }
+  if (!generatedCss.includes(".overview-status-card,") || !generatedCss.includes(".common-status-card,")) {
+    fail("Generated operational-card CSS must include shared card selectors");
+  }
+  if (!generatedCss.includes("--dcc-card-padding") || !generatedCss.includes("--dcc-card-gap")) {
+    fail("Generated operational-card CSS must apply shared card density tokens");
+  }
+  if (!generatedCss.includes("--dcc-row-padding") || !generatedCss.includes("--dcc-row-gap") || !generatedCss.includes(".settings-row,")) {
+    fail("Generated data-row CSS must apply shared row density tokens");
+  }
+  if (!generatedCss.includes("--dcc-badge-height") || !generatedCss.includes(".status,\n.risk {")) {
+    fail("Generated status-badge CSS must apply the badge contract");
+  }
+  if (!generatedCss.includes(".status-chip,\n.mode-pill {") || !generatedCss.includes(".common-mode-pill {")) {
+    fail("Generated status-badge CSS must include mode badge selectors");
+  }
+  if (!generatedCss.includes("--dcc-action-control-height") || !generatedCss.includes(".settings-action-row button,")) {
+    fail("Generated interactive-control CSS must apply action button tokens");
+  }
+  if (!generatedCss.includes(".design-studio-preview__control-field select") || !generatedCss.includes("--dcc-form-control-height")) {
+    fail("Generated interactive-control CSS must apply form control tokens");
+  }
+  for (const heading of ["Source-To-Runtime Contract", "Prototype Preview Gate", "Drift Check"]) {
+    if (!designSystem.includes(heading)) {
+      fail(`DESIGN_SYSTEM.md missing ${heading}`);
+    }
+  }
+  for (const phrase of ["Design Studio", "Interaction Editing Contract"]) {
+    if (!designSystem.includes(phrase)) {
+      fail(`DESIGN_SYSTEM.md missing ${phrase}`);
+    }
+  }
+  for (const phrase of ["Visual Editor Contract", "Atom, Molecule, Organism Preview", "Target And External Product Boundary"]) {
+    if (!designSystem.includes(phrase)) {
+      fail(`DESIGN_SYSTEM.md missing ${phrase}`);
+    }
+  }
+  for (const phrase of ["Proposal Orchestration Foundation", "Candidate Envelope", "AI Provider Boundary", "Mock And Template Bridge"]) {
+    if (!designSystem.includes(phrase)) {
+      fail(`DESIGN_SYSTEM.md missing ${phrase}`);
+    }
+  }
+}
+
+function loadSources() {
+  const tokens = readJson(tokensPath);
+  const components = readJson(componentsPath);
+  const orchestration = readJson(orchestrationPath);
+  validateSource(tokens, components);
+  validateOrchestration(orchestration);
+  return { tokens, components, orchestration };
+}
+
+function usage() {
+  console.error("Usage: ./tools/dashboard-design-system <check|write|emit-css|emit-js|emit-orchestration|plan-interaction|apply-interaction> [--component tooltip-copy] [--target-scope dashboard-control-center] [--theme-accent blue|teal|slate] [--density compact|balanced|comfortable] [--radius-scale compact|standard|soft] [--typography-scale standard|large] [--action-control-height 32px|34px|38px] [--action-control-padding '6px 10px'|'8px 11px'|'9px 13px'] [--compact-control-height 30px|32px|34px] [--compact-control-padding '4px 8px'|'5px 10px'|'6px 12px'] [--form-control-height 38px|40px|44px] [--form-control-padding '0 9px'|'0 10px'|'0 12px'] [--icon-button-size 34px|38px|42px] [--control-font-size 0.82rem|0.84rem|0.9rem] [--card-padding 12px|14px|16px] [--card-gap 8px|10px|12px] [--row-padding '9px 10px'|'10px 12px'|'12px 14px'] [--row-gap 8px|10px|12px] [--technical-affordance-gap 4px|6px|8px] [--technical-source-max-width 220px|260px|300px] [--technical-evidence-max-width 260px|292px|320px] [--technical-preview-chip-max-width 320px|360px|420px] [--page-header-padding '16px 18px'|'18px 20px'|'20px 22px'] [--metadata-gap 6px|8px|10px] [--page-icon-size 44px|52px|56px] [--badge-gap 4px|5px|6px] [--badge-height 24px|26px|28px] [--mode-badge-padding '3px 10px'|'4px 14px'|'5px 16px'] [--badge-font-size 0.72rem|0.76rem|0.8rem] [--mode-badge-font-size 0.74rem|0.78rem|0.82rem] [--tooltip-trigger hover-only|disabled] [--tooltip-hide-policy pointer-leave] [--tooltip-placement top] [--copy-feedback-trigger hover-only|disabled] [--copy-feedback-placement top] [--confirm]");
+  process.exit(2);
+}
+
+function parseOptionArgs(args) {
+  const parsed = { confirm: false };
+  for (let index = 0; index < args.length; index += 1) {
+    const arg = args[index];
+    if (arg === "--confirm") {
+      parsed.confirm = true;
+      continue;
+    }
+    if (!arg.startsWith("--")) {
+      usage();
+    }
+    const key = arg.slice(2).replace(/-/g, "_");
+    const value = args[index + 1];
+    if (!value || value.startsWith("--")) {
+      usage();
+    }
+    parsed[key] = value;
+    index += 1;
+  }
+  return parsed;
+}
+
+function interactionFromOptions(component, options) {
+  const current = component.interaction || {};
+  return {
+    tooltip: {
+      trigger: options.tooltip_trigger || current.tooltip?.trigger || "hover-only",
+      hidePolicy: options.tooltip_hide_policy || current.tooltip?.hidePolicy || "pointer-leave",
+      placement: options.tooltip_placement || current.tooltip?.placement || "top",
+      maxWidth: options.tooltip_max_width || current.tooltip?.maxWidth || "300px",
+      delayMs: Number(options.tooltip_delay_ms ?? current.tooltip?.delayMs ?? 0),
+    },
+    copyFeedback: {
+      trigger: options.copy_feedback_trigger || current.copyFeedback?.trigger || "hover-only",
+      hidePolicy: options.copy_feedback_hide_policy || current.copyFeedback?.hidePolicy || "pointer-leave",
+      placement: options.copy_feedback_placement || current.copyFeedback?.placement || "top",
+      collision: options.copy_feedback_collision || current.copyFeedback?.collision || "shift",
+      durationMs: Number(options.copy_feedback_duration_ms ?? current.copyFeedback?.durationMs ?? 1200),
+    },
+  };
+}
+
+function interactionPayload(status, component, currentFoundation, proposedFoundation, proposed, applied) {
+  return {
+    status,
+    severity: status === "passed" ? "info" : "warning",
+    reason_code: applied ? "design_system_interaction_applied" : "design_system_interaction_planned",
+    reason_key: applied ? "designStudio.result.applied" : "designStudio.result.planned",
+    next_action_key: applied ? "designStudio.result.nextVerify" : "designStudio.result.nextConfirm",
+    component_id: component.id,
+    target_scope: proposedFoundation.targetScope,
+    target_file: "docs/design-system/dashboard-control-center/tokens.json, docs/design-system/dashboard-control-center/components.json",
+    requested_changes: {
+      target_scope: proposedFoundation.targetScope,
+      theme_accent: proposedFoundation.themeAccent,
+      density: proposedFoundation.density,
+      radius_scale: proposedFoundation.radiusScale,
+      typography_scale: proposedFoundation.typographyScale,
+      action_control_height: proposedFoundation.actionControlHeight,
+      action_control_padding: proposedFoundation.actionControlPadding,
+      compact_control_height: proposedFoundation.compactControlHeight,
+      compact_control_padding: proposedFoundation.compactControlPadding,
+      form_control_height: proposedFoundation.formControlHeight,
+      form_control_padding: proposedFoundation.formControlPadding,
+      icon_button_size: proposedFoundation.iconButtonSize,
+      control_font_size: proposedFoundation.controlFontSize,
+      card_padding: proposedFoundation.cardPadding,
+      card_gap: proposedFoundation.cardGap,
+      row_padding: proposedFoundation.rowPadding,
+      row_gap: proposedFoundation.rowGap,
+      technical_affordance_gap: proposedFoundation.technicalAffordanceGap,
+      technical_source_max_width: proposedFoundation.technicalSourceMaxWidth,
+      technical_evidence_max_width: proposedFoundation.technicalEvidenceMaxWidth,
+      technical_preview_chip_max_width: proposedFoundation.technicalPreviewChipMaxWidth,
+      page_header_padding: proposedFoundation.pageHeaderPadding,
+      metadata_gap: proposedFoundation.metadataGap,
+      page_icon_size: proposedFoundation.pageIconSize,
+      badge_gap: proposedFoundation.badgeGap,
+      badge_height: proposedFoundation.badgeHeight,
+      mode_badge_padding: proposedFoundation.modeBadgePadding,
+      badge_font_size: proposedFoundation.badgeFontSize,
+      mode_badge_font_size: proposedFoundation.modeBadgeFontSize,
+      tooltip_trigger: proposed.tooltip.trigger,
+      tooltip_hide_policy: proposed.tooltip.hidePolicy,
+      tooltip_placement: proposed.tooltip.placement,
+      tooltip_max_width: proposed.tooltip.maxWidth,
+      copy_feedback_trigger: proposed.copyFeedback.trigger,
+      copy_feedback_hide_policy: proposed.copyFeedback.hidePolicy,
+      copy_feedback_placement: proposed.copyFeedback.placement,
+      copy_feedback_collision: proposed.copyFeedback.collision,
+      copy_feedback_duration_ms: String(proposed.copyFeedback.durationMs),
+    },
+    current_foundation: currentFoundation,
+    proposed_foundation: proposedFoundation,
+    current_interaction: component.interaction,
+    proposed_interaction: proposed,
+    applied,
+    generated_files: [
+      "dashboard-control-center/src/design-system.generated.css",
+      "dashboard-control-center/src/design-system.generated.js",
+    ],
+    tool_command: `tools/dashboard-design-system ${applied ? "apply-interaction" : "plan-interaction"} --component ${component.id}`,
+  };
+}
+
+function handleInteractionCommand(command, tokens, components) {
+  const options = parseOptionArgs(process.argv.slice(3));
+  const componentId = options.component || "tooltip-copy";
+  if (!supportedInteractionValues.component.has(componentId)) {
+    console.error(`unsupported component: ${componentId}`);
+    process.exit(2);
+  }
+  if (command === "apply-interaction" && options.confirm !== true) {
+    console.error("apply-interaction requires --confirm");
+    process.exit(2);
+  }
+  const currentFoundation = foundationFromTokens(tokens);
+  const proposedFoundation = foundationFromOptions(tokens, options);
+  validateFoundation(proposedFoundation);
+  if (process.exitCode) {
+    process.exit(process.exitCode);
+  }
+  const component = components.components.find((candidate) => candidate.id === componentId);
+  if (!component) {
+    console.error(`missing component: ${componentId}`);
+    process.exit(2);
+  }
+  const proposed = interactionFromOptions(component, options);
+  const updatedComponents = {
+    ...components,
+    components: components.components.map((candidate) => (candidate.id === componentId ? { ...candidate, interaction: proposed } : candidate)),
+  };
+  const updatedTokens = applyFoundationPresets(tokens, proposedFoundation);
+  validateSource(updatedTokens, updatedComponents);
+  if (process.exitCode) {
+    process.exit(process.exitCode);
+  }
+  if (command === "apply-interaction") {
+    fs.writeFileSync(tokensPath, `${JSON.stringify(updatedTokens, null, 2)}\n`, "utf8");
+    fs.writeFileSync(componentsPath, `${JSON.stringify(updatedComponents, null, 2)}\n`, "utf8");
+    fs.writeFileSync(generatedCssPath, generatedCss(updatedTokens, updatedComponents), "utf8");
+    fs.writeFileSync(generatedJsPath, generatedJs(updatedTokens, updatedComponents, orchestration), "utf8");
+  }
+  const payload = interactionPayload(command === "apply-interaction" ? "passed" : "ready", component, currentFoundation, proposedFoundation, proposed, command === "apply-interaction");
+  process.stdout.write(`${JSON.stringify(payload, null, 2)}\n`);
+}
+
+const command = process.argv[2] || "check";
+const { tokens, components, orchestration } = loadSources();
+const css = generatedCss(tokens, components);
+const js = generatedJs(tokens, components, orchestration);
+
+if (command === "emit-css") {
+  process.stdout.write(css);
+} else if (command === "emit-js") {
+  process.stdout.write(js);
+} else if (command === "emit-orchestration") {
+  process.stdout.write(`${JSON.stringify(orchestration, null, 2)}\n`);
+} else if (command === "write") {
+  fs.writeFileSync(generatedCssPath, css, "utf8");
+  fs.writeFileSync(generatedJsPath, js, "utf8");
+} else if (command === "check") {
+  checkFileMatches(generatedCssPath, css, "generated CSS");
+  checkFileMatches(generatedJsPath, js, "generated JS");
+  checkRuntimeWiring();
+  if (process.exitCode) {
+    process.exit(process.exitCode);
+  }
+  console.log("Dashboard design-system check passed.");
+} else if (command === "plan-interaction" || command === "apply-interaction") {
+  handleInteractionCommand(command, tokens, components);
+} else {
+  usage();
+}

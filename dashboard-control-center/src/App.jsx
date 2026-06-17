@@ -63,16 +63,20 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   applyDashboardSettingChange,
+  applyDashboardDesignSystemChange,
   asArray,
   displayKey,
   displayText,
   fetchDashboardDataSnapshot,
+  fetchDashboardLiveStatus,
   normalizeRisk,
   normalizeState,
   objectEntries,
   pickFirst,
   planDashboardSettingChange,
+  planDashboardDesignSystemChange,
 } from "./dashboardData.js";
+import { dashboardControlCenterDesignSystem } from "./design-system.generated.js";
 import { createTranslator, formatDateTime, formatRelativeAge, getDashboardIntlLocale, getDashboardLocaleDirection, resolveLocale } from "./i18n.js";
 
 const stateIcons = {
@@ -125,6 +129,7 @@ const repositoryNavigation = [
   { id: "repository-info", labelKey: "nav.repositoryInfo", Icon: Info, href: "#repository-info" },
   { id: "documents", labelKey: "nav.documents", Icon: FileText, href: "#documents" },
   { id: "settings", labelKey: "nav.settings", Icon: Settings, href: "#settings" },
+  { id: "design-studio", labelKey: "nav.designStudio", Icon: Wrench, href: "#design-studio" },
 ];
 
 const supportNavigation = [
@@ -133,9 +138,12 @@ const supportNavigation = [
 ];
 
 const allNavigation = [...navigation, ...repositoryNavigation, ...supportNavigation];
+const evidenceBackedViews = new Set(["workflow", "maintenance", "safety", "repository-info", "documents", "design-studio", "help", "history"]);
 const SETTINGS_APPLY_FEEDBACK_DELAY_MS = 350;
 const SETTINGS_APPLY_FEEDBACK_AUTO_CLOSE_MS = 1200;
 const SETTINGS_APPLY_FEEDBACK_TIMEOUT_MS = 8000;
+const CONTEXT_SWITCH_FALLBACK_MS = 1200;
+const CONTEXT_SWITCH_COMPLETE_HOLD_MS = 700;
 
 const contextMenuIcons = {
   step_1_7: BookOpen,
@@ -159,8 +167,74 @@ const contextMenuTones = {
   unknown: "unknown",
 };
 
+const DASHBOARD_ACTIVE_MENU_STORAGE_KEY = "dashboard-control-center.activeMenuId";
+const dashboardKnownMenuIds = new Set(Object.keys(contextMenuIcons).filter((id) => id !== "unknown"));
+
+function safeDashboardMenuId(value) {
+  const id = displayText(value, "");
+  return dashboardKnownMenuIds.has(id) ? id : "";
+}
+
+function dashboardMenuIdFromSearch() {
+  if (typeof window === "undefined") {
+    return "";
+  }
+  try {
+    return safeDashboardMenuId(new URLSearchParams(window.location.search).get("menu_id"));
+  } catch {
+    return "";
+  }
+}
+
+function storedDashboardMenuId() {
+  if (typeof window === "undefined" || !window.localStorage) {
+    return "";
+  }
+  try {
+    return safeDashboardMenuId(window.localStorage.getItem(DASHBOARD_ACTIVE_MENU_STORAGE_KEY));
+  } catch {
+    return "";
+  }
+}
+
+function initialDashboardMenuId() {
+  return dashboardMenuIdFromSearch() || storedDashboardMenuId();
+}
+
+function persistDashboardMenuId(menuId) {
+  if (typeof window === "undefined") {
+    return;
+  }
+  const id = safeDashboardMenuId(menuId);
+  try {
+    if (id) {
+      window.localStorage?.setItem(DASHBOARD_ACTIVE_MENU_STORAGE_KEY, id);
+    } else {
+      window.localStorage?.removeItem(DASHBOARD_ACTIVE_MENU_STORAGE_KEY);
+    }
+  } catch {
+    // Browser privacy settings may block localStorage; the URL remains the source of truth for this session.
+  }
+  try {
+    const params = new URLSearchParams(window.location.search);
+    if (id) {
+      params.set("menu_id", id);
+    } else {
+      params.delete("menu_id");
+    }
+    const query = params.toString();
+    const nextUrl = `${window.location.pathname}${query ? `?${query}` : ""}${window.location.hash}`;
+    if (nextUrl !== `${window.location.pathname}${window.location.search}${window.location.hash}`) {
+      window.history.replaceState(window.history.state, "", nextUrl);
+    }
+  } catch {
+    // URL persistence is best-effort; failed history writes must not block dashboard rendering.
+  }
+}
+
 const overviewStatusConfig = {
   lessons: { Icon: BookOpen, tone: "lessons", labelKey: "overview.status.lessonProgress" },
+  workflow: { Icon: WorkflowCategoryIcon, tone: "workflow", labelKey: "overview.status.workflowContext" },
   git: { Icon: Link2, tone: "git", labelKey: "overview.status.git" },
   ci: { Icon: CheckCircle2, tone: "ci", labelKey: "overview.status.ci" },
   security: { Icon: ShieldCheck, tone: "security", labelKey: "overview.status.security" },
@@ -249,8 +323,12 @@ function presentationKeyFromId(id) {
   return map[id] || technicalKeyFromId(id);
 }
 
-function sourcePresentationKey(source) {
+function sourcePresentationKey(source, t = null) {
   const id = displayText(source);
+  const translated = t ? t(`source.label.${id}`, "") : "";
+  if (translated) {
+    return translated;
+  }
   const map = {
     ci_required_gate: "ci.required_checks",
     workflow_pair_sync: "workflow.unknown_pair",
@@ -260,9 +338,20 @@ function sourcePresentationKey(source) {
     as_built_sync_live: "as_built.live",
     workflow_pair_live: "workflow_pair.live",
     git_workflow_gate_live: "git_gate.live",
+    product_authority_evidence_refresh: "product.evidence.refresh",
     product_security_gate_live: "safety_gate.live",
+    "product.gates.evidence_index": "product.evidence",
+    "product.gates.tests": "product.tests",
+    "product.gates.structure": "product.structure",
+    "product.security.local_artifacts": "product.security.local",
+    "product.security.secrets": "product.security.secrets",
+    "product.security.external_sending": "product.security.external",
   };
-  return map[id] || displayKey(id);
+  const mapped = map[id] || "";
+  if (mapped && t) {
+    return t(`source.label.${mapped}`, mapped);
+  }
+  return mapped || displayKey(id);
 }
 
 function contextLabel(menuId, t) {
@@ -273,6 +362,22 @@ function contextLabel(menuId, t) {
 function workflowContextLabel(workflowContext, t) {
   const id = displayText(workflowContext, "unknown");
   return t(`context.workflow.${id}`, displayKey(id));
+}
+
+function repositoryDisplayName(value, t) {
+  const text = displayText(value, "");
+  if (!text || text === "not_selected" || text === "not_configured" || text === "not_applicable") {
+    return t("context.repositoryNotSelected");
+  }
+  return text;
+}
+
+function selectedContextRepositoryName(context) {
+  return displayText(context?.target_repository?.name || context?.target_repository_name, "");
+}
+
+function workflowRunTarget(row, context, t) {
+  return repositoryDisplayName(selectedContextRepositoryName(context) || row.target, t);
 }
 
 function securityScopeLabel(context, t) {
@@ -300,6 +405,120 @@ function availableContexts(data) {
   return asArray(data.available_contexts);
 }
 
+function availableContextForMenu(data, menuId) {
+  const id = displayText(menuId, "");
+  return availableContexts(data).find((context) => displayText(context.menu_id, "") === id) || null;
+}
+
+function isAvailableContextSelectable(context) {
+  if (!context || typeof context !== "object") {
+    return false;
+  }
+  if (context.selectable === true) {
+    return true;
+  }
+  if (context.selectable === false) {
+    return false;
+  }
+  return !["missing", "not_run"].includes(normalizeState(context.status));
+}
+
+function isMenuSelectable(data, menuId) {
+  return isAvailableContextSelectable(availableContextForMenu(data, menuId));
+}
+
+function unavailableContextNotice(context, t) {
+  const reasonKey = displayText(context?.disabled_reason_key, "context.menuAvailability.contextMissing");
+  const reason = t(reasonKey, t("context.menuAvailability.contextMissing"));
+  const detailKey = `context.menuAvailabilityDetail.${displayText(reasonKey, "").replace(/^context\.menuAvailability\./, "") || "contextMissing"}`;
+  return {
+    menuId: displayText(context?.menu_id, "unknown"),
+    reason,
+    detail: t(detailKey, displayText(context?.disabled_detail, reason)),
+    nextAction: displayText(context?.required_next_action, ""),
+  };
+}
+
+function menuIdsForData(data) {
+  const ids = [
+    ...availableContexts(data).map((context) => displayText(context.menu_id, "")),
+    ...Object.keys(contextsByMenu(data)),
+    displayText(selectedContextData(data).menu_id, ""),
+  ].filter(Boolean);
+  return [...new Set(ids)];
+}
+
+function producerMenuIdForData(data) {
+  return displayText(selectedContextData(data).menu_id, menuIdsForData(data)[0] || "unknown");
+}
+
+function resolveActiveMenuId(data, requestedMenuId = "") {
+  const menuIds = menuIdsForData(data);
+  const requested = displayText(requestedMenuId, "");
+  const producerMenuId = producerMenuIdForData(data);
+  if (
+    requested &&
+    menuIds.includes(requested) &&
+    contextDataForMenu(data, requested) &&
+    (isMenuSelectable(data, requested) || requested === producerMenuId)
+  ) {
+    return requested;
+  }
+  if (menuIds.includes(producerMenuId) && contextDataForMenu(data, producerMenuId)) {
+    return producerMenuId;
+  }
+  return menuIds.find((menuId) => contextDataForMenu(data, menuId) && isMenuSelectable(data, menuId)) || producerMenuId;
+}
+
+function partialFailureStateForBlocker(status) {
+  const state = normalizeState(status);
+  if (state === "failed") {
+    return "failed";
+  }
+  if (state === "blocked") {
+    return "blocked";
+  }
+  return "unknown";
+}
+
+function partialFailuresForActiveContext(data, activeContext, isProducerContext) {
+  if (isProducerContext) {
+    return asArray(data.partial_failures);
+  }
+  return asArray(activeContext.blockers).map((blocker) => ({
+    source: displayText(blocker.source),
+    status: partialFailureStateForBlocker(blocker.status),
+    reason: displayText(blocker.reason),
+    required_command: displayText(blocker.required_command),
+  }));
+}
+
+function resolveActiveDashboardData(data, activeMenuId) {
+  const producerMenuId = producerMenuIdForData(data);
+  const requestedMenuId = displayText(activeMenuId, "");
+  const resolvedMenuId = resolveActiveMenuId(data, requestedMenuId || producerMenuId);
+  const producerContext = selectedContextData(data);
+  const activeContext = contextDataForMenu(data, resolvedMenuId) || producerContext;
+  const activeContextMenuId = displayText(activeContext.menu_id, resolvedMenuId);
+  const isProducerContext = activeContextMenuId === producerMenuId;
+  const viewData =
+    isProducerContext && activeContext === producerContext
+      ? data
+      : {
+          ...data,
+          selected_context: activeContext,
+          partial_failures: partialFailuresForActiveContext(data, activeContext, isProducerContext),
+        };
+  return {
+    data: viewData,
+    activeMenuId: activeContextMenuId,
+    activeContext,
+    producerMenuId,
+    isProducerContext,
+    requestedMenuId,
+  };
+}
+
 function contextIconFor(menuId) {
   return contextMenuIcons[displayText(menuId, "unknown")] || contextMenuIcons.unknown;
 }
@@ -320,6 +539,10 @@ function MenuTileLabel({ label }) {
       <span className="menu-tile__step-name">{match[2]}</span>
     </>
   );
+}
+
+function requestDashboardSnapshotRefresh() {
+  window.dispatchEvent(new CustomEvent("dashboard-control-center:refresh"));
 }
 
 function PageTitleHeader({ viewId, Icon, title, subtitle, data, locale, t, actionLabel, headingId }) {
@@ -343,7 +566,7 @@ function PageTitleHeader({ viewId, Icon, title, subtitle, data, locale, t, actio
           </span>
         ) : null}
         {actionLabel ? (
-          <button className="refresh-button" type="button" onClick={() => window.location.reload()}>
+          <button className="refresh-button" type="button" onClick={requestDashboardSnapshotRefresh}>
             <RefreshCw aria-hidden="true" size={15} />
             {actionLabel}
           </button>
@@ -353,9 +576,11 @@ function PageTitleHeader({ viewId, Icon, title, subtitle, data, locale, t, actio
   );
 }
 
-function MenuTileStrip({ data, t }) {
-  const selected = displayText(selectedContextData(data).menu_id, "unknown");
+function MenuTileStrip({ data, t, activeMenuId, pendingMenuId, onActiveMenuChange }) {
+  const selected = displayText(activeMenuId || selectedContextData(data).menu_id, "unknown");
+  const pending = displayText(pendingMenuId, "");
   const contexts = availableContexts(data);
+  const [selectionNotice, setSelectionNotice] = useState(null);
   if (!contexts.length) {
     return null;
   }
@@ -367,9 +592,35 @@ function MenuTileStrip({ data, t }) {
           const menuId = displayText(context.menu_id, "unknown");
           const Icon = contextIconFor(menuId);
           const isSelected = menuId === selected;
+          const isPending = menuId === pending;
+          const selectable = isAvailableContextSelectable(context);
           const label = contextLabel(menuId, t);
+          const showNotice = selectionNotice?.menuId === menuId;
+          const describedBy = showNotice ? "menu-unavailable-notice" : undefined;
           return (
-            <article className={`menu-tile menu-tile--${contextToneFor(menuId)}${isSelected ? " is-selected" : ""}`} key={menuId} data-menu-tile={menuId}>
+            <button
+              className={`menu-tile menu-tile--${contextToneFor(menuId)}${isSelected ? " is-selected" : ""}${isPending ? " is-pending" : ""}${selectable ? "" : " is-unselectable"}`}
+              type="button"
+              key={menuId}
+              data-menu-tile={menuId}
+              data-menu-selectable={selectable ? "true" : "false"}
+              aria-pressed={isSelected}
+              aria-disabled={selectable ? undefined : "true"}
+              aria-describedby={describedBy}
+              onFocus={() => {
+                if (!selectable) {
+                  setSelectionNotice(unavailableContextNotice(context, t));
+                }
+              }}
+              onClick={() => {
+                if (!selectable) {
+                  setSelectionNotice(unavailableContextNotice(context, t));
+                  return;
+                }
+                setSelectionNotice(null);
+                onActiveMenuChange?.(menuId);
+              }}
+            >
               <span className="menu-tile__icon">
                 <Icon aria-hidden="true" size={30} />
               </span>
@@ -381,10 +632,30 @@ function MenuTileStrip({ data, t }) {
                   <Check aria-hidden="true" size={18} />
                 </span>
               ) : null}
-            </article>
+              {isPending ? (
+                <span className="menu-tile__pending" aria-label={t("context.menuAvailability.switching")}>
+                  <RefreshCw aria-hidden="true" size={13} />
+                  {t("context.menuAvailability.switching")}
+                </span>
+              ) : null}
+              {!selectable ? (
+                <span className="menu-tile__availability">
+                  <Lock aria-hidden="true" size={13} />
+                  {t("context.menuAvailability.unavailable")}
+                </span>
+              ) : null}
+            </button>
           );
         })}
       </div>
+      {selectionNotice ? (
+        <div id="menu-unavailable-notice" className="menu-tile-notice" role="status" aria-live="polite">
+          <strong>{selectionNotice.reason}</strong>
+          <span>{selectionNotice.detail}</span>
+          <span>{t("context.menuAvailability.currentRemains")} {contextLabel(selectedContextData(data).menu_id, t)}</span>
+          {selectionNotice.nextAction ? <code>{selectionNotice.nextAction}</code> : null}
+        </div>
+      ) : null}
     </section>
   );
 }
@@ -520,15 +791,15 @@ function ContextSnapshotStrip({ data, t, locale, variant = "overview" }) {
   const metric = data.summary?.category_metrics?.lessons || {};
   const progress = contextProgress(context, metric);
   const selectedMenu = contextLabel(context.menu_id, t);
-  const currentStep = selectedStepText(context);
-  const currentStepShort = selectedStepShort(context);
-  const currentStepDetail = localizedStepDetail(context, t);
+  const currentStep = currentStepTextDisplay(context, t);
+  const currentStepShort = currentStepShortDisplay(context, t);
+  const currentStepDetail = currentStepDetailDisplay(context, t);
   const nextSafeAction = context.next_safe_action || data.summary?.primary_action || {};
   const nextAction = nextActionShort(context, data, t);
   const rowsByVariant = {
     overview: [
       { label: t("mock.context.now"), value: currentStep, Icon: Target, tone: "blue" },
-      { label: t("mock.context.target"), value: displayText(targetRepository.name), Icon: Folder, tone: "gray" },
+      { label: t("mock.context.target"), value: repositoryDisplayName(targetRepository.name, t), Icon: Folder, tone: "gray" },
       { label: t("mock.context.nextOperation"), value: nextAction || displayText(nextSafeAction.title, displayText(nextSafeAction.description)), Icon: ArrowRightCircle, tone: "blue" },
       { label: t("app.lastUpdated"), value: generated, Icon: Clock, tone: "purple" },
     ],
@@ -540,19 +811,19 @@ function ContextSnapshotStrip({ data, t, locale, variant = "overview" }) {
     ],
     workflow: [
       { label: "", value: selectedMenu, Icon: BookOpen, tone: "blue" },
-      { label: t("mock.context.externalRepository"), value: displayText(targetRepository.name), Icon: Database, tone: "teal" },
-      { label: currentStepShort, value: displayText(context.current_step_id), Icon: Flag, tone: "teal" },
+      { label: t("mock.context.externalRepository"), value: repositoryDisplayName(targetRepository.name, t), Icon: Database, tone: "teal" },
+      { label: t("repositoryInfo.field.workflow"), value: currentStepShort, Icon: Flag, tone: "teal" },
       { label: t("mock.context.nextStep"), value: nextAction || displayText(nextSafeAction.title, displayText(nextSafeAction.description)), Icon: ArrowRightCircle, tone: "teal" },
     ],
     maintenance: [
       { label: t("mock.context.maintenance.selectedMenu"), value: selectedMenu, Icon: BookOpen, tone: "purple", chip: true },
-      { label: t("mock.context.maintenance.targetRepository"), value: displayText(targetRepository.name), Icon: Folder, tone: "purple" },
+      { label: t("mock.context.maintenance.targetRepository"), value: repositoryDisplayName(targetRepository.name, t), Icon: Folder, tone: "purple" },
       { label: t("mock.context.maintenance.activeStep"), value: currentStepShort, Icon: Flag, tone: "purple" },
       { label: t("mock.context.maintenance.dataSource"), value: t("mock.context.dashboardSnapshot"), Icon: Database, tone: "purple" },
     ],
     safety: [
       { label: t("mock.context.selectedMenu"), value: selectedMenu, Icon: List, tone: "green" },
-      { label: t("mock.context.targetRepository"), value: displayText(targetRepository.name), Icon: Folder, tone: "green" },
+      { label: t("mock.context.targetRepository"), value: repositoryDisplayName(targetRepository.name, t), Icon: Folder, tone: "green" },
       { label: t("mock.context.currentStep"), value: currentStepShort, Icon: CheckCircle2, tone: "green" },
       { label: t("mock.context.securityScope"), value: securityScopeLabel(context, t), Icon: ShieldCheck, tone: "green" },
     ],
@@ -584,6 +855,740 @@ function ContextSnapshotStrip({ data, t, locale, variant = "overview" }) {
   );
 }
 
+function liveStatusForContext(liveStatus, context) {
+  if (!liveStatus || !context) {
+    return null;
+  }
+  const workflowContext = displayText(context.workflow_context, "");
+  if (!["free-development", "product-improvement", "external-integration"].includes(workflowContext)) {
+    return null;
+  }
+  const contextMenuId = displayText(context.menu_id, "");
+  const liveMenuId = displayText(liveStatus.menu_id, "");
+  if (!contextMenuId || liveMenuId !== contextMenuId) {
+    return null;
+  }
+  const contextRepository = selectedContextRepositoryName(context);
+  const liveRepository = displayText(liveStatus.target_repository?.name, "");
+  if (contextRepository && liveRepository && contextRepository !== liveRepository) {
+    return null;
+  }
+  return liveStatus;
+}
+
+function liveCheck(liveStatus, key) {
+  const check = liveStatus?.checks?.[key];
+  return check && typeof check === "object" ? check : null;
+}
+
+function liveStatusObservedTime(value) {
+  const observedAt = displayText(value, "");
+  if (!observedAt || observedAt === "not_collected" || observedAt === "unknown") {
+    return "";
+  }
+  return formatDashboardTime(observedAt);
+}
+
+function overviewLiveTargetDetail(liveStatus, context, t) {
+  const target = repositoryDisplayName(liveStatus?.target_repository?.name || context?.target_repository?.name, t);
+  return `${t("overview.fact.target")}: ${target}`;
+}
+
+function overviewLiveCheckedDetail(liveStatus, context, check, t) {
+  const checkedAt = liveStatusObservedTime(check?.observed_at) || t("overview.fact.noEvidence");
+  return `${overviewLiveTargetDetail(liveStatus, context, t)} / ${t("overview.fact.lastChecked")}: ${checkedAt}`;
+}
+
+function overviewLiveLocalizedText(value, t) {
+  const text = displayText(value, "");
+  if (!text) {
+    return "";
+  }
+  const localChanges = text.match(/^(\d+|Uncommitted) local file change\(s\) are not committed\.$/);
+  if (localChanges) {
+    return localChanges[1] === "Uncommitted" ? t("overview.liveText.gitLocalChangesUnknown") : `${t("overview.liveText.gitLocalChanges")} ${localChanges[1]}`;
+  }
+  const map = {
+    "No remote branch is configured for synchronization.": "overview.liveText.gitNoRemoteBranch",
+    "Open workflow details to inspect commit, push, upstream, and local/remote sync state.": "overview.liveText.gitOpenWorkflowAction",
+    "No local file changes are waiting for commit.": "overview.liveText.gitNoLocalChanges",
+    "Remote branch setup is not required for this mode.": "overview.liveText.gitRemoteNotRequired",
+    "Local/remote sync is not required for this mode.": "overview.liveText.gitLocalRemoteNotRequired",
+    "Git sync passed": "overview.liveText.gitSyncPassed",
+    "Inspect details when a workflow decision needs supporting evidence.": "overview.liveText.inspectDetailsWhenNeeded",
+    "CI blocked": "overview.liveText.ciBlocked",
+    "No current CI run could be associated with the selected repository.": "overview.liveText.ciRunNotAssociated",
+    "Worktree evidence is older than the configured freshness window or product HEAD.": "overview.liveText.gitWorktreeStale",
+    "Git synchronization evidence is older than the configured freshness window or product HEAD.": "overview.liveText.gitSyncStale",
+    "Structure evidence is older than the configured freshness window or product HEAD.": "overview.liveText.structureStale",
+    "Local test evidence is older than the configured freshness window or product HEAD.": "overview.liveText.localTestsStale",
+  };
+  return map[text] ? t(map[text], text) : text;
+}
+
+function overviewLiveCheckPoint(item, t) {
+  const sourceId = displayText(item?.source_id || item?.current_item_id, "");
+  const summary = overviewLiveLocalizedText(item?.summary, t) || (sourceId ? sourcePresentationKey(sourceId, t) : "");
+  const status = statusLabelForChip(item?.status, t);
+  const observedAt = liveStatusObservedTime(item?.observed_at);
+  const detailArtifactPath = displayText(item?.detail_artifact_path, "");
+  const nextCommand = displayText(item?.next_command || item?.required_command, "");
+  return [
+    summary,
+    status,
+    sourceId ? `${sourcePresentationKey(sourceId, t)}: ${sourceId}` : "",
+    detailArtifactPath,
+    nextCommand && nextCommand !== "not_applicable" ? nextCommand : "",
+    observedAt ? `${t("overview.fact.lastChecked")}: ${observedAt}` : "",
+  ].filter(Boolean).join(" / ");
+}
+
+function overviewLiveCheckModalDetail(id, title, liveStatus, context, check, t) {
+  const observedAt = liveStatusObservedTime(check?.observed_at) || t("overview.fact.noEvidence");
+  const detailPage = displayText(check?.detail_page, id === "security" ? "#safety" : "#workflow");
+  const sourceId = displayText(check?.source_id, "");
+  const currentItemId = displayText(check?.current_item_id, "");
+  const detailArtifactPath = displayText(check?.detail_artifact_path, "");
+  const requiredCommand = displayText(check?.required_command, "");
+  const points = asArray(check?.items)
+    .map((item) => overviewLiveCheckPoint(item, t))
+    .filter(Boolean)
+    .slice(0, 6);
+  const sourceParts = [
+    sourceId ? `${sourcePresentationKey(sourceId, t)}: ${sourceId}` : "",
+    currentItemId && currentItemId !== sourceId ? currentItemId : "",
+    detailArtifactPath,
+    requiredCommand && requiredCommand !== "not_applicable" ? requiredCommand : "",
+    `${t("overview.fact.lastChecked")}: ${observedAt}`,
+  ].filter(Boolean);
+  return {
+    title,
+    summary: overviewLiveLocalizedText(check?.summary, t) || points[0] || overviewLiveLocalizedText(check?.reason, t),
+    href: detailPage,
+    where: `${overviewLiveTargetDetail(liveStatus, context, t)} / ${detailPage}`,
+    why: overviewLiveLocalizedText(check?.reason, t),
+    action: overviewLiveLocalizedText(check?.next_action, t),
+    source: sourceParts.join(" / "),
+    sourceId,
+    currentItemId,
+    detailArtifactPath,
+    status: normalizeState(check?.status || "unknown"),
+    points,
+  };
+}
+
+function overviewLocalCheckCategoryForSource(sourceId) {
+  const id = displayText(sourceId, "");
+  if (!id) return "";
+  if (id === "product.gates.structure" || id.endsWith(".structure") || id.includes(".structure.") || id.includes(".scaffold.") || id.endsWith(".files") || id.includes(".files.") || id.includes(".file.") || id.endsWith(".settings") || id.includes(".settings.") || id.endsWith(".scripts") || id.includes(".scripts.")) {
+    return "structure";
+  }
+  if (id === "product.gates.tests" || id === "product.tests" || id.startsWith("product.tests.") || id.endsWith(".tests") || id.includes(".test.") || id.endsWith(".unit") || id.includes(".unit.") || id.includes("unit_test") || id.endsWith(".smoke") || id.includes(".smoke.") || id.includes("smoke_test") || id.endsWith(".e2e") || id.includes(".e2e.")) {
+    return "behavior";
+  }
+  return "";
+}
+
+function overviewLocalCheckKindForSource(sourceId, category = "") {
+  const id = displayText(sourceId, "");
+  if (id === "product.gates.tests" || id === "product.tests" || id.startsWith("product.tests.") || id.endsWith(".tests")) return "behavior_overall";
+  if (id === "product.gates.structure" || id.endsWith(".structure")) return "structure_overall";
+  if (id.endsWith(".unit") || id.includes(".unit.") || id.includes("unit_test")) return "unit_test";
+  if (id.endsWith(".smoke") || id.includes(".smoke.") || id.includes("smoke_test")) return "smoke_test";
+  if (id.endsWith(".e2e") || id.includes(".e2e.")) return "e2e_test";
+  if (id.endsWith(".files") || id.includes(".files.") || id.includes(".file.")) return "file_check";
+  if (id.endsWith(".settings") || id.includes(".settings.")) return "settings_check";
+  if (id.endsWith(".scripts") || id.includes(".scripts.")) return "script_check";
+  return category === "structure" ? "structure_check" : "behavior_check";
+}
+
+function overviewLocalCheckItemCategory(item) {
+  const explicit = displayText(item?.category, "");
+  return explicit || overviewLocalCheckCategoryForSource(overviewLocalTestSourceId(item));
+}
+
+function overviewLocalCheckItemKind(item) {
+  const explicit = displayText(item?.kind, "");
+  return explicit || overviewLocalCheckKindForSource(overviewLocalTestSourceId(item), overviewLocalCheckItemCategory(item));
+}
+
+function overviewLocalCheckCategoryLabel(category, t) {
+  const labels = {
+    behavior: "overview.localCheck.category.behavior",
+    structure: "overview.localCheck.category.structure",
+  };
+  return t(labels[category] || "overview.localCheck.category.other");
+}
+
+function overviewLocalCheckStatusText(value, t) {
+  const state = normalizeState(value);
+  if (["ready", "passed"].includes(state)) return t("overview.localCheck.status.success");
+  if (state === "cached") return t("overview.localCheck.status.cached");
+  if (state === "failed") return t("overview.localCheck.status.failed");
+  if (["blocked", "approval_required", "manual_required"].includes(state)) return t("overview.localCheck.status.needsReview");
+  if (state === "stale") return t("overview.localCheck.status.stale");
+  if (["optional", "not_applicable"].includes(state)) return t("overview.localCheck.status.notApplicable");
+  return t("overview.localCheck.status.unknown");
+}
+
+function overviewLocalCheckGroupStatus(items) {
+  const states = items.map((item) => normalizeState(item?.status || "unknown"));
+  if (!states.length) return "not_run";
+  if (states.some((item) => item === "failed")) return "failed";
+  if (states.some((item) => ["blocked", "approval_required", "manual_required"].includes(item))) return "blocked";
+  if (states.some((item) => item === "missing")) return "missing";
+  if (states.some((item) => item === "not_run")) return "not_run";
+  if (states.some((item) => item === "stale")) return "stale";
+  if (states.some((item) => item === "unknown")) return "unknown";
+  if (states.every((item) => ["ready", "passed", "cached"].includes(item))) return "passed";
+  if (states.every((item) => ["optional", "not_applicable"].includes(item))) return "not_applicable";
+  return "unknown";
+}
+
+function overviewLocalCheckObservedTime(item) {
+  const raw = displayText(item?.observed_at || item?.updated_at || item?.time || item?.last_checked, "");
+  if (!raw || raw === "not_collected" || raw === "unknown") {
+    return 0;
+  }
+  const parsed = Date.parse(raw);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function overviewLocalCheckGroupSummary(category, items, t) {
+  const status = overviewLocalCheckGroupStatus(items);
+  const passedCount = items.filter((item) => ["ready", "passed", "cached"].includes(normalizeState(item?.status || "unknown"))).length;
+  const observedAt = Math.max(0, ...items.map((item) => overviewLocalCheckObservedTime(item)));
+  return {
+    category,
+    label: overviewLocalCheckCategoryLabel(category, t),
+    count: `${passedCount}/${items.length}`,
+    status,
+    statusLabel: overviewLocalCheckStatusText(status, t),
+    observedAt,
+  };
+}
+
+function overviewLocalCheckSummary(items, t) {
+  const localItems = asArray(items).filter((item) => overviewLocalCheckItemCategory(item));
+  if (!localItems.length) {
+    return "";
+  }
+  const groups = new Map();
+  for (const item of localItems) {
+    const category = overviewLocalCheckItemCategory(item);
+    groups.set(category, [...(groups.get(category) || []), item]);
+  }
+  const summaries = ["behavior", "structure"]
+    .filter((category) => groups.has(category))
+    .map((category) => overviewLocalCheckGroupSummary(category, groups.get(category), t));
+  const latest = summaries
+    .map((summary, index) => ({ summary, index }))
+    .sort((left, right) => (right.summary.observedAt - left.summary.observedAt) || (left.index - right.index))[0]?.summary;
+  return latest ? [latest] : "";
+}
+
+function overviewLiveLocalTestCurrent(check, t) {
+  const itemSummary = overviewLocalCheckSummary(check?.items, t);
+  if (itemSummary) {
+    return itemSummary;
+  }
+  const state = normalizeState(check?.status || "not_run");
+  if (["ready", "passed", "cached"].includes(state)) {
+    return t("overview.current.localTestsChecked");
+  }
+  if (["failed", "blocked"].includes(state)) {
+    return t("overview.current.localTestsNeedsReview");
+  }
+  return t("overview.current.localTestsMissing");
+}
+
+function overviewLiveLocalTestDetail(liveStatus, context, check, t) {
+  const observedAt = liveStatusObservedTime(check?.observed_at);
+  if (observedAt) {
+    return `${overviewLiveTargetDetail(liveStatus, context, t)} / ${t("overview.fact.lastChecked")}: ${observedAt}`;
+  }
+  return `${overviewLiveTargetDetail(liveStatus, context, t)} / ${t("overview.fact.missing")}: ${t("overview.fact.localTestEvidence")}`;
+}
+
+function overviewLiveGitCurrent(liveStatus, check, t) {
+  const detailCode = displayText(check?.detail_code, "");
+  const sourceId = displayText(check?.source_id || check?.current_item_id, "");
+  const status = normalizeState(check?.status || "unknown");
+  const dirtyCount = Number(check?.dirty_count || liveStatus?.repository_state?.dirty_count || 0);
+  const untrackedCount = Number(check?.untracked_count || liveStatus?.repository_state?.untracked_count || 0);
+  const ahead = Number(check?.ahead || liveStatus?.repository_state?.ahead || 0);
+  const behind = Number(check?.behind || liveStatus?.repository_state?.behind || 0);
+  const localChangeCount = dirtyCount + untrackedCount;
+  if (sourceId === "product.git.worktree" || detailCode === "git_uncommitted_changes" || detailCode.includes("worktree")) {
+    if (localChangeCount > 0 || ["failed", "blocked"].includes(status)) {
+      return localChangeCount > 0 ? `${t("overview.current.gitUncommitted")} ${localChangeCount}` : t("overview.current.gitUncommitted");
+    }
+    if (["passed", "ready"].includes(status)) {
+      return t("overview.current.gitClean");
+    }
+  }
+  if (sourceId === "product.git.local_remote_sync" || detailCode === "git_push_pending" || detailCode === "git_remote_changes_pending" || detailCode.includes("local_remote")) {
+    if (behind > 0) {
+      return `${t("overview.current.gitRemotePending")} ${behind}`;
+    }
+    if (ahead > 0 || status === "manual_required") {
+      return ahead > 0 ? `${t("overview.current.gitPushPending")} ${ahead}` : t("overview.current.gitPushPending");
+    }
+    if (["passed", "ready"].includes(status)) {
+      return t("overview.current.gitSynced");
+    }
+  }
+  if (sourceId === "product.git.upstream" || detailCode === "git_upstream_missing" || detailCode.includes("upstream")) {
+    return status === "not_applicable" ? t("overview.current.gitSyncMissing") : t("overview.current.gitUpstreamMissing");
+  }
+  if (detailCode === "git_push_pending") {
+    return ahead > 0 ? `${t("overview.current.gitPushPending")} ${ahead}` : t("overview.current.gitPushPending");
+  }
+  if (detailCode === "git_remote_changes_pending") {
+    return behind > 0 ? `${t("overview.current.gitRemotePending")} ${behind}` : t("overview.current.gitRemotePending");
+  }
+  if (detailCode === "git_upstream_missing") {
+    return t("overview.current.gitUpstreamMissing");
+  }
+  if (detailCode === "git_worktree_clean") {
+    return t("overview.current.gitClean");
+  }
+  if (detailCode === "git_local_remote_synced") {
+    return t("overview.current.gitSynced");
+  }
+  const sourceLabel = sourceId ? sourcePresentationKey(sourceId, t) : "";
+  if (sourceLabel && sourceLabel !== displayKey(sourceId)) {
+    return sourceLabel;
+  }
+  return status === "passed" ? t("overview.current.gitSynced") : t("overview.current.gitNeedsReview");
+}
+
+function overviewLiveGitDetail(liveStatus, context, check, t) {
+  const branch = displayText(check?.branch || liveStatus?.repository_state?.branch, "");
+  const parts = [overviewLiveTargetDetail(liveStatus, context, t)];
+  if (branch) {
+    parts.push(`${t("overview.fact.branch")}: ${branch}`);
+  }
+  parts.push(`${t("overview.fact.lastChecked")}: ${liveStatusObservedTime(check?.observed_at || liveStatus?.generated_at) || t("overview.fact.noEvidence")}`);
+  return parts.join(" / ");
+}
+
+function overviewLiveCiCurrent(check, t) {
+  const detailCode = displayText(check?.detail_code, "");
+  if (detailCode === "ci_success") {
+    return t("overview.current.ciSuccess");
+  }
+  if (detailCode === "ci_failed") {
+    return t("overview.current.ciFailed");
+  }
+  if (detailCode === "ci_running" || detailCode === "ci_action_required") {
+    return t("overview.current.ciRunning");
+  }
+  if (detailCode === "ci_run_not_found") {
+    return t("overview.current.ciNotRun");
+  }
+  if (detailCode === "ci_not_required") {
+    return t("overview.current.ciNotRequired");
+  }
+  if (["blocked", "manual_required"].includes(normalizeState(check?.status))) {
+    return t("overview.current.ciBlocked");
+  }
+  return normalizeState(check?.status) === "passed" ? t("overview.current.ciSuccess") : t("overview.current.ciResultMissing");
+}
+
+function overviewLiveCiDetail(liveStatus, context, check, t) {
+  const workflowName = displayText(check?.workflow_name, "");
+  const parts = [overviewLiveTargetDetail(liveStatus, context, t)];
+  if (workflowName) {
+    parts.push(`${t("overview.fact.workflow")}: ${workflowName}`);
+  }
+  parts.push(`${t("overview.fact.lastChecked")}: ${liveStatusObservedTime(check?.observed_at) || liveStatusObservedTime(liveStatus?.generated_at) || t("overview.fact.noEvidence")}`);
+  return parts.join(" / ");
+}
+
+function overviewLiveSecurityCurrent(check, t) {
+  const blockerCount = Number(check?.blocker_count || 0);
+  const status = normalizeState(check?.status || "unknown");
+  if (blockerCount > 0) {
+    return `${t("overview.current.securityBlocked")} ${blockerCount}`;
+  }
+  if (["ready", "passed", "cached"].includes(status)) {
+    return t("overview.current.securityReady");
+  }
+  if (status === "not_run") {
+    return t("overview.current.securityMissing");
+  }
+  const sourceId = displayText(check?.source_id || check?.current_item_id, "");
+  const sourceLabel = sourceId ? sourcePresentationKey(sourceId, t) : "";
+  if (sourceId.startsWith("product.security.") && sourceLabel && sourceLabel !== displayKey(sourceId)) {
+    return sourceLabel;
+  }
+  return t("overview.current.securityReview");
+}
+
+function overviewLiveSecurityDetail(liveStatus, context, check, t) {
+  const checkedAt = liveStatusObservedTime(check?.observed_at) || liveStatusObservedTime(liveStatus?.generated_at) || t("overview.fact.noEvidence");
+  return `${overviewLiveTargetDetail(liveStatus, context, t)} / ${t("summary.blockers")}: ${Number(check?.blocker_count || 0)} / ${t("overview.fact.lastChecked")}: ${checkedAt}`;
+}
+
+function overviewPrimaryStatusCard(data, context, lessonMetric, t, liveStatus = null) {
+  const workflowContext = displayText(context.workflow_context, "unknown");
+  if (workflowContext === "lesson") {
+    const selectedLessonProgress = contextProgress(context, lessonMetric);
+    return {
+      id: "lessons",
+      title: t("overview.status.lessonProgress"),
+      status: lessonMetric.status,
+      metric: { percent: selectedLessonProgress.percent, status: lessonMetric.status },
+      value: `${selectedLessonProgress.completed} / ${selectedLessonProgress.total}`,
+      detail: `${selectedLessonProgress.percent}%`,
+      chipLabel: selectedStepShort(context),
+    };
+  }
+  const activeLiveStatus = liveStatusForContext(liveStatus, context);
+  const liveLocalTests = liveCheck(activeLiveStatus, "local_tests");
+  if (liveLocalTests) {
+    const status = normalizeState(liveLocalTests.status || "not_run");
+    return {
+      id: "workflow",
+      title: t("overview.status.localTests"),
+      status,
+      value: overviewLiveLocalTestCurrent(liveLocalTests, t),
+      detail: overviewLiveLocalTestDetail(activeLiveStatus, context, liveLocalTests, t),
+      detailInfo: overviewLiveCheckModalDetail("local_tests", t("overview.status.localTests"), activeLiveStatus, context, liveLocalTests, t),
+      detailHref: displayText(liveLocalTests.detail_page, "#workflow"),
+      chipLabel: statusLabelForChip(status, t),
+    };
+  }
+  const productAuthority = data.development?.product_authority || {};
+  const localTestStatus = overviewLocalTestStatus(productAuthority, context);
+  return {
+    id: "workflow",
+    title: t("overview.status.localTests"),
+    status: localTestStatus,
+    value: overviewLocalTestCurrent(productAuthority, context, t),
+    detail: overviewLocalTestDetail(productAuthority, context, t),
+    detailHref: "#workflow",
+    chipLabel: statusLabelForChip(localTestStatus, t),
+  };
+}
+
+const overviewGitOperationOrder = ["commit", "push", "pull_request", "pr_ci", "main_ci", "sync_check", "merge"];
+
+function overviewOperationById(data, id) {
+  return asArray(data.development?.git_operations).find((operation) => displayText(operation.id, "") === id) || null;
+}
+
+function overviewOperationFact(data, id, t) {
+  const operation = overviewOperationById(data, id);
+  const status = operation?.status || "unknown";
+  return {
+    id,
+    label: gitOperationDisplayLabel(id, operation?.label, t),
+    value: statusLabelForChip(status, t),
+    status,
+    detail: displayText(operation?.detail, t("overview.fact.notProduced")),
+  };
+}
+
+function overviewGitFacts(data, t) {
+  return overviewGitOperationOrder.map((id) => overviewOperationFact(data, id, t));
+}
+
+function overviewFirstReviewFact(facts, preferredIds = []) {
+  const preferred = preferredIds
+    .map((id) => facts.find((fact) => fact.id === id))
+    .filter(Boolean)
+    .find((fact) => isReviewState(fact.status));
+  return preferred || facts.find((fact) => isReviewState(fact.status)) || facts[0] || null;
+}
+
+function overviewGitCard(data, context, t, liveStatus = null) {
+  const activeLiveStatus = liveStatusForContext(liveStatus, context);
+  const liveGit = liveCheck(activeLiveStatus, "git_sync");
+  if (liveGit) {
+    const status = normalizeState(liveGit.status || context.git_status || "unknown");
+    return {
+      id: "git",
+      title: t("overview.status.git"),
+      status,
+      value: overviewLiveGitCurrent(activeLiveStatus, liveGit, t),
+      detail: overviewLiveGitDetail(activeLiveStatus, context, liveGit, t),
+      detailInfo: overviewLiveCheckModalDetail("git_sync", t("overview.status.git"), activeLiveStatus, context, liveGit, t),
+      detailHref: displayText(liveGit.detail_page, "#workflow"),
+      chipLabel: statusLabelForChip(status, t),
+    };
+  }
+  const facts = overviewGitFacts(data, t);
+  const summary = overviewFirstReviewFact(facts, ["sync_check", "push", "pull_request", "merge", "pr_ci", "main_ci", "commit"]);
+  return {
+    id: "git",
+    title: t("overview.status.git"),
+    status: context.git_status || summary?.status,
+    value: overviewGitCurrent(data, t),
+    detail: overviewRunDetail(overviewRecentRun(data, ["git_sync"], ["git-sync"]), context, t),
+    detailHref: "#workflow",
+    chipLabel: statusLabelForChip(context.git_status, t),
+  };
+}
+
+function overviewRecentRun(data, sourceRoles = [], ids = []) {
+  return asArray(data.development?.recent_runs).find((row) => {
+    const sourceRole = displayText(row.source_role, "");
+    const id = displayText(row.id, "");
+    return sourceRoles.includes(sourceRole) || ids.includes(id);
+  }) || null;
+}
+
+function overviewReferenceLabel(row, t) {
+  const sourceRole = displayText(row?.source_role, "");
+  const reference = displayText(row?.reference, "");
+  const sourceRoleKeys = {
+    git_sync: "overview.reference.gitSyncEvidence",
+    ci: "overview.reference.ciEvidence",
+    product_authority: "overview.reference.productAuthority",
+    security_gate: "overview.reference.securityGate",
+  };
+  if (sourceRoleKeys[sourceRole]) {
+    return t(sourceRoleKeys[sourceRole], reference || t("overview.fact.noEvidence"));
+  }
+  const normalized = reference.toLowerCase();
+  const referenceKeys = {
+    "git sync evidence": "overview.reference.gitSyncEvidence",
+    "ci evidence": "overview.reference.ciEvidence",
+    "product authority": "overview.reference.productAuthority",
+    "security gate": "overview.reference.securityGate",
+  };
+  return referenceKeys[normalized] ? t(referenceKeys[normalized], reference) : reference || t("overview.fact.noEvidence");
+}
+
+function overviewRunReference(row, context, t) {
+  const reference = overviewReferenceLabel(row, t);
+  const target = workflowRunTarget(row || {}, context, t);
+  return target ? `${reference} / ${target}` : reference;
+}
+
+function overviewCiCard(data, context, t, liveStatus = null) {
+  const activeLiveStatus = liveStatusForContext(liveStatus, context);
+  const liveCi = liveCheck(activeLiveStatus, "ci");
+  if (liveCi) {
+    const status = normalizeState(liveCi.status || context.ci_status || "unknown");
+    return {
+      id: "ci",
+      title: t("overview.status.ci"),
+      status,
+      value: overviewLiveCiCurrent(liveCi, t),
+      detail: overviewLiveCiDetail(activeLiveStatus, context, liveCi, t),
+      detailInfo: overviewLiveCheckModalDetail("ci", t("overview.status.ci"), activeLiveStatus, context, liveCi, t),
+      detailHref: displayText(liveCi.detail_page, "#workflow"),
+      chipLabel: statusLabelForChip(status, t),
+    };
+  }
+  const prCi = overviewOperationFact(data, "pr_ci", t);
+  const mainCi = overviewOperationFact(data, "main_ci", t);
+  const run = overviewRecentRun(data, ["ci"], ["ci-main", "pr-ci"]);
+  const facts = [prCi, mainCi];
+  if (run) {
+    facts.push({
+      id: "ci_evidence",
+      label: t("overview.fact.ciEvidence"),
+      value: overviewRunReference(run, context, t),
+      status: run.status || context.ci_status,
+      detail: formatDashboardTime(run.time || run.observed_at),
+    });
+  } else {
+    facts.push({
+      id: "ci_evidence",
+      label: t("overview.fact.ciEvidence"),
+      value: t("overview.fact.notProduced"),
+      status: "unknown",
+    });
+  }
+  const summary = overviewFirstReviewFact(facts, ["pr_ci", "main_ci", "ci_evidence"]);
+  return {
+    id: "ci",
+    title: t("overview.status.ci"),
+    status: context.ci_status || summary?.status,
+    value: overviewCiCurrent(data, t),
+    detail: overviewCiDetail(data, run, context, t),
+    detailHref: "#workflow",
+    chipLabel: statusLabelForChip(context.ci_status, t),
+  };
+}
+
+function overviewTargetDetail(context, t) {
+  return `${t("overview.fact.target")}: ${repositoryDisplayName(context.target_repository?.name, t)}`;
+}
+
+function overviewRunDetail(row, context, t) {
+  const target = overviewTargetDetail(context, t);
+  if (!row) {
+    return `${target} / ${t("overview.fact.lastChecked")}: ${t("overview.fact.noEvidence")}`;
+  }
+  return `${target} / ${t("overview.fact.lastChecked")}: ${formatDashboardTime(row.time || row.observed_at)}`;
+}
+
+function overviewGitCurrent(data, t) {
+  const run = overviewRecentRun(data, ["git_sync"], ["git-sync"]);
+  return run ? t("overview.current.gitSyncChecked") : t("overview.current.gitSyncMissing");
+}
+
+function overviewCiCurrent(data, t) {
+  const run = overviewRecentRun(data, ["ci"], ["ci-main", "pr-ci"]);
+  return run ? t("overview.current.ciResultChecked") : t("overview.current.ciResultMissing");
+}
+
+function overviewCiDetail(data, run, context, t) {
+  return overviewRunDetail(run, context, t);
+}
+
+function overviewLocalTestSourceId(value) {
+  return displayText(value?.source_id || value?.source || value?.id || value, "");
+}
+
+function overviewIsLocalTestSource(value) {
+  const id = overviewLocalTestSourceId(value);
+  return Boolean(overviewLocalCheckCategoryForSource(id));
+}
+
+function overviewLocalTestEvidenceItems(productAuthority) {
+  return asArray(productAuthority?.evidence_summary?.items).filter((item) => overviewIsLocalTestSource(item));
+}
+
+function overviewLocalTestEvidenceItem(productAuthority) {
+  return overviewLocalTestEvidenceItems(productAuthority)[0] || null;
+}
+
+function overviewLocalTestBlockers(productAuthority, context) {
+  const rows = [...asArray(context?.blockers), ...asArray(productAuthority?.product_operation_blockers)];
+  return rows.filter((row) => overviewIsLocalTestSource(row));
+}
+
+function overviewLocalTestBlocker(productAuthority, context) {
+  return overviewLocalTestBlockers(productAuthority, context)[0] || null;
+}
+
+function overviewLocalTestSummaryItems(productAuthority, context) {
+  const evidenceItems = overviewLocalTestEvidenceItems(productAuthority);
+  const evidenceSourceIds = new Set(evidenceItems.map((item) => overviewLocalTestSourceId(item)));
+  const blockerItems = overviewLocalTestBlockers(productAuthority, context).filter((item) => !evidenceSourceIds.has(overviewLocalTestSourceId(item)));
+  return [...evidenceItems, ...blockerItems];
+}
+
+function overviewLocalTestStatus(productAuthority, context) {
+  const items = overviewLocalTestSummaryItems(productAuthority, context);
+  return overviewLocalCheckGroupStatus(items);
+}
+
+function overviewLocalTestCurrent(productAuthority, context, t) {
+  const itemSummary = overviewLocalCheckSummary(overviewLocalTestSummaryItems(productAuthority, context), t);
+  if (itemSummary) {
+    return itemSummary;
+  }
+  const state = overviewLocalTestStatus(productAuthority, context);
+  if (["ready", "passed", "cached"].includes(state)) {
+    return t("overview.current.localTestsChecked");
+  }
+  if (["failed", "blocked"].includes(state)) {
+    return t("overview.current.localTestsNeedsReview");
+  }
+  return t("overview.current.localTestsMissing");
+}
+
+function overviewEvidenceObservedTime(row) {
+  const value = displayText(row?.observed_at || row?.time || row?.last_checked, "");
+  if (!value || value === "not_collected" || value === "unknown") {
+    return "";
+  }
+  return formatDashboardTime(value);
+}
+
+function overviewLocalTestDetail(productAuthority, context, t) {
+  const evidenceItem = overviewLocalTestEvidenceItem(productAuthority);
+  const observedAt = overviewEvidenceObservedTime(evidenceItem);
+  if (observedAt) {
+    return `${overviewTargetDetail(context, t)} / ${t("overview.fact.lastChecked")}: ${observedAt}`;
+  }
+  return `${overviewTargetDetail(context, t)} / ${t("overview.fact.missing")}: ${t("overview.fact.localTestEvidence")}`;
+}
+
+function overviewSecurityCard(data, context, t, liveStatus = null) {
+  const activeLiveStatus = liveStatusForContext(liveStatus, context);
+  const liveSecurity = liveCheck(activeLiveStatus, "security");
+  if (liveSecurity) {
+    const status = normalizeState(liveSecurity.status || context.security_status || "unknown");
+    return {
+      id: "security",
+      title: t("overview.status.security"),
+      status,
+      value: overviewLiveSecurityCurrent(liveSecurity, t),
+      detail: overviewLiveSecurityDetail(activeLiveStatus, context, liveSecurity, t),
+      detailInfo: overviewLiveCheckModalDetail("security", t("overview.status.security"), activeLiveStatus, context, liveSecurity, t),
+      detailHref: displayText(liveSecurity.detail_page, "#safety"),
+      chipLabel: statusLabelForChip(status, t),
+    };
+  }
+  const approvals = asArray(data.security?.approvals);
+  const dangerous = asArray(data.security?.dangerous_operations);
+  const blockers = asArray(context.blockers);
+  const facts = [
+    {
+      id: "gate",
+      label: t("security.item.gate"),
+      value: statusLabelForChip(data.security?.gate_status || context.security_status, t),
+      status: data.security?.gate_status || context.security_status,
+    },
+    ...approvals.slice(0, 2).map((row) => ({
+      id: displayText(row.id),
+      label: securityRowLabel(row, "approval", t),
+      value: statusLabelForChip(row.status, t),
+      status: row.status,
+      detail: securityRowDetail(row, t),
+    })),
+    ...dangerous.slice(0, 2).map((row) => ({
+      id: displayText(row.id),
+      label: securityRowLabel(row, "dangerous", t),
+      value: statusLabelForChip(row.status, t),
+      status: row.status,
+      detail: securityRowDetail(row, t),
+    })),
+    {
+      id: "blockers",
+      label: t("summary.blockers"),
+      value: blockers.length ? `${blockers.length}` : t("summary.none"),
+      status: blockers.length ? "blocked" : "ready",
+    },
+  ];
+  const summary = overviewFirstReviewFact(facts, ["merge", "dangerous_action_approval", "git_workflow_approval", "gate", "blockers"]);
+  return {
+    id: "security",
+    title: t("overview.status.security"),
+    status: context.security_status || summary?.status,
+    value: overviewSecurityCurrent(summary, blockers, t),
+    detail: overviewSecurityDetail(data, context, blockers, t),
+    chipLabel: statusLabelForChip(context.security_status, t),
+  };
+}
+
+function overviewSecurityCurrent(summary, blockers, t) {
+  if (!summary && !asArray(blockers).length) {
+    return t("overview.current.securityReady");
+  }
+  return t("overview.current.securityScopeChecked");
+}
+
+function overviewSecurityLastChecked(data) {
+  const approvals = asArray(data.security?.approvals);
+  const dangerous = asArray(data.security?.dangerous_operations);
+  const run = overviewRecentRun(data, ["security_gate"], ["security-gate"]);
+  return overviewEvidenceObservedTime(approvals[0]) || overviewEvidenceObservedTime(dangerous[0]) || overviewEvidenceObservedTime(run);
+}
+
+function overviewSecurityDetail(data, context, blockers, t) {
+  const checkedAt = overviewSecurityLastChecked(data) || t("overview.fact.noEvidence");
+  return `${overviewTargetDetail(context, t)} / ${t("overview.fact.lastChecked")}: ${checkedAt} / ${t("summary.blockers")}: ${asArray(blockers).length}`;
+}
+
 function HorizontalProgress({ percent }) {
   const value = clampPercent(percent);
   return (
@@ -593,22 +1598,53 @@ function HorizontalProgress({ percent }) {
   );
 }
 
-function OverviewStatusCard({ id, title, status, metric, value, detail, t, chipLabel }) {
+function OverviewLocalCheckSummaryValue({ rows }) {
+  return (
+    <div className="decision-progress-summary" role="list">
+      {rows.map((row) => (
+        <span className={`decision-progress-summary__row decision-progress-summary__row--${normalizeState(row.status)}`} role="listitem" key={row.category}>
+          <span className="decision-progress-summary__label">{row.label}</span>
+          {" "}
+          <strong className="decision-progress-summary__count">{row.count}</strong>
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function OverviewStatusValue({ value }) {
+  if (Array.isArray(value)) {
+    return <OverviewLocalCheckSummaryValue rows={value} />;
+  }
+  return <strong>{value}</strong>;
+}
+
+function OverviewStatusCard({ id, title, status, metric, value, detail, t, chipLabel, detailInfo, detailHref }) {
   const config = overviewStatusConfig[id] || overviewStatusConfig.lessons;
   const Icon = config.Icon;
   const state = normalizeState(metric?.status || status);
-  const valueText = value || stateLabel(state, t);
-  const chipCompactClass = state === "manual_required" ? "status-chip--compact-label" : "";
+  const valueText = value === undefined || value === null || value === "" ? stateLabel(state, t) : value;
+  const chipCompactClass = [state === "manual_required" ? "status-chip--compact-label" : "", id !== "lessons" ? "status-chip--compact-density" : ""].filter(Boolean).join(" ");
   const percentValue = id === "lessons" ? displayText(detail, "").match(/^(\d+)%$/) : null;
+  const insightDetail = detailInfo ? { ...detailInfo, href: detailInfo.href || detailHref } : null;
+  const evidenceSourceId = displayText(insightDetail?.sourceId, "");
+  const evidenceCurrentItemId = displayText(insightDetail?.currentItemId, "");
+  const evidenceDetailArtifactPath = displayText(insightDetail?.detailArtifactPath, "");
   return (
-    <article className={`overview-status-card overview-status-card--${config.tone}`} data-overview-status-card={id}>
+    <article
+      className={`overview-status-card overview-status-card--${config.tone}`}
+      data-overview-status-card={id}
+      data-evidence-source-id={evidenceSourceId || undefined}
+      data-evidence-current-item-id={evidenceCurrentItemId || undefined}
+      data-evidence-detail-artifact-path={evidenceDetailArtifactPath || undefined}
+    >
       <div className="overview-status-card__head">
         <span className="overview-status-card__icon">
           <Icon aria-hidden="true" size={26} />
         </span>
         <div>
           <h3>{title}</h3>
-          {id === "lessons" ? <OverviewLessonProgressValue value={valueText} /> : <strong>{valueText}</strong>}
+          {id === "lessons" ? <OverviewLessonProgressValue value={valueText} /> : <OverviewStatusValue value={valueText} />}
         </div>
       </div>
       {metric ? (
@@ -625,6 +1661,15 @@ function OverviewStatusCard({ id, title, status, metric, value, detail, t, chipL
         </div>
       ) : null}
       {detail && !metric ? <p>{detail}</p> : null}
+      {insightDetail ? (
+        <InsightDetailButton
+          className="mini-card-button"
+          detail={insightDetail}
+          label={t("detail.openPlainDetail")}
+          t={t}
+          tone={id === "security" ? "safety" : "default"}
+        />
+      ) : null}
       {chipLabel ? <span className={`status-chip status-chip--${config.tone} ${chipCompactClass}`.trim()}>{chipLabel}</span> : <StatusPill value={state} t={t} />}
     </article>
   );
@@ -643,8 +1688,20 @@ function gitOperationIcon(id) {
   return map[displayText(id)] || GitBranch;
 }
 
-function gitOperationModeLabel(mode, t) {
+function gitOperationModeLabel(mode, t, id = "") {
   const normalized = displayText(mode, "auto");
+  const operationId = displayText(id, "");
+  if (operationId === "merge") {
+    if (["auto", "after_approval", "developer_auto"].includes(normalized)) {
+      return t("settingsPage.value.boolean.true");
+    }
+    if (normalized === "manual" || normalized === "false") {
+      return t("settingsPage.value.boolean.false");
+    }
+    if (normalized === "not_applicable") {
+      return statusLabelForChip("not_applicable", t);
+    }
+  }
   if (normalized === "manual") {
     return t("mock.git.manual");
   }
@@ -654,8 +1711,12 @@ function gitOperationModeLabel(mode, t) {
   return t("mock.git.auto");
 }
 
-function gitOperationModeClass(mode) {
+function gitOperationModeClass(mode, id = "") {
   const normalized = displayText(mode, "auto");
+  const operationId = displayText(id, "");
+  if (operationId === "merge" && ["auto", "after_approval", "developer_auto"].includes(normalized)) {
+    return "allowed";
+  }
   if (normalized === "developer_auto") {
     return "auto";
   }
@@ -682,14 +1743,14 @@ function GitOperationRail({ operations, t, variant = "workflow" }) {
       <div className="operation-rail__items">
         {rows.map((row) => {
           const Icon = gitOperationIcon(row.id);
-          const mode = gitOperationModeClass(row.mode);
+          const mode = gitOperationModeClass(row.mode, row.id);
           return (
           <article className={`operation-chip operation-chip--${mode}`} key={displayText(row.id)}>
             <span className="operation-chip__icon">
               <Icon aria-hidden="true" size={18} />
             </span>
             <strong>{gitOperationDisplayLabel(row.id, row.label, t)}</strong>
-            <span className={`mode-pill mode-pill--${mode}`}>{gitOperationModeLabel(row.mode, t)}</span>
+            <span className={`mode-pill mode-pill--${mode}`}>{gitOperationModeLabel(row.mode, t, row.id)}</span>
           </article>
         );
         })}
@@ -740,14 +1801,14 @@ function CommonStatusPanel({ data, partialFailures, t }) {
             <div className="common-status-ops">
               {visibleOperations.map((operation) => {
                 const Icon = gitOperationIcon(operation.id);
-                const mode = gitOperationModeClass(operation.mode);
+                const mode = gitOperationModeClass(operation.mode, operation.id);
                 return (
                   <div className="common-status-op" key={displayText(operation.id)}>
                   <span className="common-status-op__label">
                     <Icon aria-hidden="true" size={17} />
                       {gitOperationDisplayLabel(operation.id, operation.label, t)}
                   </span>
-                    <span className={`common-mode-pill common-mode-pill--${mode}`}>{gitOperationModeLabel(operation.mode, t)}</span>
+                    <span className={`common-mode-pill common-mode-pill--${mode}`}>{gitOperationModeLabel(operation.mode, t, operation.id)}</span>
                   </div>
                 );
               })}
@@ -793,15 +1854,15 @@ function WorkflowStatusCards({ data, t }) {
   const productAuthority = data.development?.product_authority || {};
   const nextAction = nextActionShort(context, data, t);
   const cards = [
-    { id: "git-sync", title: t("workflow.card.gitSync"), Icon: RefreshCw, value: workflowStatusLabel(context.git_status, t), detail: normalizeState(context.git_status) === "passed" || normalizeState(context.git_status) === "ready" ? t("workflow.card.gitSyncDetail") : t("workflow.card.gitSyncReviewDetail"), button: t("summary.viewDetails") },
-    { id: "ci", title: t("workflow.card.ci"), Icon: CheckCircle2, value: workflowStatusLabel(context.ci_status, t), detail: normalizeState(context.ci_status) === "passed" || normalizeState(context.ci_status) === "ready" ? displayText(context.target_repository?.name) : t("workflow.card.ciReviewDetail"), button: t("summary.viewDetails") },
-    { id: "pr-merge", title: t("workflow.card.prMerge"), Icon: GitPullRequest, value: workflowStatusLabel(data.git_workflow?.approval_status, t), detail: t("workflow.card.prMergeDetail"), button: t("summary.viewDetails") },
-    { id: "product-evidence", title: t("workflow.card.productEvidence"), Icon: Folder, value: productEvidenceStatusLabel(productAuthority, t), detail: productEvidenceDetail(productAuthority, t), button: t("workflow.card.collectEvidence") },
-    { id: "next-step", title: t("workflow.card.nextStep"), Icon: Flag, value: displayText(context.current_step_id), detail: nextAction || localizedStepDetail(context, t), button: workflowStepDetailLabel(context, t) },
+    { id: "git-sync", title: t("workflow.card.gitSync"), Icon: RefreshCw, status: context.git_status, value: workflowStatusLabel(context.git_status, t), detail: normalizeState(context.git_status) === "passed" || normalizeState(context.git_status) === "ready" ? t("workflow.card.gitSyncDetail") : t("workflow.card.gitSyncReviewDetail"), button: t("summary.viewDetails") },
+    { id: "ci", title: t("workflow.card.ci"), Icon: CheckCircle2, status: context.ci_status, value: workflowStatusLabel(context.ci_status, t), detail: normalizeState(context.ci_status) === "passed" || normalizeState(context.ci_status) === "ready" ? repositoryDisplayName(context.target_repository?.name, t) : t("workflow.card.ciReviewDetail"), button: t("summary.viewDetails") },
+    { id: "pr-merge", title: t("workflow.card.prMerge"), Icon: GitPullRequest, status: data.git_workflow?.approval_status, value: workflowStatusLabel(data.git_workflow?.approval_status, t), detail: t("workflow.card.prMergeDetail"), button: t("summary.viewDetails") },
+    { id: "product-evidence", title: t("workflow.card.productEvidence"), Icon: Folder, status: productAuthority.status || context.product_authority_status || "manual_required", value: productEvidenceStatusLabel(productAuthority, t), detail: productEvidenceDetail(productAuthority, t), button: t("workflow.card.collectEvidence") },
+    { id: "next-step", title: t("workflow.card.nextStep"), Icon: Flag, status: context.status || "ready", value: currentStepShortDisplay(context, t), detail: nextAction || currentStepDetailDisplay(context, t), button: workflowStepDetailLabel(context, t) },
   ];
   return (
     <section className="workflow-card-grid" aria-label={t("workflow.currentEvidence")}>
-      {cards.map(({ id, title, Icon, value, detail, button }) => (
+      {cards.map(({ id, title, Icon, value, detail, button, status }) => (
         <article className={`workflow-mini-card workflow-mini-card--${id}`} key={id}>
           <span className="workflow-mini-card__icon">
             <Icon aria-hidden="true" size={24} />
@@ -809,14 +1870,44 @@ function WorkflowStatusCards({ data, t }) {
           <h3>{title}</h3>
           <strong>{value}</strong>
           <p>{detail}</p>
-          <a className="mini-card-button" href="#workflow">
-            {button}
-            <ArrowRightCircle aria-hidden="true" size={15} />
-          </a>
+          <InsightDetailButton
+            className="mini-card-button"
+            detail={workflowCardInsight(id, { title, value, detail, status }, context, data, t)}
+            label={button}
+            t={t}
+            tone="workflow"
+          />
         </article>
       ))}
     </section>
   );
+}
+
+function workflowCardInsight(id, card, context, data, t) {
+  return {
+    title: card.title,
+    eyebrow: t("workflow.detail.eyebrow"),
+    summary: card.detail,
+    where: t(`workflow.detail.${id}.where`, t("workflow.detail.default.where")),
+    why: t(`workflow.detail.${id}.why`, t("workflow.detail.default.why")),
+    action: t(`workflow.detail.${id}.action`, t("workflow.detail.default.action")),
+    source: workflowCardSource(id, context, data, t),
+    status: card.status || "unknown",
+    statusLabel: card.value,
+  };
+}
+
+function workflowCardSource(id, context, data, t) {
+  const rawTargetName = displayText(context.target_repository?.name, "");
+  const targetName = rawTargetName ? repositoryDisplayName(rawTargetName, t) : "";
+  const map = {
+    "git-sync": t("workflow.reference.gitSync"),
+    ci: t("workflow.reference.ci"),
+    "pr-merge": t("workflow.reference.selectedContext"),
+    "product-evidence": t("workflow.reference.productAuthority"),
+    "next-step": displayText(context.current_step_id, t("workflow.run.nextStep")),
+  };
+  return targetName ? `${map[id] || t("workflow.reference.selectedContext")} / ${targetName}` : map[id] || t("workflow.reference.selectedContext");
 }
 
 function WorkflowRecentTable({ rows: recentRows, data, t }) {
@@ -839,19 +1930,61 @@ function WorkflowRecentTable({ rows: recentRows, data, t }) {
         </div>
         {rows.map((row) => (
           <article className="mock-table-row mock-table-row--workflow" key={displayText(row.id)}>
-            <span data-label={t("workflow.table.time")}>{formatDashboardDateTime(row.time) || displayText(row.time)}</span>
+            <span data-label={t("workflow.table.time")}>{formatDashboardDateTime(row.time) || t("workflow.table.snapshotEvidence")}</span>
             <strong data-label={t("workflow.table.type")}>{workflowRunTypeLabel(row.type, t)}</strong>
-            <span data-label={t("workflow.table.target")}>{displayText(row.target)}</span>
+            <span data-label={t("workflow.table.target")}>{workflowRunTarget(row, context, t)}</span>
             <p data-label={t("workflow.table.detail")}>{workflowRunDetail(row, context, t)}</p>
             <span className="mock-table-row__status" data-label={t("workflow.table.status")}>
               <StatusPill value={row.status} t={t} label={workflowStatusLabel(row.status, t)} />
             </span>
-            <a className="mock-table-link" href="#workflow" data-label={t("workflow.table.reference")}>{workflowRunReferenceLabel(row.reference, t)} <ExternalLink aria-hidden="true" size={13} /></a>
+            <span className="mock-table-row__reference" data-label={t("workflow.table.reference")}>
+              <InsightDetailButton
+                className="mock-table-link"
+                detail={workflowRunInsight(row, context, t)}
+                label={workflowRunReferenceLabel(row.reference, t)}
+                t={t}
+                tone="workflow"
+              />
+            </span>
           </article>
         ))}
       </div>
     </section>
   );
+}
+
+function workflowRunInsight(row, context, t) {
+  const reference = displayText(row.reference, "");
+  const role = displayText(row.source_role, "workflow");
+  const status = normalizeState(row.status);
+  const rawCommand = displayText(row.required_command, "");
+  const command = rawCommand === "not_applicable" ? "" : rawCommand;
+  const observedAt = formatDashboardDateTime(row.observed_at) || formatDashboardDateTime(row.time);
+  const evidencePath = displayText(row.evidence_path, "");
+  const action = t(`workflow.runReferenceAction.${role}.${status}`, "") || t(`workflow.runReferenceAction.${role}`, t("workflow.runReference.action"));
+  const points = [
+    `${t("workflow.runReference.scope")}: ${workflowRunScopeLabel(row, context, t)}`,
+    `${t("workflow.runReference.role")}: ${t(`workflow.runReferenceRole.${role}`, displayKey(role))}`,
+    `${t("workflow.runReference.target")}: ${workflowRunTarget(row, context, t)}`,
+  ];
+  if (observedAt) {
+    points.push(`${t("workflow.runReference.observedAt")}: ${observedAt}`);
+  }
+  if (evidencePath) {
+    points.push(`${t("workflow.runReference.evidencePath")}: ${evidencePath}`);
+  }
+  return {
+    title: workflowRunReferenceLabel(reference, t),
+    eyebrow: workflowRunTypeLabel(row.type, t),
+    summary: workflowRunDetail(row, context, t),
+    where: workflowRunReferenceWhere(row, context, t),
+    why: t(`workflow.referenceMeaning.${role}`, t(`workflow.referenceMeaning.${reference}`, t("workflow.referenceMeaning.default"))),
+    action: command ? `${action} ${t("workflow.runReference.command")}: ${command}` : action,
+    source: workflowRunTarget(row, context, t),
+    status: row.status,
+    statusLabel: workflowStatusLabel(row.status, t),
+    points,
+  };
 }
 
 function EvidenceRowsTable({ rows, t }) {
@@ -869,29 +2002,48 @@ function EvidenceRowsTable({ rows, t }) {
           <span>{t("detail.confirm.status")}</span>
           <span>{t("maintenance.reference")}</span>
         </div>
-        {items.map((row) => (
-          <article className="evidence-row" key={displayText(row.id)}>
-            <div className="evidence-row__title">
-              {(() => {
-                const Icon = maintenanceEvidenceIcon(row.id);
-                return <Icon aria-hidden="true" size={20} />;
-              })()}
-              <strong>{maintenanceEvidenceLabel(row, t)}</strong>
-            </div>
-            <p>{maintenanceEvidenceWhy(row.id, t)}</p>
-            <StatusPill value={row.status} t={t} label={maintenanceStatusLabel(row.id, row.status, t)} />
-            <div className="evidence-row__reference">
-              {maintenanceReferenceValues(row).map((reference) => (
-                <span className="evidence-row__reference-chip" key={reference} tabIndex={0} data-tooltip={reference}>
-                  {technicalChip(reference)}
-                  <button className="evidence-row__reference-copy" type="button" aria-label={`${t("maintenance.copyReference")}: ${reference}`} title={t("maintenance.copyReference")} onClick={() => copyTextToClipboard(reference)}>
-                    <Copy aria-hidden="true" size={14} />
-                  </button>
-                </span>
-              ))}
-            </div>
-          </article>
-        ))}
+        {items.map((row) => {
+          const unresolvedCount = maintenanceUnresolvedCount(row);
+          const observedAt = maintenanceObservedAt(row);
+          return (
+            <article className="evidence-row" key={displayText(row.id)}>
+              <div className="evidence-row__title">
+                {(() => {
+                  const Icon = maintenanceEvidenceIcon(row.id);
+                  return <Icon aria-hidden="true" size={20} />;
+                })()}
+                <div>
+                  <strong>{maintenanceEvidenceLabel(row, t)}</strong>
+                  <span>{maintenanceEvidenceTarget(row, t)}</span>
+                </div>
+                {unresolvedCount > 0 ? <span className="small-badge small-badge--warning">{maintenanceUnresolvedLabel(unresolvedCount, t)}</span> : null}
+              </div>
+              <div className="evidence-row__body">
+                <p>{maintenanceEvidenceWhy(row.id, t)}</p>
+                {observedAt ? <span>{t("maintenance.updatedAt")}: {observedAt}</span> : null}
+                <span>{t("maintenance.evidencePoint.priority")}: {maintenancePriorityLabel(row, t)}</span>
+              </div>
+              <StatusPill value={row.status} t={t} label={maintenanceStatusLabel(row.id, row.status, t)} />
+              <div className="evidence-row__reference">
+                <InsightDetailButton
+                  className="evidence-row__detail"
+                  detail={maintenanceEvidenceInsight(row, t)}
+                  label={t("maintenance.evidenceDetail")}
+                  t={t}
+                  tone="maintenance"
+                />
+                {maintenanceReferenceValues(row).map((reference) => (
+                  <span className="evidence-row__reference-chip" key={reference} aria-label={`${maintenanceEvidenceLabel(row, t)}: ${reference}`}>
+                    {technicalTooltipValue(reference, referenceTooltip(reference, t, t("maintenance.evidenceReferenceTooltip")), "evidence-row__reference-value")}
+                    <button className="evidence-row__reference-copy" type="button" aria-label={`${t("maintenance.copyReference")}: ${reference}`} data-copy-tooltip={reference} onClick={() => copyTextToClipboard(reference)}>
+                      <Copy aria-hidden="true" size={14} />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            </article>
+          );
+        })}
       </div>
     </section>
   );
@@ -937,29 +2089,24 @@ function SecurityStatusCards({ security, partialFailures, data, t }) {
   );
 }
 
-function ContextPanel({ data, t }) {
-  const producerContext = data.selected_context && typeof data.selected_context === "object" ? data.selected_context : {};
+function ContextPanel({ data, t, activeMenuId, activeContext, onActiveMenuChange }) {
+  const context = activeContext && typeof activeContext === "object" ? activeContext : selectedContextData(data);
   const availableContexts = asArray(data.available_contexts);
-  const producerMenuId = displayText(producerContext.menu_id, availableContexts[0]?.menu_id || "unknown");
-  const [selectedMenuId, setSelectedMenuId] = useState(producerMenuId);
+  const selectedMenuId = displayText(activeMenuId || context.menu_id, availableContexts[0]?.menu_id || "unknown");
 
-  useEffect(() => {
-    setSelectedMenuId(producerMenuId);
-  }, [producerMenuId, data.snapshot_id]);
-
-  if (!availableContexts.length && !displayText(producerContext.menu_id, "")) {
+  if (!availableContexts.length && !displayText(context.menu_id, "")) {
     return null;
   }
 
   const selectedAvailable =
-    availableContexts.find((context) => displayText(context.menu_id, "") === selectedMenuId) ||
-    availableContexts.find((context) => displayText(context.menu_id, "") === producerMenuId) ||
+    availableContexts.find((availableContext) => displayText(availableContext.menu_id, "") === selectedMenuId) ||
+    availableContexts[0] ||
     {};
-  const usesProducerContext = selectedMenuId === producerMenuId;
-  const targetRepository = producerContext.target_repository || {};
-  const selectedStatus = usesProducerContext ? producerContext.evidence_status : selectedAvailable.status;
-  const blockers = usesProducerContext ? asArray(producerContext.blockers) : [];
-  const selectorOptions = availableContexts.length ? availableContexts : [{ menu_id: producerMenuId, workflow_context: producerContext.workflow_context, status: selectedStatus }];
+  const targetRepository = context.target_repository || {};
+  const selectedStatus = context.evidence_status || selectedAvailable.status;
+  const blockers = asArray(context.blockers);
+  const selectorOptions = availableContexts.length ? availableContexts : [{ menu_id: selectedMenuId, workflow_context: context.workflow_context, status: selectedStatus }];
+  const repositorySelection = repositorySelectionForMenu(data, selectedMenuId);
 
   return (
     <section className="context-panel" aria-label={t("context.title")}>
@@ -968,12 +2115,14 @@ function ContextPanel({ data, t }) {
           <Compass aria-hidden="true" size={18} />
           <span>{t("context.selectLabel")}</span>
         </label>
-        <select id="dashboard-context-select" value={selectedMenuId} onChange={(event) => setSelectedMenuId(event.target.value)}>
+        <select id="dashboard-context-select" value={selectedMenuId} onChange={(event) => onActiveMenuChange?.(event.target.value)}>
           {selectorOptions.map((context) => {
             const id = displayText(context.menu_id, "unknown");
+            const selectable = isAvailableContextSelectable(context) || id === selectedMenuId;
             return (
-              <option value={id} key={id}>
+              <option value={id} key={id} disabled={!selectable}>
                 {contextLabel(id, t)}
+                {!selectable ? ` - ${t("context.menuAvailability.unavailable")}` : ""}
               </option>
             );
           })}
@@ -986,25 +2135,26 @@ function ContextPanel({ data, t }) {
           </span>
           <div>
             <strong>{contextLabel(selectedMenuId, t)}</strong>
-            <span>{workflowContextLabel(usesProducerContext ? producerContext.workflow_context : selectedAvailable.workflow_context, t)}</span>
+            <span>{workflowContextLabel(context.workflow_context || selectedAvailable.workflow_context, t)}</span>
           </div>
         </div>
         <StatusPill value={selectedStatus} t={t} />
       </div>
       <div className="context-panel__facts">
         <ActionMetaRow Icon={Database} label={t("context.repository")}>
-          {usesProducerContext ? displayText(targetRepository.name) : displayText(selectedAvailable.target_repository_name)}
+          {repositoryDisplayName(targetRepository.name || selectedAvailable.target_repository_name, t)}
         </ActionMetaRow>
         <ActionMetaRow Icon={MapPinIcon} label={t("context.currentStep")}>
-          {usesProducerContext ? displayText(producerContext.current_step_id) : t("context.availableOnly")}
+          {currentStepTextDisplay(context, t)}
         </ActionMetaRow>
         <ActionMetaRow Icon={ShieldCheck} label={t("context.security")}>
-          {usesProducerContext ? stateLabel(producerContext.security_status, t) : t("context.availableOnly")}
+          {stateLabel(context.security_status, t)}
         </ActionMetaRow>
         <ActionMetaRow Icon={GitBranch} label={t("context.gitCi")}>
-          {usesProducerContext ? `${stateLabel(producerContext.git_status, t)} / ${stateLabel(producerContext.ci_status, t)}` : t("context.availableOnly")}
+          {`${stateLabel(context.git_status, t)} / ${stateLabel(context.ci_status, t)}`}
         </ActionMetaRow>
       </div>
+      <RepositorySelectionPanel selection={repositorySelection} t={t} />
       <div className="context-panel__footer">
         <span>
           <AlertTriangle aria-hidden="true" size={16} />
@@ -1015,6 +2165,140 @@ function ContextPanel({ data, t }) {
           {t("context.readOnly")}
         </span>
       </div>
+    </section>
+  );
+}
+
+function repositorySelectionForMenu(data, menuId) {
+  const selection = data?.repository_selection;
+  if (!selection || typeof selection !== "object" || Array.isArray(selection)) {
+    return null;
+  }
+  if (displayText(selection.menu_id, "") !== displayText(menuId, "")) {
+    return null;
+  }
+  if (normalizeState(selection.status) === "not_applicable") {
+    return null;
+  }
+  return selection;
+}
+
+function repositorySelectionStateLabel(value, t) {
+  return t(`context.repositorySelection.state.${displayText(value, "none")}`, displayKey(value));
+}
+
+function repositorySelectionSourceLabel(value, t) {
+  return t(`context.repositorySelection.source.${displayText(value, "unknown")}`, displayKey(value));
+}
+
+function repositorySelectionAllowedContexts(option, t) {
+  const contexts = asArray(option.allowed_contexts).map((context) => contextLabel(context, t));
+  return contexts.length ? contexts.join(" / ") : t("context.repositorySelection.none");
+}
+
+function RepositorySelectionCommand({ command, selected, t }) {
+  const text = displayText(command, "");
+  if (!text) {
+    return null;
+  }
+  return (
+    <div className="repository-selection__command" aria-label={t("context.repositorySelection.command")}>
+      <span className="repository-selection__command-label">
+        <TerminalSquare aria-hidden="true" size={14} />
+        {selected ? t("context.repositorySelection.commandSelected") : t("context.repositorySelection.command")}
+      </span>
+      <code>{text}</code>
+      <button className="repository-selection__copy" type="button" aria-label={`${t("app.copyItem")}: ${text}`} data-copy-tooltip={text} onClick={() => copyTextToClipboard(text)}>
+        <Copy aria-hidden="true" size={14} />
+      </button>
+    </div>
+  );
+}
+
+function RepositorySelectionOption({ option, t }) {
+  const selected = option.selected === true;
+  const selectable = option.selectable === true;
+  const Icon = selected ? Check : selectable ? Database : Lock;
+  return (
+    <article className={`repository-selection__option${selected ? " is-selected" : ""}${selectable ? "" : " is-disabled"}`} data-repository-option={displayText(option.repo_id, "")}>
+      <div className="repository-selection__option-main">
+        <span className="repository-selection__option-icon">
+          <Icon aria-hidden="true" size={17} />
+        </span>
+        <div>
+          <strong>{repositoryDisplayName(option.display_name, t)}</strong>
+          <small>{displayText(option.repo_id, "")}</small>
+        </div>
+      </div>
+      <StatusPill value={option.status} t={t} label={selected ? t("context.repositorySelection.selected") : statusLabelForChip(option.status, t)} />
+      <dl className="repository-selection__option-meta">
+        <div>
+          <dt>{t("context.repositorySelection.productType")}</dt>
+          <dd>{t(`repositoryInfo.productType.${displayText(option.product_type, "unknown")}`, displayKey(option.product_type))}</dd>
+        </div>
+        <div>
+          <dt>{t("context.repositorySelection.allowedContexts")}</dt>
+          <dd>{repositorySelectionAllowedContexts(option, t)}</dd>
+        </div>
+        <div>
+          <dt>{t("context.repositorySelection.pathState")}</dt>
+          <dd>{t(`repositoryInfo.pathState.${displayText(option.path_state, "unknown")}`, displayKey(option.path_state))}</dd>
+        </div>
+        <div>
+          <dt>{t("context.repositorySelection.gitState")}</dt>
+          <dd>{t(`repositoryInfo.pathState.${displayText(option.git_state, "unknown")}`, displayKey(option.git_state))}</dd>
+        </div>
+        <div>
+          <dt>{t("context.repositorySelection.source")}</dt>
+          <dd>{repositorySelectionSourceLabel(option.registration_source, t)}</dd>
+        </div>
+      </dl>
+      {!selectable ? <p className="repository-selection__reason">{t(option.disabled_reason_key, displayText(option.disabled_detail, ""))}</p> : null}
+      <RepositorySelectionCommand command={option.select_command} selected={selected} t={t} />
+    </article>
+  );
+}
+
+function RepositorySelectionPanel({ selection, t }) {
+  if (!selection) {
+    return null;
+  }
+  const options = asArray(selection.options);
+  const currentName = repositoryDisplayName(selection.current_repository_name, t);
+  return (
+    <section className="repository-selection" aria-labelledby="repository-selection-heading">
+      <div className="repository-selection__head">
+        <div>
+          <h3 id="repository-selection-heading">{t("context.repositorySelection.title")}</h3>
+          <p>{t("context.repositorySelection.detail")}</p>
+        </div>
+        <StatusPill value={selection.status} t={t} />
+      </div>
+      <div className="repository-selection__current">
+        <ActionMetaRow Icon={Database} label={t("context.repositorySelection.current")}>
+          {currentName}
+        </ActionMetaRow>
+        <ActionMetaRow Icon={CircleDashed} label={t("context.repositorySelection.selectionState")}>
+          {repositorySelectionStateLabel(selection.selection_state, t)}
+        </ActionMetaRow>
+        <ActionMetaRow Icon={FileText} label={t("context.repositorySelection.sources")}>
+          {`${displayText(selection.registry_file, "")} / ${displayText(selection.selection_file, "")}`}
+        </ActionMetaRow>
+      </div>
+      {options.length ? (
+        <div className="repository-selection__options" role="list" aria-label={t("context.repositorySelection.candidates")}>
+          {options.map((option) => (
+            <div role="listitem" key={displayText(option.repo_id, "")}>
+              <RepositorySelectionOption option={option} t={t} />
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="repository-selection__empty" role="status">
+          <Lock aria-hidden="true" size={16} />
+          <span>{t("context.repositorySelection.noCandidates")}</span>
+        </div>
+      )}
     </section>
   );
 }
@@ -1073,6 +2357,113 @@ function technicalChip(value) {
   return text ? <code className="technical-chip">{text}</code> : null;
 }
 
+function technicalTooltipValue(value, tooltip, className = "") {
+  const text = displayText(value, "");
+  if (!text) {
+    return null;
+  }
+  return (
+    <span className={`technical-tooltip-value ${className}`.trim()} data-tooltip={displayText(tooltip, "")}>
+      {technicalChip(text)}
+    </span>
+  );
+}
+
+function referenceTooltip(value, t, fallback = "") {
+  const text = displayText(value, "");
+  if (!text) {
+    return displayText(fallback, "");
+  }
+  if (/\s/.test(text)) {
+    return displayText(fallback, "");
+  }
+  return repositoryFileRoleLabel({ path: text, source_id: text }, t) || displayText(fallback, "");
+}
+
+function sourceCommandRoleKey(value) {
+  return displayText(value, "generic").replace(/[^A-Za-z0-9]+/g, "_").replace(/^_+|_+$/g, "") || "generic";
+}
+
+function sourceFileRoleLabel(value, t, fallback = "") {
+  const path = displayText(value, "").replace(/^product:/, "");
+  if (!path) {
+    return displayText(fallback, "");
+  }
+  const exact = {
+    "AGENTS.MD": "maintenance.sourceFileRole.agents",
+    "guides/DOCUMENT_MAP.md": "maintenance.sourceFileRole.documentMap",
+    "docs/workflow/DASHBOARD_DATA_SCHEMA.tsv": "maintenance.sourceFileRole.dashboardSchema",
+    "docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv": "maintenance.sourceFileRole.asBuiltContract",
+    "docs/workflow/DOCUMENT_DECISION_BRIEFS.tsv": "maintenance.sourceFileRole.documentDecisionBriefs",
+    "docs/workflow/TEST_PLAN_MANIFEST.tsv": "maintenance.sourceFileRole.testPlanManifest",
+    "docs/workflow/GIT_HOOK_CHECKS.tsv": "maintenance.sourceFileRole.gitHookChecks",
+    "docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv": "maintenance.sourceFileRole.gitHookGroups",
+    "docs/workflow/FINAL_GATE_COVERAGE.tsv": "maintenance.sourceFileRole.finalGateCoverage",
+    "docs/workflow/GIT_WORKFLOW_POLICY.tsv": "maintenance.sourceFileRole.gitWorkflowPolicy",
+    "docs/workflow/PRODUCT_WORKFLOW_GIT_USAGE_POLICY.tsv": "maintenance.sourceFileRole.productGitPolicy",
+    "docs/workflow/MENU_PRODUCT_PROFILE_POLICY.tsv": "maintenance.sourceFileRole.menuProfilePolicy",
+    "docs/workflow/PRODUCT_SECURITY_POLICY.tsv": "maintenance.sourceFileRole.productSecurityPolicy",
+    "docs/workflow/PRODUCT_REPOSITORY_STRUCTURE.tsv": "maintenance.sourceFileRole.productRepositoryStructure",
+    "docs/workflow/PRODUCT_REPOSITORY_FORBIDDEN_ROOT_PATHS.tsv": "maintenance.sourceFileRole.productRepositoryForbiddenPaths",
+    "docs/workflow/PRODUCT_GATE_EVIDENCE_SCHEMA.tsv": "maintenance.sourceFileRole.productGateEvidenceSchema",
+    "learning/context/WORKFLOW_CONTEXT_MAP.tsv": "maintenance.sourceFileRole.workflowContextMap",
+    "learning/GIT_WORKFLOW_SETTINGS.tsv": "maintenance.sourceFileRole.gitWorkflowSettings",
+    "learning/PRODUCT_WORKFLOW_GIT_USAGE_SETTINGS.tsv": "maintenance.sourceFileRole.productGitUsageSettings",
+    "learning/GIT_WORKFLOW_APPROVALS.tsv": "maintenance.sourceFileRole.gitWorkflowApprovals",
+    "lesson/LESSON_CONFIG.tsv": "maintenance.sourceFileRole.lessonConfig",
+    "lesson/LESSON_CONFIG_14_DAYS.tsv": "maintenance.sourceFileRole.lessonConfig",
+    "learning/LESSON_STATE.tsv": "maintenance.sourceFileRole.lessonState",
+    "learning/LESSON_STATE_14_DAYS.tsv": "maintenance.sourceFileRole.lessonState",
+    "learning/LESSON_MODE.tsv": "maintenance.sourceFileRole.lessonMode",
+    "learning/LESSON_MODE_14_DAYS.tsv": "maintenance.sourceFileRole.lessonMode",
+    "learning/WORKFLOW_DISPLAY_LANGUAGE.tsv": "maintenance.sourceFileRole.workflowLanguage",
+    "learning/WORKFLOW_DISPLAY_LANGUAGE_14_DAYS.tsv": "maintenance.sourceFileRole.workflowLanguage",
+    "learning/PRODUCT_DEVELOPMENT_LANGUAGE.tsv": "maintenance.sourceFileRole.productLanguage",
+    "learning/PRODUCT_DEVELOPMENT_LANGUAGE_14_DAYS.tsv": "maintenance.sourceFileRole.productLanguage",
+    "learning/LESSON_APPROVALS_14_DAYS.tsv": "maintenance.sourceFileRole.lessonApprovals",
+    "docs/as-built/REQUIREMENTS.md": "maintenance.sourceFileRole.requirements",
+    "docs/as-built/SPECIFICATION.md": "maintenance.sourceFileRole.specification",
+    "docs/as-built/IMPLEMENTATION_PLAN.md": "maintenance.sourceFileRole.implementationPlan",
+    "docs/workflow/TASK_TRACKER.md": "maintenance.sourceFileRole.taskTracker",
+    "docs/workflow/HANDOFF.md": "maintenance.sourceFileRole.handoff",
+    "docs/memory/DEVELOPER_MEMORY.md": "maintenance.sourceFileRole.developerMemory",
+  };
+  const exactKey = exact[path];
+  if (exactKey) {
+    return t(exactKey, displayText(fallback, ""));
+  }
+  if (path.startsWith("docs/workflow/")) {
+    return t("maintenance.sourceFileRole.workflowDocument", displayText(fallback, ""));
+  }
+  if (path.startsWith("learning/")) {
+    return t("maintenance.sourceFileRole.learningSetting", displayText(fallback, ""));
+  }
+  return referenceTooltip(path, t, fallback);
+}
+
+function sourceBoundaryTooltip(value, variant, t, fallback = "") {
+  const text = displayText(value, "");
+  if (variant === "commands") {
+    if (text.includes("product-repository-authority")) {
+      return t("maintenance.sourceCommandRole.productAuthorityContext", displayText(fallback, ""));
+    }
+    if (text.includes("check_git_sync")) {
+      return t("maintenance.sourceCommandRole.productGitSync", displayText(fallback, ""));
+    }
+    if (text.includes("check_ci_status")) {
+      return t("maintenance.sourceCommandRole.productCiStatus", displayText(fallback, ""));
+    }
+    if (text.includes("product-security")) {
+      return t("maintenance.sourceCommandRole.productSecurityGate", displayText(fallback, ""));
+    }
+    return t(`maintenance.sourceCommandRole.${sourceCommandRoleKey(text)}`, displayText(fallback, ""));
+  }
+  if (variant === "files") {
+    return sourceFileRoleLabel(text, t, fallback);
+  }
+  return referenceTooltip(text, t, fallback);
+}
+
 function copyTextToClipboard(value) {
   const text = displayText(value, "");
   if (!text) {
@@ -1093,13 +2484,102 @@ function copyTextToClipboard(value) {
   document.body.removeChild(textarea);
 }
 
+function InsightDetailButton({ detail, t, label, className = "", tone = "default" }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const openerRef = useRef(null);
+  const closeRef = useRef(null);
+  const title = detail?.title || t("detail.infoTitle");
+  const bodyId = `insight-detail-${String(title).replace(/[^a-z0-9]+/gi, "-").toLowerCase()}`;
+
+  useEffect(() => {
+    if (!isOpen) {
+      return undefined;
+    }
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape") {
+        setIsOpen(false);
+        openerRef.current?.focus();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    window.setTimeout(() => closeRef.current?.focus(), 0);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen]);
+
+  const close = () => {
+    setIsOpen(false);
+    openerRef.current?.focus();
+  };
+
+  return (
+    <>
+      <button
+        className={`insight-detail-button insight-detail-button--${tone} ${className}`.trim()}
+        type="button"
+        ref={openerRef}
+        onClick={() => setIsOpen(true)}
+      >
+        <CircleHelp aria-hidden="true" size={15} />
+        {label || t("detail.openPlainDetail")}
+      </button>
+      {isOpen ? (
+        <div className="insight-detail-modal" role="presentation" onMouseDown={(event) => {
+          if (event.target === event.currentTarget) {
+            close();
+          }
+        }}>
+          <section className="insight-detail-modal__panel" role="dialog" aria-modal="true" aria-labelledby={`${bodyId}-title`} aria-describedby={`${bodyId}-summary`}>
+            <header className="insight-detail-modal__head">
+              <div>
+                {detail?.eyebrow ? <span className="insight-detail-modal__eyebrow">{detail.eyebrow}</span> : null}
+                <h3 id={`${bodyId}-title`}>{title}</h3>
+              </div>
+              <button className="insight-detail-modal__close" type="button" ref={closeRef} onClick={close} aria-label={t("detail.closeDetail")}>
+                <CircleX aria-hidden="true" size={18} />
+              </button>
+            </header>
+            {detail?.summary ? <p className="insight-detail-modal__summary" id={`${bodyId}-summary`}>{detail.summary}</p> : null}
+            <dl className="insight-detail-modal__grid">
+              {[
+                [t("detail.whereItAppears"), detail?.where],
+                [t("detail.whyItMatters"), detail?.why],
+                [t("detail.nextSafeAction"), detail?.action],
+                [t("detail.technicalSource"), detail?.source],
+              ]
+                .filter(([, value]) => displayText(value, ""))
+                .map(([term, value]) => (
+                  <div key={term}>
+                    <dt>{term}</dt>
+                    <dd>{displayText(value)}</dd>
+                  </div>
+                ))}
+            </dl>
+            {detail?.status ? (
+              <div className="insight-detail-modal__status">
+                <StatusPill value={detail.status} t={t} label={detail.statusLabel || statusLabelForChip(detail.status, t)} />
+              </div>
+            ) : null}
+            {asArray(detail?.points).length ? (
+              <ul className="insight-detail-modal__points">
+                {asArray(detail.points).map((point, index) => (
+                  <li key={`${displayText(point)}-${index}`}>{displayText(point)}</li>
+                ))}
+              </ul>
+            ) : null}
+          </section>
+        </div>
+      ) : null}
+    </>
+  );
+}
+
 function showMoreItemsLabel(remaining, t) {
   const prefix = t("app.showMoreItemsPrefix", "");
   const suffix = t("app.showMoreItemsSuffix", "");
   return `${prefix ? `${prefix} ` : ""}${remaining} ${t("summary.moreItems")}${suffix}`;
 }
 
-function SourceBoundaryChips({ values, t, limit = 3, variant = "default" }) {
+function SourceBoundaryChips({ values, t, limit = 3, variant = "default", labelKey = "maintenance.sourceItem", tooltipKey = "maintenance.sourceRoleTooltip" }) {
   const [expanded, setExpanded] = useState(false);
   const normalized = asArray(values).map((value) => displayText(value, "")).filter(Boolean);
   if (!normalized.length) {
@@ -1109,14 +2589,17 @@ function SourceBoundaryChips({ values, t, limit = 3, variant = "default" }) {
   const remaining = Math.max(0, normalized.length - limit);
   return (
     <div className={`source-boundary__chips source-boundary__chips--${variant}${expanded ? " source-boundary__chips--expanded" : ""}`}>
-      {visible.map((value, index) => (
-        <span className="source-boundary__chip" key={`${value}-${index}`} tabIndex={0} data-tooltip={value}>
-          {technicalChip(value)}
-          <button className="source-boundary__chip-copy" type="button" aria-label={`${t("app.copyItem")}: ${value}`} title={t("app.copyItem")} onClick={() => copyTextToClipboard(value)}>
-            <Copy aria-hidden="true" size={14} />
-          </button>
-        </span>
-      ))}
+      {visible.map((value, index) => {
+        const tooltip = sourceBoundaryTooltip(value, variant, t, t(tooltipKey));
+        return (
+          <span className="source-boundary__chip" key={`${value}-${index}`} aria-label={`${t(labelKey)} ${index + 1}: ${value}`} data-tooltip={tooltip}>
+            {technicalTooltipValue(value, tooltip, "source-boundary__chip-value")}
+            <button className="source-boundary__chip-copy" type="button" aria-label={`${t("app.copyItem")}: ${value}`} data-copy-tooltip={value} onClick={() => copyTextToClipboard(value)}>
+              <Copy aria-hidden="true" size={14} />
+            </button>
+          </span>
+        );
+      })}
       {remaining > 0 ? (
         <button className="source-boundary__expand" type="button" aria-expanded={expanded} onClick={() => setExpanded((current) => !current)}>
           {expanded ? t("app.hideExtraItems") : showMoreItemsLabel(remaining, t)}
@@ -1140,7 +2623,8 @@ function formatDashboardDateTime(value) {
   const day = String(date.getDate()).padStart(2, "0");
   const hour = String(date.getHours()).padStart(2, "0");
   const minute = String(date.getMinutes()).padStart(2, "0");
-  return `${year}-${month}-${day} ${hour}:${minute}`;
+  const second = String(date.getSeconds()).padStart(2, "0");
+  return `${year}-${month}-${day} ${hour}:${minute}:${second}`;
 }
 
 function formatDashboardTime(value) {
@@ -1148,7 +2632,7 @@ function formatDashboardTime(value) {
   if (Number.isNaN(date.getTime())) {
     return "";
   }
-  return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+  return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}:${String(date.getSeconds()).padStart(2, "0")}`;
 }
 
 function normalizedStepCountLabel(value) {
@@ -1212,6 +2696,36 @@ function localizedStepDetail(context, t) {
   const id = displayText(context.current_step_id, "");
   const translated = id ? t(`lesson.step.${id}`, "") : "";
   return translated || selectedStepDetail(context);
+}
+
+function isLessonWorkflowContext(context) {
+  return displayText(context.workflow_context, "") === "lesson";
+}
+
+function currentWorkflowStepLabel(context, t) {
+  if (isLessonWorkflowContext(context)) {
+    return "";
+  }
+  return workflowContextLabel(context.workflow_context || context.menu_id, t);
+}
+
+function currentStepShortDisplay(context, t) {
+  return currentWorkflowStepLabel(context, t) || selectedStepShort(context);
+}
+
+function currentStepDetailDisplay(context, t) {
+  if (!isLessonWorkflowContext(context)) {
+    return nextActionShort(context, {}, t) || t("summary.viewDetails");
+  }
+  return localizedStepDetail(context, t);
+}
+
+function currentStepTextDisplay(context, t) {
+  const workflowLabel = currentWorkflowStepLabel(context, t);
+  if (workflowLabel) {
+    return workflowLabel;
+  }
+  return selectedStepText(context);
 }
 
 function localizedLessonAction(value, context, t) {
@@ -1328,6 +2842,9 @@ function currentStepNumber(context) {
 }
 
 function workflowStepDetailLabel(context, t) {
+  if (!isLessonWorkflowContext(context)) {
+    return t("summary.viewDetails");
+  }
   const step = currentStepNumber(context);
   return step ? `${t("workflow.card.stepLabel")} ${step} ${t("workflow.card.stepDetailSuffix")}` : t("workflow.card.stepDetail");
 }
@@ -1335,11 +2852,14 @@ function workflowStepDetailLabel(context, t) {
 function workflowRunTypeLabel(value, t) {
   const key = displayText(value, "");
   const map = {
+    "Selected context": "workflow.run.selectedContext",
     "CI run": "workflow.run.ci",
     "Git sync": "workflow.run.gitSync",
     "Product evidence": "workflow.run.productEvidence",
     "Security gate": "workflow.run.securityGate",
     "Next step": "workflow.run.nextStep",
+    "Repository observation": "workflow.run.repositoryObservation",
+    "Repository index drift": "workflow.run.repositoryIndexDrift",
   };
   return map[key] ? t(map[key]) : displayText(value);
 }
@@ -1351,9 +2871,15 @@ function workflowRunDetail(row, context, t) {
     "Current snapshot Git synchronization evidence": "workflow.runDetail.gitSync",
     "Product authority and manifest evidence": "workflow.runDetail.productEvidence",
     "Product security gate snapshot": "workflow.runDetail.securityGate",
+    "Selected context Git synchronization evidence": "workflow.runDetail.selectedGitSync",
+    "Selected context CI evidence": "workflow.runDetail.selectedCi",
+    "Selected context product authority evidence": "workflow.runDetail.selectedProductEvidence",
+    "Selected context security gate snapshot": "workflow.runDetail.selectedSecurityGate",
+    "Observed selected repository inventory and required paths.": "workflow.runDetail.repositoryObservation",
+    "Compared worktree files with repository index.": "workflow.runDetail.repositoryIndexDrift",
   };
   if (detail === displayText(context.current_step_id, "")) {
-    return localizedStepDetail(context, t);
+    return currentStepDetailDisplay(context, t);
   }
   return map[detail] ? t(map[detail]) : detail;
 }
@@ -1366,8 +2892,160 @@ function workflowRunReferenceLabel(value, t) {
     "Product authority": "workflow.reference.productAuthority",
     "Security gate": "workflow.reference.securityGate",
     "Selected context": "workflow.reference.selectedContext",
+    "Repository scope": "workflow.reference.repositoryScope",
+    "Repository inventory": "workflow.reference.repositoryInventory",
   };
   return map[key] ? t(map[key]) : displayText(value, t("summary.viewDetails"));
+}
+
+function liveEvidenceCheckTitle(key, t) {
+  const map = {
+    local_tests: "overview.status.localTests",
+    git_sync: "overview.status.git",
+    ci: "overview.status.ci",
+    security: "overview.status.security",
+  };
+  return t(map[key] || "detail.liveEvidence.title", displayKey(key));
+}
+
+function liveEvidenceRows(activeLiveStatus, keys, t) {
+  if (!activeLiveStatus) {
+    return [];
+  }
+  const rows = [];
+  for (const key of keys) {
+    const check = liveCheck(activeLiveStatus, key);
+    if (!check) {
+      continue;
+    }
+    const items = asArray(check.items).length ? asArray(check.items) : [check];
+    items.forEach((item, index) => {
+      const sourceId = displayText(item?.source_id || item?.current_item_id || check.source_id, "");
+      const currentItemId = displayText(item?.current_item_id || check.current_item_id || sourceId, "");
+      const status = item?.status || check.status || "unknown";
+      const rawSummary = displayText(item?.summary || check.summary, "");
+      const observedAt = liveStatusObservedTime(item?.observed_at || check.observed_at);
+      const detailArtifactPath = displayText(item?.detail_artifact_path || check.detail_artifact_path, "");
+      const command = displayText(item?.next_command || item?.required_command || check.required_command, "");
+      rows.push({
+        id: `${key}-${sourceId || index}-${index}`,
+        key,
+        sourceId,
+        currentItemId,
+        title: liveEvidenceCheckTitle(key, t),
+        target: repositoryDisplayName(activeLiveStatus.target_repository?.name, t),
+        branch: displayText(check.branch || activeLiveStatus.repository_state?.branch, ""),
+        status,
+        summary: rawSummary && sourceId && rawSummary === `${sourceId} ${normalizeState(status)}` ? `${sourcePresentationKey(sourceId, t)} ${statusLabelForChip(status, t)}` : (overviewLiveLocalizedText(rawSummary, t) || (sourceId ? sourcePresentationKey(sourceId, t) : liveEvidenceCheckTitle(key, t))),
+        reason: overviewLiveLocalizedText(item?.reason || check.reason, t),
+        action: overviewLiveLocalizedText(item?.next_action || check.next_action, t),
+        observedAt,
+        detailArtifactPath,
+        command,
+      });
+    });
+  }
+  return rows;
+}
+
+function liveEvidenceRowInsight(row, t) {
+  const sourceParts = [
+    row.sourceId ? `${sourcePresentationKey(row.sourceId, t)}: ${row.sourceId}` : "",
+    row.currentItemId && row.currentItemId !== row.sourceId ? row.currentItemId : "",
+    row.detailArtifactPath,
+    row.command && row.command !== "not_applicable" ? row.command : "",
+    row.observedAt ? `${t("overview.fact.lastChecked")}: ${row.observedAt}` : "",
+  ].filter(Boolean);
+  return {
+    title: row.title,
+    eyebrow: t("detail.liveEvidence.title"),
+    summary: row.summary,
+    where: `${t("overview.fact.target")}: ${row.target}${row.branch ? ` / ${t("overview.fact.branch")}: ${row.branch}` : ""}`,
+    why: row.reason,
+    action: row.action,
+    source: sourceParts.join(" / "),
+    status: row.status,
+    statusLabel: statusLabelForChip(row.status, t),
+    points: sourceParts,
+  };
+}
+
+function LiveEvidenceTable({ liveStatus, context, keys, title, headingId, t, tone = "workflow" }) {
+  const activeLiveStatus = liveStatusForContext(liveStatus, context);
+  const rows = liveEvidenceRows(activeLiveStatus, keys, t);
+  const id = headingId || `live-evidence-${keys.join("-")}`;
+  return (
+    <section className={`mock-table-section mock-table-section--${tone}`} aria-labelledby={id}>
+      <h3 id={id}>{title || t("detail.liveEvidence.title")}</h3>
+      <div className="mock-table">
+        <div className={`mock-table__head mock-table__head--live-evidence mock-table__head--live-evidence-${tone}`}>
+          <span>{t("workflow.table.type")}</span>
+          <span>{t("workflow.table.target")}</span>
+          <span>{t("workflow.table.detail")}</span>
+          <span>{t("workflow.table.status")}</span>
+          <span>{t("workflow.table.time")}</span>
+          <span>{t("workflow.table.reference")}</span>
+        </div>
+        {rows.length ? rows.map((row) => (
+          <article
+            className={`mock-table-row mock-table-row--live-evidence mock-table-row--live-evidence-${tone}`}
+            key={row.id}
+            data-live-evidence-key={row.key}
+            data-evidence-source-id={row.sourceId || undefined}
+            data-evidence-current-item-id={row.currentItemId || undefined}
+            data-evidence-detail-artifact-path={row.detailArtifactPath || undefined}
+          >
+            <strong data-label={t("workflow.table.type")}>{row.title}</strong>
+            <span data-label={t("workflow.table.target")}>{row.target}{row.branch ? ` / ${row.branch}` : ""}</span>
+            <p data-label={t("workflow.table.detail")}>{row.summary}</p>
+            <span className="mock-table-row__status" data-label={t("workflow.table.status")}>
+              <StatusPill value={row.status} t={t} label={statusLabelForChip(row.status, t)} />
+            </span>
+            <span data-label={t("workflow.table.time")}>{row.observedAt || t("workflow.table.snapshotEvidence")}</span>
+            <span className="mock-table-row__reference" data-label={t("workflow.table.reference")}>
+              <InsightDetailButton
+                className="mock-table-link"
+                detail={liveEvidenceRowInsight(row, t)}
+                label={t("summary.viewDetails")}
+                t={t}
+                tone={tone === "safety" ? "safety" : tone === "maintenance" ? "maintenance" : "workflow"}
+              />
+            </span>
+          </article>
+        )) : (
+          <article className={`mock-table-row mock-table-row--live-evidence mock-table-row--live-evidence-${tone}`}>
+            <strong data-label={t("workflow.table.type")}>{t("summary.none")}</strong>
+            <span data-label={t("workflow.table.target")}>{repositoryDisplayName(context.target_repository?.name, t)}</span>
+            <p data-label={t("workflow.table.detail")}>{t("detail.liveEvidence.empty")}</p>
+            <span className="mock-table-row__status" data-label={t("workflow.table.status")}>
+              <StatusPill value="unknown" t={t} label={statusLabelForChip("unknown", t)} />
+            </span>
+            <span data-label={t("workflow.table.time")}>{t("workflow.table.snapshotEvidence")}</span>
+            <span data-label={t("workflow.table.reference")}>{t("summary.none")}</span>
+          </article>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function workflowRunScopeLabel(row, context, t) {
+  const scope = displayText(row.scope, "");
+  if (!scope) {
+    return workflowContextLabel(context.workflow_context, t);
+  }
+  if (scope === displayText(context.menu_id, "")) {
+    return contextLabel(scope, t);
+  }
+  return workflowContextLabel(scope, t);
+}
+
+function workflowRunReferenceWhere(row, context, t) {
+  const role = displayText(row.source_role, "workflow");
+  const scope = workflowRunScopeLabel(row, context, t);
+  const target = workflowRunTarget(row, context, t);
+  const base = t(`workflow.runReferenceWhere.${role}`, t("workflow.runReference.where"));
+  return `${base} ${t("workflow.runReference.scope")}: ${scope}. ${t("workflow.runReference.target")}: ${target}.`;
 }
 
 function workflowDecisionValueLines(context, t) {
@@ -1409,7 +3087,6 @@ function maintenanceStatusLabel(id, status, t) {
     git_workflow_settings: "maintenance.status.enabled",
     security_policy: "maintenance.status.compliant",
     dashboard_data_schema: "maintenance.status.normal",
-    product_authority_evidence: "maintenance.status.notCollected",
   };
   return t(labels[id] || "maintenance.status.ready", statusLabelForChip(status, t));
 }
@@ -1432,11 +3109,44 @@ function maintenanceEvidenceLabel(row, t) {
 }
 
 function maintenanceReferenceValues(row) {
-  const id = displayText(row?.id, "");
-  if (id === "workflow_pair") {
-    return ["docs/workflow/TASK_TRACKER.md", "docs/workflow/HANDOFF.md"];
+  const rawReference = [displayText(row?.reference, ""), displayText(row?.source_artifacts, "")]
+    .filter(Boolean)
+    .join(";");
+  if (!rawReference) {
+    return [];
   }
-  return [displayText(row?.reference, "")].filter(Boolean);
+  return Array.from(new Set(rawReference
+    .split(";")
+    .map((reference) => reference.trim())
+    .filter(Boolean)));
+}
+
+function maintenanceObservedAt(row) {
+  return formatDashboardDateTime(row?.observed_at) || "";
+}
+
+function maintenanceUnresolvedCount(row) {
+  const value = Number.parseInt(displayText(row?.unresolved_count, "0"), 10);
+  return Number.isFinite(value) && value > 0 ? value : 0;
+}
+
+function maintenanceUnresolvedLabel(count, t) {
+  return `${count}${t("maintenance.unresolvedUnit")}`;
+}
+
+function maintenancePriorityLabel(row, t) {
+  const priority = displayText(row?.priority, "medium").toLowerCase();
+  return t(`maintenance.priority.${priority}`, displayKey(priority));
+}
+
+function maintenanceEvidenceImpact(row, t) {
+  const id = displayText(row?.id, "");
+  return t(`maintenance.evidenceImpact.${id}`, displayText(row?.impact, t("maintenance.evidenceImpact.default")));
+}
+
+function maintenanceEvidenceCompletion(row, t) {
+  const id = displayText(row?.id, "");
+  return t(`maintenance.evidenceCompletion.${id}`, displayText(row?.completion_condition, t("maintenance.evidenceCompletion.default")));
 }
 
 function maintenanceReviewPoints(t) {
@@ -1544,6 +3254,7 @@ function securityGateDetail(security, failures, t) {
 function localizedSecurityDetail(detail, t) {
   const text = displayText(detail, "");
   const detailKeys = {
+    "Required product evidence has not run.": "security.detail.requiredEvidenceNotRun",
     "Dangerous operations require explicit approval before execution.": "security.detail.dangerousApprovalRequired",
     "Push, PR, and merge approval states are tracked separately.": "security.detail.gitWorkflowApprovalTracked",
     "Merge is gated and must stay outside the dashboard UI.": "security.detail.mergeGated",
@@ -1587,6 +3298,24 @@ function securityPartialDetail(failures, t) {
     return localizedSecurityDetail(failures[0].reason, t);
   }
   return t("security.card.partialNone");
+}
+
+function securityReviewCount(security, partialFailures) {
+  const rows = [
+    { status: security?.gate_status },
+    { status: security?.dangerous_action_approval },
+    ...asArray(security?.approvals),
+    ...asArray(security?.dangerous_operations),
+    ...asArray(partialFailures),
+  ];
+  return rows.filter((row) => hasReviewState(row?.status)).length;
+}
+
+function securityHasHardBlock(security, partialFailures) {
+  return [
+    security?.gate_status,
+    ...asArray(partialFailures).map((failure) => failure.status),
+  ].some((status) => ["blocked", "failed"].includes(normalizeState(status)));
 }
 
 function maintenanceEvidenceRow(maintenance, ids) {
@@ -1669,10 +3398,10 @@ function DetailPageHeader({ tone, Icon, title, subtitle, data, locale, t, action
           {t("app.snapshot")} / {t("app.readOnly")}
         </span>
         {actionLabel ? (
-          <span className="detail-page-header__action">
+          <button className="detail-page-header__action" type="button" onClick={requestDashboardSnapshotRefresh}>
             <RefreshCw aria-hidden="true" size={15} />
             {actionLabel}
-          </span>
+          </button>
         ) : null}
       </div>
     </div>
@@ -2120,7 +3849,7 @@ function RepositoryNotice({ t }) {
   );
 }
 
-function OverviewSection({ data, t, locale }) {
+function OverviewSection({ data, t, locale, activeMenuId, pendingMenuId, onActiveMenuChange, liveStatus }) {
   const summary = data.summary || {};
   const partialFailures = asArray(data.partial_failures);
   const categorySummaries = buildCategorySummaries({
@@ -2135,27 +3864,35 @@ function OverviewSection({ data, t, locale }) {
       ? `${context.current_step_index} / ${context.current_step_total}`
       : displayText(context.current_step_label || context.current_step_id);
   const lessonMetric = metrics.lessons || {};
-  const selectedLessonProgress = contextProgress(context, lessonMetric);
+  const primaryStatusCard = overviewPrimaryStatusCard(data, context, lessonMetric, t, liveStatus);
+  const gitStatusCard = overviewGitCard(data, context, t, liveStatus);
+  const ciStatusCard = overviewCiCard(data, context, t, liveStatus);
+  const securityStatusCard = overviewSecurityCard(data, context, t, liveStatus);
+  const selectedMenuId = displayText(activeMenuId || context.menu_id, context.menu_id);
+  const repositorySelection = repositorySelectionForMenu(data, selectedMenuId);
 
   return (
     <section className="view-surface" id="overview" aria-labelledby="overview-heading">
       <PageTitleHeader viewId="overview" Icon={Home} title={t("nav.overview")} subtitle={t("overview.subtitle")} data={data} locale={locale} t={t} actionLabel={t("detail.refreshDisplayOnly")} headingId="overview-heading" />
-      <MenuTileStrip data={data} t={t} />
+      <MenuTileStrip data={data} t={t} activeMenuId={activeMenuId} pendingMenuId={pendingMenuId} onActiveMenuChange={onActiveMenuChange} />
       <ContextSnapshotStrip data={data} t={t} locale={locale} />
+      <RepositorySelectionPanel selection={repositorySelection} t={t} />
       <section className="overview-status-grid" aria-label={t("overview.currentStatus")}>
         <OverviewStatusCard
-          id="lessons"
-          title={t("overview.status.lessonProgress")}
-          status={lessonMetric.status}
-          metric={{ percent: selectedLessonProgress.percent, status: lessonMetric.status }}
-          value={`${selectedLessonProgress.completed} / ${selectedLessonProgress.total}`}
-          detail={`${selectedLessonProgress.percent}%`}
-          chipLabel={selectedStepShort(context)}
+          id={primaryStatusCard.id}
+          title={primaryStatusCard.title}
+          status={primaryStatusCard.status}
+          metric={primaryStatusCard.metric}
+          value={primaryStatusCard.value}
+          detail={primaryStatusCard.detail}
+          chipLabel={primaryStatusCard.chipLabel}
+          detailInfo={primaryStatusCard.detailInfo}
+          detailHref={primaryStatusCard.detailHref}
           t={t}
         />
-        <OverviewStatusCard id="git" title={t("overview.status.git")} status={context.git_status} value={statusLabelForChip(context.git_status, t)} detail={workflowContextLabel(context.workflow_context, t)} chipLabel={statusLabelForChip(context.git_status, t)} t={t} />
-        <OverviewStatusCard id="ci" title={t("overview.status.ci")} status={context.ci_status} value={statusLabelForChip(context.ci_status, t)} detail={displayText(context.target_repository?.name)} chipLabel={statusLabelForChip(context.ci_status, t)} t={t} />
-        <OverviewStatusCard id="security" title={t("overview.status.security")} status={context.security_status} value={statusLabelForChip(context.security_status, t)} detail={`${t("summary.blockers")}: ${asArray(context.blockers).length}`} chipLabel={statusLabelForChip(context.security_status, t)} t={t} />
+        <OverviewStatusCard {...gitStatusCard} t={t} />
+        <OverviewStatusCard {...ciStatusCard} t={t} />
+        <OverviewStatusCard {...securityStatusCard} t={t} />
       </section>
       <CommonStatusPanel data={data} partialFailures={partialFailures} t={t} />
       <ExplorePages categories={exploreSummaries} t={t} />
@@ -2359,11 +4096,13 @@ function CommandPreviewCommand({ command, t }) {
     return null;
   }
   return (
-    <span className="command-preview__command-chip" tabIndex={0} data-tooltip={text}>
-      <code className="command-chip command-chip--preview">
-        <span>{text}</span>
-      </code>
-      <button className="command-preview__command-copy" type="button" aria-label={`${t("app.copyItem")}: ${text}`} title={t("app.copyItem")} onClick={() => copyTextToClipboard(text)}>
+    <span className="command-preview__command-chip">
+      <span className="technical-tooltip-value command-preview__command-value" data-tooltip={t("security.commandPreviewTooltip")}>
+        <code className="command-chip command-chip--preview">
+          <span>{text}</span>
+        </code>
+      </span>
+      <button className="command-preview__command-copy" type="button" aria-label={`${t("app.copyItem")}: ${text}`} data-copy-tooltip={text} onClick={() => copyTextToClipboard(text)}>
         <Copy aria-hidden="true" size={14} />
       </button>
     </span>
@@ -2588,7 +4327,7 @@ function LessonLiveStatusTable({ data, t }) {
   const rows = [
     { id: "lesson-progress", Icon: FileCheck2, item: t("lesson.live.progress"), status: `${progressStatus} (${t("lesson.live.live")})`, statusTone: "blue", detail: `${contextLabel(context.menu_id, t)} / ${selectedStepShort(context)}` },
     { id: "settings", Icon: Settings, item: t("lesson.live.settings"), status: statusLabelForChip(settingsStatus, t), detail: lessonSettingsDetail(lesson, t) },
-    { id: "repository", Icon: Database, item: t("lesson.live.repository"), status: statusLabelForChip(repositoryStatus, t), detail: `${displayText(context.target_repository?.name)} (${t("lesson.live.productRepositoryLabel")})` },
+    { id: "repository", Icon: Database, item: t("lesson.live.repository"), status: statusLabelForChip(repositoryStatus, t), detail: `${repositoryDisplayName(context.target_repository?.name, t)} (${t("lesson.live.productRepositoryLabel")})` },
     { id: "git-ci", Icon: RefreshCw, item: t("lesson.live.gitCi"), status: gitCiStatus.status, detail: gitCiStatus.detail },
     { id: "dashboard", Icon: FileJson, item: t("lesson.live.dashboard"), status: reflectionStatus === "passed" ? t("lesson.live.dashboardShowing") : statusLabelForChip(reflectionStatus, t), statusTone: reflectionStatus === "passed" ? "" : "orange", detail: dashboardReflectionDetail(data, t) },
   ];
@@ -2620,6 +4359,21 @@ function LessonLiveStatusTable({ data, t }) {
 
 function LessonSection({ lessons, data, locale, t }) {
   const context = selectedContextData(data);
+  if (displayText(context.workflow_context, "") !== "lesson") {
+    return (
+      <section className="view-surface view-surface--lessons" id="lessons" aria-labelledby="lesson-heading">
+        <PageTitleHeader viewId="lessons" Icon={BookOpen} title={t("lessons.title")} subtitle={t("lessons.description")} data={data} locale={locale} t={t} actionLabel={t("lesson.snapshotButton")} headingId="lesson-heading" />
+        <ContextSnapshotStrip data={data} t={t} locale={locale} variant="workflow" />
+        <SidebarPageCard
+          Icon={WorkflowCategoryIcon}
+          title={t("lessons.notLessonTitle")}
+          detail={`${t("lessons.notLessonDetail")} ${contextLabel(context.menu_id, t)} / ${repositoryDisplayName(context.target_repository?.name, t)}`}
+          status="not_applicable"
+          t={t}
+        />
+      </section>
+    );
+  }
   const metric = data.summary?.category_metrics?.lessons || {};
   const progress = contextProgress(context, metric);
   const isComplete = progress.total > 0 && progress.completed >= progress.total;
@@ -2667,10 +4421,11 @@ function StatusObjectCard({ id, value, t, Icon = CircleDashed }) {
   );
 }
 
-function WorkflowSection({ development, gitWorkflow, data, locale, t }) {
+function WorkflowSection({ development, gitWorkflow, data, locale, t, liveStatus }) {
   const workflowItems = collectWorkflowItems({ development, gitWorkflow, t });
   const reviewItems = workflowItems.filter((item) => isReviewState(item.state));
   const context = selectedContextData(data);
+  const activeLiveStatus = liveStatusForContext(liveStatus, context);
   const step = currentStepNumber(context);
   return (
     <section className="view-surface view-surface--workflow" id="workflow" aria-labelledby="workflow-heading">
@@ -2688,6 +4443,7 @@ function WorkflowSection({ development, gitWorkflow, data, locale, t }) {
       />
       <GitOperationRail operations={development.git_operations} t={t} />
       <WorkflowStatusCards data={data} t={t} />
+      <LiveEvidenceTable liveStatus={liveStatus} context={context} keys={["local_tests", "git_sync", "ci"]} title={t("detail.liveEvidence.workflowTitle")} headingId="workflow-live-evidence-heading" t={t} tone="workflow" />
       <WorkflowRecentTable rows={development.recent_runs} data={data} t={t} />
       <MockNotice
         tone="workflow-warning"
@@ -2709,7 +4465,7 @@ function MaintenanceConfirmationTable({ manualFollowups, warnings, data, t }) {
     status: item.status,
     why: sourceWhy(item.source, t) || displayText(item.reason),
     location: item.required_command,
-    technicalKey: sourcePresentationKey(item.source),
+    technicalKey: sourcePresentationKey(item.source, t),
   }));
   const warningRows = warnings.map((item, index) => ({
     id: `warning-${index}`,
@@ -2772,6 +4528,78 @@ function maintenanceEvidenceWhy(id, t) {
   return t(`maintenance.evidenceWhy.${displayText(id)}`, t("maintenance.evidenceWhy.default"));
 }
 
+function maintenanceEvidenceWhere(row, t) {
+  const id = displayText(row?.id, "");
+  const base = t(`maintenance.evidenceWhere.${id}`, t("maintenance.evidenceDetail.where"));
+  const references = maintenanceReferenceValues(row);
+  if (!references.length) {
+    return base;
+  }
+  return `${base} ${t("maintenance.reference")}: ${references.join(" / ")}`;
+}
+
+function maintenanceEvidenceAction(row, t) {
+  const id = displayText(row?.id, "");
+  const state = normalizeState(row?.status);
+  const command = displayText(row?.required_command, "");
+  const statusAction = t(`maintenance.evidenceStatusAction.${state}`, "");
+  const baseAction = statusAction || t(`maintenance.evidenceAction.${id}`, t("maintenance.evidenceAction.default"));
+  if (!command) {
+    return baseAction;
+  }
+  return `${baseAction} ${t("maintenance.evidenceCommand")}: ${command}`;
+}
+
+function maintenanceEvidenceSourceRole(row, t) {
+  const role = displayText(row?.source_role, "evidence");
+  return t(`maintenance.evidenceSourceRole.${role}`, displayKey(role));
+}
+
+function maintenanceEvidenceTarget(row, t) {
+  const id = displayText(row?.id, "");
+  if (id === "product_authority_evidence" && displayText(row?.target, "")) {
+    return repositoryDisplayName(row.target, t);
+  }
+  return t(`maintenance.evidenceTarget.${id}`, displayText(row?.target, maintenanceEvidenceLabel(row, t)));
+}
+
+function maintenanceEvidenceInsight(row, t) {
+  const id = displayText(row?.id, "");
+  const state = normalizeState(row?.status);
+  const references = maintenanceReferenceValues(row);
+  const label = maintenanceEvidenceLabel(row, t);
+  const statusLabel = maintenanceStatusLabel(id, row.status, t);
+  const statusMeaning = t(`maintenance.evidenceStatusMeaning.${state}`, statusLabelForChip(row.status, t));
+  const observedAt = maintenanceObservedAt(row);
+  const unresolvedCount = maintenanceUnresolvedCount(row);
+  const points = [
+    `${t("maintenance.evidencePoint.target")}: ${maintenanceEvidenceTarget(row, t)}`,
+    `${t("maintenance.evidencePoint.role")}: ${maintenanceEvidenceSourceRole(row, t)}`,
+    `${t("maintenance.evidencePoint.importance")}: ${displayText(row?.importance, t("summary.none"))}`,
+    `${t("maintenance.evidencePoint.priority")}: ${maintenancePriorityLabel(row, t)}`,
+    `${t("maintenance.evidencePoint.impact")}: ${maintenanceEvidenceImpact(row, t)}`,
+    `${t("maintenance.evidencePoint.completionCondition")}: ${maintenanceEvidenceCompletion(row, t)}`,
+  ];
+  if (observedAt) {
+    points.push(`${t("maintenance.evidencePoint.updatedAt")}: ${observedAt}`);
+  }
+  if (unresolvedCount > 0) {
+    points.push(`${t("maintenance.evidencePoint.unresolved")}: ${maintenanceUnresolvedLabel(unresolvedCount, t)}`);
+  }
+  return {
+    title: label,
+    eyebrow: t("maintenance.evidenceDetail"),
+    summary: `${label}: ${statusLabel}. ${maintenanceEvidenceWhy(id, t)}`,
+    where: maintenanceEvidenceWhere(row, t),
+    why: `${maintenanceEvidenceWhy(id, t)} ${statusMeaning} ${t("maintenance.evidencePoint.impact")}: ${maintenanceEvidenceImpact(row, t)}`,
+    action: `${maintenanceEvidenceAction(row, t)} ${t("maintenance.evidencePoint.completionCondition")}: ${maintenanceEvidenceCompletion(row, t)}`,
+    source: references.length ? references.join(", ") : t("summary.none"),
+    status: row.status,
+    statusLabel,
+    points,
+  };
+}
+
 function MaintenanceStatusCards({ maintenance, data, t }) {
   const cards = [
     { id: "as_built_sync_status", title: t("maintenance.item.asBuilt"), Icon: RefreshCw, status: maintenance.as_built_sync_status, detail: maintenanceCardCopy("as_built_sync_status", t) },
@@ -2797,7 +4625,9 @@ function MaintenanceStatusCards({ maintenance, data, t }) {
   );
 }
 
-function MaintenanceSection({ maintenance, data, locale, t }) {
+function MaintenanceSection({ maintenance, data, locale, t, liveStatus }) {
+  const context = selectedContextData(data);
+  const activeLiveStatus = liveStatusForContext(liveStatus, context);
   const manualFollowups = asArray(data.summary?.manual_followups);
   const warnings = asArray(data.warnings).map((warning, index) => ({
     source: `${t("summary.warningItem")} ${index + 1}`,
@@ -2831,7 +4661,13 @@ function MaintenanceSection({ maintenance, data, locale, t }) {
         ]}
       />
       <MaintenanceStatusCards maintenance={maintenance} data={data} t={t} />
-      <EvidenceRowsTable rows={maintenance.evidence_rows} t={t} />
+      <LiveEvidenceTable liveStatus={liveStatus} context={context} keys={["local_tests", "git_sync", "ci", "security"]} title={t("detail.liveEvidence.maintenanceTitle")} headingId="maintenance-live-evidence-heading" t={t} tone="maintenance" />
+      <section className="maintenance-confirmation-section evidence-table-section" aria-labelledby="maintenance-confirmation-heading">
+        <h3 id="maintenance-confirmation-heading">{t("maintenance.confirmationFlow")}</h3>
+        <p className="section-help-text">{t("maintenance.confirmationFlowDetail")}</p>
+        <MaintenanceConfirmationTable manualFollowups={manualFollowups} warnings={warnings} data={data} t={t} />
+      </section>
+      {activeLiveStatus ? null : <EvidenceRowsTable rows={maintenance.evidence_rows} t={t} />}
       <SourceBoundary data={data} t={t} />
       <MockNotice
         tone="maintenance-warning"
@@ -2884,12 +4720,19 @@ function SafetyFailuresTable({ items, t }) {
                 </div>
                 <div className="failure-row__item">
                   <strong>{sourceLabel(item.source, t)}</strong>
-                  <span>{sourcePresentationKey(item.source)}</span>
+                  <span>{sourcePresentationKey(item.source, t)}</span>
                 </div>
                 <div>{sourceDetector(item.source, t)}</div>
                 <div>
-                  <p>{displayText(item.reason)}</p>
+                  <p>{localizedSecurityDetail(item.reason, t)}</p>
                   {reasonHint ? <span className="small-badge small-badge--soft">{reasonHint}</span> : null}
+                  <InsightDetailButton
+                    className="failure-row__detail"
+                    detail={safetyFailureInsight(item, t)}
+                    label={t("security.failureDetail")}
+                    t={t}
+                    tone="safety"
+                  />
                 </div>
                 <div>
                   <StatusPill value={item.status} t={t} />
@@ -2916,7 +4759,67 @@ function SafetyFailuresTable({ items, t }) {
   );
 }
 
-function SecuritySection({ security, partialFailures, data, locale, t }) {
+function securityRowLabel(row, type, t) {
+  const id = displayText(row?.id, "");
+  return t(`security.rowLabel.${id}`, displayText(row?.label, type === "approval" ? t("security.approvals") : t("security.dangerousOperations")));
+}
+
+function securityRowDetail(row, t) {
+  return localizedSecurityDetail(row?.detail, t) || t("security.rowDetail.default");
+}
+
+function SecurityRowsTable({ rows, title, type, t }) {
+  const items = asArray(rows);
+  if (!items.length) {
+    return null;
+  }
+  return (
+    <section className={`security-row-table security-row-table--${type}`} aria-labelledby={`security-${type}-heading`}>
+      <h3 id={`security-${type}-heading`}>{title}</h3>
+      <div className="security-row-table__grid">
+        <div className="security-row-table__head">
+          <span>{t("detail.failure.item")}</span>
+          <span>{t("detail.failure.status")}</span>
+          <span>{t("security.lastChecked")}</span>
+          <span>{t("detail.whyItMatters")}</span>
+        </div>
+        {items.map((row) => (
+          <article className="security-row" key={`${type}-${displayText(row.id)}`}>
+            <div className="security-row__name">
+              {type === "approval" ? <UserCheck aria-hidden="true" size={20} /> : <AlertTriangle aria-hidden="true" size={20} />}
+              <strong>{securityRowLabel(row, type, t)}</strong>
+            </div>
+            <StatusPill value={row.status} t={t} />
+            <span>{formatDashboardDateTime(row.last_checked) || displayText(row.last_checked, t("summary.none"))}</span>
+            <p>{securityRowDetail(row, t)}</p>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function safetyFailureInsight(item, t) {
+  const command = displayText(item.required_command, t("summary.none"));
+  return {
+    title: sourceLabel(item.source, t),
+    eyebrow: t("security.failureDetail"),
+    summary: localizedSecurityDetail(item.reason, t),
+    where: t("security.failureDetail.where"),
+    why: `${sourceReasonHint(item.source, t) || t("security.failureDetail.why")} ${t("security.recoveryPriority")}: ${t("security.recoveryPriority.high")}`,
+    action: `${t("security.failureDetail.action")} ${t("security.displayOnlyCommand")}: ${command}`,
+    source: command,
+    status: item.status,
+    statusLabel: statusLabelForChip(item.status, t),
+    points: [
+      `${t("source.detector.label")}: ${sourceDetector(item.source, t)}`,
+      `${t("security.recoveryPriority")}: ${t("security.recoveryPriority.high")}`,
+      `${t("security.displayOnlyCommand")}: ${displayText(item.required_command, t("summary.none"))}`,
+    ],
+  };
+}
+
+function SecuritySection({ security, partialFailures, data, locale, t, liveStatus }) {
   const securityItems = objectEntries(security).filter(([id]) => !["approvals", "dangerous_operations"].includes(id)).map(([id, value]) => {
     const meta = safetyItemMeta(id, t);
     const hasSecurityGateFailure = id === "gate_status" && asArray(partialFailures).some((failure) => normalizeState(failure.status) === "blocked" || displayText(failure.source) === "security_gate");
@@ -2929,8 +4832,10 @@ function SecuritySection({ security, partialFailures, data, locale, t }) {
     };
   });
   const failureCount = asArray(partialFailures).length;
+  const reviewCount = securityReviewCount(security, partialFailures);
+  const hardBlocked = securityHasHardBlock(security, partialFailures);
   return (
-    <section className="view-surface view-surface--safety" id="safety" aria-labelledby="security-heading">
+    <div className="safety-primary">
       <PageTitleHeader viewId="safety" Icon={ShieldCheck} title={t("security.title")} subtitle={t("security.description")} data={data} locale={locale} t={t} actionLabel={t("detail.refreshDisplayOnly")} headingId="security-heading" />
       <ContextSnapshotStrip data={data} t={t} locale={locale} variant="safety" />
       <DetailDecisionSummary
@@ -2938,14 +4843,17 @@ function SecuritySection({ security, partialFailures, data, locale, t }) {
         t={t}
         items={[
           { Icon: Target, label: t("detail.checks"), value: t("detail.security.checks"), detail: t("detail.security.checksDetail") },
-          { Icon: failureCount ? BadgeAlert : CheckCircle2, label: t("detail.currentJudgment"), value: failureCount ? t("detail.judgment.blocked") : t("detail.judgment.ready"), detail: failureCount ? t("detail.security.blockedDetail") : t("detail.noRequiredReview"), badge: statusSummaryBadge(failureCount, t("summary.partialFailures"), t), tone: failureCount ? "danger" : "ready" },
+          { Icon: reviewCount ? BadgeAlert : CheckCircle2, label: t("detail.currentJudgment"), value: hardBlocked ? t("detail.judgment.blocked") : reviewCount ? t("detail.judgment.needsReview") : t("detail.judgment.ready"), detail: reviewCount ? t("detail.security.reviewDetail") : t("detail.noRequiredReview"), badge: statusSummaryBadge(reviewCount, t("security.reviewItems"), t), tone: hardBlocked ? "danger" : reviewCount ? "warning" : "ready" },
           { Icon: FileSearch, label: t("detail.mustReview"), points: [t("summary.partialFailures"), t("security.item.approval"), t("actions.title")] },
           { Icon: ArrowRightCircle, label: t("detail.nextSafeCheck"), value: t("detail.security.nextSafe"), detail: t("detail.security.nextSafeDetail"), cta: { href: "#partial-failures-heading", label: t("detail.openPartialFailures") } },
         ]}
       />
       <SecurityStatusCards security={security} partialFailures={partialFailures} data={data} t={t} />
+      <LiveEvidenceTable liveStatus={liveStatus} context={selectedContextData(data)} keys={["security"]} title={t("detail.liveEvidence.safetyTitle")} headingId="safety-live-evidence-heading" t={t} tone="safety" />
+      <SecurityRowsTable rows={security?.approvals} title={t("security.approvalTable")} type="approval" t={t} />
+      <SecurityRowsTable rows={security?.dangerous_operations} title={t("security.dangerousOperationTable")} type="dangerous" t={t} />
       <SafetyFailuresTable items={partialFailures} t={t} />
-    </section>
+    </div>
   );
 }
 
@@ -2991,6 +4899,11 @@ function SecurityPolicyPanel({ security, data, t }) {
   const status = security?.policy_status || "unknown";
   const contexts = ["free-development", "product-improvement", "external-integration", "lesson-repository-improvement"];
   const activePolicyContext = displayText(context.workflow_context) === "lesson" ? "lesson-repository-improvement" : displayText(context.menu_id);
+  const policyPoints = ["secrets", "approval", "displayOnly", "blockers", "gates"].map((id) => ({
+    id,
+    title: t(`security.policyRule.${id}.title`),
+    detail: t(`security.policyRule.${id}.detail`),
+  }));
   return (
     <section className="security-policy-panel" aria-labelledby="security-policy-heading">
       <div className="security-policy-panel__head">
@@ -3011,19 +4924,25 @@ function SecurityPolicyPanel({ security, data, t }) {
         </div>
         <StatusPill value={status} t={t} label={`${t("security.policyActive")}: ${statusLabelForChip(status, t)}`} />
       </div>
-      <ul>
-        <li>{t("security.policyPoint.guard")}</li>
-        <li>{t("security.policyPoint.block")}</li>
-        <li>{t("security.policyPoint.pass")}</li>
-      </ul>
+      <div className="security-policy-panel__rules">
+        {policyPoints.map((point) => (
+          <article className="security-policy-rule" key={point.id}>
+            <ShieldCheck aria-hidden="true" size={17} />
+            <div>
+              <strong>{point.title}</strong>
+              <p>{point.detail}</p>
+            </div>
+          </article>
+        ))}
+      </div>
     </section>
   );
 }
 
-function SafetySection({ security, actions, partialFailures, data, locale, t }) {
+function SafetySection({ security, actions, partialFailures, data, locale, t, liveStatus }) {
   return (
-    <>
-      <SecuritySection security={security} partialFailures={partialFailures} data={data} locale={locale} t={t} />
+    <section className="view-surface view-surface--safety" id="safety" aria-labelledby="security-heading">
+      <SecuritySection security={security} partialFailures={partialFailures} data={data} locale={locale} t={t} liveStatus={liveStatus} />
       <div className="safety-lower-grid">
         <CommandPreviews actions={actions} t={t} />
         <SecurityPolicyPanel security={security} data={data} t={t} />
@@ -3035,7 +4954,7 @@ function SafetySection({ security, actions, partialFailures, data, locale, t }) 
         detail={t("security.warning.detail")}
         cta={{ href: "#action-heading", label: t("security.warning.cta") }}
       />
-    </>
+    </section>
   );
 }
 
@@ -3045,9 +4964,9 @@ function SidebarReferenceChip({ value, t }) {
     return null;
   }
   return (
-    <span className="sidebar-reference-chip" tabIndex={0} data-tooltip={text}>
-      {technicalChip(text)}
-      <button className="sidebar-reference-chip__copy" type="button" aria-label={`${t("app.copyItem")}: ${text}`} title={t("app.copyItem")} onClick={() => copyTextToClipboard(text)}>
+    <span className="sidebar-reference-chip">
+      {technicalTooltipValue(text, t("app.technicalReferenceTooltip"), "sidebar-reference-chip__value")}
+      <button className="sidebar-reference-chip__copy" type="button" aria-label={`${t("app.copyItem")}: ${text}`} data-copy-tooltip={text} onClick={() => copyTextToClipboard(text)}>
         <Copy aria-hidden="true" size={14} />
       </button>
     </span>
@@ -3252,8 +5171,72 @@ function repositoryFileRoleKey(value) {
   return displayText(value, "generic").replace(/[^A-Za-z0-9]+/g, "_").replace(/^_+|_+$/g, "") || "generic";
 }
 
+function repositoryPathSpecificRoleLabel(pathValue, t) {
+  const path = displayText(pathValue, "");
+  if (!path) {
+    return "";
+  }
+  const exact = {
+    "AGENTS.MD": "repositoryInfo.pathDescription.agents",
+    "README.md": "repositoryInfo.pathDescription.readme",
+    "bin/framecue.mjs": "repositoryInfo.pathDescription.framecueCli",
+    "ops/PRODUCT_PROFILE.json": "repositoryInfo.pathDescription.productProfile",
+    "ops/REPOSITORY_INDEX.json": "repositoryInfo.pathDescription.repositoryIndex",
+    "ops/PRODUCT_OPERATION_MODE.tsv": "repositoryInfo.pathDescription.operationMode",
+    "tools/product-mode": "repositoryInfo.pathDescription.productModeTool",
+    "docs/product/REQUIREMENTS.md": "repositoryInfo.pathDescription.requirements",
+    "docs/product/SPECIFICATION.md": "repositoryInfo.pathDescription.specification",
+    "docs/product/IMPLEMENTATION_PLAN.md": "repositoryInfo.pathDescription.implementationPlan",
+    "docs/workflow/TASK_TRACKER.md": "repositoryInfo.pathDescription.taskTracker",
+    "docs/workflow/HANDOFF.md": "repositoryInfo.pathDescription.handoff",
+    "docs/workflow/VERIFICATION.md": "repositoryInfo.pathDescription.verification",
+    "docs/workflow/SECURITY.md": "repositoryInfo.pathDescription.security",
+  };
+  if (exact[path]) {
+    return t(exact[path], "");
+  }
+  const patterns = [
+    [/^control-center\/src\//, "repositoryInfo.pathDescription.controlCenterSource"],
+    [/^control-center\/mocks\//, "repositoryInfo.pathDescription.controlCenterMocks"],
+    [/^docs\/design-system\//, "repositoryInfo.pathDescription.designSystem"],
+    [/^docs\/product\//, "repositoryInfo.pathDescription.productDoc"],
+    [/^docs\/workflow\//, "repositoryInfo.pathDescription.workflowDoc"],
+    [/^skills\//, "repositoryInfo.pathDescription.productSkill"],
+    [/^tools\/check/, "repositoryInfo.pathDescription.checkTool"],
+    [/^tools\//, "repositoryInfo.pathDescription.productTool"],
+    [/^ops\//, "repositoryInfo.pathDescription.opsManifest"],
+    [/^test\//, "repositoryInfo.pathDescription.test"],
+    [/^tests\//, "repositoryInfo.pathDescription.test"],
+    [/^src\/generated\/design-system\//, "repositoryInfo.pathDescription.generatedDesignSystem"],
+    [/^package(-lock)?\.json$/, "repositoryInfo.pathDescription.packageConfig"],
+  ];
+  const matched = patterns.find(([pattern]) => pattern.test(path));
+  return matched ? t(matched[1], "") : "";
+}
+
 function repositoryFileRoleLabel(row, t) {
-  const pathDescription = t(`repositoryInfo.pathDescription.${repositoryFileRoleKey(row.path)}`, "");
+  const path = displayText(row.path, "");
+  if (path.includes("DASHBOARD_DATA_SCHEMA")) {
+    return t("repositoryInfo.fileRole.dashboardDataSchema");
+  }
+  if (path.includes("LESSON_STATE")) {
+    return t("repositoryInfo.fileRole.lessonState");
+  }
+  if (path.includes("PRODUCT_GATE_EVIDENCE_SCHEMA")) {
+    return t("repositoryInfo.fileRole.productEvidence");
+  }
+  if (path.includes("docs/product/REQUIREMENTS")) {
+    return t("repositoryInfo.fileRole.productRequirements");
+  }
+  if (path.includes("TASK_TRACKER")) {
+    return t("repositoryInfo.fileRole.taskTracker");
+  }
+  if (path.includes("HANDOFF")) {
+    return t("repositoryInfo.fileRole.handoff");
+  }
+  const pathDescription =
+    repositoryPathSpecificRoleLabel(path, t) ||
+    t(`repositoryInfo.pathDescription.${repositoryFileRoleKey(path)}`, "");
   if (pathDescription) {
     return pathDescription;
   }
@@ -3285,26 +5268,7 @@ function repositoryFileRoleLabel(row, t) {
     return description;
   }
   const sourceId = displayText(row.source_id || row.id, "");
-  const path = displayText(row.path, "");
   const key = repositoryFileRoleKey(sourceId || path);
-  if (path.includes("DASHBOARD_DATA_SCHEMA")) {
-    return t("repositoryInfo.fileRole.dashboardDataSchema");
-  }
-  if (path.includes("LESSON_STATE")) {
-    return t("repositoryInfo.fileRole.lessonState");
-  }
-  if (path.includes("PRODUCT_GATE_EVIDENCE_SCHEMA")) {
-    return t("repositoryInfo.fileRole.productEvidence");
-  }
-  if (path.includes("docs/product/REQUIREMENTS")) {
-    return t("repositoryInfo.fileRole.productRequirements");
-  }
-  if (path.includes("TASK_TRACKER")) {
-    return t("repositoryInfo.fileRole.taskTracker");
-  }
-  if (path.includes("HANDOFF")) {
-    return t("repositoryInfo.fileRole.handoff");
-  }
   return t(`repositoryInfo.fileRole.${key}`, t("repositoryInfo.fileRole.generic"));
 }
 
@@ -3319,6 +5283,32 @@ function repositoryNodeTooltip(node, t) {
 }
 
 function repositoryFileRows(data, authority) {
+  const scopeInventory = data.repository_scope?.inventory && typeof data.repository_scope.inventory === "object" ? data.repository_scope.inventory : {};
+  const scopeRoles = scopeInventory.roles && typeof scopeInventory.roles === "object" && !Array.isArray(scopeInventory.roles) ? scopeInventory.roles : {};
+  const scopedRows = asArray(scopeInventory.files)
+    .map((item) => {
+      const path = displayText(item?.path, "");
+      if (!path) {
+        return null;
+      }
+      const roleIds = asArray(item.role_ids).map((roleId) => displayText(roleId, "")).filter(Boolean);
+      return {
+        id: displayText(item.id, `repository-scope:${path}`),
+        path,
+        source_id: displayText(item.source_id, roleIds[0] || "repository_file"),
+        status: normalizeState(item.status || scopeInventory.status || "unknown"),
+        required: item.indexed === true || item.index_state === "missing_required",
+        type: item.type === "directory" ? "directory" : "file",
+        description: displayText(item.description, ""),
+        role_ids: roleIds.length ? roleIds : [item.type === "directory" ? "repository_directory" : "repository_file"],
+        roles: scopeRoles,
+      };
+    })
+    .filter(Boolean);
+  if (scopedRows.length) {
+    return scopedRows;
+  }
+
   const repositoryIndex = authority?.repository_index || {};
   const indexedRows = asArray(repositoryIndex.files)
     .map((item) => {
@@ -3344,50 +5334,7 @@ function repositoryFileRows(data, authority) {
     return indexedRows;
   }
 
-  const rows = [];
-  for (const item of asArray(authority?.document_paths)) {
-    const path = displayText(item.resolved_path || item.canonical_path, "");
-    if (!path) {
-      continue;
-    }
-    rows.push({
-      id: displayText(item.source_id || path),
-      path,
-      source_id: item.source_id,
-      status: item.status || "unknown",
-      required: item.required_in_context,
-    });
-  }
-  for (const row of asArray(data.maintenance?.evidence_rows)) {
-    const path = displayText(row.reference, "");
-    if (!path) {
-      continue;
-    }
-    rows.push({
-      id: displayText(row.id || path),
-      path,
-      source_id: row.id,
-      status: row.status || "unknown",
-      required: displayText(row.importance, "") === "required",
-    });
-  }
-  for (const path of asArray(data.source_files)) {
-    rows.push({
-      id: `source:${displayText(path)}`,
-      path: displayText(path),
-      status: "ready",
-      required: true,
-    });
-  }
-  const seen = new Set();
-  return rows.filter((row) => {
-    const path = displayText(row.path, "");
-    if (!path || seen.has(path)) {
-      return false;
-    }
-    seen.add(path);
-    return true;
-  });
+  return [];
 }
 
 function repositoryBuildFileTree(rows) {
@@ -3470,7 +5417,10 @@ function RepositoryFileTreeNode({ node, level, expandedIds, onToggle, t }) {
         <button className="repository-file-tree__node repository-file-tree__node--directory" type="button" aria-expanded={isExpanded} data-tooltip={tooltip} onClick={() => onToggle(node.id)} style={{ "--tree-level": level }}>
           <ChevronRight aria-hidden="true" size={16} />
           <Folder aria-hidden="true" size={18} />
-          <strong>{node.name}</strong>
+          <div>
+            <strong>{node.name}</strong>
+            <p>{tooltip}</p>
+          </div>
           <small>{node.children.length}</small>
         </button>
         {isExpanded ? (
@@ -3491,6 +5441,7 @@ function RepositoryFileTreeNode({ node, level, expandedIds, onToggle, t }) {
         <FileText aria-hidden="true" size={18} />
         <div>
           <strong title={displayText(file.path || node.path)}>{node.name}</strong>
+          <p>{tooltip}</p>
         </div>
         <StatusPill value={file.status || "unknown"} t={t} label={statusLabelForChip(file.status || "unknown", t)} />
       </div>
@@ -3586,7 +5537,7 @@ function RepositoryGitFlow({ operations, t }) {
     <div className="repository-operation-grid">
       {rows.map((row) => {
         const Icon = gitOperationIcon(row.id);
-        const mode = gitOperationModeClass(row.mode);
+        const mode = gitOperationModeClass(row.mode, row.id);
         return (
           <article className="repository-operation-card" key={displayText(row.id)}>
             <span className="repository-operation-card__icon">
@@ -3598,7 +5549,7 @@ function RepositoryGitFlow({ operations, t }) {
             </div>
             <div className="repository-operation-card__meta">
               <StatusPill value={row.status} t={t} label={workflowStatusLabel(row.status, t)} />
-              <span className={`mode-pill mode-pill--${mode}`}>{gitOperationModeLabel(row.mode, t)}</span>
+              <span className={`mode-pill mode-pill--${mode}`}>{gitOperationModeLabel(row.mode, t, row.id)}</span>
             </div>
           </article>
         );
@@ -3725,6 +5676,44 @@ function settingItemDetail(item, t) {
   return t(displayText(item.description_key, ""), "");
 }
 
+const workflowActionSettingIds = new Set([
+  "git_commit_automation",
+  "git_push_automation",
+  "git_pr_creation",
+  "git_pr_ci_monitoring",
+  "git_merge_execution",
+  "git_main_ci_monitoring",
+  "git_sync_monitoring",
+]);
+
+function settingIsWorkflowAction(item) {
+  return workflowActionSettingIds.has(displayText(item?.id, ""));
+}
+
+function settingWorkflowActionValueLabel(value, item, t) {
+  if (!settingIsWorkflowAction(item)) {
+    return "";
+  }
+  const normalized = displayText(value, "");
+  if (normalized === "false") {
+    return t("settingsPage.value.workflow.prohibited");
+  }
+  if (normalized === "manual") {
+    return t("settingsPage.value.workflow.confirmEachTime");
+  }
+  if (normalized === "auto" || normalized === "after_approval" || normalized === "true") {
+    return t("settingsPage.value.workflow.auto");
+  }
+  return "";
+}
+
+function settingShowsAutomationNote(item) {
+  if (!settingIsWorkflowAction(item)) {
+    return false;
+  }
+  return settingEditableOptions(item).some((value) => ["auto", "after_approval", "true"].includes(value));
+}
+
 function settingValueLabel(item, t) {
   const id = displayText(item.id, "");
   const value = displayText(item.current_value, "");
@@ -3736,6 +5725,10 @@ function settingValueLabel(item, t) {
   }
   if (id === "learning_mode") {
     return t(`settingsPage.value.learningMode.${value}`, displayText(item.current_label, value));
+  }
+  const workflowActionLabel = settingWorkflowActionValueLabel(value, item, t);
+  if (workflowActionLabel) {
+    return workflowActionLabel;
   }
   if (id.includes("language")) {
     return t(`settingsPage.value.language.${value}`, displayText(item.current_label, value));
@@ -3753,10 +5746,18 @@ function settingValueLabel(item, t) {
   return displayText(item.current_label || value, t("summary.none"));
 }
 
-function settingAllowedValueLabel(value, t) {
+function settingAllowedValueLabel(value, item, t) {
   const normalized = displayText(value, "");
+  const id = displayText(item?.id, "");
   if (!normalized) {
     return "";
+  }
+  if (id === "learning_mode") {
+    return t(`settingsPage.value.learningMode.${normalized}`, normalized);
+  }
+  const workflowActionLabel = settingWorkflowActionValueLabel(normalized, item, t);
+  if (workflowActionLabel) {
+    return workflowActionLabel;
   }
   if (normalized === "true" || normalized === "false") {
     return t(`settingsPage.value.boolean.${normalized}`, normalized);
@@ -3931,17 +5932,75 @@ function settingEditableOptions(item) {
   return asArray(item.allowed_values).map((value) => displayText(value, "")).filter(Boolean);
 }
 
-function RepositoryInfoPage({ data, locale, t }) {
+function repositoryOperationModeLabel(value, t) {
+  const mode = displayText(value, "unknown");
+  return t(`repositoryInfo.operationMode.${mode}`, displayKey(mode));
+}
+
+function repositoryBooleanLabel(value, t) {
+  return value === true ? t("repositoryInfo.boolean.true") : t("repositoryInfo.boolean.false");
+}
+
+function repositoryLegacyAgentLabel(value, t) {
+  const status = displayText(value, "unknown");
+  return t(`repositoryInfo.legacyAgent.${status}`, displayKey(status));
+}
+
+function repositoryOperationNextActionLabel(value, t) {
+  const action = displayText(value, "");
+  if (action === "No operation-mode repair is required.") {
+    return t("repositoryInfo.operationNext.noRepairRequired");
+  }
+  return action;
+}
+
+function RepositoryRealStatePanel({ authority, context, t }) {
+  const operationMode = authority.operation_mode && typeof authority.operation_mode === "object" ? authority.operation_mode : {};
+  const blockerCount = asArray(authority.product_operation_blockers).length || asArray(context.blockers).length;
+  const hasRealState =
+    displayText(operationMode.workflow_mode, "") ||
+    displayText(authority.status, "") ||
+    displayText(context.evidence_status, "") ||
+    displayText(context.security_status, "");
+  if (!hasRealState) {
+    return null;
+  }
+  return (
+    <DetailSection id="repository-real-state" title={t("repositoryInfo.realStateTitle")} Icon={ShieldCheck}>
+      <FieldGrid
+        fields={[
+          { label: t("repositoryInfo.field.operationMode"), value: operationMode.workflow_mode, render: (value) => repositoryOperationModeLabel(value, t) },
+          { label: t("repositoryInfo.field.parentManaged"), value: operationMode.managed_by_parent, render: (value) => repositoryBooleanLabel(value, t) },
+          { label: t("repositoryInfo.field.ruleConnection"), value: operationMode.rule_connection_status, render: (value) => <StatusPill value={value} t={t} label={statusLabelForChip(value, t)} /> },
+          { label: t("repositoryInfo.field.agentsMd"), value: operationMode.agents_path_status, render: (value) => <StatusPill value={value} t={t} label={statusLabelForChip(value, t)} /> },
+          { label: t("repositoryInfo.field.legacyAgent"), value: operationMode.legacy_agent_status, render: (value) => repositoryLegacyAgentLabel(value, t) },
+          { label: t("repositoryInfo.field.operationModeSource"), value: operationMode.source_path },
+          { label: t("repositoryInfo.field.evidenceStatus"), value: context.evidence_status || authority.status, render: (value) => <StatusPill value={value} t={t} label={statusLabelForChip(value, t)} /> },
+          { label: t("repositoryInfo.field.securityStatus"), value: context.security_status, render: (value) => <StatusPill value={value} t={t} label={statusLabelForChip(value, t)} /> },
+          { label: t("repositoryInfo.field.blockers"), value: String(blockerCount), render: (value) => `${value} ${t("repositoryInfo.blockerUnit")}` },
+          { label: t("repositoryInfo.field.nextSafeAction"), value: operationMode.next_safe_action, render: (value) => repositoryOperationNextActionLabel(value, t) },
+        ]}
+      />
+    </DetailSection>
+  );
+}
+
+function RepositoryInfoPage({ data, locale, t, liveStatus }) {
   const context = selectedContextData(data);
   const authority = data.development?.product_authority || {};
+  const repositoryScope = data.repository_scope && typeof data.repository_scope === "object" ? data.repository_scope : {};
+  const scopeInventory = repositoryScope.inventory && typeof repositoryScope.inventory === "object" ? repositoryScope.inventory : {};
   const repositoryIndex = authority.repository_index || {};
   const repository = authority.repository || {};
-  const repositoryIndexSummary = repositoryIndex.summary || {};
-  const selectedRepository = displayText(context.target_repository?.name || repository.configured_name || repository.name, t("summary.none"));
+  const repositoryIndexSummary = scopeInventory.summary || repositoryIndex.summary || {};
+  const selectedRepository = repositoryDisplayName(context.target_repository?.name || repositoryScope.repository_name || repository.configured_name || repository.name, t);
   const fileRows = repositoryFileRows(data, authority);
   const repositoryStructureValue = Number(repositoryIndexSummary.total)
     ? `${Number(repositoryIndexSummary.directories) || 0} ${t("repositoryInfo.summary.directories")} / ${Number(repositoryIndexSummary.files) || 0} ${t("repositoryInfo.summary.files")}`
+    : Number(repositoryIndexSummary.directories) || Number(repositoryIndexSummary.files)
+      ? `${Number(repositoryIndexSummary.directories) || 0} ${t("repositoryInfo.summary.directories")} / ${Number(repositoryIndexSummary.files) || 0} ${t("repositoryInfo.summary.files")}`
     : t("repositoryInfo.notCollected");
+  const repositoryStructureStatus = normalizeState(scopeInventory.status || repositoryIndex.status || "unknown");
 
   return (
     <section className="view-surface view-surface--repository-info sidebar-page" id="repository-info" aria-labelledby="repository-info-heading">
@@ -3952,7 +6011,7 @@ function RepositoryInfoPage({ data, locale, t }) {
         items={[
           { Icon: Database, label: t("repositoryInfo.summary.target"), value: selectedRepository, detail: contextLabel(context.menu_id, t) },
           { Icon: Compass, label: t("repositoryInfo.summary.context"), value: contextLabel(context.menu_id, t), detail: workflowContextLabel(context.workflow_context, t) },
-          { Icon: FileSearch, label: t("repositoryInfo.summary.structure"), value: repositoryStructureValue, detail: t("repositoryInfo.summary.structureDetail"), tone: repositoryIndex.status === "ready" ? "ready" : "warning" },
+          { Icon: FileSearch, label: t("repositoryInfo.summary.structure"), value: repositoryStructureValue, detail: t("repositoryInfo.summary.structureDetail"), tone: repositoryStructureStatus === "ready" ? "ready" : "warning" },
           { Icon: ClipboardCheck, label: t("repositoryInfo.summary.productContent"), value: repositoryProductContentLabel(authority, t, locale), detail: t("repositoryInfo.summary.productContentDetail") },
         ]}
       />
@@ -3963,12 +6022,14 @@ function RepositoryInfoPage({ data, locale, t }) {
             { label: t("repositoryInfo.field.workflow"), value: context.workflow_context, render: () => workflowContextLabel(context.workflow_context, t) },
             { label: t("repositoryInfo.field.repository"), value: selectedRepository },
             { label: t("repositoryInfo.field.productType"), value: context.product_type, render: (value) => productTypeLabel(value, t) },
-            { label: t("repositoryInfo.field.currentStep"), value: selectedStepText(context) },
+            { label: t("repositoryInfo.field.currentStep"), value: currentStepTextDisplay(context, t) },
             { label: t("repositoryInfo.field.updated"), value: context.updated_at, render: (value) => formatDashboardDateTime(value) || displayText(value) },
             { label: t("repositoryInfo.field.pathState"), value: context.target_repository?.path_state, render: (value) => <StatusPill value={repositoryPathStateToStatus(value)} t={t} label={t(`repositoryInfo.pathState.${displayText(value, "unknown")}`, displayKey(value))} /> },
           ]}
         />
       </DetailSection>
+      <RepositoryRealStatePanel authority={authority} context={context} t={t} />
+      <LiveEvidenceTable liveStatus={liveStatus} context={context} keys={["git_sync", "ci", "local_tests", "security"]} title={t("detail.liveEvidence.repositoryTitle")} headingId="repository-live-evidence-heading" t={t} tone="workflow" />
       <DetailSection id="repository-file-map" title={t("repositoryInfo.fileMapTitle")} Icon={FileSearch}>
         <RepositoryFileTree rows={fileRows} t={t} defaultExpandDepth={0} />
       </DetailSection>
@@ -3991,10 +6052,10 @@ function DocumentsPage({ data, locale, t }) {
   const relatedPages = Array.from(new Set(catalog.map((item) => displayText(item.related_page, "")).filter((href) => href && href !== "#documents")));
   const selectedBrief = briefCards.find((card) => displayText(card.id, "") === selectedBriefId) || null;
   const SelectedBriefIcon = selectedBrief ? documentBriefIconFor(selectedBrief) : FileText;
-  const selectedRepository = displayText(context.target_repository?.name || authority.repository?.configured_name || authority.repository?.name, t("summary.none"));
+  const selectedRepository = repositoryDisplayName(context.target_repository?.name || authority.repository?.configured_name || authority.repository?.name, t);
   const productName = repositoryProductContentLabel(authority, t, locale);
-  const stepShort = selectedStepShort(context);
-  const stepDetail = localizedStepDetail(context, t);
+  const stepShort = currentStepShortDisplay(context, t);
+  const stepDetail = currentStepDetailDisplay(context, t);
 
   return (
     <section className="view-surface view-surface--documents sidebar-page" id="documents" aria-labelledby="documents-heading">
@@ -4105,6 +6166,16 @@ function DocumentsPage({ data, locale, t }) {
                 <h3>{t("documentsPage.modal.actionTitle")}</h3>
                 <p>{documentBriefAction(selectedBrief, t, locale)}</p>
               </section>
+              <section>
+                <h3>{t("documentsPage.modal.sourcePathsTitle")}</h3>
+                <ul className="documents-brief-modal__source-list">
+                  {asArray(selectedBrief.source_paths).map((sourcePath) => (
+                    <li key={displayText(sourcePath)}>
+                      <code>{displayText(sourcePath)}</code>
+                    </li>
+                  ))}
+                </ul>
+              </section>
             </div>
             <div className="documents-brief-modal__footer">
               <a href={displayText(selectedBrief.related_page, "#documents")} onClick={() => setSelectedBriefId("")}>
@@ -4126,6 +6197,1175 @@ function DocumentsPage({ data, locale, t }) {
   );
 }
 
+const DESIGN_STUDIO_TOOLTIP_WIDTH_OPTIONS = ["260px", "300px", "360px"];
+const DESIGN_STUDIO_COPY_DURATION_OPTIONS = [800, 1200, 1800];
+const DESIGN_STUDIO_DISPLAY_CONDITION_OPTIONS = ["hover-only", "disabled"];
+const DESIGN_STUDIO_THEME_OPTIONS = ["blue", "teal", "slate"];
+const DESIGN_STUDIO_DENSITY_OPTIONS = ["compact", "balanced", "comfortable"];
+const DESIGN_STUDIO_RADIUS_OPTIONS = ["compact", "standard", "soft"];
+const DESIGN_STUDIO_TYPOGRAPHY_OPTIONS = ["standard", "large"];
+const DESIGN_STUDIO_ACTION_CONTROL_HEIGHT_OPTIONS = ["32px", "34px", "38px"];
+const DESIGN_STUDIO_ACTION_CONTROL_PADDING_OPTIONS = ["6px 10px", "8px 11px", "9px 13px"];
+const DESIGN_STUDIO_COMPACT_CONTROL_HEIGHT_OPTIONS = ["30px", "32px", "34px"];
+const DESIGN_STUDIO_COMPACT_CONTROL_PADDING_OPTIONS = ["4px 8px", "5px 10px", "6px 12px"];
+const DESIGN_STUDIO_FORM_CONTROL_HEIGHT_OPTIONS = ["38px", "40px", "44px"];
+const DESIGN_STUDIO_FORM_CONTROL_PADDING_OPTIONS = ["0 9px", "0 10px", "0 12px"];
+const DESIGN_STUDIO_ICON_BUTTON_SIZE_OPTIONS = ["34px", "38px", "42px"];
+const DESIGN_STUDIO_CONTROL_FONT_SIZE_OPTIONS = ["0.82rem", "0.84rem", "0.9rem"];
+const DESIGN_STUDIO_CARD_PADDING_OPTIONS = ["12px", "14px", "16px"];
+const DESIGN_STUDIO_CARD_GAP_OPTIONS = ["8px", "10px", "12px"];
+const DESIGN_STUDIO_ROW_PADDING_OPTIONS = ["9px 10px", "10px 12px", "12px 14px"];
+const DESIGN_STUDIO_ROW_GAP_OPTIONS = ["8px", "10px", "12px"];
+const DESIGN_STUDIO_TECHNICAL_GAP_OPTIONS = ["4px", "6px", "8px"];
+const DESIGN_STUDIO_SOURCE_WIDTH_OPTIONS = ["220px", "260px", "300px"];
+const DESIGN_STUDIO_EVIDENCE_WIDTH_OPTIONS = ["260px", "292px", "320px"];
+const DESIGN_STUDIO_PREVIEW_WIDTH_OPTIONS = ["320px", "360px", "420px"];
+const DESIGN_STUDIO_PAGE_HEADER_PADDING_OPTIONS = ["16px 18px", "18px 20px", "20px 22px"];
+const DESIGN_STUDIO_METADATA_GAP_OPTIONS = ["6px", "8px", "10px"];
+const DESIGN_STUDIO_PAGE_ICON_SIZE_OPTIONS = ["44px", "52px", "56px"];
+const DESIGN_STUDIO_BADGE_GAP_OPTIONS = ["4px", "5px", "6px"];
+const DESIGN_STUDIO_BADGE_HEIGHT_OPTIONS = ["24px", "26px", "28px"];
+const DESIGN_STUDIO_MODE_BADGE_PADDING_OPTIONS = ["3px 10px", "4px 14px", "5px 16px"];
+const DESIGN_STUDIO_BADGE_FONT_SIZE_OPTIONS = ["0.72rem", "0.76rem", "0.8rem"];
+const DESIGN_STUDIO_MODE_BADGE_FONT_SIZE_OPTIONS = ["0.74rem", "0.78rem", "0.82rem"];
+const DESIGN_STUDIO_FOUNDATION_PRESETS = {
+  themeAccent: {
+    blue: { pageAccent: "#1559c7", pageSoft: "#e8f0ff", pageBorder: "#b8cdf7" },
+    teal: { pageAccent: "#0f766e", pageSoft: "#e6fffb", pageBorder: "#99d7d0" },
+    slate: { pageAccent: "#334155", pageSoft: "#eef2f7", pageBorder: "#cbd5e1" },
+  },
+  density: {
+    compact: { sectionGap: "12px", panelPadding: "12px", controlGap: "8px" },
+    balanced: { sectionGap: "16px", panelPadding: "16px", controlGap: "10px" },
+    comfortable: { sectionGap: "20px", panelPadding: "20px", controlGap: "12px" },
+  },
+  radiusScale: {
+    compact: { radius: "6px" },
+    standard: { radius: "8px" },
+    soft: { radius: "10px" },
+  },
+  typographyScale: {
+    standard: { body: "0.92rem", sectionTitle: "1rem", pageTitle: "1.35rem" },
+    large: { body: "0.98rem", sectionTitle: "1.06rem", pageTitle: "1.45rem" },
+  },
+};
+
+function designStudioComponentById(id) {
+  return dashboardControlCenterDesignSystem.components.find((component) => component.id === id) || null;
+}
+
+function designStudioTokenValue(name) {
+  return dashboardControlCenterDesignSystem.tokens.find((token) => token.name === name)?.value || "";
+}
+
+function designStudioMatchPreset(group, tokenValues, fallback) {
+  return Object.entries(group).find(([, preset]) => Object.entries(preset).every(([key, value]) => tokenValues[key] === value))?.[0] || fallback;
+}
+
+function designStudioFoundation() {
+  const themeTokens = {
+    pageAccent: designStudioTokenValue("page-accent"),
+    pageSoft: designStudioTokenValue("page-soft"),
+    pageBorder: designStudioTokenValue("page-border"),
+  };
+  const densityTokens = {
+    sectionGap: designStudioTokenValue("section-gap"),
+    panelPadding: designStudioTokenValue("panel-padding"),
+    controlGap: designStudioTokenValue("control-gap"),
+  };
+  const radiusTokens = { radius: designStudioTokenValue("default-radius") };
+  const typeTokens = {
+    body: designStudioTokenValue("font-size-body"),
+    sectionTitle: designStudioTokenValue("font-size-section-title"),
+    pageTitle: designStudioTokenValue("font-size-page-title"),
+  };
+  return {
+    targetScope: "dashboard-control-center",
+    themeAccent: designStudioMatchPreset(DESIGN_STUDIO_FOUNDATION_PRESETS.themeAccent, themeTokens, "blue"),
+    density: designStudioMatchPreset(DESIGN_STUDIO_FOUNDATION_PRESETS.density, densityTokens, "balanced"),
+    radiusScale: designStudioMatchPreset(DESIGN_STUDIO_FOUNDATION_PRESETS.radiusScale, radiusTokens, "standard"),
+    typographyScale: designStudioMatchPreset(DESIGN_STUDIO_FOUNDATION_PRESETS.typographyScale, typeTokens, "standard"),
+    actionControlHeight: designStudioTokenValue("action-control-height") || "34px",
+    actionControlPadding: designStudioTokenValue("action-control-padding") || "8px 11px",
+    compactControlHeight: designStudioTokenValue("compact-control-height") || "32px",
+    compactControlPadding: designStudioTokenValue("compact-control-padding") || "5px 10px",
+    formControlHeight: designStudioTokenValue("form-control-height") || "40px",
+    formControlPadding: designStudioTokenValue("form-control-padding") || "0 10px",
+    iconButtonSize: designStudioTokenValue("icon-button-size") || "38px",
+    controlFontSize: designStudioTokenValue("control-font-size") || "0.84rem",
+    cardPadding: designStudioTokenValue("card-padding") || "14px",
+    cardGap: designStudioTokenValue("card-gap") || "10px",
+    rowPadding: designStudioTokenValue("row-padding") || "10px 12px",
+    rowGap: designStudioTokenValue("row-gap") || "10px",
+    technicalAffordanceGap: designStudioTokenValue("technical-affordance-gap") || "4px",
+    technicalSourceMaxWidth: designStudioTokenValue("technical-source-max-width") || "260px",
+    technicalEvidenceMaxWidth: designStudioTokenValue("technical-evidence-max-width") || "292px",
+    technicalPreviewChipMaxWidth: designStudioTokenValue("technical-preview-chip-max-width") || "360px",
+    pageHeaderPadding: designStudioTokenValue("page-header-padding") || "18px 20px",
+    metadataGap: designStudioTokenValue("metadata-gap") || "8px",
+    pageIconSize: designStudioTokenValue("page-icon-size") || "52px",
+    badgeGap: designStudioTokenValue("badge-gap") || "5px",
+    badgeHeight: designStudioTokenValue("badge-height") || "26px",
+    modeBadgePadding: designStudioTokenValue("mode-badge-padding") || "4px 14px",
+    badgeFontSize: designStudioTokenValue("badge-font-size") || "0.76rem",
+    modeBadgeFontSize: designStudioTokenValue("mode-badge-font-size") || "0.78rem",
+  };
+}
+
+function designStudioInteraction(component) {
+  const interaction = component?.interaction || {};
+  return {
+    foundation: designStudioFoundation(),
+    tooltip: {
+      trigger: interaction.tooltip?.trigger || "hover-only",
+      hidePolicy: interaction.tooltip?.hidePolicy || "pointer-leave",
+      placement: interaction.tooltip?.placement || "top",
+      maxWidth: interaction.tooltip?.maxWidth || "300px",
+      delayMs: Number(interaction.tooltip?.delayMs) || 0,
+    },
+    copyFeedback: {
+      trigger: interaction.copyFeedback?.trigger || "hover-only",
+      hidePolicy: interaction.copyFeedback?.hidePolicy || "pointer-leave",
+      placement: interaction.copyFeedback?.placement || "top",
+      collision: interaction.copyFeedback?.collision || "shift",
+      durationMs: Number(interaction.copyFeedback?.durationMs) || 1200,
+    },
+  };
+}
+
+function designStudioInteractionChanged(left, right) {
+  return JSON.stringify(left) !== JSON.stringify(right);
+}
+
+function designStudioOrchestrationStatus(value) {
+  const status = displayText(value, "ready");
+  if (["blocked", "manual_required", "approval_required", "stale", "failed"].includes(status)) {
+    return status;
+  }
+  if (status === "plan-only" || status === "proposal_only") {
+    return "manual_required";
+  }
+  return "ready";
+}
+
+function designStudioContractId(value, t) {
+  const id = displayText(value, "");
+  return t(`designStudio.contractId.${id}`, displayKey(id));
+}
+
+function designStudioFlowStepLabel(value, t) {
+  const id = displayText(value, "");
+  return t(`designStudio.flowStep.${id}`, displayKey(id));
+}
+
+function designStudioSchemaPurpose(schema, t) {
+  const id = displayText(schema?.id, "");
+  return t(`designStudio.schemaPurpose.${id}`, displayText(schema?.purpose));
+}
+
+function designStudioProviderDescription(provider, t) {
+  const id = displayText(provider?.id, "");
+  return t(`designStudio.providerDetail.${id}`, displayText(provider?.description));
+}
+
+function designStudioApplyModeLabel(value, t) {
+  const id = displayText(value, "");
+  return t(`designStudio.applyMode.${id}`, displayKey(id));
+}
+
+function designStudioProductDesignSources(data) {
+  const files = asArray(historyRepositoryScope(data).inventory?.files)
+    .map((file) => displayText(file.path, ""))
+    .filter((path) => path === "ops/DESIGN_SYSTEM_MANIFEST.tsv" || path.startsWith("docs/design-system/"));
+  const priority = [
+    "docs/design-system/DESIGN_SYSTEM.md",
+    "ops/DESIGN_SYSTEM_MANIFEST.tsv",
+    "docs/design-system/tokens.json",
+    "docs/design-system/components.json",
+    "docs/design-system/design-system-contract.json",
+  ];
+  return [...new Set([...priority.filter((path) => files.includes(path)), ...files])]
+    .slice(0, 8)
+    .map((path) => `product:${path}`);
+}
+
+function DesignStudioRulePreview({ type, t, style }) {
+  return (
+    <div className="design-studio-rule-preview" data-preview-for={type} style={style}>
+      <div className="design-studio-rule-preview__head">
+        <Eye aria-hidden="true" size={16} />
+        <div>
+          <strong>{t("designStudio.itemPreview.title")}</strong>
+          <p>{t(`designStudio.itemPreview.${type}.focus`)}</p>
+        </div>
+      </div>
+      {type === "page-header" ? (
+        <div className="design-studio-rule-preview__sample design-studio-rule-preview__sample--header page-title page-title--overview">
+          <div className="page-title__main">
+            <span className="page-title__icon">
+              <Wrench aria-hidden="true" size={18} />
+            </span>
+            <div>
+              <h2>{t("designStudio.preview.headerTitle")}</h2>
+              <p>{t("designStudio.preview.headerDetail")}</p>
+            </div>
+          </div>
+        </div>
+      ) : null}
+      {type === "controls" ? (
+        <div className="design-studio-rule-preview__sample design-studio-rule-preview__sample--controls">
+          <button type="button">
+            <Pencil aria-hidden="true" size={14} />
+            {t("designStudio.preview.controlReview")}
+          </button>
+          <button className="design-studio-action--primary" type="button">
+            <Check aria-hidden="true" size={14} />
+            {t("designStudio.preview.controlApply")}
+          </button>
+          <select aria-label={t("designStudio.preview.controlSelect")}>
+            <option>{t("designStudio.preview.controlOption")}</option>
+          </select>
+        </div>
+      ) : null}
+      {type === "badges" ? (
+        <div className="design-studio-rule-preview__sample design-studio-rule-preview__sample--badges">
+          <StatusPill value="ready" t={t} label={statusLabelForChip("ready", t)} />
+          <span className="mode-pill mode-pill--allowed">{t("settingsPage.value.boolean.true")}</span>
+        </div>
+      ) : null}
+      {type === "technical" ? (
+        <div className="design-studio-rule-preview__sample design-studio-rule-preview__sample--technical">
+          <span className="source-boundary__chip design-studio-preview__chip">
+            {technicalTooltipValue("product:docs/design-system/DESIGN_SYSTEM.md", t("designStudio.preview.tooltip"), "source-boundary__chip-value")}
+            <button className="source-boundary__chip-copy" type="button" aria-label={`${t("app.copyItem")}: product:docs/design-system/DESIGN_SYSTEM.md`} data-copy-tooltip="product:docs/design-system/DESIGN_SYSTEM.md">
+              <Copy aria-hidden="true" size={14} />
+            </button>
+          </span>
+        </div>
+      ) : null}
+      {type === "foundation" ? (
+        <div className="design-studio-rule-preview__sample design-studio-rule-preview__sample--foundation">
+          <span className="design-studio-rule-preview__swatch" />
+          <div>
+            <strong>{t("designStudio.preview.organismTitle")}</strong>
+            <p>{t("designStudio.preview.organismDetail")}</p>
+          </div>
+        </div>
+      ) : null}
+      {type === "card-row" ? (
+        <div className="design-studio-rule-preview__sample design-studio-rule-preview__sample--card-row">
+          <article className="workflow-mini-card design-studio-preview__card-density">
+            <strong>{t("designStudio.preview.cardTitle")}</strong>
+            <p>{t("designStudio.preview.cardDetail")}</p>
+          </article>
+          <div className="mock-table-row design-studio-preview__row-density">
+            <span>{t("designStudio.preview.row")}</span>
+            <strong>{t("designStudio.preview.rowTitle")}</strong>
+          </div>
+        </div>
+      ) : null}
+      {type === "interactions" ? (
+        <div className="design-studio-rule-preview__sample design-studio-rule-preview__sample--interactions">
+          <span className="source-boundary__chip design-studio-preview__chip design-studio-rule-preview__interaction-chip">
+            {technicalTooltipValue("product:docs/design-system/DESIGN_SYSTEM.md", t("designStudio.preview.tooltip"), "source-boundary__chip-value")}
+            <button className="source-boundary__chip-copy" type="button" aria-label={`${t("app.copyItem")}: product:docs/design-system/DESIGN_SYSTEM.md`} data-copy-tooltip="product:docs/design-system/DESIGN_SYSTEM.md">
+              <Copy aria-hidden="true" size={14} />
+            </button>
+          </span>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function DesignStudioOrchestrationPanel({ t }) {
+  const orchestration = dashboardControlCenterDesignSystem.orchestration || {};
+  const flowSteps = asArray(orchestration.model);
+  const schemas = asArray(orchestration.schemas);
+  const providerModes = asArray(orchestration.providerModes);
+  const targetAdapters = asArray(orchestration.targetAdapters);
+  const store = orchestration.store || {};
+  const eventRunner = orchestration.eventRunner || {};
+  const mockLibrary = orchestration.mockLibrary || {};
+  const templateLibrary = orchestration.templateLibrary || {};
+  const headingId = "design-studio-orchestration-heading";
+
+  return (
+    <details className="detail-section design-studio-orchestration-panel" id="design-studio-orchestration" aria-labelledby={headingId}>
+      <summary className="design-studio-orchestration-panel__summary">
+        <span className="design-studio-orchestration-panel__title">
+          <Waypoints aria-hidden="true" size={20} />
+          <h3 id={headingId}>{t("designStudio.orchestration.title")}</h3>
+        </span>
+        <span className="design-studio-orchestration-panel__meta">
+          <span className="design-studio-orchestration-panel__hint design-studio-orchestration-panel__hint--closed">{t("designStudio.orchestration.show")}</span>
+          <span className="design-studio-orchestration-panel__hint design-studio-orchestration-panel__hint--open">{t("designStudio.orchestration.hide")}</span>
+          <span className="design-studio-orchestration-panel__indicator" aria-hidden="true" />
+        </span>
+      </summary>
+      <div className="design-studio-orchestration">
+        <div className="design-studio-orchestration__intro">
+          <StatusPill value="ready" t={t} label={t("designStudio.orchestration.status")} />
+          <p>{t("designStudio.orchestration.detail")}</p>
+        </div>
+        <div className="design-studio-orchestration__flow" aria-label={t("designStudio.orchestration.flowTitle")}>
+          {flowSteps.map((step, index) => (
+            <div className="design-studio-orchestration__flow-step" key={`${step}-${index}`}>
+              <span>{index + 1}</span>
+              <strong>{designStudioFlowStepLabel(step, t)}</strong>
+            </div>
+          ))}
+        </div>
+        <div className="design-studio-orchestration__cards">
+          <article className="design-studio-orchestration__card">
+            <div className="design-studio-orchestration__card-head">
+              <Database aria-hidden="true" size={18} />
+              <h3>{t("designStudio.orchestration.storeTitle")}</h3>
+            </div>
+            <StatusPill value={designStudioOrchestrationStatus(store.status)} t={t} label={statusLabelForChip(designStudioOrchestrationStatus(store.status), t)} />
+            <p>{t("designStudio.orchestration.storeDetail")}</p>
+            <small>{t("designStudio.orchestration.storeFields")}</small>
+          </article>
+          <article className="design-studio-orchestration__card">
+            <div className="design-studio-orchestration__card-head">
+              <Activity aria-hidden="true" size={18} />
+              <h3>{t("designStudio.orchestration.runnerTitle")}</h3>
+            </div>
+            <StatusPill value={designStudioOrchestrationStatus(eventRunner.status)} t={t} label={statusLabelForChip(designStudioOrchestrationStatus(eventRunner.status), t)} />
+            <p>{t("designStudio.orchestration.runnerDetail")}</p>
+            <small>{t("designStudio.orchestration.runnerCapabilities")}</small>
+          </article>
+          <article className="design-studio-orchestration__card">
+            <div className="design-studio-orchestration__card-head">
+              <Eye aria-hidden="true" size={18} />
+              <h3>{t("designStudio.orchestration.mockTitle")}</h3>
+            </div>
+            <StatusPill value={designStudioOrchestrationStatus(mockLibrary.status)} t={t} label={statusLabelForChip(designStudioOrchestrationStatus(mockLibrary.status), t)} />
+            <p>{t("designStudio.orchestration.mockDetail")}</p>
+            <small>{t("designStudio.orchestration.mockOperations")}</small>
+          </article>
+          <article className="design-studio-orchestration__card">
+            <div className="design-studio-orchestration__card-head">
+              <FileText aria-hidden="true" size={18} />
+              <h3>{t("designStudio.orchestration.templateTitle")}</h3>
+            </div>
+            <StatusPill value={designStudioOrchestrationStatus(templateLibrary.status)} t={t} label={statusLabelForChip(designStudioOrchestrationStatus(templateLibrary.status), t)} />
+            <p>{t("designStudio.orchestration.templateDetail")}</p>
+            <small>{t("designStudio.orchestration.templateOperations")}</small>
+          </article>
+        </div>
+        <div className="design-studio-contract-table" role="table" aria-label={t("designStudio.orchestration.schemasTitle")}>
+          <div className="design-studio-contract-table__head" role="row">
+            <span role="columnheader">{t("designStudio.orchestration.schemaColumn")}</span>
+            <span role="columnheader">{t("designStudio.orchestration.purposeColumn")}</span>
+            <span role="columnheader">{t("designStudio.orchestration.stateColumn")}</span>
+          </div>
+          {schemas.map((schema) => (
+            <div className="design-studio-contract-table__row" role="row" key={schema.id}>
+              <strong role="cell">{designStudioContractId(schema.id, t)}</strong>
+              <span role="cell">{designStudioSchemaPurpose(schema, t)}</span>
+              <span role="cell">
+                <StatusPill value={designStudioOrchestrationStatus(schema.status)} t={t} label={statusLabelForChip(designStudioOrchestrationStatus(schema.status), t)} />
+              </span>
+            </div>
+          ))}
+        </div>
+        <div className="design-studio-orchestration__cards design-studio-orchestration__cards--compact">
+          {providerModes.map((provider) => (
+            <article className="design-studio-orchestration__card" key={provider.id}>
+              <div className="design-studio-orchestration__card-head">
+                <Brain aria-hidden="true" size={18} />
+                <h3>{designStudioContractId(provider.id, t)}</h3>
+              </div>
+              <StatusPill value={designStudioOrchestrationStatus(provider.status)} t={t} label={statusLabelForChip(designStudioOrchestrationStatus(provider.status), t)} />
+              <p>{designStudioProviderDescription(provider, t)}</p>
+              <small>{t("designStudio.orchestration.applyAuthority")}: {provider.directApplyAuthority ? t("designStudio.orchestration.yes") : t("designStudio.orchestration.no")}</small>
+            </article>
+          ))}
+          {targetAdapters.map((target) => (
+            <article className="design-studio-orchestration__card" key={target.id}>
+              <div className="design-studio-orchestration__card-head">
+                <Target aria-hidden="true" size={18} />
+                <h3>{designStudioContractId(target.id, t)}</h3>
+              </div>
+              <StatusPill value={designStudioOrchestrationStatus(target.status)} t={t} label={statusLabelForChip(designStudioOrchestrationStatus(target.status), t)} />
+              <p>{t("designStudio.orchestration.targetDetail")}</p>
+              <small>{t("designStudio.orchestration.applyMode")}: {designStudioApplyModeLabel(target.applyMode, t)}</small>
+            </article>
+          ))}
+        </div>
+      </div>
+    </details>
+  );
+}
+
+function DesignStudioPage({ data, locale, t }) {
+  const tooltipComponent = designStudioComponentById("tooltip-copy");
+  const sourceInteraction = useMemo(() => designStudioInteraction(tooltipComponent), [tooltipComponent]);
+  const [draftInteraction, setDraftInteraction] = useState(sourceInteraction);
+  const [confirmed, setConfirmed] = useState(false);
+  const [planToken, setPlanToken] = useState("");
+  const [mutationState, setMutationState] = useState({ status: "idle", result: null, error: null });
+  const componentCount = dashboardControlCenterDesignSystem.components.length;
+  const tokenCount = dashboardControlCenterDesignSystem.tokens.length;
+  const hasDraftChanges = designStudioInteractionChanged(sourceInteraction, draftInteraction);
+  const updateTooltip = (updates) => {
+    setDraftInteraction((previous) => ({ ...previous, tooltip: { ...previous.tooltip, ...updates } }));
+    setConfirmed(false);
+    setPlanToken("");
+    setMutationState({ status: "idle", result: null, error: null });
+  };
+  const updateFoundation = (updates) => {
+    setDraftInteraction((previous) => ({ ...previous, foundation: { ...previous.foundation, ...updates } }));
+    setConfirmed(false);
+    setPlanToken("");
+    setMutationState({ status: "idle", result: null, error: null });
+  };
+  const updateCopyFeedback = (updates) => {
+    setDraftInteraction((previous) => ({ ...previous, copyFeedback: { ...previous.copyFeedback, ...updates } }));
+    setConfirmed(false);
+    setPlanToken("");
+    setMutationState({ status: "idle", result: null, error: null });
+  };
+  const resetDraft = () => {
+    setDraftInteraction(sourceInteraction);
+    setConfirmed(false);
+    setPlanToken("");
+    setMutationState({ status: "idle", result: null, error: null });
+  };
+  const handlePlan = async () => {
+    setConfirmed(false);
+    setPlanToken("");
+    setMutationState({ status: "planning", result: null, error: null });
+    try {
+      const result = await planDashboardDesignSystemChange(draftInteraction);
+      setPlanToken(displayText(result.plan_token, ""));
+      setMutationState({ status: "planned", result, error: null });
+    } catch (error) {
+      setMutationState({ status: "error", result: null, error });
+    }
+  };
+  const handleApply = async () => {
+    if (!confirmed || mutationState.status !== "planned" || !planToken) {
+      return;
+    }
+    setMutationState((previous) => ({ ...previous, status: "applying", error: null }));
+    setConfirmed(false);
+    try {
+      const result = await applyDashboardDesignSystemChange(draftInteraction, planToken);
+      setPlanToken("");
+      setMutationState({ status: "applied", result, error: null });
+    } catch (error) {
+      setPlanToken("");
+      setMutationState((previous) => ({ ...previous, status: "error", error }));
+    }
+  };
+  const draftTheme = DESIGN_STUDIO_FOUNDATION_PRESETS.themeAccent[draftInteraction.foundation.themeAccent] || DESIGN_STUDIO_FOUNDATION_PRESETS.themeAccent.blue;
+  const draftDensity = DESIGN_STUDIO_FOUNDATION_PRESETS.density[draftInteraction.foundation.density] || DESIGN_STUDIO_FOUNDATION_PRESETS.density.balanced;
+  const draftRadius = DESIGN_STUDIO_FOUNDATION_PRESETS.radiusScale[draftInteraction.foundation.radiusScale] || DESIGN_STUDIO_FOUNDATION_PRESETS.radiusScale.standard;
+  const draftTypography = DESIGN_STUDIO_FOUNDATION_PRESETS.typographyScale[draftInteraction.foundation.typographyScale] || DESIGN_STUDIO_FOUNDATION_PRESETS.typographyScale.standard;
+  const previewStyle = {
+    "--dcc-tooltip-max-width": draftInteraction.tooltip.maxWidth,
+    "--dcc-page-accent-fallback": draftTheme.pageAccent,
+    "--dcc-page-soft-fallback": draftTheme.pageSoft,
+    "--dcc-page-border-fallback": draftTheme.pageBorder,
+    "--dcc-section-gap": draftDensity.sectionGap,
+    "--dcc-panel-padding": draftDensity.panelPadding,
+    "--dcc-control-gap": draftDensity.controlGap,
+    "--dcc-radius": draftRadius.radius,
+    "--dcc-font-size-body": draftTypography.body,
+    "--dcc-font-size-section-title": draftTypography.sectionTitle,
+    "--dcc-font-size-page-title": draftTypography.pageTitle,
+    "--dcc-action-control-height": draftInteraction.foundation.actionControlHeight,
+    "--dcc-action-control-padding": draftInteraction.foundation.actionControlPadding,
+    "--dcc-compact-control-height": draftInteraction.foundation.compactControlHeight,
+    "--dcc-compact-control-padding": draftInteraction.foundation.compactControlPadding,
+    "--dcc-form-control-height": draftInteraction.foundation.formControlHeight,
+    "--dcc-form-control-padding": draftInteraction.foundation.formControlPadding,
+    "--dcc-icon-button-size": draftInteraction.foundation.iconButtonSize,
+    "--dcc-control-font-size": draftInteraction.foundation.controlFontSize,
+    "--dcc-card-padding": draftInteraction.foundation.cardPadding,
+    "--dcc-card-gap": draftInteraction.foundation.cardGap,
+    "--dcc-row-padding": draftInteraction.foundation.rowPadding,
+    "--dcc-row-gap": draftInteraction.foundation.rowGap,
+    "--dcc-technical-affordance-gap": draftInteraction.foundation.technicalAffordanceGap,
+    "--dcc-technical-source-max-width": draftInteraction.foundation.technicalSourceMaxWidth,
+    "--dcc-technical-evidence-max-width": draftInteraction.foundation.technicalEvidenceMaxWidth,
+    "--dcc-technical-preview-chip-max-width": draftInteraction.foundation.technicalPreviewChipMaxWidth,
+    "--dcc-page-header-padding": draftInteraction.foundation.pageHeaderPadding,
+    "--dcc-metadata-gap": draftInteraction.foundation.metadataGap,
+    "--dcc-page-icon-size": draftInteraction.foundation.pageIconSize,
+    "--dcc-badge-gap": draftInteraction.foundation.badgeGap,
+    "--dcc-badge-height": draftInteraction.foundation.badgeHeight,
+    "--dcc-mode-badge-padding": draftInteraction.foundation.modeBadgePadding,
+    "--dcc-badge-font-size": draftInteraction.foundation.badgeFontSize,
+    "--dcc-mode-badge-font-size": draftInteraction.foundation.modeBadgeFontSize,
+  };
+  const context = selectedContextData(data);
+  const selectedRepository = repositoryDisplayName(context.target_repository?.name || historyRepositoryScope(data).repository_name, t);
+  const productDesignSources = designStudioProductDesignSources(data);
+  const productDesignStatus = productDesignSources.length ? "manual_required" : "unknown";
+
+  return (
+    <section className="view-surface view-surface--design-studio sidebar-page" id="design-studio" aria-labelledby="design-studio-heading">
+      <DetailPageHeader tone="design-studio" Icon={Wrench} title={t("designStudio.title")} subtitle={t("designStudio.description")} data={data} locale={locale} t={t} actionLabel={t("detail.refreshDisplayOnly")} headingId="design-studio-heading" />
+      <DetailDecisionSummary
+        tone="sidebar"
+        t={t}
+        items={[
+          { Icon: FileText, label: t("designStudio.summary.source"), value: "DESIGN_SYSTEM.md", detail: t("designStudio.summary.sourceDetail") },
+          { Icon: FileJson, label: t("designStudio.summary.machine"), value: `${tokenCount} ${t("designStudio.summary.tokens")} / ${componentCount} ${t("designStudio.summary.components")}`, detail: t("designStudio.summary.machineDetail") },
+          { Icon: Eye, label: t("designStudio.summary.preview"), value: t("designStudio.summary.previewValue"), detail: t("designStudio.summary.previewDetail"), tone: "ready" },
+          { Icon: Lock, label: t("designStudio.summary.boundary"), value: t("designStudio.summary.boundaryValue"), detail: t("designStudio.summary.boundaryDetail"), tone: "warning" },
+        ]}
+      />
+      <DetailSection id="design-studio-targets" title={t("designStudio.targetsTitle")} Icon={GitBranch}>
+        <div className="design-studio-target-grid">
+          <article className="design-studio-target-card design-studio-target-card--active" data-design-target="dashboard-control-center">
+            <StatusPill value="ready" t={t} label={t("designStudio.target.dashboard.status")} />
+            <h3>{t("designStudio.target.dashboard.title")}</h3>
+            <p>{t("designStudio.target.dashboard.detail")}</p>
+          </article>
+          <article className="design-studio-target-card" data-design-target="external-product">
+            <StatusPill value={productDesignStatus} t={t} label={t("designStudio.target.product.status")} />
+            <h3>{t("designStudio.target.product.title")}</h3>
+            <p>{t("designStudio.target.product.detail")}</p>
+            <div className="design-studio-target-card__sources">
+              <strong>{t("designStudio.target.product.sourceTitle")}: {selectedRepository}</strong>
+              {productDesignSources.length ? (
+                <SourceBoundaryChips values={productDesignSources} t={t} limit={5} variant="files" labelKey="maintenance.sourceFileItem" tooltipKey="maintenance.sourceFileTooltip" />
+              ) : (
+                <small>{t("designStudio.target.product.noSources")}</small>
+              )}
+              <small>{t("designStudio.target.product.planOnly")}</small>
+            </div>
+          </article>
+        </div>
+      </DetailSection>
+      <DesignStudioOrchestrationPanel t={t} />
+      <DetailSection id="design-studio-interactions" title={t("designStudio.interactionsTitle")} Icon={Wrench}>
+        <div className="design-studio-grid">
+          <article className="design-studio-editor">
+            <div className="design-studio-editor__head">
+              <span className="design-studio-editor__icon">
+                <Info aria-hidden="true" size={20} />
+              </span>
+              <div>
+                <h3>{t("designStudio.tooltipCopy.title")}</h3>
+                <p>{t("designStudio.tooltipCopy.detail")}</p>
+              </div>
+            </div>
+            <div className="design-studio-subsection">
+              <h4>{t("designStudio.foundationTitle")}</h4>
+              <p>{t("designStudio.foundationDetail")}</p>
+              <div className="design-studio-form-grid design-studio-foundation-grid">
+                <label>
+                  <span>{t("designStudio.field.themeAccent")}</span>
+                  <select value={draftInteraction.foundation.themeAccent} onChange={(event) => updateFoundation({ themeAccent: event.target.value })}>
+                    {DESIGN_STUDIO_THEME_OPTIONS.map((value) => (
+                      <option value={value} key={value}>{t(`designStudio.value.theme.${value}`)}</option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  <span>{t("designStudio.field.density")}</span>
+                  <select value={draftInteraction.foundation.density} onChange={(event) => updateFoundation({ density: event.target.value })}>
+                    {DESIGN_STUDIO_DENSITY_OPTIONS.map((value) => (
+                      <option value={value} key={value}>{t(`designStudio.value.density.${value}`)}</option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  <span>{t("designStudio.field.radiusScale")}</span>
+                  <select value={draftInteraction.foundation.radiusScale} onChange={(event) => updateFoundation({ radiusScale: event.target.value })}>
+                    {DESIGN_STUDIO_RADIUS_OPTIONS.map((value) => (
+                      <option value={value} key={value}>{t(`designStudio.value.radius.${value}`)}</option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  <span>{t("designStudio.field.typographyScale")}</span>
+                  <select value={draftInteraction.foundation.typographyScale} onChange={(event) => updateFoundation({ typographyScale: event.target.value })}>
+                    {DESIGN_STUDIO_TYPOGRAPHY_OPTIONS.map((value) => (
+                      <option value={value} key={value}>{t(`designStudio.value.typography.${value}`)}</option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+              <DesignStudioRulePreview type="foundation" t={t} style={previewStyle} />
+            </div>
+            <div className="design-studio-subsection">
+              <h4>{t("designStudio.technicalLayoutTitle")}</h4>
+              <p>{t("designStudio.technicalLayoutDetail")}</p>
+              <div className="design-studio-form-grid design-studio-foundation-grid">
+                <label>
+                  <span>{t("designStudio.field.technicalAffordanceGap")}</span>
+                  <select value={draftInteraction.foundation.technicalAffordanceGap} onChange={(event) => updateFoundation({ technicalAffordanceGap: event.target.value })}>
+                    {DESIGN_STUDIO_TECHNICAL_GAP_OPTIONS.map((value) => (
+                      <option value={value} key={value}>{value}</option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  <span>{t("designStudio.field.technicalSourceMaxWidth")}</span>
+                  <select value={draftInteraction.foundation.technicalSourceMaxWidth} onChange={(event) => updateFoundation({ technicalSourceMaxWidth: event.target.value })}>
+                    {DESIGN_STUDIO_SOURCE_WIDTH_OPTIONS.map((value) => (
+                      <option value={value} key={value}>{value}</option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  <span>{t("designStudio.field.technicalEvidenceMaxWidth")}</span>
+                  <select value={draftInteraction.foundation.technicalEvidenceMaxWidth} onChange={(event) => updateFoundation({ technicalEvidenceMaxWidth: event.target.value })}>
+                    {DESIGN_STUDIO_EVIDENCE_WIDTH_OPTIONS.map((value) => (
+                      <option value={value} key={value}>{value}</option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  <span>{t("designStudio.field.technicalPreviewChipMaxWidth")}</span>
+                  <select value={draftInteraction.foundation.technicalPreviewChipMaxWidth} onChange={(event) => updateFoundation({ technicalPreviewChipMaxWidth: event.target.value })}>
+                    {DESIGN_STUDIO_PREVIEW_WIDTH_OPTIONS.map((value) => (
+                      <option value={value} key={value}>{value}</option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+              <DesignStudioRulePreview type="technical" t={t} style={previewStyle} />
+            </div>
+            <div className="design-studio-subsection">
+              <h4>{t("designStudio.pageHeaderLayoutTitle")}</h4>
+              <p>{t("designStudio.pageHeaderLayoutDetail")}</p>
+              <div className="design-studio-form-grid design-studio-foundation-grid">
+                <label>
+                  <span>{t("designStudio.field.pageHeaderPadding")}</span>
+                  <select value={draftInteraction.foundation.pageHeaderPadding} onChange={(event) => updateFoundation({ pageHeaderPadding: event.target.value })}>
+                    {DESIGN_STUDIO_PAGE_HEADER_PADDING_OPTIONS.map((value) => (
+                      <option value={value} key={value}>{value}</option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  <span>{t("designStudio.field.metadataGap")}</span>
+                  <select value={draftInteraction.foundation.metadataGap} onChange={(event) => updateFoundation({ metadataGap: event.target.value })}>
+                    {DESIGN_STUDIO_METADATA_GAP_OPTIONS.map((value) => (
+                      <option value={value} key={value}>{value}</option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  <span>{t("designStudio.field.pageIconSize")}</span>
+                  <select value={draftInteraction.foundation.pageIconSize} onChange={(event) => updateFoundation({ pageIconSize: event.target.value })}>
+                    {DESIGN_STUDIO_PAGE_ICON_SIZE_OPTIONS.map((value) => (
+                      <option value={value} key={value}>{value}</option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+              <DesignStudioRulePreview type="page-header" t={t} style={previewStyle} />
+            </div>
+            <div className="design-studio-subsection">
+              <h4>{t("designStudio.controlLayoutTitle")}</h4>
+              <p>{t("designStudio.controlLayoutDetail")}</p>
+              <div className="design-studio-form-grid design-studio-foundation-grid">
+                <label>
+                  <span>{t("designStudio.field.actionControlHeight")}</span>
+                  <select value={draftInteraction.foundation.actionControlHeight} onChange={(event) => updateFoundation({ actionControlHeight: event.target.value })}>
+                    {DESIGN_STUDIO_ACTION_CONTROL_HEIGHT_OPTIONS.map((value) => (
+                      <option value={value} key={value}>{value}</option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  <span>{t("designStudio.field.actionControlPadding")}</span>
+                  <select value={draftInteraction.foundation.actionControlPadding} onChange={(event) => updateFoundation({ actionControlPadding: event.target.value })}>
+                    {DESIGN_STUDIO_ACTION_CONTROL_PADDING_OPTIONS.map((value) => (
+                      <option value={value} key={value}>{value}</option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  <span>{t("designStudio.field.compactControlHeight")}</span>
+                  <select value={draftInteraction.foundation.compactControlHeight} onChange={(event) => updateFoundation({ compactControlHeight: event.target.value })}>
+                    {DESIGN_STUDIO_COMPACT_CONTROL_HEIGHT_OPTIONS.map((value) => (
+                      <option value={value} key={value}>{value}</option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  <span>{t("designStudio.field.compactControlPadding")}</span>
+                  <select value={draftInteraction.foundation.compactControlPadding} onChange={(event) => updateFoundation({ compactControlPadding: event.target.value })}>
+                    {DESIGN_STUDIO_COMPACT_CONTROL_PADDING_OPTIONS.map((value) => (
+                      <option value={value} key={value}>{value}</option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  <span>{t("designStudio.field.formControlHeight")}</span>
+                  <select value={draftInteraction.foundation.formControlHeight} onChange={(event) => updateFoundation({ formControlHeight: event.target.value })}>
+                    {DESIGN_STUDIO_FORM_CONTROL_HEIGHT_OPTIONS.map((value) => (
+                      <option value={value} key={value}>{value}</option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  <span>{t("designStudio.field.formControlPadding")}</span>
+                  <select value={draftInteraction.foundation.formControlPadding} onChange={(event) => updateFoundation({ formControlPadding: event.target.value })}>
+                    {DESIGN_STUDIO_FORM_CONTROL_PADDING_OPTIONS.map((value) => (
+                      <option value={value} key={value}>{value}</option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  <span>{t("designStudio.field.iconButtonSize")}</span>
+                  <select value={draftInteraction.foundation.iconButtonSize} onChange={(event) => updateFoundation({ iconButtonSize: event.target.value })}>
+                    {DESIGN_STUDIO_ICON_BUTTON_SIZE_OPTIONS.map((value) => (
+                      <option value={value} key={value}>{value}</option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  <span>{t("designStudio.field.controlFontSize")}</span>
+                  <select value={draftInteraction.foundation.controlFontSize} onChange={(event) => updateFoundation({ controlFontSize: event.target.value })}>
+                    {DESIGN_STUDIO_CONTROL_FONT_SIZE_OPTIONS.map((value) => (
+                      <option value={value} key={value}>{value}</option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+              <DesignStudioRulePreview type="controls" t={t} style={previewStyle} />
+            </div>
+            <div className="design-studio-subsection">
+              <h4>{t("designStudio.cardRowLayoutTitle")}</h4>
+              <p>{t("designStudio.cardRowLayoutDetail")}</p>
+              <div className="design-studio-form-grid design-studio-foundation-grid">
+                <label>
+                  <span>{t("designStudio.field.cardPadding")}</span>
+                  <select value={draftInteraction.foundation.cardPadding} onChange={(event) => updateFoundation({ cardPadding: event.target.value })}>
+                    {DESIGN_STUDIO_CARD_PADDING_OPTIONS.map((value) => (
+                      <option value={value} key={value}>{value}</option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  <span>{t("designStudio.field.cardGap")}</span>
+                  <select value={draftInteraction.foundation.cardGap} onChange={(event) => updateFoundation({ cardGap: event.target.value })}>
+                    {DESIGN_STUDIO_CARD_GAP_OPTIONS.map((value) => (
+                      <option value={value} key={value}>{value}</option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  <span>{t("designStudio.field.rowPadding")}</span>
+                  <select value={draftInteraction.foundation.rowPadding} onChange={(event) => updateFoundation({ rowPadding: event.target.value })}>
+                    {DESIGN_STUDIO_ROW_PADDING_OPTIONS.map((value) => (
+                      <option value={value} key={value}>{value}</option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  <span>{t("designStudio.field.rowGap")}</span>
+                  <select value={draftInteraction.foundation.rowGap} onChange={(event) => updateFoundation({ rowGap: event.target.value })}>
+                    {DESIGN_STUDIO_ROW_GAP_OPTIONS.map((value) => (
+                      <option value={value} key={value}>{value}</option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+              <DesignStudioRulePreview type="card-row" t={t} style={previewStyle} />
+            </div>
+            <div className="design-studio-subsection">
+              <h4>{t("designStudio.badgeLayoutTitle")}</h4>
+              <p>{t("designStudio.badgeLayoutDetail")}</p>
+              <div className="design-studio-form-grid design-studio-foundation-grid">
+                <label>
+                  <span>{t("designStudio.field.badgeGap")}</span>
+                  <select value={draftInteraction.foundation.badgeGap} onChange={(event) => updateFoundation({ badgeGap: event.target.value })}>
+                    {DESIGN_STUDIO_BADGE_GAP_OPTIONS.map((value) => (
+                      <option value={value} key={value}>{value}</option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  <span>{t("designStudio.field.badgeHeight")}</span>
+                  <select value={draftInteraction.foundation.badgeHeight} onChange={(event) => updateFoundation({ badgeHeight: event.target.value })}>
+                    {DESIGN_STUDIO_BADGE_HEIGHT_OPTIONS.map((value) => (
+                      <option value={value} key={value}>{value}</option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  <span>{t("designStudio.field.modeBadgePadding")}</span>
+                  <select value={draftInteraction.foundation.modeBadgePadding} onChange={(event) => updateFoundation({ modeBadgePadding: event.target.value })}>
+                    {DESIGN_STUDIO_MODE_BADGE_PADDING_OPTIONS.map((value) => (
+                      <option value={value} key={value}>{value}</option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  <span>{t("designStudio.field.badgeFontSize")}</span>
+                  <select value={draftInteraction.foundation.badgeFontSize} onChange={(event) => updateFoundation({ badgeFontSize: event.target.value })}>
+                    {DESIGN_STUDIO_BADGE_FONT_SIZE_OPTIONS.map((value) => (
+                      <option value={value} key={value}>{value}</option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  <span>{t("designStudio.field.modeBadgeFontSize")}</span>
+                  <select value={draftInteraction.foundation.modeBadgeFontSize} onChange={(event) => updateFoundation({ modeBadgeFontSize: event.target.value })}>
+                    {DESIGN_STUDIO_MODE_BADGE_FONT_SIZE_OPTIONS.map((value) => (
+                      <option value={value} key={value}>{value}</option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+              <DesignStudioRulePreview type="badges" t={t} style={previewStyle} />
+            </div>
+            <div className="design-studio-subsection">
+              <h4>{t("designStudio.interactionPresetTitle")}</h4>
+              <p>{t("designStudio.interactionPresetDetail")}</p>
+              <div className="design-studio-interaction-groups">
+                <section className="design-studio-interaction-group" aria-label={t("designStudio.fileTooltip.title")}>
+                  <h5>{t("designStudio.fileTooltip.title")}</h5>
+                  <p>{t("designStudio.fileTooltip.detail")}</p>
+                  <div className="design-studio-form-grid">
+                    <label>
+                      <span>{t("designStudio.field.fileTooltipTrigger")}</span>
+                      <select value={draftInteraction.tooltip.trigger} onChange={(event) => updateTooltip({ trigger: event.target.value })}>
+                        {DESIGN_STUDIO_DISPLAY_CONDITION_OPTIONS.map((value) => (
+                          <option value={value} key={value}>{t(`designStudio.value.display.${value}`)}</option>
+                        ))}
+                      </select>
+                    </label>
+                    <label>
+                      <span>{t("designStudio.field.fileTooltipHidePolicy")}</span>
+                      <select value={draftInteraction.tooltip.hidePolicy} onChange={(event) => updateTooltip({ hidePolicy: event.target.value })}>
+                        <option value="pointer-leave">{t("designStudio.value.pointerLeave")}</option>
+                      </select>
+                    </label>
+                    <label>
+                      <span>{t("designStudio.field.fileTooltipPlacement")}</span>
+                      <select value={draftInteraction.tooltip.placement} onChange={(event) => updateTooltip({ placement: event.target.value })}>
+                        <option value="top">{t("designStudio.value.top")}</option>
+                      </select>
+                    </label>
+                    <label>
+                      <span>{t("designStudio.field.fileTooltipMaxWidth")}</span>
+                      <select value={draftInteraction.tooltip.maxWidth} onChange={(event) => updateTooltip({ maxWidth: event.target.value })}>
+                        {DESIGN_STUDIO_TOOLTIP_WIDTH_OPTIONS.map((value) => (
+                          <option value={value} key={value}>{value}</option>
+                        ))}
+                      </select>
+                    </label>
+                  </div>
+                </section>
+                <section className="design-studio-interaction-group" aria-label={t("designStudio.copyPopup.title")}>
+                  <h5>{t("designStudio.copyPopup.title")}</h5>
+                  <p>{t("designStudio.copyPopup.detail")}</p>
+                  <div className="design-studio-form-grid">
+                    <label>
+                      <span>{t("designStudio.field.copyTrigger")}</span>
+                      <select value={draftInteraction.copyFeedback.trigger} onChange={(event) => updateCopyFeedback({ trigger: event.target.value })}>
+                        {DESIGN_STUDIO_DISPLAY_CONDITION_OPTIONS.map((value) => (
+                          <option value={value} key={value}>{t(`designStudio.value.display.${value}`)}</option>
+                        ))}
+                      </select>
+                    </label>
+                    <label>
+                      <span>{t("designStudio.field.copyHidePolicy")}</span>
+                      <select value={draftInteraction.copyFeedback.hidePolicy} onChange={(event) => updateCopyFeedback({ hidePolicy: event.target.value })}>
+                        <option value="pointer-leave">{t("designStudio.value.pointerLeave")}</option>
+                      </select>
+                    </label>
+                    <label>
+                      <span>{t("designStudio.field.copyPlacement")}</span>
+                      <select value={draftInteraction.copyFeedback.placement} onChange={(event) => updateCopyFeedback({ placement: event.target.value })}>
+                        <option value="top">{t("designStudio.value.top")}</option>
+                      </select>
+                    </label>
+                    <label>
+                      <span>{t("designStudio.field.copyDuration")}</span>
+                      <select value={draftInteraction.copyFeedback.durationMs} onChange={(event) => updateCopyFeedback({ durationMs: Number(event.target.value) })}>
+                        {DESIGN_STUDIO_COPY_DURATION_OPTIONS.map((value) => (
+                          <option value={value} key={value}>{value}ms</option>
+                        ))}
+                      </select>
+                    </label>
+                  </div>
+                </section>
+              </div>
+              <DesignStudioRulePreview type="interactions" t={t} style={previewStyle} />
+            </div>
+            <div className="design-studio-action-row">
+              <button type="button" onClick={resetDraft} disabled={!hasDraftChanges && mutationState.status !== "planned"}>
+                <RefreshCw aria-hidden="true" size={16} />
+                {t("designStudio.action.reset")}
+              </button>
+              <button type="button" onClick={handlePlan} disabled={mutationState.status === "planning" || mutationState.status === "applying"}>
+                <Pencil aria-hidden="true" size={16} />
+                {mutationState.status === "planning" ? t("designStudio.action.planning") : t("designStudio.action.plan")}
+              </button>
+            </div>
+            <label className="design-studio-confirm-row">
+              <input type="checkbox" checked={confirmed} disabled={mutationState.status !== "planned"} onChange={(event) => setConfirmed(event.target.checked)} />
+              <span>{t("designStudio.action.confirm")}</span>
+            </label>
+            <div className="design-studio-action-row">
+              <button className="design-studio-action--primary" type="button" onClick={handleApply} disabled={!confirmed || mutationState.status !== "planned" || !planToken}>
+                <Check aria-hidden="true" size={16} />
+                {mutationState.status === "applying" ? t("designStudio.action.applying") : t("designStudio.action.apply")}
+              </button>
+            </div>
+            {mutationState.result ? (
+              <div className={`design-studio-result design-studio-result--${mutationState.status === "applied" ? "applied" : "planned"}`} role="status">
+                <StatusPill value={mutationState.status === "applied" ? "passed" : "ready"} t={t} label={mutationState.status === "applied" ? t("designStudio.result.appliedShort") : t("designStudio.result.plannedShort")} />
+                <p>{t(displayText(mutationState.result.reason_key, ""), t("designStudio.result.planned"))}</p>
+                <small>{t("designStudio.result.target")}: {displayText(mutationState.result.target_file)}</small>
+                <code>{displayText(mutationState.result.tool_command)}</code>
+              </div>
+            ) : null}
+            {mutationState.error ? (
+              <div className="design-studio-result design-studio-result--error" role="alert">
+                <StatusPill value="failed" t={t} label={statusLabelForChip("failed", t)} />
+                <p>{displayText(mutationState.error.message, t("designStudio.result.failed"))}</p>
+              </div>
+            ) : null}
+          </article>
+          <article className="design-studio-preview">
+            <div className="design-studio-preview__head">
+              <Eye aria-hidden="true" size={20} />
+              <div>
+                <h3>{t("designStudio.preview.title")}</h3>
+                <p>{t("designStudio.preview.detail")}</p>
+              </div>
+            </div>
+            <div className="design-studio-preview__surface" style={previewStyle}>
+              <div className="design-studio-preview__sample design-studio-preview__sample--header page-title page-title--overview">
+                <div className="page-title__main">
+                  <span className="page-title__icon">
+                    <Wrench aria-hidden="true" size={22} />
+                  </span>
+                  <div>
+                    <h2>{t("designStudio.preview.headerTitle")}</h2>
+                    <p>{t("designStudio.preview.headerDetail")}</p>
+                  </div>
+                </div>
+                <div className="page-title__meta">
+                  <span>{t("designStudio.preview.headerMetaOne")}</span>
+                  <span>{t("designStudio.preview.headerMetaTwo")}</span>
+                </div>
+              </div>
+              <div className="design-studio-preview__sample design-studio-preview__sample--organism">
+                <div className="design-studio-preview__sample-icon">
+                  <Wrench aria-hidden="true" size={18} />
+                </div>
+                <div>
+                  <span>{t("designStudio.preview.organism")}</span>
+                  <strong>{t("designStudio.preview.organismTitle")}</strong>
+                  <p>{t("designStudio.preview.organismDetail")}</p>
+                </div>
+              </div>
+              <div className="design-studio-preview__sample design-studio-preview__sample--card-row">
+                <article className="workflow-mini-card design-studio-preview__card-density">
+                  <span className="design-studio-preview__badge">{t("designStudio.preview.card")}</span>
+                  <strong>{t("designStudio.preview.cardTitle")}</strong>
+                  <p>{t("designStudio.preview.cardDetail")}</p>
+                </article>
+                <div className="mock-table-row design-studio-preview__row-density">
+                  <span>{t("designStudio.preview.row")}</span>
+                  <strong>{t("designStudio.preview.rowTitle")}</strong>
+                  <StatusPill value="ready" t={t} label={statusLabelForChip("ready", t)} />
+                </div>
+              </div>
+              <div className="design-studio-preview__sample design-studio-preview__sample--controls">
+                <div className="design-studio-action-row">
+                  <button type="button">
+                    <Pencil aria-hidden="true" size={15} />
+                    {t("designStudio.preview.controlReview")}
+                  </button>
+                  <button className="design-studio-action--primary" type="button">
+                    <Check aria-hidden="true" size={15} />
+                    {t("designStudio.preview.controlApply")}
+                  </button>
+                </div>
+                <label className="design-studio-preview__control-field">
+                  <span>{t("designStudio.preview.controlSelect")}</span>
+                  <select aria-label={t("designStudio.preview.controlSelect")}>
+                    <option>{t("designStudio.preview.controlOption")}</option>
+                  </select>
+                </label>
+                <button className="settings-modal__close" type="button" aria-label={t("designStudio.preview.controlIcon")}>
+                  <CircleX aria-hidden="true" size={16} />
+                </button>
+              </div>
+              <div className="design-studio-preview__sample design-studio-preview__sample--molecule">
+                <span className="design-studio-preview__badge">{t("designStudio.preview.atom")}</span>
+                <StatusPill value="ready" t={t} label={statusLabelForChip("ready", t)} />
+                <span className="mode-pill mode-pill--allowed">{t("settingsPage.value.boolean.true")}</span>
+                <span className="source-boundary__chip design-studio-preview__chip">
+                  {technicalTooltipValue("docs/workflow/DASHBOARD_DATA_SCHEMA.tsv", t("designStudio.preview.tooltip"), "source-boundary__chip-value")}
+                  <button className="source-boundary__chip-copy" type="button" aria-label={`${t("app.copyItem")}: docs/workflow/DASHBOARD_DATA_SCHEMA.tsv`} data-copy-tooltip="docs/workflow/DASHBOARD_DATA_SCHEMA.tsv">
+                    <Copy aria-hidden="true" size={14} />
+                  </button>
+                </span>
+              </div>
+            </div>
+            <details className="design-studio-diff">
+              <summary>
+                <span className="design-studio-diff__title">{t("designStudio.diff.title")}</span>
+                <span className="design-studio-diff__meta">
+                  <span className="design-studio-diff__hint design-studio-diff__hint--closed">{t("designStudio.diff.showAll")}</span>
+                  <span className="design-studio-diff__hint design-studio-diff__hint--open">{t("designStudio.diff.hide")}</span>
+                  <span className="design-studio-diff__indicator" aria-hidden="true" />
+                </span>
+              </summary>
+              <dl>
+                <div>
+                  <dt>{t("designStudio.field.themeAccent")}</dt>
+                  <dd>{t(`designStudio.value.theme.${sourceInteraction.foundation.themeAccent}`)}{" -> "}{t(`designStudio.value.theme.${draftInteraction.foundation.themeAccent}`)}</dd>
+                </div>
+                <div>
+                  <dt>{t("designStudio.field.density")}</dt>
+                  <dd>{t(`designStudio.value.density.${sourceInteraction.foundation.density}`)}{" -> "}{t(`designStudio.value.density.${draftInteraction.foundation.density}`)}</dd>
+                </div>
+                <div>
+                  <dt>{t("designStudio.field.radiusScale")}</dt>
+                  <dd>{t(`designStudio.value.radius.${sourceInteraction.foundation.radiusScale}`)}{" -> "}{t(`designStudio.value.radius.${draftInteraction.foundation.radiusScale}`)}</dd>
+                </div>
+                <div>
+                  <dt>{t("designStudio.field.typographyScale")}</dt>
+                  <dd>{t(`designStudio.value.typography.${sourceInteraction.foundation.typographyScale}`)}{" -> "}{t(`designStudio.value.typography.${draftInteraction.foundation.typographyScale}`)}</dd>
+                </div>
+                <div>
+                  <dt>{t("designStudio.field.actionControlHeight")}</dt>
+                  <dd>{sourceInteraction.foundation.actionControlHeight}{" -> "}{draftInteraction.foundation.actionControlHeight}</dd>
+                </div>
+                <div>
+                  <dt>{t("designStudio.field.actionControlPadding")}</dt>
+                  <dd>{sourceInteraction.foundation.actionControlPadding}{" -> "}{draftInteraction.foundation.actionControlPadding}</dd>
+                </div>
+                <div>
+                  <dt>{t("designStudio.field.compactControlHeight")}</dt>
+                  <dd>{sourceInteraction.foundation.compactControlHeight}{" -> "}{draftInteraction.foundation.compactControlHeight}</dd>
+                </div>
+                <div>
+                  <dt>{t("designStudio.field.compactControlPadding")}</dt>
+                  <dd>{sourceInteraction.foundation.compactControlPadding}{" -> "}{draftInteraction.foundation.compactControlPadding}</dd>
+                </div>
+                <div>
+                  <dt>{t("designStudio.field.formControlHeight")}</dt>
+                  <dd>{sourceInteraction.foundation.formControlHeight}{" -> "}{draftInteraction.foundation.formControlHeight}</dd>
+                </div>
+                <div>
+                  <dt>{t("designStudio.field.formControlPadding")}</dt>
+                  <dd>{sourceInteraction.foundation.formControlPadding}{" -> "}{draftInteraction.foundation.formControlPadding}</dd>
+                </div>
+                <div>
+                  <dt>{t("designStudio.field.iconButtonSize")}</dt>
+                  <dd>{sourceInteraction.foundation.iconButtonSize}{" -> "}{draftInteraction.foundation.iconButtonSize}</dd>
+                </div>
+                <div>
+                  <dt>{t("designStudio.field.controlFontSize")}</dt>
+                  <dd>{sourceInteraction.foundation.controlFontSize}{" -> "}{draftInteraction.foundation.controlFontSize}</dd>
+                </div>
+                <div>
+                  <dt>{t("designStudio.field.cardPadding")}</dt>
+                  <dd>{sourceInteraction.foundation.cardPadding}{" -> "}{draftInteraction.foundation.cardPadding}</dd>
+                </div>
+                <div>
+                  <dt>{t("designStudio.field.cardGap")}</dt>
+                  <dd>{sourceInteraction.foundation.cardGap}{" -> "}{draftInteraction.foundation.cardGap}</dd>
+                </div>
+                <div>
+                  <dt>{t("designStudio.field.rowPadding")}</dt>
+                  <dd>{sourceInteraction.foundation.rowPadding}{" -> "}{draftInteraction.foundation.rowPadding}</dd>
+                </div>
+                <div>
+                  <dt>{t("designStudio.field.rowGap")}</dt>
+                  <dd>{sourceInteraction.foundation.rowGap}{" -> "}{draftInteraction.foundation.rowGap}</dd>
+                </div>
+                <div>
+                  <dt>{t("designStudio.field.technicalAffordanceGap")}</dt>
+                  <dd>{sourceInteraction.foundation.technicalAffordanceGap}{" -> "}{draftInteraction.foundation.technicalAffordanceGap}</dd>
+                </div>
+                <div>
+                  <dt>{t("designStudio.field.technicalSourceMaxWidth")}</dt>
+                  <dd>{sourceInteraction.foundation.technicalSourceMaxWidth}{" -> "}{draftInteraction.foundation.technicalSourceMaxWidth}</dd>
+                </div>
+                <div>
+                  <dt>{t("designStudio.field.technicalEvidenceMaxWidth")}</dt>
+                  <dd>{sourceInteraction.foundation.technicalEvidenceMaxWidth}{" -> "}{draftInteraction.foundation.technicalEvidenceMaxWidth}</dd>
+                </div>
+                <div>
+                  <dt>{t("designStudio.field.technicalPreviewChipMaxWidth")}</dt>
+                  <dd>{sourceInteraction.foundation.technicalPreviewChipMaxWidth}{" -> "}{draftInteraction.foundation.technicalPreviewChipMaxWidth}</dd>
+                </div>
+                <div>
+                  <dt>{t("designStudio.field.pageHeaderPadding")}</dt>
+                  <dd>{sourceInteraction.foundation.pageHeaderPadding}{" -> "}{draftInteraction.foundation.pageHeaderPadding}</dd>
+                </div>
+                <div>
+                  <dt>{t("designStudio.field.metadataGap")}</dt>
+                  <dd>{sourceInteraction.foundation.metadataGap}{" -> "}{draftInteraction.foundation.metadataGap}</dd>
+                </div>
+                <div>
+                  <dt>{t("designStudio.field.pageIconSize")}</dt>
+                  <dd>{sourceInteraction.foundation.pageIconSize}{" -> "}{draftInteraction.foundation.pageIconSize}</dd>
+                </div>
+                <div>
+                  <dt>{t("designStudio.field.badgeGap")}</dt>
+                  <dd>{sourceInteraction.foundation.badgeGap}{" -> "}{draftInteraction.foundation.badgeGap}</dd>
+                </div>
+                <div>
+                  <dt>{t("designStudio.field.badgeHeight")}</dt>
+                  <dd>{sourceInteraction.foundation.badgeHeight}{" -> "}{draftInteraction.foundation.badgeHeight}</dd>
+                </div>
+                <div>
+                  <dt>{t("designStudio.field.modeBadgePadding")}</dt>
+                  <dd>{sourceInteraction.foundation.modeBadgePadding}{" -> "}{draftInteraction.foundation.modeBadgePadding}</dd>
+                </div>
+                <div>
+                  <dt>{t("designStudio.field.badgeFontSize")}</dt>
+                  <dd>{sourceInteraction.foundation.badgeFontSize}{" -> "}{draftInteraction.foundation.badgeFontSize}</dd>
+                </div>
+                <div>
+                  <dt>{t("designStudio.field.modeBadgeFontSize")}</dt>
+                  <dd>{sourceInteraction.foundation.modeBadgeFontSize}{" -> "}{draftInteraction.foundation.modeBadgeFontSize}</dd>
+                </div>
+                <div>
+                  <dt>{t("designStudio.field.fileTooltipTrigger")}</dt>
+                  <dd>{t(`designStudio.value.display.${sourceInteraction.tooltip.trigger}`)}{" -> "}{t(`designStudio.value.display.${draftInteraction.tooltip.trigger}`)}</dd>
+                </div>
+                <div>
+                  <dt>{t("designStudio.field.copyTrigger")}</dt>
+                  <dd>{t(`designStudio.value.display.${sourceInteraction.copyFeedback.trigger}`)}{" -> "}{t(`designStudio.value.display.${draftInteraction.copyFeedback.trigger}`)}</dd>
+                </div>
+                <div>
+                  <dt>{t("designStudio.field.fileTooltipMaxWidth")}</dt>
+                  <dd>{sourceInteraction.tooltip.maxWidth}{" -> "}{draftInteraction.tooltip.maxWidth}</dd>
+                </div>
+                <div>
+                  <dt>{t("designStudio.field.copyDuration")}</dt>
+                  <dd>{sourceInteraction.copyFeedback.durationMs}ms{" -> "}{draftInteraction.copyFeedback.durationMs}ms</dd>
+                </div>
+              </dl>
+            </details>
+          </article>
+        </div>
+      </DetailSection>
+      <DetailSection id="design-studio-contract" title={t("designStudio.contractTitle")} Icon={FileCheck2}>
+        <div className="sidebar-page-card-grid">
+          <SidebarPageCard Icon={FileText} title={t("designStudio.contract.human")} detail="docs/design-system/dashboard-control-center/DESIGN_SYSTEM.md" status="ready" t={t} />
+          <SidebarPageCard Icon={FileJson} title={t("designStudio.contract.machine")} detail="tokens.json / components.json" status="ready" t={t} />
+          <SidebarPageCard Icon={Code2} title={t("designStudio.contract.generated")} detail="design-system.generated.css / js" status="ready" t={t} />
+          <SidebarPageCard Icon={FileCheck2} title={t("designStudio.contract.check")} detail="tools/check_dashboard_design_system.sh" status="ready" t={t} />
+        </div>
+      </DetailSection>
+      <SourceBoundary data={data} t={t} />
+    </section>
+  );
+}
+
 function SettingsPage({ data, locale, t, onRefreshSnapshot }) {
   const [selectedSettingId, setSelectedSettingId] = useState("");
   const [draftValue, setDraftValue] = useState("");
@@ -4143,7 +7383,7 @@ function SettingsPage({ data, locale, t, onRefreshSnapshot }) {
   const { settings, groups, items } = settingsCatalogData(data);
   const hasSettingsCatalog = groups.length > 0 && items.length > 0;
   const reviewItems = items.filter((item) => isReviewState(item.status));
-  const selectedRepository = displayText(context.target_repository?.name || authority.repository?.configured_name || authority.repository?.name, t("summary.none"));
+  const selectedRepository = repositoryDisplayName(context.target_repository?.name || authority.repository?.configured_name || authority.repository?.name, t);
   const selectedSetting = items.find((item) => displayText(item.id, "") === selectedSettingId) || null;
   const selectedMenuId = displayText(context.menu_id, "step_1_14");
   const editableOptions = selectedSetting ? settingEditableOptions(selectedSetting) : [];
@@ -4513,7 +7753,7 @@ function SettingsPage({ data, locale, t, onRefreshSnapshot }) {
                 {asArray(selectedSetting.allowed_values).length ? (
                   <div className="settings-modal__allowed">
                     {asArray(selectedSetting.allowed_values).map((value) => (
-                      <span key={displayText(value)}>{settingAllowedValueLabel(value, t)}</span>
+                      <span key={displayText(value)}>{settingAllowedValueLabel(value, selectedSetting, t)}</span>
                     ))}
                   </div>
                 ) : (
@@ -4534,10 +7774,13 @@ function SettingsPage({ data, locale, t, onRefreshSnapshot }) {
                         }}
                       >
                         {editableOptions.map((value) => (
-                          <option value={value} key={value}>{settingAllowedValueLabel(value, t)}</option>
+                          <option value={value} key={value}>{settingAllowedValueLabel(value, selectedSetting, t)}</option>
                         ))}
                       </select>
                     </label>
+                    {settingShowsAutomationNote(selectedSetting) ? (
+                      <small className="settings-modal__automation-note">{t("settingsPage.modal.autoMeansPriorApproval")}</small>
+                    ) : null}
                     <div className="settings-action-row">
                       <button type="button" onClick={handlePlanSetting} disabled={!draftValue || mutationState.status === "planning" || mutationState.status === "applying"}>
                         <Pencil aria-hidden="true" size={16} />
@@ -4609,20 +7852,176 @@ function SettingsPage({ data, locale, t, onRefreshSnapshot }) {
   );
 }
 
+const glossaryCategories = [
+  {
+    id: "dashboard",
+    icon: CircleHelp,
+    terms: ["dashboardControlCenter", "selectedMenu", "currentJudgment", "status", "displayOnly", "sourceFile", "sourceCommand"],
+  },
+  {
+    id: "repositories",
+    icon: Database,
+    terms: ["lessonRepository", "productRepository", "productWorkspace", "repositoryBoundary", "gitWorktree", "workingTree"],
+  },
+  {
+    id: "gitCi",
+    icon: GitBranch,
+    terms: ["git", "branch", "commit", "push", "pullRequest", "prCi", "mainCi", "merge", "localRemoteSync"],
+  },
+  {
+    id: "workflow",
+    icon: WorkflowCategoryIcon,
+    terms: ["skill", "repositoryDevelopmentWorkflow", "productDevelopmentWorkflow", "fastLoop", "midTests", "releaseGate"],
+  },
+  {
+    id: "documents",
+    icon: FileText,
+    terms: ["requirements", "specification", "implementationPlan", "taskTracker", "handoff", "developerMemory", "sourceOfTruth", "documentSync"],
+  },
+  {
+    id: "testsEvidence",
+    icon: FileSearch,
+    terms: ["unitTest", "aggregateTest", "gitHooks", "snapshot", "evidence", "freshness"],
+  },
+  {
+    id: "safety",
+    icon: ShieldCheck,
+    terms: ["securityGate", "approval", "blocker", "secretLikeData", "leastPrivilege"],
+  },
+  {
+    id: "settings",
+    icon: Settings,
+    terms: ["settings", "learningMode", "workflowDisplayLanguage", "productGitUsageMode", "prohibited", "askEachTime", "auto"],
+  },
+];
+
+function helpTermSearchText(categoryId, term, t) {
+  return [
+    term,
+    categoryId,
+    t(`helpPage.glossary.${term}.title`, displayKey(term)),
+    t(`helpPage.glossary.${term}.detail`, ""),
+    t(`helpPage.glossaryCategory.${categoryId}`, displayKey(categoryId)),
+    t(`helpPage.glossaryCategory.${categoryId}.detail`, ""),
+  ]
+    .join(" ")
+    .toLowerCase();
+}
+
+function helpCurrentContextSummary(data, t) {
+  const context = selectedContextData(data);
+  const repository = repositoryDisplayName(context.target_repository?.name, t);
+  const menu = contextLabel(context.menu_id, t);
+  const workflow = workflowContextLabel(context.workflow_context, t);
+  const failures = asArray(data.partial_failures);
+  const evidenceRows = asArray(data.maintenance?.evidence_rows);
+  const documents = asArray(data.documents?.catalog);
+  const firstFailure = failures[0] || null;
+  return {
+    context,
+    repository,
+    menu,
+    workflow,
+    failures,
+    evidenceRows,
+    documents,
+    firstFailure,
+  };
+}
+
+function helpRecommendedTerms(data) {
+  const context = selectedContextData(data);
+  const menuId = displayText(context.menu_id, "");
+  const failures = asArray(data.partial_failures);
+  const recommended = ["selectedMenu", "productRepository", "repositoryBoundary", "sourceOfTruth"];
+  if (menuId.includes("lesson")) {
+    recommended.push("lessonRepository", "repositoryDevelopmentWorkflow");
+  } else {
+    recommended.push("productDevelopmentWorkflow");
+  }
+  if (failures.length) {
+    recommended.push("blocker", "evidence", "securityGate");
+  }
+  recommended.push("sourceFile", "sourceCommand");
+  return [...new Set(recommended)];
+}
+
+function glossaryTermExample(term, summary, t) {
+  switch (term) {
+    case "selectedMenu":
+      return `${t("helpPage.glossaryContext.examplePrefix")} ${summary.menu}`;
+    case "productRepository":
+      return `${t("helpPage.glossaryContext.examplePrefix")} ${summary.repository}`;
+    case "repositoryBoundary":
+      return `${summary.repository} ${t("helpPage.glossaryContext.repositoryBoundaryExample")}`;
+    case "sourceFile": {
+      const source = asArray(summary.documents).find((item) => displayText(item.path, ""))?.path || "";
+      return source ? `${t("helpPage.glossaryContext.examplePrefix")} ${displayText(source)}` : "";
+    }
+    case "sourceCommand": {
+      const command = asArray(summary.evidenceRows).find((row) => displayText(row.required_command, ""))?.required_command || "";
+      return command ? `${t("helpPage.glossaryContext.examplePrefix")} ${displayText(command)}` : "";
+    }
+    case "evidence": {
+      const evidence = asArray(summary.evidenceRows).find((row) => normalizeState(row.status) !== "ready") || asArray(summary.evidenceRows)[0];
+      return evidence ? `${t("helpPage.glossaryContext.examplePrefix")} ${displayText(evidence.label || evidence.id)}` : "";
+    }
+    case "blocker":
+      return `${t("helpPage.glossaryContext.examplePrefix")} ${summary.failures.length ? `${summary.failures.length} ${t("helpPage.context.unresolvedUnit")}` : t("summary.none")}`;
+    case "securityGate":
+      return `${t("helpPage.glossaryContext.examplePrefix")} ${statusLabelForChip(summary.context.security_status, t)}`;
+    case "productDevelopmentWorkflow":
+      return `${t("helpPage.glossaryContext.examplePrefix")} ${summary.workflow}`;
+    default:
+      return "";
+  }
+}
+
+function glossaryTermDetail(categoryId, term, t, data) {
+  const title = t(`helpPage.glossary.${term}.title`, displayKey(term));
+  const summary = helpCurrentContextSummary(data || {}, t);
+  const example = glossaryTermExample(term, summary, t);
+  const points = [
+    `${t("helpPage.glossaryContext.currentTarget")}: ${summary.repository}`,
+    `${t("helpPage.glossaryContext.currentMenu")}: ${summary.menu}`,
+    example,
+    summary.failures.length ? `${t("helpPage.glossaryContext.currentBlockers")}: ${summary.failures.length} ${t("helpPage.context.unresolvedUnit")}` : `${t("helpPage.glossaryContext.currentBlockers")}: ${t("summary.none")}`,
+  ].filter((point) => displayText(point, ""));
+  return {
+    title,
+    eyebrow: t(`helpPage.glossaryCategory.${categoryId}`, displayKey(categoryId)),
+    summary: t(`helpPage.glossary.${term}.detail`, t("helpPage.glossary.default.detail")),
+    where: t(`helpPage.glossary.${term}.where`, t(`helpPage.glossaryCategory.${categoryId}.where`, t("helpPage.glossary.default.where"))),
+    why: t(`helpPage.glossary.${term}.why`, t("helpPage.glossary.default.why")),
+    action: t(`helpPage.glossary.${term}.action`, `${t("helpPage.glossaryContext.openRelatedPage")} ${summary.menu}`),
+    source: `${t(`helpPage.glossary.${term}.source`, t("helpPage.glossary.default.source"))} / ${summary.repository}`,
+    points,
+  };
+}
+
 function HelpPage({ data, locale, t }) {
+  const [query, setQuery] = useState("");
+  const contextSummary = helpCurrentContextSummary(data, t);
+  const normalizedQuery = query.trim().toLowerCase();
+  const recommendedTerms = helpRecommendedTerms(data);
+  const recommendedTermSet = new Set(recommendedTerms);
   const topics = [
     { Icon: BookOpen, title: t("helpPage.topic.lessons.title"), detail: t("helpPage.topic.lessons.detail"), href: "#lessons" },
-    { Icon: Info, title: t("helpPage.topic.repository.title"), detail: t("helpPage.topic.repository.detail"), href: "#repository-info" },
-    { Icon: WorkflowCategoryIcon, title: t("helpPage.topic.workflow.title"), detail: t("helpPage.topic.workflow.detail"), href: "#workflow" },
-    { Icon: RefreshCw, title: t("helpPage.topic.maintenance.title"), detail: t("helpPage.topic.maintenance.detail"), href: "#maintenance" },
-    { Icon: ShieldCheck, title: t("helpPage.topic.safety.title"), detail: t("helpPage.topic.safety.detail"), href: "#safety" },
+    { Icon: Info, title: t("helpPage.topic.repository.title"), detail: `${t("helpPage.topic.repository.detail")} ${contextSummary.repository}`, href: "#repository-info" },
+    { Icon: WorkflowCategoryIcon, title: t("helpPage.topic.workflow.title"), detail: `${t("helpPage.topic.workflow.detail")} ${contextSummary.menu}`, href: "#workflow" },
+    { Icon: RefreshCw, title: t("helpPage.topic.maintenance.title"), detail: `${t("helpPage.topic.maintenance.detail")} ${contextSummary.evidenceRows.length} ${t("helpPage.context.evidenceUnit")}`, href: "#maintenance" },
+    { Icon: ShieldCheck, title: t("helpPage.topic.safety.title"), detail: `${t("helpPage.topic.safety.detail")} ${contextSummary.failures.length} ${t("helpPage.context.unresolvedUnit")}`, href: "#safety" },
     { Icon: Settings, title: t("helpPage.topic.settings.title"), detail: t("helpPage.topic.settings.detail"), href: "#settings" },
   ];
-  const glossary = ["git", "ci", "pr", "merge", "snapshot", "evidence", "securityGate"].map((id) => ({
-    id,
-    title: t(`helpPage.glossary.${id}.title`),
-    detail: t(`helpPage.glossary.${id}.detail`),
-  }));
+  const filteredCategories = glossaryCategories
+    .map((category) => ({
+      ...category,
+      terms: category.terms.filter((term) => !normalizedQuery || helpTermSearchText(category.id, term, t).includes(normalizedQuery)),
+    }))
+    .filter((category) => category.terms.length);
+  const firstFailure = contextSummary.firstFailure;
+  const nextHref = contextSummary.failures.length ? "#safety" : "#repository-info";
+  const nextLabel = contextSummary.failures.length ? t("nav.safety") : t("nav.repositoryInfo");
 
   return (
     <section className="view-surface view-surface--help sidebar-page" id="help" aria-labelledby="help-heading">
@@ -4631,12 +8030,34 @@ function HelpPage({ data, locale, t }) {
         tone="sidebar"
         t={t}
         items={[
-          { Icon: Compass, label: t("helpPage.summary.where"), value: contextLabel(selectedContextData(data).menu_id, t), detail: t("helpPage.summary.whereDetail") },
-          { Icon: BookOpen, label: t("helpPage.summary.learn"), value: t("helpPage.summary.learnValue"), detail: t("helpPage.summary.learnDetail") },
-          { Icon: ShieldCheck, label: t("helpPage.summary.safety"), value: t("helpPage.summary.safetyValue"), detail: t("helpPage.summary.safetyDetail") },
-          { Icon: ArrowRightCircle, label: t("detail.nextSafeCheck"), value: t("helpPage.summary.next"), detail: t("helpPage.summary.nextDetail"), cta: { href: "#overview", label: t("nav.overview") } },
+          { Icon: Compass, label: t("helpPage.summary.where"), value: contextSummary.menu, detail: contextSummary.workflow },
+          { Icon: Database, label: t("helpPage.context.repository"), value: contextSummary.repository, detail: t("helpPage.context.repositoryDetail") },
+          { Icon: ShieldCheck, label: t("helpPage.context.blockers"), value: contextSummary.failures.length ? `${contextSummary.failures.length} ${t("helpPage.context.unresolvedUnit")}` : t("summary.none"), detail: firstFailure ? `${sourceDetector(firstFailure.source, t)}: ${localizedSecurityDetail(firstFailure.reason, t)}` : t("helpPage.context.noBlockers"), tone: contextSummary.failures.length ? "warning" : "ready" },
+          { Icon: ArrowRightCircle, label: t("detail.nextSafeCheck"), value: nextLabel, detail: contextSummary.failures.length ? t("helpPage.context.nextSafetyDetail") : t("helpPage.context.nextRepositoryDetail"), cta: { href: nextHref, label: nextLabel } },
         ]}
       />
+      <DetailSection id="help-current-context" title={t("helpPage.contextTitle")} Icon={Target}>
+        <div className="help-context-grid">
+          <SidebarPageCard Icon={Database} title={t("helpPage.context.repository")} detail={t("helpPage.context.repositoryDetail")} status={contextSummary.context.target_repository?.path_state || "unknown"} t={t}>
+            <div className="help-context-fact">
+              <strong>{contextSummary.repository}</strong>
+              <span>{contextSummary.menu}</span>
+            </div>
+          </SidebarPageCard>
+          <SidebarPageCard Icon={FileSearch} title={t("helpPage.context.evidence")} detail={t("helpPage.context.evidenceDetail")} status={contextSummary.failures.length ? "manual_required" : "ready"} t={t}>
+            <div className="help-context-fact">
+              <strong>{contextSummary.evidenceRows.length} {t("helpPage.context.evidenceUnit")}</strong>
+              <span>{contextSummary.failures.length ? `${contextSummary.failures.length} ${t("helpPage.context.unresolvedUnit")}` : t("helpPage.context.noBlockers")}</span>
+            </div>
+          </SidebarPageCard>
+          <SidebarPageCard Icon={Clock} title={t("helpPage.context.updated")} detail={t("helpPage.context.updatedDetail")} status="cached" t={t}>
+            <div className="help-context-fact">
+              <strong>{formatDateTime(data.generated_at || contextSummary.context.updated_at, locale)}</strong>
+              <span>{contextSummary.documents.length} {t("helpPage.context.documentUnit")}</span>
+            </div>
+          </SidebarPageCard>
+        </div>
+      </DetailSection>
       <DetailSection id="help-topics" title={t("helpPage.topicsTitle")} Icon={CircleHelp}>
         <div className="sidebar-page-link-grid">
           {topics.map((topic) => (
@@ -4644,24 +8065,156 @@ function HelpPage({ data, locale, t }) {
           ))}
         </div>
       </DetailSection>
-      <DetailSection id="help-glossary" title={t("helpPage.glossaryTitle")} Icon={BookMarked}>
+      <DetailSection id="help-recommended" title={t("helpPage.recommendedTitle")} Icon={ListChecks}>
         <div className="sidebar-glossary-grid">
-          {glossary.map((item) => (
-            <article className="sidebar-glossary-card" key={item.id}>
-              <strong>{item.title}</strong>
-              <p>{item.detail}</p>
-            </article>
+          {glossaryCategories.flatMap(({ id, terms }) =>
+            terms.filter((term) => recommendedTermSet.has(term)).map((term) => {
+              const detail = glossaryTermDetail(id, term, t, data);
+              return (
+                <article className="sidebar-glossary-card sidebar-glossary-card--recommended" key={`${id}-${term}`}>
+                  <strong>{detail.title}</strong>
+                  <p>{detail.summary}</p>
+                  <small>{t(`helpPage.glossaryCategory.${id}`, displayKey(id))}</small>
+                  <InsightDetailButton detail={detail} label={t("helpPage.glossary.openDetail")} t={t} tone="help" />
+                </article>
+              );
+            })
+          )}
+        </div>
+      </DetailSection>
+      <DetailSection id="help-glossary" title={t("helpPage.glossaryTitle")} Icon={BookMarked}>
+        <label className="help-search">
+          <span>{t("helpPage.searchLabel")}</span>
+          <input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("helpPage.searchPlaceholder")} />
+        </label>
+        <div className="glossary-category-stack">
+          {filteredCategories.map(({ id, icon: CategoryIcon, terms }) => (
+            <section className="glossary-category" aria-labelledby={`glossary-category-${id}`} key={id}>
+              <div className="glossary-category__head">
+                <CategoryIcon aria-hidden="true" size={19} />
+                <div>
+                  <h4 id={`glossary-category-${id}`}>{t(`helpPage.glossaryCategory.${id}`, displayKey(id))}</h4>
+                  <p>{t(`helpPage.glossaryCategory.${id}.detail`, t("helpPage.glossaryCategory.default.detail"))}</p>
+                </div>
+              </div>
+              <div className="sidebar-glossary-grid">
+                {terms.map((term) => {
+                  const detail = glossaryTermDetail(id, term, t, data);
+                  return (
+                    <article className="sidebar-glossary-card" key={term}>
+                      <strong>{detail.title}</strong>
+                      <p>{detail.summary}</p>
+                      <InsightDetailButton detail={detail} label={t("helpPage.glossary.openDetail")} t={t} tone="help" />
+                    </article>
+                  );
+                })}
+              </div>
+            </section>
           ))}
+          {!filteredCategories.length ? <p className="help-empty-search">{t("helpPage.emptySearch")}</p> : null}
         </div>
       </DetailSection>
     </section>
   );
 }
 
+function shortIdentifier(value, head = 12, tail = 8) {
+  const text = displayText(value, "");
+  if (!text || text.length <= head + tail + 3) {
+    return text;
+  }
+  return `${text.slice(0, head)}...${text.slice(-tail)}`;
+}
+
+function historyRepositoryScope(data) {
+  return data.repository_scope && typeof data.repository_scope === "object" ? data.repository_scope : {};
+}
+
+function historyInventorySummary(scope, t) {
+  const summary = scope.inventory?.summary || {};
+  const parts = [];
+  if (Number.isInteger(summary.files)) {
+    parts.push(`${t("historyPage.inventory.files")}: ${summary.files}`);
+  }
+  if (Number.isInteger(summary.indexed_files)) {
+    parts.push(`${t("historyPage.inventory.indexed")}: ${summary.indexed_files}`);
+  }
+  if (Number.isInteger(summary.added_since_index) && summary.added_since_index > 0) {
+    parts.push(`${t("historyPage.inventory.added")}: ${summary.added_since_index}`);
+  }
+  return parts.join(" / ");
+}
+
+function localizedHistoryWarning(warning, t) {
+  const text = displayText(warning, "");
+  const known = {
+    "repository index does not include every observed file": "historyPage.warning.repositoryIndexIncomplete",
+  };
+  return known[text] ? t(known[text]) : text;
+}
+
+function historyWarningItems(data, t) {
+  const scope = historyRepositoryScope(data);
+  const topLevelWarnings = asArray(data.warnings).map((warning, index) => ({
+    id: `snapshot-${index}`,
+    source: t("historyPage.warningSource.snapshot"),
+    detail: displayText(warning),
+  }));
+  const inventoryWarnings = asArray(scope.inventory?.warnings).map((warning, index) => ({
+    id: `repository-inventory-${index}`,
+    source: t("historyPage.warningSource.repositoryInventory"),
+    detail: localizedHistoryWarning(warning, t),
+  }));
+  return [...topLevelWarnings, ...inventoryWarnings];
+}
+
+function historyFailureItems(data) {
+  return asArray(data.partial_failures);
+}
+
+function HistoryIssueList({ warnings, failures, t }) {
+  const hasIssues = warnings.length || failures.length;
+  if (!hasIssues) {
+    return <SidebarPageCard Icon={CheckCircle2} title={t("summary.none")} detail={t("historyPage.noIssues")} status="ready" t={t} />;
+  }
+  return (
+    <div className="history-issue-list">
+      {warnings.map((warning) => (
+        <article className="history-issue history-issue--warning" key={warning.id}>
+          <AlertTriangle aria-hidden="true" size={18} />
+          <div>
+            <strong>{warning.source}</strong>
+            <p>{warning.detail}</p>
+          </div>
+        </article>
+      ))}
+      {failures.map((failure, index) => (
+        <article className="history-issue history-issue--failure" key={`${displayText(failure.source)}-${index}`}>
+          <ShieldAlert aria-hidden="true" size={18} />
+          <div>
+            <strong>{sourceDetector(failure.source, t)}</strong>
+            <p>{localizedSecurityDetail(failure.reason, t)}</p>
+            {displayText(failure.required_command, "") ? <small>{t("historyPage.issue.requiredCommand")}: {displayText(failure.required_command)}</small> : null}
+          </div>
+          <StatusPill value={failure.status || "unknown"} t={t} label={statusLabelForChip(failure.status || "unknown", t)} />
+        </article>
+      ))}
+    </div>
+  );
+}
+
 function HistoryPage({ data, locale, t }) {
-  const warnings = asArray(data.warnings);
+  const context = selectedContextData(data);
+  const scope = historyRepositoryScope(data);
+  const targetRepository = repositoryDisplayName(context.target_repository?.name || scope.repository_name, t);
+  const warnings = historyWarningItems(data, t);
+  const failures = historyFailureItems(data);
   const sourceFiles = asArray(data.source_files);
   const sourceCommands = asArray(data.source_commands);
+  const issueCount = warnings.length + failures.length;
+  const observedAt = formatDashboardDateTime(scope.observed_at) || formatGenerated(data, locale);
+  const scopeIdentity = shortIdentifier(scope.scope_id || scope.inventory_hash || "", 8, 4);
+  const inventorySummary = historyInventorySummary(scope, t);
   return (
     <section className="view-surface view-surface--history sidebar-page" id="history" aria-labelledby="history-heading">
       <DetailPageHeader tone="history" Icon={Clock} title={t("historyPage.title")} subtitle={t("historyPage.description")} data={data} locale={locale} t={t} actionLabel={t("detail.refreshDisplayOnly")} headingId="history-heading" />
@@ -4670,27 +8223,41 @@ function HistoryPage({ data, locale, t }) {
         t={t}
         items={[
           { Icon: CalendarDays, label: t("historyPage.summary.generated"), value: formatGenerated(data, locale), detail: t("historyPage.summary.generatedDetail") },
-          { Icon: FileJson, label: t("historyPage.summary.snapshot"), value: displayText(data.snapshot_id), detail: t("historyPage.summary.snapshotDetail") },
-          { Icon: FileText, label: t("historyPage.summary.sources"), value: `${sourceFiles.length} / ${sourceCommands.length}`, detail: t("historyPage.summary.sourcesDetail") },
-          { Icon: AlertTriangle, label: t("summary.warnings"), value: warnings.length ? `${warnings.length}` : t("summary.none"), detail: warnings.length ? t("historyPage.summary.warningDetail") : t("historyPage.summary.noWarningDetail"), tone: warnings.length ? "warning" : "ready" },
+          { Icon: Database, label: t("historyPage.summary.target"), value: targetRepository, detail: `${contextLabel(context.menu_id, t)} / ${workflowContextLabel(context.workflow_context, t)}` },
+          { Icon: FileJson, label: t("historyPage.summary.scope"), value: scopeIdentity || shortIdentifier(data.snapshot_id), detail: inventorySummary || t("historyPage.summary.scopeDetail") },
+          { Icon: AlertTriangle, label: t("historyPage.summary.issues"), value: issueCount ? `${issueCount}` : t("summary.none"), detail: issueCount ? t("historyPage.summary.issueDetail") : t("historyPage.summary.noIssueDetail"), tone: issueCount ? "warning" : "ready" },
+          { Icon: FileText, label: t("historyPage.summary.sources"), valueLines: [`${t("historyPage.sourceFilesCount")}: ${sourceFiles.length}`, `${t("historyPage.sourceCommandsCount")}: ${sourceCommands.length}`], detail: t("historyPage.summary.sourcesDetail") },
         ]}
       />
       <DetailSection id="history-snapshot" title={t("historyPage.snapshotTitle")} Icon={FileJson}>
         <div className="sidebar-page-card-grid">
           <SidebarPageCard Icon={CalendarDays} title={t("summary.generated")} detail={formatGenerated(data, locale)} status="ready" t={t} />
+          <SidebarPageCard Icon={Database} title={t("historyPage.snapshotTarget")} detail={`${targetRepository} / ${contextLabel(context.menu_id, t)}`} status={scope.path_state || context.target_repository?.path_state || "unknown"} t={t} />
+          <SidebarPageCard Icon={Clock} title={t("historyPage.observedAt")} detail={observedAt} status={scope.inventory?.status || "cached"} t={t} />
           <SidebarPageCard Icon={Database} title={t("summary.schema")} detail={displayText(data.schema_version)} status="ready" t={t} />
-          <SidebarPageCard Icon={FileJson} title={t("historyPage.contentHash")} detail={displayText(data.content_hash)} status={data.content_hash ? "ready" : "unknown"} t={t} />
+          <SidebarPageCard Icon={FileJson} title={t("historyPage.snapshotIdentity")} detail={shortIdentifier(data.snapshot_id)} status={data.snapshot_id ? "ready" : "unknown"} t={t}>
+            <SidebarReferenceChip value={data.snapshot_id} t={t} />
+          </SidebarPageCard>
+          <SidebarPageCard Icon={FileJson} title={t("historyPage.contentHash")} detail={shortIdentifier(data.content_hash)} status={data.content_hash ? "ready" : "unknown"} t={t}>
+            <SidebarReferenceChip value={data.content_hash} t={t} />
+          </SidebarPageCard>
+          <SidebarPageCard Icon={FileSearch} title={t("historyPage.inventoryHash")} detail={shortIdentifier(scope.inventory_hash)} status={scope.inventory_hash ? scope.inventory?.status || "cached" : "unknown"} t={t}>
+            <SidebarReferenceChip value={scope.inventory_hash} t={t} />
+          </SidebarPageCard>
           <SidebarPageCard Icon={Lock} title={t("app.readOnly")} detail={t("historyPage.readOnlyDetail")} status="ready" t={t} />
         </div>
+      </DetailSection>
+      <DetailSection id="history-issues" title={t("historyPage.issuesTitle")} Icon={AlertTriangle}>
+        <HistoryIssueList warnings={warnings} failures={failures} t={t} />
       </DetailSection>
       <WorkflowRecentTable rows={data.development?.recent_runs} data={data} t={t} />
       <DetailSection id="history-warnings" title={t("summary.warnings")} Icon={AlertTriangle}>
         {warnings.length ? (
           <div className="sidebar-warning-list">
             {warnings.map((warning, index) => (
-              <article className="sidebar-warning-item" key={`${displayText(warning)}-${index}`}>
+              <article className="sidebar-warning-item" key={`${displayText(warning.detail)}-${index}`}>
                 <AlertTriangle aria-hidden="true" size={18} />
-                <p>{displayText(warning)}</p>
+                <p>{warning.detail}</p>
               </article>
             ))}
           </div>
@@ -4706,30 +8273,57 @@ function HistoryPage({ data, locale, t }) {
 function SourceBoundary({ data, t }) {
   const files = asArray(data.source_files);
   const commands = asArray(data.source_commands);
+  const productFiles = files.filter((value) => displayText(value, "").startsWith("product:"));
+  const rootFiles = files.filter((value) => !displayText(value, "").startsWith("product:"));
+  const productCommands = commands.filter((value) => /(\[absolute-path\]|--context|check_git_sync|check_ci_status|product-security)/.test(displayText(value, "")));
+  const rootCommands = commands.filter((value) => !productCommands.includes(value));
   return (
-    <section className="source-boundary" aria-label={t("aria.dataBoundary")}>
-      <header className="source-boundary__head">
+    <details className="source-boundary" aria-label={t("aria.dataBoundary")}>
+      <summary className="source-boundary__head">
         <FileText aria-hidden="true" size={22} />
         <div>
           <h3>{t("maintenance.dataRoot.title")}</h3>
           <p>{t("maintenance.dataRoot.detail")}</p>
         </div>
-      </header>
+        <span className="source-boundary__summary-action">{t("maintenance.dataRoot.open")}</span>
+      </summary>
       <div className="source-boundary__grid">
         <div>
           <FileText aria-hidden="true" size={20} />
           <div>
             <strong>{t("app.sourceFiles")}</strong>
-            <SourceBoundaryChips values={files} t={t} limit={3} variant="files" />
+            <p className="source-boundary__role">{t("maintenance.sourceFilesRole")}</p>
+            <SourceBoundaryChips values={rootFiles} t={t} limit={3} variant="files" labelKey="maintenance.sourceFileItem" tooltipKey="maintenance.sourceFileTooltip" />
           </div>
         </div>
+        {productFiles.length ? (
+          <div>
+            <Database aria-hidden="true" size={20} />
+            <div>
+              <strong>{t("maintenance.productSourceFiles")}</strong>
+              <p className="source-boundary__role">{t("maintenance.productSourceFilesRole")}</p>
+              <SourceBoundaryChips values={productFiles} t={t} limit={8} variant="files" labelKey="maintenance.sourceFileItem" tooltipKey="maintenance.sourceFileTooltip" />
+            </div>
+          </div>
+        ) : null}
         <div>
           <Copy aria-hidden="true" size={20} />
           <div>
             <strong>{t("app.sourceCommands")}</strong>
-            <SourceBoundaryChips values={commands} t={t} limit={2} variant="commands" />
+            <p className="source-boundary__role">{t("maintenance.sourceCommandsRole")}</p>
+            <SourceBoundaryChips values={rootCommands} t={t} limit={2} variant="commands" labelKey="maintenance.sourceCommandItem" tooltipKey="maintenance.sourceCommandTooltip" />
           </div>
         </div>
+        {productCommands.length ? (
+          <div>
+            <TerminalSquare aria-hidden="true" size={20} />
+            <div>
+              <strong>{t("maintenance.productSourceCommands")}</strong>
+              <p className="source-boundary__role">{t("maintenance.productSourceCommandsRole")}</p>
+              <SourceBoundaryChips values={productCommands} t={t} limit={4} variant="commands" labelKey="maintenance.sourceCommandItem" tooltipKey="maintenance.sourceCommandTooltip" />
+            </div>
+          </div>
+        ) : null}
         <div>
           <Lock aria-hidden="true" size={20} />
           <div>
@@ -4738,7 +8332,7 @@ function SourceBoundary({ data, t }) {
           </div>
         </div>
       </div>
-    </section>
+    </details>
   );
 }
 
@@ -4838,16 +8432,143 @@ function resolveRefreshIntervalMs() {
   return defaultRefreshMs;
 }
 
+function resolveContextSwitchFallbackMs() {
+  const params = new URLSearchParams(window.location.search);
+  const requested = Number(params.get("context_switch_fallback_ms"));
+  if (Number.isFinite(requested) && requested >= 300) {
+    return Math.min(requested, 30000);
+  }
+  return CONTEXT_SWITCH_FALLBACK_MS;
+}
+
 function SyncBanner({ error, t }) {
   if (!error) {
     return null;
   }
+  const message = displayText(error.message, "");
+  const detail = /timed out/i.test(message) ? t("app.refreshIssueTimeout") : t("app.refreshIssueDetail");
   return (
     <div className="sync-banner" role="status">
       <AlertTriangle aria-hidden="true" size={18} />
       <span>{t("app.refreshIssue")}</span>
-      <small>{displayText(error.message)}</small>
+      {detail ? <small>{detail}</small> : null}
     </div>
+  );
+}
+
+function ContextSwitchFailureNotice({ failure, activeMenuId, t }) {
+  const failedMenuId = displayText(failure?.menuId, "");
+  const currentMenuId = displayText(activeMenuId, "");
+  if (!failure || !failedMenuId || failedMenuId === currentMenuId) {
+    return null;
+  }
+  const message = displayText(failure.message, "");
+  const detail = /timed out/i.test(message) ? t("context.switchFailure.timeoutDetail") : t("context.switchFailure.genericDetail");
+  return (
+    <div className="context-switch-failure" role="status" aria-live="polite">
+      <AlertTriangle aria-hidden="true" size={18} />
+      <div>
+        <strong>{t("context.switchFailure.title")} {contextLabel(failedMenuId, t)}</strong>
+        <span>{t("context.switchFailure.detail")} {contextLabel(activeMenuId, t)}</span>
+        {detail ? <small>{detail}</small> : null}
+      </div>
+    </div>
+  );
+}
+
+function ContextSwitchProgressStep({ state, children }) {
+  const normalizedState = displayText(state, "pending");
+  const Icon = normalizedState === "complete" ? Check : normalizedState === "active" ? RefreshCw : CircleDashed;
+  return (
+    <li className={`context-switch-progress__step context-switch-progress__step--${normalizedState}`}>
+      <span className="context-switch-progress__step-icon">
+        <Icon aria-hidden="true" size={13} />
+      </span>
+      <span>{children}</span>
+    </li>
+  );
+}
+
+function ContextSwitchProgressPopup({ pendingMenuId, activeMenuId, data, t, progress }) {
+  const pending = displayText(pendingMenuId, "");
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+
+  useEffect(() => {
+    if (!pending) {
+      setElapsedSeconds(0);
+      return undefined;
+    }
+    const startedAt = Date.now();
+    setElapsedSeconds(0);
+    const timerId = window.setInterval(() => {
+      setElapsedSeconds(Math.max(1, Math.floor((Date.now() - startedAt) / 1000)));
+    }, 1000);
+    return () => window.clearInterval(timerId);
+  }, [pending]);
+
+  if (!pending) {
+    return null;
+  }
+
+  const pendingContext = contextDataForMenu(data, pending) || availableContextForMenu(data, pending) || {};
+  const targetRepository = repositoryDisplayName(pendingContext.target_repository?.name || pendingContext.target_repository_name, t);
+  const snapshotStepState = progress?.snapshotReady ? "complete" : "active";
+  const applyStepState = progress?.viewApplied ? "complete" : progress?.snapshotReady ? "active" : "pending";
+  return (
+    <div className="context-switch-progress" role="status" aria-live="polite" aria-atomic="true">
+      <div className="context-switch-progress__panel" aria-busy="true">
+        <div className="context-switch-progress__header">
+          <span className="context-switch-progress__spinner" aria-hidden="true">
+            <RefreshCw size={24} />
+          </span>
+          <div>
+            <p className="context-switch-progress__eyebrow">{t("context.switchProgress.eyebrow")}</p>
+            <h2>{t("context.switchProgress.title")}</h2>
+            <p>{t("context.switchProgress.detail")}</p>
+          </div>
+        </div>
+        <dl className="context-switch-progress__summary">
+          <div>
+            <dt>{t("context.switchProgress.currentMenu")}</dt>
+            <dd>{contextLabel(activeMenuId, t)}</dd>
+          </div>
+          <div>
+            <dt>{t("context.switchProgress.nextMenu")}</dt>
+            <dd>{contextLabel(pending, t)}</dd>
+          </div>
+          <div>
+            <dt>{t("context.switchProgress.targetRepository")}</dt>
+            <dd>{targetRepository}</dd>
+          </div>
+        </dl>
+        <div className="context-switch-progress__bar" aria-hidden="true">
+          <span />
+        </div>
+        <ol className="context-switch-progress__steps" aria-label={t("context.switchProgress.stepsLabel")}>
+          <ContextSwitchProgressStep state="complete">{t("context.switchProgress.stepRequested")}</ContextSwitchProgressStep>
+          <ContextSwitchProgressStep state={snapshotStepState}>{progress?.fallbackApplied ? t("context.switchProgress.stepRefreshingSlow") : t("context.switchProgress.stepRefreshing")}</ContextSwitchProgressStep>
+          <ContextSwitchProgressStep state={applyStepState}>{t("context.switchProgress.stepPreparing")}</ContextSwitchProgressStep>
+        </ol>
+        <p className="context-switch-progress__elapsed">
+          {t("context.switchProgress.elapsedPrefix")} {elapsedSeconds} {t("context.switchProgress.elapsedSuffix")}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function ContextSwitchHoldingPage({ pendingMenuId, t }) {
+  const pending = displayText(pendingMenuId, "");
+  return (
+    <section className="view-surface context-switch-holding" aria-live="polite" aria-label={t("context.menuAvailability.waitTitle")}>
+      <div className="context-switch-holding__icon">
+        <RefreshCw aria-hidden="true" size={28} />
+      </div>
+      <div>
+        <h2>{t("context.menuAvailability.waitTitle")}</h2>
+        <p>{t("context.menuAvailability.waitDetail")} {contextLabel(pending, t)}</p>
+      </div>
+    </section>
   );
 }
 
@@ -4858,8 +8579,21 @@ function snapshotLocaleForHint(snapshotData) {
 }
 
 export default function App() {
+  const initialActiveMenuIdRef = useRef(null);
+  if (initialActiveMenuIdRef.current === null) {
+    initialActiveMenuIdRef.current = initialDashboardMenuId();
+  }
   const [state, setState] = useState({ status: "loading", data: null, error: null, refreshError: null, signature: "" });
   const [activeView, setActiveView] = useState(viewFromHash);
+  const [activeMenuId, setActiveMenuId] = useState(() => initialActiveMenuIdRef.current);
+  const [pendingMenuId, setPendingMenuId] = useState("");
+  const [contextSwitchFailure, setContextSwitchFailure] = useState(null);
+  const [contextSwitchProgress, setContextSwitchProgress] = useState(null);
+  const [liveStatus, setLiveStatus] = useState(null);
+  const activeMenuIdRef = useRef(initialActiveMenuIdRef.current);
+  const pendingMenuIdRef = useRef("");
+  const backgroundRefreshMenuIdRef = useRef("");
+  const firstSnapshotLoadedRef = useRef(false);
   const [localeHint, setLocaleHint] = useState("");
   const locale = useMemo(() => {
     const summary = state.data?.summary || {};
@@ -4873,6 +8607,11 @@ export default function App() {
   const htmlLang = useMemo(() => getDashboardIntlLocale(locale), [locale]);
   const htmlDirection = useMemo(() => getDashboardLocaleDirection(locale), [locale]);
   const refreshIntervalMs = useMemo(() => resolveRefreshIntervalMs(), []);
+  const contextSwitchFallbackMs = useMemo(() => resolveContextSwitchFallbackMs(), []);
+  useEffect(() => {
+    document.documentElement.lang = htmlLang;
+    document.documentElement.dir = htmlDirection;
+  }, [htmlLang, htmlDirection]);
   const publishSnapshot = useCallback((snapshot) => {
     setLocaleHint((previous) => {
       if (!previous) {
@@ -4895,6 +8634,13 @@ export default function App() {
       return { status: "failed", data: null, error, refreshError: null, signature: "" };
     });
   }, []);
+  const snapshotMatchesActiveMenu = useCallback((snapshot, requestedMenuId = "") => {
+    const expectedMenuId = displayText(requestedMenuId || activeMenuIdRef.current, "");
+    if (!expectedMenuId) {
+      return true;
+    }
+    return producerMenuIdForData(snapshot?.data || {}) === expectedMenuId;
+  }, []);
   const refreshSnapshotNow = useCallback(async (options = {}) => {
     if (options.clearLocaleHint) {
       setLocaleHint("");
@@ -4907,14 +8653,173 @@ export default function App() {
       return null;
     }
     try {
-      const snapshot = await fetchDashboardDataSnapshot();
+      const savedSnapshotOnly = Boolean(options.savedSnapshotOnly);
+      const requestedMenuId = savedSnapshotOnly ? "" : displayText(options.menuId || activeMenuIdRef.current, "");
+      const snapshot = await fetchDashboardDataSnapshot(requestedMenuId ? { menuId: requestedMenuId } : {});
+      if (!savedSnapshotOnly && !snapshotMatchesActiveMenu(snapshot, requestedMenuId)) {
+        throw new Error(`dashboard data menu mismatch: requested ${requestedMenuId || "current"}, received ${producerMenuIdForData(snapshot?.data || {})}`);
+      }
       publishSnapshot(snapshot);
       return snapshot;
     } catch (error) {
-      publishSnapshotError(error);
+      if (!options.suppressRefreshError) {
+        publishSnapshotError(error);
+      }
       throw error;
     }
-  }, [publishSnapshot, publishSnapshotError]);
+  }, [publishSnapshot, publishSnapshotError, snapshotMatchesActiveMenu]);
+
+  const rawData = state.data || {};
+  const loaded = Boolean(state.data) && (state.status === "ready" || state.status === "stale");
+  const producerMenuId = useMemo(() => producerMenuIdForData(rawData), [rawData]);
+
+  useEffect(() => {
+    if (!loaded) {
+      return;
+    }
+    const requestedMenuId = displayText(activeMenuIdRef.current || initialActiveMenuIdRef.current, "");
+    const nextMenuId = resolveActiveMenuId(rawData, requestedMenuId || producerMenuId);
+    setActiveMenuId((currentMenuId) => {
+      return currentMenuId === nextMenuId ? currentMenuId : nextMenuId;
+    });
+    if (nextMenuId) {
+      activeMenuIdRef.current = nextMenuId;
+      persistDashboardMenuId(nextMenuId);
+    }
+  }, [loaded, producerMenuId, rawData, state.signature]);
+
+  useEffect(() => {
+    activeMenuIdRef.current = activeMenuId;
+    setLiveStatus((previous) => (displayText(previous?.menu_id, "") === activeMenuId ? previous : null));
+  }, [activeMenuId]);
+
+  useEffect(() => {
+    if (!loaded) {
+      return undefined;
+    }
+    let active = true;
+    let inFlight = false;
+    let timerId = 0;
+
+    async function loadLiveStatus() {
+      if (inFlight) {
+        return;
+      }
+      const menuId = displayText(activeMenuIdRef.current, "");
+      if (!menuId) {
+        return;
+      }
+      inFlight = true;
+      try {
+        const nextLiveStatus = await fetchDashboardLiveStatus({ menuId });
+        if (!active || displayText(activeMenuIdRef.current, "") !== displayText(nextLiveStatus.menu_id, "")) {
+          return;
+        }
+        setLiveStatus(nextLiveStatus);
+      } catch {
+        if (!active) {
+          return;
+        }
+        setLiveStatus((previous) => (displayText(previous?.menu_id, "") === menuId ? previous : null));
+      } finally {
+        inFlight = false;
+      }
+    }
+
+    loadLiveStatus();
+    timerId = window.setInterval(loadLiveStatus, refreshIntervalMs);
+    return () => {
+      active = false;
+      window.clearInterval(timerId);
+    };
+  }, [loaded, refreshIntervalMs, activeMenuId]);
+
+  const clearContextSwitchPending = useCallback((menuId, delayMs = 0) => {
+    window.setTimeout(() => {
+      if (pendingMenuIdRef.current !== menuId) {
+        return;
+      }
+      pendingMenuIdRef.current = "";
+      setPendingMenuId("");
+      setContextSwitchProgress(null);
+    }, delayMs);
+  }, []);
+
+  const applyMenuFromSnapshotData = useCallback((snapshotData, menuId, options = {}) => {
+    const requestedMenuId = displayText(menuId, "");
+    const nextMenuId = resolveActiveMenuId(snapshotData, requestedMenuId);
+    if (!requestedMenuId || nextMenuId !== requestedMenuId) {
+      return false;
+    }
+    activeMenuIdRef.current = nextMenuId;
+    setActiveMenuId(nextMenuId);
+    setContextSwitchFailure(null);
+    setContextSwitchProgress({
+      menuId: nextMenuId,
+      snapshotReady: !options.fallbackApplied,
+      viewApplied: true,
+      fallbackApplied: Boolean(options.fallbackApplied),
+    });
+    persistDashboardMenuId(nextMenuId);
+    return true;
+  }, []);
+
+  const handleActiveMenuChange = useCallback(
+    (menuId) => {
+      const resolvedMenuId = resolveActiveMenuId(rawData, menuId);
+      if (!resolvedMenuId || !isMenuSelectable(rawData, resolvedMenuId)) {
+        return;
+      }
+      if (resolvedMenuId === producerMenuIdForData(rawData)) {
+        activeMenuIdRef.current = resolvedMenuId;
+        pendingMenuIdRef.current = "";
+        setPendingMenuId("");
+        setContextSwitchFailure(null);
+        setContextSwitchProgress(null);
+        setActiveMenuId(resolvedMenuId);
+        persistDashboardMenuId(resolvedMenuId);
+        return;
+      }
+      pendingMenuIdRef.current = resolvedMenuId;
+      setContextSwitchFailure(null);
+      setContextSwitchProgress({ menuId: resolvedMenuId, snapshotReady: false, viewApplied: false, fallbackApplied: false });
+      setPendingMenuId(resolvedMenuId);
+      const fallbackTimerId = window.setTimeout(() => {
+        if (pendingMenuIdRef.current !== resolvedMenuId) {
+          return;
+        }
+        if (applyMenuFromSnapshotData(rawData, resolvedMenuId, { fallbackApplied: true })) {
+          backgroundRefreshMenuIdRef.current = resolvedMenuId;
+          clearContextSwitchPending(resolvedMenuId, CONTEXT_SWITCH_COMPLETE_HOLD_MS);
+        }
+      }, contextSwitchFallbackMs);
+      void refreshSnapshotNow({ menuId: resolvedMenuId, suppressRefreshError: true })
+        .then((snapshot) => {
+          window.clearTimeout(fallbackTimerId);
+          if (snapshot?.data && snapshotMatchesActiveMenu(snapshot, resolvedMenuId)) {
+            applyMenuFromSnapshotData(snapshot.data, resolvedMenuId);
+          }
+        })
+        .catch((error) => {
+          window.clearTimeout(fallbackTimerId);
+          if (pendingMenuIdRef.current === resolvedMenuId) {
+            setContextSwitchFailure({ menuId: resolvedMenuId, message: displayText(error?.message, "") });
+          }
+        })
+        .finally(() => {
+          if (backgroundRefreshMenuIdRef.current === resolvedMenuId) {
+            backgroundRefreshMenuIdRef.current = "";
+          }
+          clearContextSwitchPending(resolvedMenuId, CONTEXT_SWITCH_COMPLETE_HOLD_MS);
+        });
+    },
+    [applyMenuFromSnapshotData, clearContextSwitchPending, contextSwitchFallbackMs, rawData, refreshSnapshotNow, snapshotMatchesActiveMenu],
+  );
+
+  const activeDashboard = useMemo(() => resolveActiveDashboardData(rawData, activeMenuId), [rawData, activeMenuId]);
+  const data = loaded ? activeDashboard.data : rawData;
+  const isContextSwitching = Boolean(displayText(pendingMenuId, ""));
+  const evidenceViewNeedsCurrentSnapshot = loaded && evidenceBackedViews.has(activeView) && !activeDashboard.isProducerContext;
 
   useEffect(() => {
     function handleHashChange() {
@@ -4935,16 +8840,69 @@ export default function App() {
       if (inFlight) {
         return;
       }
+      if (pendingMenuIdRef.current || backgroundRefreshMenuIdRef.current) {
+        return;
+      }
       inFlight = true;
       try {
-        const snapshot = await fetchDashboardDataSnapshot();
+        const menuId = displayText(activeMenuIdRef.current, "");
+        const firstSnapshotLoad = !firstSnapshotLoadedRef.current;
+        const snapshot = await fetchDashboardDataSnapshot({});
         if (!active) {
           return;
         }
+        firstSnapshotLoadedRef.current = true;
+        if (pendingMenuIdRef.current || displayText(activeMenuIdRef.current, "") !== menuId) {
+          if (!firstSnapshotLoad) {
+            return;
+          }
+        }
         publishSnapshot(snapshot);
+        if (firstSnapshotLoad && menuId) {
+          const selectedMenuNeedsLiveRefresh = menuId !== producerMenuIdForData(snapshot.data);
+          const appliedFromSnapshot = applyMenuFromSnapshotData(snapshot.data, menuId, { fallbackApplied: selectedMenuNeedsLiveRefresh });
+          if (!selectedMenuNeedsLiveRefresh) {
+            return;
+          }
+          if (!appliedFromSnapshot) {
+            return;
+          }
+          backgroundRefreshMenuIdRef.current = menuId;
+          void fetchDashboardDataSnapshot({ menuId })
+            .then((selectedSnapshot) => {
+              if (!active) {
+                return;
+              }
+              if (!snapshotMatchesActiveMenu(selectedSnapshot, menuId)) {
+                throw new Error(`dashboard data menu mismatch: requested ${menuId}, received ${producerMenuIdForData(selectedSnapshot?.data || {})}`);
+              }
+              applyMenuFromSnapshotData(selectedSnapshot.data, menuId);
+              publishSnapshot(selectedSnapshot);
+            })
+            .catch((error) => {
+              if (!active) {
+                return;
+              }
+              if (displayText(activeMenuIdRef.current, "") !== menuId) {
+                publishSnapshotError(error);
+                setContextSwitchFailure({ menuId, message: displayText(error?.message, "") });
+              }
+            })
+            .finally(() => {
+              if (backgroundRefreshMenuIdRef.current === menuId) {
+                backgroundRefreshMenuIdRef.current = "";
+              }
+            });
+        }
       } catch (error) {
         if (!active) {
           return;
+        }
+        firstSnapshotLoadedRef.current = true;
+        const failedPendingMenuId = displayText(pendingMenuIdRef.current, "");
+        if (failedPendingMenuId && displayText(activeMenuIdRef.current, "") !== failedPendingMenuId) {
+          setContextSwitchFailure({ menuId: failedPendingMenuId, message: displayText(error?.message, "") });
+          clearContextSwitchPending(failedPendingMenuId, CONTEXT_SWITCH_COMPLETE_HOLD_MS);
         }
         publishSnapshotError(error);
       } finally {
@@ -4958,16 +8916,28 @@ export default function App() {
       active = false;
       window.clearInterval(timerId);
     };
-  }, [publishSnapshot, publishSnapshotError, refreshIntervalMs]);
+  }, [applyMenuFromSnapshotData, clearContextSwitchPending, publishSnapshot, publishSnapshotError, refreshIntervalMs, snapshotMatchesActiveMenu]);
 
-  const data = state.data || {};
-  const loaded = Boolean(state.data) && (state.status === "ready" || state.status === "stale");
+  useEffect(() => {
+    function handleManualSnapshotRefresh() {
+      pendingMenuIdRef.current = "";
+      setPendingMenuId("");
+      setContextSwitchProgress(null);
+      void refreshSnapshotNow({ savedSnapshotOnly: true }).catch(() => {});
+    }
+    window.addEventListener("dashboard-control-center:refresh", handleManualSnapshotRefresh);
+    return () => {
+      window.removeEventListener("dashboard-control-center:refresh", handleManualSnapshotRefresh);
+    };
+  }, [refreshSnapshotNow]);
 
   return (
-    <main className="app-shell" lang={htmlLang} dir={htmlDirection}>
+    <main className="app-shell" lang={htmlLang} dir={htmlDirection} data-dcc-design-system="dashboard-control-center">
       <Sidebar activeView={activeView} t={t} data={data} locale={locale} loaded={loaded} />
-      <section className="app-main">
+      <section className="app-main" aria-busy={isContextSwitching ? "true" : undefined}>
         <h1 className="sr-only">{t("app.title")}</h1>
+        <ContextSwitchProgressPopup pendingMenuId={pendingMenuId} activeMenuId={activeDashboard.activeMenuId} data={data} t={t} progress={contextSwitchProgress} />
+        <ContextSwitchFailureNotice failure={contextSwitchFailure} activeMenuId={activeDashboard.activeMenuId} t={t} />
         <SyncBanner error={loaded ? state.refreshError : null} t={t} />
 
         {state.status === "loading" ? (
@@ -4988,16 +8958,18 @@ export default function App() {
           </section>
         ) : null}
 
-        {loaded && activeView === "overview" ? <OverviewSection data={data} t={t} locale={locale} /> : null}
+        {loaded && activeView === "overview" ? <OverviewSection data={data} t={t} locale={locale} activeMenuId={activeDashboard.activeMenuId} pendingMenuId={pendingMenuId} onActiveMenuChange={handleActiveMenuChange} liveStatus={liveStatus} /> : null}
         {loaded && activeView === "lessons" ? <LessonSection lessons={data.lessons || {}} data={data} locale={locale} t={t} /> : null}
-        {loaded && activeView === "workflow" ? <WorkflowSection development={data.development || {}} gitWorkflow={data.git_workflow || {}} data={data} locale={locale} t={t} /> : null}
-        {loaded && activeView === "maintenance" ? <MaintenanceSection maintenance={data.maintenance || {}} data={data} locale={locale} t={t} /> : null}
-        {loaded && activeView === "safety" ? <SafetySection security={data.security || {}} actions={data.actions || {}} partialFailures={data.partial_failures || []} data={data} locale={locale} t={t} /> : null}
-        {loaded && activeView === "repository-info" ? <RepositoryInfoPage data={data} locale={locale} t={t} /> : null}
-        {loaded && activeView === "documents" ? <DocumentsPage data={data} locale={locale} t={t} /> : null}
+        {loaded && evidenceViewNeedsCurrentSnapshot ? <ContextSwitchHoldingPage pendingMenuId={activeDashboard.activeMenuId} t={t} /> : null}
+        {loaded && !evidenceViewNeedsCurrentSnapshot && activeView === "workflow" ? <WorkflowSection development={data.development || {}} gitWorkflow={data.git_workflow || {}} data={data} locale={locale} t={t} liveStatus={liveStatus} /> : null}
+        {loaded && !evidenceViewNeedsCurrentSnapshot && activeView === "maintenance" ? <MaintenanceSection maintenance={data.maintenance || {}} data={data} locale={locale} t={t} liveStatus={liveStatus} /> : null}
+        {loaded && !evidenceViewNeedsCurrentSnapshot && activeView === "safety" ? <SafetySection security={data.security || {}} actions={data.actions || {}} partialFailures={data.partial_failures || []} data={data} locale={locale} t={t} liveStatus={liveStatus} /> : null}
+        {loaded && !evidenceViewNeedsCurrentSnapshot && activeView === "repository-info" ? <RepositoryInfoPage data={data} locale={locale} t={t} liveStatus={liveStatus} /> : null}
+        {loaded && !evidenceViewNeedsCurrentSnapshot && activeView === "documents" ? <DocumentsPage data={data} locale={locale} t={t} /> : null}
         {loaded && activeView === "settings" ? <SettingsPage data={data} locale={locale} t={t} onRefreshSnapshot={refreshSnapshotNow} /> : null}
-        {loaded && activeView === "help" ? <HelpPage data={data} locale={locale} t={t} /> : null}
-        {loaded && activeView === "history" ? <HistoryPage data={data} locale={locale} t={t} /> : null}
+        {loaded && !evidenceViewNeedsCurrentSnapshot && activeView === "design-studio" ? <DesignStudioPage data={data} locale={locale} t={t} /> : null}
+        {loaded && !evidenceViewNeedsCurrentSnapshot && activeView === "help" ? <HelpPage data={data} locale={locale} t={t} /> : null}
+        {loaded && !evidenceViewNeedsCurrentSnapshot && activeView === "history" ? <HistoryPage data={data} locale={locale} t={t} /> : null}
       </section>
     </main>
   );

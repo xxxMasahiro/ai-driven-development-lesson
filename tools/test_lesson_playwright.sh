@@ -32,6 +32,7 @@ playwright_evidence_inputs=(
   package-lock.json
   playwright.config.js
   tests/playwright/dashboard.spec.js
+  tools/playwright-env
   tools/test_lesson_playwright.sh
   tools/resource-guard
   tools/lib/resource_guard.sh

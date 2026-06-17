@@ -1,0 +1,167 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck source=tools/lib/lesson_common.sh
+source "$ROOT/tools/lib/lesson_common.sh"
+# shellcheck source=tools/lib/product_repository_authority.sh
+source "$ROOT/tools/lib/product_repository_authority.sh"
+
+COMMAND="${1:-status}"
+if [[ $# -gt 0 ]]; then
+  shift
+fi
+
+REPO=""
+JSON="false"
+CONFIRM="false"
+
+usage() {
+  cat <<'USAGE'
+Usage:
+  tools/product-repository-mode status [--repo <path>|--product <path>] [--json]
+  tools/product-repository-mode check [--repo <path>|--product <path>]
+  tools/product-repository-mode attach [--repo <path>|--product <path>] --confirm
+  tools/product-repository-mode detach [--repo <path>|--product <path>] --confirm
+  tools/product-repository-mode reconnect [--repo <path>|--product <path>] --confirm
+
+This command manages only the product operation-mode manifest:
+ops/PRODUCT_OPERATION_MODE.tsv. It does not delete legacy AGENT.md, fetch
+remotes, call GitHub, run CI, or mutate product code.
+USAGE
+}
+
+while [[ "$#" -gt 0 ]]; do
+  case "$1" in
+    --repo|--product)
+      REPO="${2:-}"
+      shift 2
+      ;;
+    --json)
+      JSON="true"
+      shift
+      ;;
+    --confirm)
+      CONFIRM="true"
+      shift
+      ;;
+    -h|--help|help)
+      usage
+      exit 0
+      ;;
+    *)
+      printf 'unknown option: %s\n' "$1" >&2
+      usage >&2
+      exit 1
+      ;;
+  esac
+done
+
+if [[ -z "$REPO" ]]; then
+  REPO="$(lesson_product_repo_root)"
+fi
+
+mode_file() {
+  printf '%s/ops/PRODUCT_OPERATION_MODE.tsv\n' "$REPO"
+}
+
+utc_now() {
+  date -u '+%Y-%m-%dT%H:%M:%SZ'
+}
+
+write_mode() {
+  local workflow_mode="$1"
+  local managed_by_parent="$2"
+  local parent_repository="$3"
+  local parent_rules_ref="$4"
+  local active_parent_run="$5"
+  local file
+  file="$(mode_file)"
+  mkdir -p "$(dirname "$file")"
+  {
+    printf '# key\tvalue\n'
+    printf 'workflow_mode\t%s\n' "$workflow_mode"
+    printf 'managed_by_parent\t%s\n' "$managed_by_parent"
+    printf 'parent_repository\t%s\n' "$parent_repository"
+    printf 'parent_rules_ref\t%s\n' "$parent_rules_ref"
+    printf 'last_parent_sync\t%s\n' "$(utc_now)"
+    printf 'active_parent_run\t%s\n' "$active_parent_run"
+    printf 'local_agents_version\t1\n'
+    printf 'routing_table_version\t1\n'
+  } >"$file"
+  printf 'Product operation mode recorded: %s\n' "$workflow_mode"
+  printf 'Source: ops/PRODUCT_OPERATION_MODE.tsv\n'
+}
+
+print_status() {
+  local mode_json
+  mode_json="$(product_repository_authority_operation_mode_json "$REPO")"
+  if [[ "$JSON" == "true" ]]; then
+    printf '%s\n' "$mode_json"
+    return
+  fi
+  PRODUCT_OPERATION_MODE_JSON="$mode_json" node <<'NODE'
+const data = JSON.parse(process.env.PRODUCT_OPERATION_MODE_JSON || "{}");
+console.log("Product Repository Operation Mode");
+console.log(`Status: ${data.status || "unknown"}`);
+console.log(`Mode: ${data.workflow_mode || "unknown"}`);
+console.log(`Managed by parent: ${data.managed_by_parent === true ? "true" : "false"}`);
+console.log(`Rule connection: ${data.rule_connection_status || "unknown"}`);
+console.log(`Product AGENTS.MD: ${data.agents_path_status || "unknown"}`);
+console.log(`Legacy AGENT.md: ${data.legacy_agent_status || "unknown"}`);
+if (data.repair_reason) console.log(`Repair reason: ${data.repair_reason}`);
+if (data.next_safe_action) console.log(`Next safe action: ${data.next_safe_action}`);
+NODE
+}
+
+check_mode() {
+  local mode_json
+  mode_json="$(product_repository_authority_operation_mode_json "$REPO")"
+  PRODUCT_OPERATION_MODE_JSON="$mode_json" node <<'NODE'
+const data = JSON.parse(process.env.PRODUCT_OPERATION_MODE_JSON || "{}");
+if (data.status !== "ready") {
+  console.error(`Product operation mode check failed: ${data.status || "unknown"}`);
+  if (data.repair_reason) console.error(`- ${data.repair_reason}`);
+  if (data.next_safe_action) console.error(`- ${data.next_safe_action}`);
+  process.exit(1);
+}
+console.log("Product operation mode check passed.");
+NODE
+}
+
+require_confirm_for_write() {
+  if [[ "$CONFIRM" != "true" ]]; then
+    printf 'This command would update %s.\n' "$(mode_file)" >&2
+    printf 'Run again with --confirm after the product operation-mode change is approved.\n' >&2
+    exit 1
+  fi
+}
+
+case "$COMMAND" in
+  status|現在地)
+    print_status
+    ;;
+  check|gate)
+    check_mode
+    ;;
+  attach|parent-managed)
+    require_confirm_for_write
+    write_mode "parent_managed" "true" "lesson_repository" "AGENTS.MD" "none"
+    ;;
+  detach|standalone)
+    require_confirm_for_write
+    write_mode "standalone" "false" "none" "none" "none"
+    ;;
+  reconnect)
+    require_confirm_for_write
+    write_mode "reconnecting" "true" "lesson_repository" "AGENTS.MD" "none"
+    ;;
+  ""|-h|--help|help)
+    usage
+    ;;
+  *)
+    printf 'unknown command: %s\n' "$COMMAND" >&2
+    usage >&2
+    exit 1
+    ;;
+esac

@@ -76,6 +76,61 @@
 ## 次に改善したいこと
 ```
 
+## 外部リポジトリ標準構成
+
+```text
+AGENTS.MD
+README.md
+.gitignore
+docs/product/REQUIREMENTS.md
+docs/product/SPECIFICATION.md
+docs/product/IMPLEMENTATION_PLAN.md
+docs/design-system/DESIGN_SYSTEM.md
+docs/design-system/tokens.json
+docs/design-system/components.json
+docs/workflow/TASK_TRACKER.md
+docs/workflow/HANDOFF.md
+docs/workflow/SECURITY.md
+docs/workflow/VERIFICATION.md
+docs/memory/README.md
+ops/STAGE_MANIFEST.tsv
+ops/TEST_PLAN_MANIFEST.tsv
+ops/DESIGN_SYSTEM_MANIFEST.tsv
+ops/DASHBOARD_MANIFEST.tsv
+ops/PRODUCT_MANIFEST.tsv
+ops/PRODUCT_OPERATION_MODE.tsv
+ops/PRODUCT_PROFILE.json
+ops/REPOSITORY_INDEX.json
+skills/product-development-workflow/SKILL.md
+skills/product-doc-sync/SKILL.md
+skills/product-security/SKILL.md
+skills/product-test/SKILL.md
+skills/product-design-system/SKILL.md
+tools/product-gate
+tools/check_product_structure.sh
+tools/check_product_docs.sh
+tools/check_product_security.sh
+tools/check_product_design_system.sh
+tools/test_product_repository.sh
+tools/product-mode
+tools/lib/product_common.sh
+tools/lib/product_gate_evidence.sh
+tools/product-gate-evidence
+src/
+tests/
+```
+
+条件付き:
+
+```text
+.github/workflows/                 CIありの場合
+ops/CI_MANIFEST.tsv                CIありの場合
+ops/INTEGRATION_MANIFEST.tsv       外部連携の場合
+EXTERNAL_INTEGRATION_SECURITY.md   外部連携の場合
+.githooks/                         product側でGit hooksを使う場合
+.env.example                       環境変数が必要な場合のみ
+```
+
 ## LEARNING_TASK_TRACKER.md
 
 ```text

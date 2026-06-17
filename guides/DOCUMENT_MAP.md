@@ -7,11 +7,12 @@ The short version:
 
 - `AGENTS.MD` tells an agent how to operate inside this lesson repository.
 - `docs/as-built/` describes what this lesson repository is meant to provide and how it is implemented.
+- `docs/design-system/` records durable UI design rules for control-center screens.
 - `docs/workflow/` records current work state and restart context.
 - `docs/memory/` records stable maintainer intent and decisions.
 - `learning/context/` stores learner-facing source context that future lesson implementation can render in the selected display language.
 - `skills/*/SKILL.md` stores reusable agent procedures.
-- Product repositories have their own documents, such as `AGENT.md`, `docs/workflow/TASK_TRACKER.md`, `docs/workflow/HANDOFF.md`, and `docs/memory/FAILURE_MEMORY.md`.
+- Product repositories have their own documents, such as product-local `AGENTS.MD`, `docs/workflow/TASK_TRACKER.md`, `docs/workflow/HANDOFF.md`, and `docs/memory/FAILURE_MEMORY.md`; legacy product `AGENT.md` is a migration target.
 
 ## Why This Exists
 
@@ -43,8 +44,9 @@ It contains:
 
 Important distinction:
 
-- `AGENTS.MD` belongs to this lesson repository.
-- `AGENT.md` belongs to a product repository created by a learner.
+- Lesson-side `AGENTS.MD` belongs to this lesson repository.
+- Product-side `AGENTS.MD` belongs to a product repository created by a learner.
+- Product-side `AGENT.md` is legacy drift that should be migrated after product `AGENTS.MD` is validated.
 
 Do not merge these roles.
 The lesson repository teaches and controls the workflow.
@@ -66,6 +68,21 @@ These documents are useful when a learner asks:
 - What behavior should exist?
 - What should be changed first?
 - How do we know the change is complete?
+
+## Design System Documents
+
+Design-system documents live in `docs/design-system/`.
+
+| File | Plain-language role |
+| --- | --- |
+| `docs/design-system/dashboard-control-center/DESIGN_SYSTEM.md` | Visual, interaction, accessibility, and safety-display rules for Repository Control Center and Dashboard Control Center screens |
+
+This document is useful when a developer asks:
+
+- Why do status badges, cards, source chips, tooltips, or glossary details need to look consistent?
+- Which information should appear first for non-engineers?
+- How should raw file paths, commands, and technical IDs be exposed without overwhelming the main UI?
+- How do we keep command previews display-only and Settings as the only mutation surface?
 
 ## Workflow Documents
 
@@ -98,6 +115,7 @@ The lesson memory documents live in `docs/memory/`.
 | File | Plain-language role |
 | --- | --- |
 | `docs/memory/DEVELOPER_MEMORY.md` | Stable maintainer intent, preferences, review findings, and follow-up requirements |
+| `docs/memory/SESSION_MEMORY.md` | Current handoff notes, temporary verification scope, and next-session restart context |
 
 Product repositories may also use memory documents.
 For example, a product-side `docs/memory/FAILURE_MEMORY.md` records failures, recovery steps, and prevention notes.
@@ -130,6 +148,8 @@ For example:
 - `skills/lesson-sync-gate/SKILL.md` explains synchronization-gate validation.
 - `skills/worklog-doc-sync/SKILL.md` explains how to keep work logs and design documents aligned.
 
+When a skill points to `references/*.md`, that reference file is part of the same route and must be read through the parent `SKILL.md`.
+
 Skills help the agent repeat the same workflow consistently.
 
 ## Prompt Examples
@@ -159,6 +179,7 @@ Do not edit files yet.
 The command-line tour is:
 
 ```bash
+./tools/check_document_root.sh
 ./tools/docs-tour status
 ./tools/docs-tour rules
 ./tools/docs-tour design

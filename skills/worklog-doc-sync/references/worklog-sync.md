@@ -2,7 +2,8 @@
 
 Product documentation has two roles:
 
-Before product-repository development or product-document edits, prompt the learner to open a separate Ubuntu/WSL CLI window for `$HOME/projects/task-tracker-repository/`.
+Before product-repository development or product-document edits, prompt the learner to open a separate Ubuntu/WSL CLI window for the configured product workspace.
+The structured STEP 1-14 default is `$HOME/projects/task-tracker-repository/`; Free Development, Product Improvement, and External Integration must use the product workspace selected by lesson configuration and Dashboard Settings.
 
 ```text
 docs/product/REQUIREMENTS.md / docs/product/SPECIFICATION.md / docs/product/IMPLEMENTATION_PLAN.md: current design

@@ -47,6 +47,11 @@ required_files=(
   "learning/PRODUCT_DEVELOPMENT_LANGUAGE_14_DAYS.tsv"
   "learning/GIT_WORKFLOW_SETTINGS.tsv"
   "learning/GIT_HOOK_SETTINGS.tsv"
+  "learning/context/README.md"
+  "learning/context/AI_DRIVEN_DEVELOPMENT_FOUNDATION.md"
+  "learning/context/SECURITY_FOUNDATION.md"
+  "learning/context/LESSON_CONTEXT_MAP.tsv"
+  "learning/context/WORKFLOW_CONTEXT_MAP.tsv"
   "learning/LEARNING_TASK_TRACKER_14_DAYS.md"
   "learning/LEARNING_HANDOFF_14_DAYS.md"
   "learning/ROADMAP.md"
@@ -61,12 +66,14 @@ required_files=(
   "tests/playwright/dashboard.spec.js"
   "prompts/PROMPTS_14_DAYS.md"
   "tools/lib/lesson_runtime.sh"
+  "tools/lib/lesson_context.sh"
   "tools/lib/document_paths.sh"
   "tools/lib/dashboard_data.sh"
   "tools/lib/git_workflow_policy.sh"
   "tools/lib/git_hooks_policy.sh"
   "docs/workflow/GIT_HOOK_RECOMMENDATION_PATHS.tsv"
   "tools/lesson14"
+  "tools/lesson-context"
   "tools/roadmap"
   "tools/helpdesk"
   "tools/free-development"
@@ -95,6 +102,7 @@ required_files=(
   "tools/check_developer_memory_requirements.sh"
   "tools/list_non_english_docs.sh"
   "tools/test_lesson_repository.sh"
+  "tools/test_lesson_context.sh"
   "tools/test_product_gate_tools.sh"
   "tools/product-repository-authority"
   "tools/product-repository-cleanup"
@@ -121,6 +129,7 @@ required_files=(
 
 executable_files=(
   "tools/lesson14"
+  "tools/lesson-context"
   "tools/roadmap"
   "tools/helpdesk"
   "tools/free-development"
@@ -149,6 +158,7 @@ executable_files=(
   "tools/check_developer_memory_requirements.sh"
   "tools/list_non_english_docs.sh"
   "tools/test_lesson_repository.sh"
+  "tools/test_lesson_context.sh"
   "tools/test_product_gate_tools.sh"
   "tools/product-repository-authority"
   "tools/product-repository-cleanup"
@@ -335,6 +345,11 @@ fi
 
 if ! "$ROOT/tools/check_lesson14_sync.sh" >/dev/null; then
   "$ROOT/tools/check_lesson14_sync.sh" >&2 || true
+  missing=1
+fi
+
+if ! "$ROOT/tools/lesson-context" validate >/dev/null; then
+  "$ROOT/tools/lesson-context" validate >&2 || true
   missing=1
 fi
 

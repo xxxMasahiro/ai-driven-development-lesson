@@ -22,6 +22,7 @@ jobs:
         run: |
           bash -n tools/lib/lesson_display_labels.sh
           bash -n tools/lib/lesson_runtime.sh
+          bash -n tools/lib/lesson_context.sh
           bash -n tools/lib/document_paths.sh
           bash -n tools/lib/git_workflow_policy.sh
           bash -n tools/lib/git_hooks_policy.sh
@@ -54,6 +55,7 @@ jobs:
           bash -n tools/check_review_protocol.sh
           bash -n tools/check_developer_memory_requirements.sh
           bash -n tools/check_repository_development_workflow.sh
+          bash -n tools/check_dashboard_design_system.sh
           bash -n tools/check_ci_workflow_structure.sh
           bash -n tools/test_lesson_playwright.sh
           bash -n tools/test_docs_tour.sh
@@ -83,15 +85,18 @@ jobs:
           bash -n tools/test_ci_pipeline_acceleration.sh
           bash -n tools/test_lesson_start_position.sh
           bash -n tools/test_lesson.sh
+          bash -n tools/test_lesson_context.sh
           bash -n tools/test_menu_prerequisites.sh
           bash -n tools/test_product_gate_tools.sh
           bash -n tools/lib/product_repository_authority.sh
           bash -n tools/lib/product_workflow_git_usage.sh
           bash -n tools/product-repository-authority
+          bash -n tools/product-repository-mode
           bash -n tools/product-repository-cleanup
           bash -n tools/fixture-copy
           bash -n tools/test_product_repository_cleanup.sh
           bash -n tools/test_product_repository_authority.sh
+          bash -n tools/test_product_repository_mode.sh
           bash -n tools/product-security
           bash -n tools/test_product_security.sh
           bash -n tools/test_product_git_usage_modes.sh
@@ -116,6 +121,7 @@ jobs:
           bash -n tools/team-development
           bash -n tools/external-integration
           bash -n tools/product-improvement
+          bash -n tools/lesson-context
 
   lesson14-structure-sync:
     runs-on: ubuntu-latest
@@ -155,6 +161,7 @@ jobs:
           ./tools/check_ci_workflow_structure.sh
           ./tools/test_ci_pipeline_acceleration.sh
           ./tools/test_ci_timing.sh
+          ./tools/test_lesson_context.sh
           ./tools/test_menu_prerequisites.sh
           ./tools/test_dashboard_settings.sh
           printf 'Lesson14 CI keeps the policy-regression-tests job context; common policy regressions are provided by CI / policy-regression-tests for the same commit.\n'

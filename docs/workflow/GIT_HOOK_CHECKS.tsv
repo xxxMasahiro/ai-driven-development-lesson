@@ -14,11 +14,13 @@ check_workflow_pair_sync	full|fast|minimal	./tools/check_workflow_pair_sync.sh	V
 check_review_protocol	full|fast	./tools/check_review_protocol.sh	Validate the sub-agent review protocol.
 check_developer_memory_requirements	full|fast|minimal	./tools/check_developer_memory_requirements.sh	Validate developer-memory requirements.
 check_repository_development_workflow	full|fast|minimal	./tools/check_repository_development_workflow.sh	Validate repository development workflow policy, skill, and wiring.
+check_dashboard_design_system	full|fast|minimal	./tools/check_dashboard_design_system.sh	Validate Dashboard Control Center design-system source-to-runtime drift.
 test_docs_tour	full|fast	./tools/test_docs_tour.sh	Run documentation tour regression tests.
 test_as_built_sync_contract	full|fast	./tools/test_as_built_sync_contract.sh	Run sync-contract regression tests.
 test_test_plan	full|fast	./tools/test_test_plan.sh	Run observe-only test-plan regression tests.
 test_repository_development_workflow	full|fast	./tools/test_repository_development_workflow.sh	Run repository development workflow regression tests.
 test_security_invariants	full|fast	./tools/test_security_invariants.sh	Run Security guard invariant regression tests.
+test_lesson_context	full|fast	./tools/test_lesson_context.sh	Run learner context map and CLI regression tests.
 test_git_workflow_policy	full|fast	./tools/test_git_workflow_policy.sh	Run Git workflow policy regression tests.
 test_git_hooks	full|fast	./tools/test_git_hooks.sh	Run Git hooks policy regression tests.
 test_resource_guard	full|fast	./tools/test_resource_guard.sh	Run resource guard policy and budget regression tests.
@@ -42,6 +44,7 @@ test_product_launch_check	full|fast	./tools/test_product_launch_check.sh	Run pro
 test_product_scaffold_check	full|fast	./tools/test_product_scaffold_check.sh	Run product scaffold regression tests.
 test_product_repository_cleanup	full|fast	./tools/test_product_repository_cleanup.sh	Run product repository cleanup regression tests.
 test_product_repository_authority	full|fast	./tools/test_product_repository_authority.sh	Run product repository authority regression tests.
+test_product_repository_mode	full|fast	./tools/test_product_repository_mode.sh	Run product repository operation-mode regression tests.
 test_product_security	full|fast	./tools/test_product_security.sh	Run product security workflow regression tests.
 test_product_git_usage_modes	full|fast	./tools/test_product_git_usage_modes.sh	Run product workflow Git usage mode regression tests.
 test_lesson_playwright	full|fast	./tools/test_lesson_playwright.sh --use-evidence	Run lesson dashboard and illustration Playwright checks.

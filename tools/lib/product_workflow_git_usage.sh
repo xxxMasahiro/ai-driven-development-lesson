@@ -11,6 +11,11 @@ if ! declare -F product_repository_authority_gate >/dev/null 2>&1; then
   source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/product_repository_authority.sh"
 fi
 
+if ! declare -F product_repository_registry_root_for_menu >/dev/null 2>&1; then
+  # shellcheck source=product_repository_registry.sh
+  source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/product_repository_registry.sh"
+fi
+
 product_workflow_git_usage_policy_file() {
   printf '%s\n' "${PRODUCT_WORKFLOW_GIT_USAGE_POLICY_FILE:-$LESSON_ROOT/docs/workflow/PRODUCT_WORKFLOW_GIT_USAGE_POLICY.tsv}"
 }
@@ -143,11 +148,19 @@ product_workflow_git_usage_setting_mode() {
   '
 }
 
+product_workflow_git_usage_env_override_allowed() {
+  [[ "${PRODUCT_WORKFLOW_GIT_USAGE_ALLOW_ENV_OVERRIDE:-}" == "1" ]]
+}
+
 product_workflow_git_usage_mode_for_context() {
   local context="$1"
   local mode
   product_workflow_git_usage_context_supported "$context" || { printf 'not_applicable'; return 0; }
   if [[ -n "${PRODUCT_WORKFLOW_GIT_USAGE_MODE:-}" ]]; then
+    product_workflow_git_usage_env_override_allowed || {
+      printf 'PRODUCT_WORKFLOW_GIT_USAGE_MODE requires PRODUCT_WORKFLOW_GIT_USAGE_ALLOW_ENV_OVERRIDE=1; Dashboard Settings are the source of truth.\n' >&2
+      return 1
+    }
     mode="$PRODUCT_WORKFLOW_GIT_USAGE_MODE"
     product_workflow_git_usage_mode_allowed_for_context "$context" "$mode" || {
       printf 'invalid product workflow Git usage mode for %s: %s\n' "$context" "$mode" >&2
@@ -235,21 +248,127 @@ product_workflow_git_usage_status_for_axis() {
 
 product_workflow_git_usage_git_command() {
   local mode="$1"
+  local repo="${2:-}"
+  local repo_arg="--product"
+  [[ -z "$repo" ]] || repo_arg="--repo $repo"
   case "$mode" in
     none) printf 'not_applicable' ;;
-    local) printf './tools/check_git_sync.sh --product --clean-required' ;;
-    remote_sync|ci) printf './tools/check_git_sync.sh --product --required' ;;
+    local) printf './tools/check_git_sync.sh %s --clean-required' "$repo_arg" ;;
+    remote_sync|ci) printf './tools/check_git_sync.sh %s --required' "$repo_arg" ;;
     *) printf 'not_applicable' ;;
   esac
 }
 
 product_workflow_git_usage_ci_command() {
   local mode="$1"
+  local repo="${2:-}"
+  local repo_arg="--product"
+  [[ -z "$repo" ]] || repo_arg="--repo $repo"
   if product_workflow_git_usage_requires_ci "$mode"; then
-    printf './tools/check_ci_status.sh --product --required'
+    printf './tools/check_ci_status.sh %s --required' "$repo_arg"
   else
     printf 'not_applicable'
   fi
+}
+
+product_workflow_git_usage_operation_mode_gate() {
+  local repo="${1:-$(lesson_product_repo_root)}"
+  "$LESSON_ROOT/tools/product-repository-mode" check --repo "$repo"
+}
+
+product_workflow_git_usage_repository_root_for_context() {
+  local context="$1"
+  local root
+  if product_repository_registry_has_rows; then
+    root="$(product_repository_registry_root_for_menu "$context" 2>/dev/null || true)"
+    [[ -n "$root" ]] || {
+      printf 'no external product repository is selected for %s\n' "$context" >&2
+      return 1
+    }
+    printf '%s' "$root"
+    return 0
+  fi
+  lesson_product_repo_root
+}
+
+product_workflow_git_usage_repository_boundary_gate_for_repo() {
+  local context="$1"
+  local repo="$2"
+  local mode
+  mode="$(product_workflow_git_usage_mode_for_context "$context")"
+  if [[ -z "$repo" ]]; then
+    printf 'missing selected product repository for %s: not_selected\n' "$context" >&2
+    return 1
+  fi
+  if [[ ! -d "$repo" ]]; then
+    printf 'expected product repository does not exist: %s\n' "$repo" >&2
+    return 1
+  fi
+  case "$repo/" in
+    "$LESSON_ROOT/"*)
+      printf 'product repository must not be inside the lesson repository: %s\n' "$repo" >&2
+      return 1
+      ;;
+  esac
+  if product_workflow_git_usage_requires_git_worktree "$mode"; then
+    git -C "$repo" rev-parse --is-inside-work-tree >/dev/null 2>&1 || {
+      printf 'selected product repository is not a Git worktree: %s\n' "$repo" >&2
+      return 1
+    }
+  fi
+}
+
+product_workflow_git_usage_gate_plan_row() {
+  local context="$1"
+  local mode="$2"
+  local gate_id="$3"
+  local requirement="$4"
+  local command="$5"
+  local description="$6"
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$context" "$mode" "$gate_id" "$requirement" "$command" "$description"
+}
+
+product_workflow_git_usage_gate_plan() {
+  local context="$1"
+  local product_type="${2:-all}"
+  local mode git_requirement ci_requirement scaffold_command authority_command security_command git_command ci_command boundary_command repo repo_arg
+  mode="$(product_workflow_git_usage_mode_for_context "$context")"
+  repo="$(product_workflow_git_usage_repository_root_for_context "$context" 2>/dev/null || true)"
+  repo_arg=""
+  [[ -z "$repo" ]] || repo_arg=" --repo $repo"
+  git_requirement="$(product_workflow_git_usage_requirement_for_axis "$mode" git)"
+  ci_requirement="$(product_workflow_git_usage_requirement_for_axis "$mode" ci)"
+  if product_repository_registry_has_rows; then
+    boundary_command="./tools/product-repository-registry selected $context"
+  else
+    boundary_command="./tools/check_repository_boundary.sh --product-workspace-required"
+  fi
+  if product_workflow_git_usage_requires_git_worktree "$mode"; then
+    security_command="./tools/product-security gate --context $context"
+  else
+    security_command="./tools/product-security gate --context $context --git-optional"
+  fi
+  scaffold_command="./tools/product-scaffold-check check --context $context --product-type $product_type$repo_arg"
+  authority_command="./tools/product-repository-authority status --context $context --product-type $product_type --json$repo_arg"
+  if [[ "$git_requirement" == "not_applicable" ]]; then
+    scaffold_command="$scaffold_command --git-optional"
+    authority_command="$authority_command --git-optional"
+  fi
+  if [[ "$ci_requirement" == "not_applicable" ]]; then
+    scaffold_command="$scaffold_command --ci-optional"
+    authority_command="$authority_command --ci-optional"
+  fi
+  git_command="$(product_workflow_git_usage_git_command "$mode" "$repo")"
+  ci_command="$(product_workflow_git_usage_ci_command "$mode" "$repo")"
+  printf '# context\tmode\tgate_id\trequirement\tcommand\tdescription\n'
+  product_workflow_git_usage_gate_plan_row "$context" "$mode" "repository_boundary" "required" "$boundary_command" "Confirm the product target path matches the selected Git usage mode."
+  product_workflow_git_usage_gate_plan_row "$context" "$mode" "operation_mode" "required" "./tools/product-repository-mode check$repo_arg" "Confirm product AGENTS.MD and ops/PRODUCT_OPERATION_MODE.tsv are ready."
+  product_workflow_git_usage_gate_plan_row "$context" "$mode" "scaffold" "required" "$scaffold_command" "Validate product-local docs, manifests, skills, tools, and source/test authorities."
+  product_workflow_git_usage_gate_plan_row "$context" "$mode" "authority" "required" "$authority_command" "Read product manifests and evidence with the selected Git/CI applicability."
+  product_workflow_git_usage_gate_plan_row "$context" "$mode" "security" "required" "$security_command" "Run product security checks with matching Git applicability."
+  product_workflow_git_usage_gate_plan_row "$context" "$mode" "workflow_pair_sync" "required" "./tools/check_workflow_pair_sync.sh$repo_arg" "Confirm product task tracker and handoff stay synchronized."
+  product_workflow_git_usage_gate_plan_row "$context" "$mode" "git_sync" "$git_requirement" "$git_command" "Check product Git state only when the selected mode requires Git."
+  product_workflow_git_usage_gate_plan_row "$context" "$mode" "ci" "$ci_requirement" "$ci_command" "Check product CI only when the selected mode requires CI."
 }
 
 product_workflow_git_usage_write_setting() {
@@ -286,63 +405,66 @@ product_workflow_git_usage_write_setting() {
 
 product_workflow_git_usage_repository_boundary_gate() {
   local context="$1"
-  local mode
-  mode="$(product_workflow_git_usage_mode_for_context "$context")"
-  if product_workflow_git_usage_requires_git_worktree "$mode"; then
-    "$LESSON_ROOT/tools/check_repository_boundary.sh" --product-required >/dev/null
-  else
-    "$LESSON_ROOT/tools/check_repository_boundary.sh" --product-workspace-required >/dev/null
-  fi
+  local repo
+  repo="$(product_workflow_git_usage_repository_root_for_context "$context")" || return 1
+  product_workflow_git_usage_repository_boundary_gate_for_repo "$context" "$repo"
 }
 
 product_workflow_git_usage_scaffold_gate() {
   local context="$1"
   local product_type="${2:-all}"
-  local mode
+  local mode args repo
+  repo="$(product_workflow_git_usage_repository_root_for_context "$context")" || return 1
   mode="$(product_workflow_git_usage_mode_for_context "$context")"
-  if product_workflow_git_usage_requires_git_worktree "$mode"; then
-    "$LESSON_ROOT/tools/product-scaffold-check" check --context "$context" --product-type "$product_type"
-  else
-    "$LESSON_ROOT/tools/product-scaffold-check" check --context "$context" --product-type "$product_type" --git-optional
+  args=(check --repo "$repo" --context "$context" --product-type "$product_type")
+  if ! product_workflow_git_usage_requires_git_worktree "$mode"; then
+    args+=(--git-optional)
   fi
+  if ! product_workflow_git_usage_requires_ci "$mode"; then
+    args+=(--ci-optional)
+  fi
+  "$LESSON_ROOT/tools/product-scaffold-check" "${args[@]}"
 }
 
 product_workflow_git_usage_authority_gate() {
   local context="$1"
   local product_type="${2:-all}"
-  local mode git_required ci_required
+  local mode git_required ci_required repo
+  repo="$(product_workflow_git_usage_repository_root_for_context "$context")" || return 1
   mode="$(product_workflow_git_usage_mode_for_context "$context")"
   git_required="$(product_workflow_git_usage_bool product_workflow_git_usage_requires_git_worktree "$mode")"
   ci_required="$(product_workflow_git_usage_bool product_workflow_git_usage_requires_ci "$mode")"
-  product_repository_authority_gate "$(lesson_product_repo_root)" "$context" "$product_type" "$git_required" "$ci_required"
+  product_repository_authority_gate "$repo" "$context" "$product_type" "$git_required" "$ci_required"
 }
 
 product_workflow_git_usage_security_gate() {
   local context="$1"
-  local mode
+  local mode repo
+  repo="$(product_workflow_git_usage_repository_root_for_context "$context")" || return 1
   mode="$(product_workflow_git_usage_mode_for_context "$context")"
   if product_workflow_git_usage_requires_git_worktree "$mode"; then
-    "$LESSON_ROOT/tools/product-security" gate --context "$context"
+    "$LESSON_ROOT/tools/product-security" gate --context "$context" --repo "$repo"
   else
-    "$LESSON_ROOT/tools/product-security" gate --context "$context" --git-optional
+    "$LESSON_ROOT/tools/product-security" gate --context "$context" --repo "$repo" --git-optional
   fi
 }
 
 product_workflow_git_usage_git_ci_gate() {
   local context="$1"
-  local mode
+  local mode repo
+  repo="$(product_workflow_git_usage_repository_root_for_context "$context")" || return 1
   mode="$(product_workflow_git_usage_mode_for_context "$context")"
   if product_workflow_git_usage_requires_git_worktree "$mode"; then
     if product_workflow_git_usage_requires_remote_sync "$mode"; then
-      "$LESSON_ROOT/tools/check_git_sync.sh" --product --required
+      "$LESSON_ROOT/tools/check_git_sync.sh" --repo "$repo" --required
     else
-      "$LESSON_ROOT/tools/check_git_sync.sh" --product --clean-required
+      "$LESSON_ROOT/tools/check_git_sync.sh" --repo "$repo" --clean-required
     fi
   else
     printf 'Product Git sync gate: not applicable for product workflow Git usage mode "%s".\n' "$mode"
   fi
   if product_workflow_git_usage_requires_ci "$mode"; then
-    "$LESSON_ROOT/tools/check_ci_status.sh" --product --required
+    "$LESSON_ROOT/tools/check_ci_status.sh" --repo "$repo" --required
   else
     printf 'Product CI gate: not applicable for product workflow Git usage mode "%s".\n' "$mode"
   fi
@@ -351,10 +473,13 @@ product_workflow_git_usage_git_ci_gate() {
 product_workflow_git_usage_gate() {
   local context="$1"
   local product_type="${2:-all}"
+  local repo
+  repo="$(product_workflow_git_usage_repository_root_for_context "$context")" || return 1
   product_workflow_git_usage_repository_boundary_gate "$context"
+  product_workflow_git_usage_operation_mode_gate "$repo"
   product_workflow_git_usage_scaffold_gate "$context" "$product_type"
   product_workflow_git_usage_authority_gate "$context" "$product_type"
   product_workflow_git_usage_security_gate "$context"
-  "$LESSON_ROOT/tools/check_workflow_pair_sync.sh" --product
+  "$LESSON_ROOT/tools/check_workflow_pair_sync.sh" --repo "$repo"
   product_workflow_git_usage_git_ci_gate "$context"
 }

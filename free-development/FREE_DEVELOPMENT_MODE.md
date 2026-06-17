@@ -18,11 +18,12 @@ Use the same workflow learned in the lesson:
 6. Track work in `docs/workflow/TASK_TRACKER.md`.
 7. Preserve restart context in `docs/workflow/HANDOFF.md`.
 8. Declare entrypoint, source, and test authorities in `ops/PRODUCT_MANIFEST.tsv`.
-9. Work on a branch when the change is not trivial.
-10. Commit small, reviewable changes.
-11. Run local tests.
-12. Push to GitHub and confirm CI.
-13. Update documentation before considering the work complete.
+9. Keep product-local `skills/` and `tools/` so routine maintenance can run from inside the product repository.
+10. Follow the Dashboard Settings product workflow Git usage mode.
+11. Work on a branch and commit small, reviewable changes when Git is applicable.
+12. Run local tests and product safety checks.
+13. Push, remote-sync, and confirm CI only when the selected product mode and Git workflow action settings make those phases applicable.
+14. Update documentation before considering the work complete.
 
 ## Technology Choice Support
 
@@ -53,8 +54,10 @@ Please help me choose or confirm the product repository, then guide development 
 Start with a dialogue about my goal, users, constraints, priorities, and success criteria.
 Ask one question at a time when choices are unclear.
 Help me choose the programming language, framework, database, payment system, and other tools needed for the product instead of assuming a fixed stack.
-Do not skip requirements, specification, implementation plan, task tracking, handoff, Git sync, tests, or CI.
-Use the standard product repository scaffold: docs/product/, docs/workflow/, docs/memory/, ops/, src/, and tests/.
+Do not skip requirements, specification, implementation plan, task tracking, handoff, local checks, or product safety checks.
+Use Dashboard Settings as the source of truth for whether Git, remote sync, and CI apply to this product.
+Use the standard product repository scaffold: docs/product/, docs/workflow/, docs/memory/, ops/, skills/, tools/, src/, and tests/.
+Keep product-local skills and tools minimal, product-scoped, and reusable so the product can run document, structure, security, and test checks from inside its own repository.
 Declare the actual entrypoint, source, and test authorities in ops/PRODUCT_MANIFEST.tsv so the dashboard and gates can read them without guessing the stack.
 Ask for approval before each major workflow transition.
 ```
@@ -64,12 +67,14 @@ Ask for approval before each major workflow transition.
 Free Development Mode work is ready only when these checks pass:
 
 ```bash
-./tools/check_repository_boundary.sh --product-required
-./tools/product-scaffold-check check --context free-development
-./tools/check_git_sync.sh --product --required
-./tools/check_ci_status.sh --product --required
+./tools/free-development gate
 ```
 
-If a product does not have CI yet, create CI first and then run the gate again.
+`./tools/free-development gate` reads the product workflow Git usage mode from Dashboard Settings:
+
+- `none`: product workspace, canonical documents, scaffold authority, product security, and required local checks are still required; Git, remote sync, and CI are not applicable.
+- `local`: local Git worktree and local Git safety checks are required; remote sync and CI are not applicable.
+- `remote_sync`: local Git and remote sync are required; CI is not applicable.
+- `ci`: local Git, remote sync, and CI are required. This is the default and preserves the strict existing behavior.
 
 For team development or container work, use `advanced/TEAM_DEVELOPMENT_DOCKER.md`.

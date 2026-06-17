@@ -9,6 +9,7 @@ lesson_runtime_approval="${LESSON_RUNTIME_APPROVAL:-}"
 lesson_runtime_approval_required="${LESSON_RUNTIME_REQUIRE_APPROVAL:-0}"
 lesson_runtime_check="${LESSON_RUNTIME_CHECK:-lesson_structure_check}"
 lesson_runtime_before_pass="${LESSON_RUNTIME_BEFORE_PASS:-}"
+lesson_runtime_context_scope="${LESSON_RUNTIME_CONTEXT_SCOPE:-}"
 
 lesson_runtime_usage() {
   cat <<USAGE
@@ -260,6 +261,14 @@ lesson_runtime_status() {
     lesson_runtime_step_command_line pass "$current"
   else
     printf 'Current step: all steps completed\n'
+  fi
+  if [[ -n "$lesson_runtime_context_scope" ]]; then
+    printf '\nLearner context:\n'
+    "$LESSON_ROOT/tools/lesson-context" summary --scope "$lesson_runtime_context_scope"
+    if [[ -n "$current" ]]; then
+      printf 'Current step context command:\n'
+      printf './tools/lesson-context step %s %s\n' "$lesson_runtime_context_scope" "$current"
+    fi
   fi
   printf '\nUse:\n'
   printf '  ./tools/%s 開始 <step_id>\n' "$lesson_runtime_name"

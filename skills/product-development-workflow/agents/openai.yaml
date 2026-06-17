@@ -1,0 +1,4 @@
+interface:
+  display_name: "Product Development Workflow"
+  short_description: "Run Settings-aware external product development."
+  default_prompt: "Use $product-development-workflow for Settings-aware external product development."

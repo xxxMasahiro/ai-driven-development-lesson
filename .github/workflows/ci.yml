@@ -23,6 +23,8 @@ jobs:
           bash -n .githooks/pre-commit
           bash -n tools/lib/lesson_display_labels.sh
           bash -n tools/lib/lesson_common.sh
+          bash -n tools/lib/lesson_runtime.sh
+          bash -n tools/lib/lesson_context.sh
           bash -n tools/lib/document_paths.sh
           bash -n tools/lib/git_workflow_policy.sh
           bash -n tools/lib/git_hooks_policy.sh
@@ -49,6 +51,7 @@ jobs:
           bash -n tools/check_review_protocol.sh
           bash -n tools/check_developer_memory_requirements.sh
           bash -n tools/check_repository_development_workflow.sh
+          bash -n tools/check_dashboard_design_system.sh
           bash -n tools/check_ci_workflow_structure.sh
           bash -n tools/test_lesson_playwright.sh
           bash -n tools/test_docs_tour.sh
@@ -78,15 +81,18 @@ jobs:
           bash -n tools/test_ci_pipeline_acceleration.sh
           bash -n tools/test_lesson_start_position.sh
           bash -n tools/test_lesson.sh
+          bash -n tools/test_lesson_context.sh
           bash -n tools/test_lesson14.sh
           bash -n tools/test_menu_prerequisites.sh
           bash -n tools/test_product_gate_tools.sh
           bash -n tools/lib/product_repository_authority.sh
           bash -n tools/lib/product_workflow_git_usage.sh
           bash -n tools/product-repository-authority
+          bash -n tools/product-repository-mode
           bash -n tools/product-repository-cleanup
           bash -n tools/test_product_repository_cleanup.sh
           bash -n tools/test_product_repository_authority.sh
+          bash -n tools/test_product_repository_mode.sh
           bash -n tools/fixture-copy
           bash -n tools/product-security
           bash -n tools/test_product_security.sh
@@ -112,6 +118,7 @@ jobs:
           bash -n tools/external-integration
           bash -n tools/product-improvement
           bash -n tools/lesson
+          bash -n tools/lesson-context
           bash -n tools/learn
 
   structure-docs-checks:
@@ -135,6 +142,7 @@ jobs:
           ./tools/check_review_protocol.sh
           ./tools/check_developer_memory_requirements.sh
           ./tools/check_repository_development_workflow.sh
+          ./tools/check_dashboard_design_system.sh
 
       - name: Repository boundary
         run: ./tools/check_repository_boundary.sh
@@ -144,6 +152,7 @@ jobs:
           ./tools/lesson 現在地
           ./tools/lesson 一覧
           ./tools/learn 現在地
+          ./tools/lesson-context status
 
       - name: Regression checks
         run: |
@@ -193,6 +202,7 @@ jobs:
           ./tools/test_resource_cleanup.sh
           ./tools/test_git_hooks_parallel.sh
           ./tools/test_fixture_copy.sh
+          ./tools/test_lesson_context.sh
           ./tools/test_ci_evidence.sh
           ./tools/test_ci_timing.sh
           ./tools/test_dashboard_schema.sh
@@ -209,6 +219,7 @@ jobs:
           ./tools/test_product_gate_tools.sh
           ./tools/test_product_repository_cleanup.sh
           ./tools/test_product_repository_authority.sh
+          ./tools/test_product_repository_mode.sh
           ./tools/test_product_security.sh
           ./tools/test_product_git_usage_modes.sh
           ./tools/check_ci_workflow_structure.sh

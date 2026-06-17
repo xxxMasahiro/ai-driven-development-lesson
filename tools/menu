@@ -8,6 +8,10 @@ source "$SCRIPT_DIR/lib/lesson_common.sh"
 source "$SCRIPT_DIR/lib/git_workflow_policy.sh"
 # shellcheck source=tools/lib/lesson_display_labels.sh
 source "$SCRIPT_DIR/lib/lesson_display_labels.sh"
+# shellcheck source=tools/lib/product_workflow_git_usage.sh
+source "$SCRIPT_DIR/lib/product_workflow_git_usage.sh"
+
+SKILL_ALIASES_FILE="$LESSON_ROOT/skills/SKILL_ALIASES.tsv"
 
 show_menu() {
   local lesson7_label lesson14_label lesson7_description lesson14_description
@@ -79,9 +83,49 @@ Usage:
   tools/menu
   tools/menu status
   tools/menu readiness
+  tools/menu skills
+  tools/menu skill-aliases
   tools/menu check <1|2|3|4|5|6|7>
   tools/menu start <1|2|3|4|5|6|7> --confirm
 USAGE
+}
+
+menu_require_skill_aliases_file() {
+  if [[ ! -f "$SKILL_ALIASES_FILE" ]]; then
+    printf 'missing skill aliases file: %s\n' "$SKILL_ALIASES_FILE" >&2
+    exit 1
+  fi
+}
+
+menu_skill_alias_rows() {
+  menu_require_skill_aliases_file
+  awk -F '\t' '
+    /^[[:space:]]*#/ { next }
+    /^[[:space:]]*$/ { next }
+    NF >= 4 { print $1 "\t" $2 "\t" $3 "\t" $4 }
+  ' "$SKILL_ALIASES_FILE"
+}
+
+menu_show_skills() {
+  local alias skill display_name description
+  printf 'Skills\n'
+  printf '======\n'
+  while IFS=$'\t' read -r alias skill display_name description; do
+    printf '\n%s\n' "$skill"
+    printf '  Alias: %s\n' "$alias"
+    printf '  Display: %s\n' "$display_name"
+    printf '  Use: %s\n' "$description"
+    printf '  File: skills/%s/SKILL.md\n' "$skill"
+  done < <(menu_skill_alias_rows)
+}
+
+menu_show_skill_aliases() {
+  local alias skill display_name description
+  printf 'Skill aliases\n'
+  printf '=============\n'
+  while IFS=$'\t' read -r alias skill display_name description; do
+    printf '%s -> %s\n' "$alias" "$skill"
+  done < <(menu_skill_alias_rows)
 }
 
 menu_item_name() {
@@ -112,13 +156,43 @@ menu_item_entry() {
 
 menu_git_workflow_repo_for_item() {
   case "$1" in
-    5|6)
-      lesson_product_repo_root
-      ;;
+    4) product_workflow_git_usage_repository_root_for_context free-development ;;
+    5) product_workflow_git_usage_repository_root_for_context product-improvement ;;
+    6) product_workflow_git_usage_repository_root_for_context external-integration ;;
     *)
       printf '%s\n' "$LESSON_ROOT"
       ;;
   esac
+}
+
+menu_product_workflow_context_for_item() {
+  case "$1" in
+    4) printf 'free-development' ;;
+    5) printf 'product-improvement' ;;
+    6) printf 'external-integration' ;;
+    *) printf 'not_applicable' ;;
+  esac
+}
+
+menu_product_workflow_mode_for_item() {
+  local context
+  context="$(menu_product_workflow_context_for_item "$1")"
+  product_workflow_git_usage_mode_for_context "$context"
+}
+
+menu_product_workflow_requires_git_for_item() {
+  local context mode
+  context="$(menu_product_workflow_context_for_item "$1")"
+  [[ "$context" != "not_applicable" ]] || return 1
+  mode="$(product_workflow_git_usage_mode_for_context "$context")"
+  product_workflow_git_usage_requires_git_worktree "$mode"
+}
+
+menu_product_workflow_repository_boundary_gate_for_item() {
+  local context
+  context="$(menu_product_workflow_context_for_item "$1")"
+  [[ "$context" != "not_applicable" ]] || return 1
+  product_workflow_git_usage_repository_boundary_gate "$context"
 }
 
 menu_require_git_workflow_policy() {
@@ -140,6 +214,14 @@ menu_require_git_workflow_policy() {
     git_workflow_setting_value "$key" >/dev/null
   done < <(git_workflow_policy_rows)
 
+  if [[ "$(menu_product_workflow_context_for_item "$item")" != "not_applicable" ]] && ! menu_product_workflow_requires_git_for_item "$item"; then
+    printf 'Git workflow policy: ready\n'
+    printf 'Git workflow settings: %s\n' "$settings_file"
+    printf 'Git workflow repository context: not_applicable\n'
+    printf 'Git workflow automation: not_applicable\n'
+    return 0
+  fi
+
   repo="$(menu_git_workflow_repo_for_item "$item")"
   context="$(git_workflow_repository_context "$repo")" || {
     printf 'missing Git workflow repository context for menu item %s: %s\n' "$item" "$repo" >&2
@@ -157,6 +239,15 @@ menu_print_git_workflow_readiness() {
   local repo
   local context
   if ( menu_require_git_workflow_policy "$item" ) >/dev/null 2>&1; then
+    if [[ "$(menu_product_workflow_context_for_item "$item")" != "not_applicable" ]]; then
+      printf 'Product workflow Git usage mode: %s\n' "$(menu_product_workflow_mode_for_item "$item")"
+    fi
+    if [[ "$(menu_product_workflow_context_for_item "$item")" != "not_applicable" ]] && ! menu_product_workflow_requires_git_for_item "$item"; then
+      printf 'Git workflow policy: ready\n'
+      printf 'Git workflow repository monitor: not_applicable\n'
+      printf 'Git workflow actions: not_applicable\n'
+      return
+    fi
     repo="$(menu_git_workflow_repo_for_item "$item")"
     context="$(git_workflow_repository_context "$repo")"
     printf 'Git workflow policy: ready\n'
@@ -192,7 +283,6 @@ menu_check_item() {
       ;;
     5|6)
       lesson_menu_require_settings "$(menu_item_name "$item")"
-      "$LESSON_ROOT/tools/check_repository_boundary.sh" --product-required >/dev/null
       ;;
     7)
       :
@@ -202,10 +292,13 @@ menu_check_item() {
       exit 1
       ;;
   esac
+  if [[ "$(menu_product_workflow_context_for_item "$item")" != "not_applicable" ]]; then
+    menu_product_workflow_repository_boundary_gate_for_item "$item" >/dev/null
+  fi
   lesson_product_profile_require "$item" "$(menu_item_name "$item")"
   menu_require_git_workflow_policy "$item"
   if [[ "$item" == "4" || "$item" == "5" || "$item" == "6" ]]; then
-    "$LESSON_ROOT/tools/product-security" status --context "$(case "$item" in 4) printf 'free-development' ;; 5) printf 'product-improvement' ;; 6) printf 'external-integration' ;; esac)" >/dev/null
+    "$LESSON_ROOT/tools/product-security" status --context "$(menu_product_workflow_context_for_item "$item")" >/dev/null
     printf 'Product security policy: ready\n'
   fi
   printf 'Menu prerequisite check passed: %s\n' "$(menu_item_name "$item")"
@@ -236,8 +329,9 @@ menu_readiness() {
         else
           lesson_menu_print_readiness "$(menu_item_name "$item")"
         fi
-        if [[ "$item" == "5" || "$item" == "6" ]]; then
-          if "$LESSON_ROOT/tools/check_repository_boundary.sh" --product-required >/dev/null 2>&1; then
+        if [[ "$(menu_product_workflow_context_for_item "$item")" != "not_applicable" ]]; then
+          printf 'Product workflow Git usage mode: %s\n' "$(menu_product_workflow_mode_for_item "$item")"
+          if menu_product_workflow_repository_boundary_gate_for_item "$item" >/dev/null 2>&1; then
             printf 'Product repository boundary: ready\n'
           else
             printf 'Product repository boundary: missing\n'
@@ -251,7 +345,7 @@ menu_readiness() {
     menu_print_git_workflow_readiness "$item"
     if [[ "$item" == "4" || "$item" == "5" || "$item" == "6" ]]; then
       printf 'Product security: '
-      if "$LESSON_ROOT/tools/product-security" status --context "$(case "$item" in 4) printf 'free-development' ;; 5) printf 'product-improvement' ;; 6) printf 'external-integration' ;; esac)" >/dev/null 2>&1; then
+      if "$LESSON_ROOT/tools/product-security" status --context "$(menu_product_workflow_context_for_item "$item")" >/dev/null 2>&1; then
         printf 'policy ready\n'
       else
         printf 'policy missing\n'
@@ -267,6 +361,12 @@ case "${1:-status}" in
     ;;
   readiness|準備)
     menu_readiness
+    ;;
+  skills|skill|スキル)
+    menu_show_skills
+    ;;
+  skill-aliases|aliases|alias)
+    menu_show_skill_aliases
     ;;
   check|確認)
     menu_check_item "${2:-}"

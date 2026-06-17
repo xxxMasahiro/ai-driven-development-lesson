@@ -21,6 +21,7 @@ LESSON_RUNTIME_APPROVAL="$(lesson_approval_file)"
 LESSON_RUNTIME_REQUIRE_APPROVAL=1
 LESSON_RUNTIME_CHECK="$ROOT/tools/check_lesson14_structure.sh"
 LESSON_RUNTIME_BEFORE_PASS="lesson14_before_pass"
+LESSON_RUNTIME_CONTEXT_SCOPE="lesson-14"
 LESSON14_LEARNING_MODE_FILE="$(lesson_learning_mode_file)"
 LESSON14_WORKFLOW_LANGUAGE_FILE="$(lesson_workflow_language_file)"
 LESSON14_PRODUCT_LANGUAGE_FILE="$(lesson_product_language_file)"
@@ -35,6 +36,7 @@ lesson_runtime_approval="$LESSON_RUNTIME_APPROVAL"
 lesson_runtime_approval_required="$LESSON_RUNTIME_REQUIRE_APPROVAL"
 lesson_runtime_check="$LESSON_RUNTIME_CHECK"
 lesson_runtime_before_pass="$LESSON_RUNTIME_BEFORE_PASS"
+lesson_runtime_context_scope="$LESSON_RUNTIME_CONTEXT_SCOPE"
 
 lesson14_current_learning_mode() {
   lesson_current_learning_mode_file "$LESSON14_LEARNING_MODE_FILE"

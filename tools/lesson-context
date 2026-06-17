@@ -1,0 +1,92 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=tools/lib/lesson_common.sh
+source "$SCRIPT_DIR/lib/lesson_common.sh"
+# shellcheck source=tools/lib/lesson_context.sh
+source "$SCRIPT_DIR/lib/lesson_context.sh"
+
+COMMAND="${1:-status}"
+[[ $# -gt 0 ]] && shift || true
+
+usage() {
+  cat <<'USAGE'
+Usage:
+  tools/lesson-context status
+  tools/lesson-context validate
+  tools/lesson-context list [--scope <scope>]
+  tools/lesson-context summary [--scope <scope>]
+  tools/lesson-context show <context_id>
+  tools/lesson-context opening <lesson-7|lesson-14|applied|all>
+  tools/lesson-context step <lesson-7|lesson-14|applied> <step_id>
+  tools/lesson-context recap <lesson-7|lesson-14|applied|all>
+  tools/lesson-context workflow [<context_id|all>]
+
+Scopes:
+  all, lesson-7, lesson-14, applied, security, dashboard, prompt
+USAGE
+}
+
+scope_arg() {
+  local default_scope="$1"
+  shift || true
+  local scope="$default_scope"
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --scope)
+        scope="${2:-}"
+        shift 2
+        ;;
+      *)
+        if [[ "$scope" == "$default_scope" ]]; then
+          scope="$1"
+          shift
+        else
+          printf 'unexpected argument: %s\n' "$1" >&2
+          return 1
+        fi
+        ;;
+    esac
+  done
+  printf '%s' "$scope"
+}
+
+case "$COMMAND" in
+  status|現在地)
+    lesson_context_print_status
+    ;;
+  validate|check|確認)
+    lesson_context_validate
+    printf 'Learner context validation passed.\n'
+    ;;
+  list|一覧)
+    lesson_context_print_list "$(scope_arg all "$@")"
+    ;;
+  summary|要約)
+    lesson_context_print_summary "$(scope_arg all "$@")"
+    ;;
+  show|表示)
+    lesson_context_print_topic_detail "${1:-}"
+    ;;
+  opening|開始文脈)
+    lesson_context_print_phase "${1:-}" opening
+    ;;
+  step|項目文脈)
+    lesson_context_print_step "${1:-}" "${2:-}"
+    ;;
+  recap|振り返り文脈)
+    lesson_context_print_phase "${1:-}" recap
+    ;;
+  workflow|ワークフロー)
+    lesson_context_print_workflow "${1:-all}"
+    ;;
+  ""|-h|--help|help)
+    usage
+    ;;
+  *)
+    printf 'unknown command: %s\n' "$COMMAND" >&2
+    usage
+    exit 1
+    ;;
+esac

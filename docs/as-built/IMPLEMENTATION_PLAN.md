@@ -203,13 +203,13 @@ It preserves existing features without tradeoffs and follows the repository qual
 2. Explain the agent rule and routing layer.
    - Explained `AGENTS.MD` as the lesson-side rulebook for agents.
    - Covered invariant rules, document root, routing table, and repo-local skills.
-   - Explicitly distinguished `AGENTS.MD` from product-side `AGENT.md`.
+   - Explicitly distinguished lesson-side `AGENTS.MD`, legacy product-side `AGENT.md`, and the planned product-side `AGENTS.MD` transition.
 
 3. Explain design, workflow, and memory documents.
    - Explained `docs/as-built/REQUIREMENTS.md`, `docs/as-built/SPECIFICATION.md`, and `docs/as-built/IMPLEMENTATION_PLAN.md`.
    - Explained `docs/workflow/TASK_TRACKER.md` and `docs/workflow/HANDOFF.md` as a synchronized pair.
    - Explained `docs/workflow/GIT_HOOKS_POLICY.tsv`, `docs/workflow/GIT_HOOK_CHECKS.tsv`, and `learning/GIT_HOOK_SETTINGS.tsv` as the Git hook policy and current local hook-mode controls.
-   - Explained `docs/memory/DEVELOPER_MEMORY.md`.
+   - Explained `docs/memory/DEVELOPER_MEMORY.md` and `docs/memory/SESSION_MEMORY.md`.
    - Explained product-side `FAILURE_MEMORY.md` and failure-recovery records without implying a lesson-side `docs/memory/FAILURE_MEMORY.md` exists.
 
 4. Add a CLI tour command.
@@ -231,15 +231,17 @@ It preserves existing features without tradeoffs and follows the repository qual
    - Preserve ordered lesson progression and approval gates.
 
 8. Add mechanical validation.
+   - Added `tools/check_document_root.sh`.
    - Added `tools/test_docs_tour.sh`.
    - Updated structure checks, as-built checks, developer-memory checks, dashboard tests, aggregate tests, CI, and pre-commit as needed.
-   - Ensure checks fail if `guides/DOCUMENT_MAP.md`, `tools/docs-tour`, `dashboard docs`, prompt examples, or the synchronized planning/workflow entries are missing.
-   - `guides/DOCUMENT_MAP.md`, `tools/docs-tour`, `tools/test_docs_tour.sh`, and `./tools/dashboard docs` are now expected to exist in runtime.
-   - Validation is wired through `tools/test_docs_tour.sh`, structure checks, as-built checks, developer-memory checks, dashboard or Playwright tests, aggregate tests, CI, and pre-commit.
+   - Ensure checks fail if `docs/**/*.md` cannot be reached from `AGENTS.MD` or `guides/DOCUMENT_MAP.md`, if `skills/*/SKILL.md` is not routed from `AGENTS.MD`, if skill `references/*.md` files are not routed by their parent skill, or if `guides/DOCUMENT_MAP.md`, `tools/docs-tour`, `dashboard docs`, prompt examples, or the synchronized planning/workflow entries are missing.
+   - `guides/DOCUMENT_MAP.md`, `tools/docs-tour`, `tools/check_document_root.sh`, `tools/test_docs_tour.sh`, and `./tools/dashboard docs` are now expected to exist in runtime.
+   - Validation is wired through `tools/check_document_root.sh`, `tools/test_docs_tour.sh`, structure checks, as-built checks, developer-memory checks, dashboard or Playwright tests, aggregate tests, CI, and pre-commit.
    - The validation suite must preserve existing 7-day, 14-day, menu, dashboard, Free Development, Product Improvement, external-integration, product-gate, Playwright, CI, and pre-commit behavior.
 
 9. Verify with existing and new tests.
    - Run the existing lesson-side verification sequence.
+   - Run the document-root check.
    - Run the new docs-tour test.
    - Confirm existing 7-day, 14-day, menu, dashboard, free-development, product-improvement, external-integration, product-gate, Playwright, CI, and pre-commit behavior remains available.
 
@@ -372,8 +374,8 @@ It preserves existing checks and does not trade away any current 7-day, 14-day, 
 ```text
 SYNC-ID: documentation_map
 STATUS: implemented
-ARTIFACTS: guides/DOCUMENT_MAP.md, tools/docs-tour, tools/test_docs_tour.sh
-TESTS: tools/test_docs_tour.sh
+ARTIFACTS: guides/DOCUMENT_MAP.md, tools/docs-tour, tools/check_document_root.sh, tools/test_docs_tour.sh
+TESTS: tools/test_docs_tour.sh, tools/check_agents_skills.sh
 
 SYNC-ID: menu_prerequisite_control
 STATUS: implemented
@@ -426,14 +428,14 @@ ARTIFACTS: docs/workflow/RESOURCE_POLICY.tsv, learning/RESOURCE_SETTINGS.tsv, to
 TESTS: tools/test_resource_guard_summary.sh, tools/test_git_hooks_parallel.sh, tools/check_ci_workflow_structure.sh
 
 SYNC-ID: learner_context_foundation
-STATUS: planned
-ARTIFACTS: learning/context/README.md,learning/context/AI_DRIVEN_DEVELOPMENT_FOUNDATION.md,learning/context/SECURITY_FOUNDATION.md,learning/context/LESSON_CONTEXT_MAP.tsv
-TESTS: tools/test_lesson_repository.sh
+STATUS: implemented
+ARTIFACTS: learning/context/README.md,learning/context/AI_DRIVEN_DEVELOPMENT_FOUNDATION.md,learning/context/SECURITY_FOUNDATION.md,learning/context/LESSON_CONTEXT_MAP.tsv,tools/lib/lesson_context.sh,tools/lesson-context,tools/test_lesson_context.sh,tools/check_lesson_structure.sh,docs/workflow/TEST_PLAN_MANIFEST.tsv,docs/workflow/GIT_HOOK_CHECKS.tsv,docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv,docs/workflow/FINAL_GATE_COVERAGE.tsv,.github/workflows/ci.yml,.github/workflows/lesson14-ci.yml
+TESTS: tools/test_lesson_context.sh,tools/check_lesson_structure.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_test_plan_coverage.sh
 
 SYNC-ID: learner_context_runtime_integration
-STATUS: planned
-ARTIFACTS: learning/context/README.md,learning/context/LESSON_CONTEXT_MAP.tsv
-TESTS: tools/test_lesson_repository.sh
+STATUS: implemented
+ARTIFACTS: learning/context/README.md,learning/context/LESSON_CONTEXT_MAP.tsv,learning/context/WORKFLOW_CONTEXT_MAP.tsv,tools/lib/lesson_context.sh,tools/lesson-context,tools/lesson,tools/lesson14,tools/lib/lesson_runtime.sh,tools/test_lesson_context.sh,tools/test_lesson_repository.sh,.github/workflows/ci.yml,.github/workflows/lesson14-ci.yml
+TESTS: tools/test_lesson_context.sh,tools/test_lesson.sh,tools/test_lesson14.sh,tools/check_ci_workflow_structure.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_test_plan_coverage.sh
 
 SYNC-ID: safeflow_security_backfill
 STATUS: implemented
@@ -559,110 +561,61 @@ Run:
 - If CI diverges from local behavior, keep CI full and separate local resource policy from CI workflow structure.
 - Developer approval is required before `.wslconfig` writes, swap creation/deletion, privileged cleanup, process killing, changing Git hooks mode semantics, weakening CI, weakening pre-commit, or introducing Docker/cgroups/systemd memory enforcement.
 
-## Planned Learner Context Foundation Plan
+## Implemented Learner Context Foundation Plan
 
-This plan prepares the learner-facing context foundation only.
-It does not implement runtime lesson rendering yet.
-The next implementation plan should connect these files to lesson output, dashboards, prompts, and checks.
+This implementation keeps learner-facing context as source material under `learning/context/` and exposes a read-only runtime command for validating and rendering scoped context views.
 
-1. Add context source documents under `learning/context/`.
-   - Add a directory README that explains the role of learner context and its synchronization boundary.
-   - Add the main AI-driven development foundation text.
-   - Add a staged security foundation.
-   - Add a machine-readable context-to-lesson map.
+1. Preserved source documents under `learning/context/`.
+   - `README.md` documents the source and runtime boundary.
+   - `AI_DRIVEN_DEVELOPMENT_FOUNDATION.md` remains the main conceptual source.
+   - `SECURITY_FOUNDATION.md` remains the staged security source.
+   - `LESSON_CONTEXT_MAP.tsv` remains the machine-readable lesson-context map.
 
-2. Preserve source-language and display-language separation.
-   - Keep repository source documents in English.
-   - Let future runtime output translate or summarize according to the selected workflow display language.
-   - Do not hard-code Japanese-only lesson text into runtime behavior from this documentation step.
+2. Added runtime context tooling.
+   - `tools/lib/lesson_context.sh` validates context files and renders scoped rows.
+   - `tools/lesson-context` provides `status`, `validate`, `list`, `summary`, `show`, `opening`, `step`, `recap`, and `workflow`.
+   - `tools/test_lesson_context.sh` verifies successful output and fail-closed parsing for lesson and workflow maps.
 
-3. Keep context separate from runtime implementation.
-   - Do not modify lesson state machines in this step.
-   - Do not change `tools/lesson`, `tools/lesson14`, dashboard behavior, or browser dashboard behavior in this step.
-   - Mark the sync ID as `planned` until runtime integration and targeted checks are implemented.
+3. Preserved source-language and display-language separation.
+   - Repository source documents remain in English.
+   - Runtime output exposes structured context rather than hard-coded translated lesson prose.
+   - Future translation or deeper rendering can build on the context command without changing the source map contract.
 
-4. Prepare future implementation connections.
-   - Use `LESSON_CONTEXT_MAP.tsv` as the future bridge from context topics to lesson openings, per-topic explanations, final recaps, security coverage, prompt examples, and dashboard candidates.
-   - Use the main foundation and security foundation as the source for learner-mode-specific rendering.
-   - Add future tests only when runtime integration is implemented.
+4. Wired validation.
+   - `tools/check_lesson_structure.sh` and `tools/check_lesson14_structure.sh` require and validate learner context files.
+   - `docs/workflow/TEST_PLAN_MANIFEST.tsv`, `docs/workflow/GIT_HOOK_CHECKS.tsv`, `docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv`, and `docs/workflow/FINAL_GATE_COVERAGE.tsv` include learner-context coverage.
+   - `.github/workflows/ci.yml`, `.github/workflows/lesson14-ci.yml`, `tools/check_ci_workflow_structure.sh`, and `tools/test_lesson_repository.sh` include the new syntax and regression paths.
 
-5. Synchronize document discovery.
-   - Update `guides/DOCUMENT_MAP.md` so learners and agents can find `learning/context/`.
-   - Synchronize the planned context foundation through the as-built sync contract and the five synchronized documents.
+## Implemented Learner Context Runtime Integration Plan
 
-## Planned Learner Context Runtime Integration Plan
+This implementation connects learner context to runtime guidance while keeping Free Development Mode as a workflow, not as a lesson.
 
-This plan connects the existing learner-context foundation to runtime guidance.
-It is not implemented yet.
-The implementation must keep Free Development Mode as a workflow, not as a lesson.
-
-### Planned Change Targets
+### Implemented Change Targets
 
 - `learning/context/LESSON_CONTEXT_MAP.tsv`
-- planned new `learning/context/WORKFLOW_CONTEXT_MAP.tsv`
-- planned new `tools/lib/lesson_context.sh`
-- planned new `tools/lesson-context`
+- `learning/context/WORKFLOW_CONTEXT_MAP.tsv`
+- `tools/lib/lesson_context.sh`
+- `tools/lesson-context`
 - `tools/lesson`
 - `tools/lesson14`
-- `tools/team-development`
-- `tools/free-development`
-- `tools/product-improvement`
-- `tools/external-integration`
-- `tools/menu`
-- `tools/dashboard`
-- `guides/DOCUMENT_MAP.md`
+- `tools/lib/lesson_runtime.sh`
+- `tools/test_lesson_context.sh`
+- `tools/test_lesson_repository.sh`
 - `docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv`
 - the three design/as-built documents and the two workflow-state documents
 
-### Planned Implementation Order
+### Implemented Runtime Behavior
 
-1. Refine the learning context map.
-   - Keep `LESSON_CONTEXT_MAP.tsv` focused on learning contexts: 7-day lesson, 14-day lesson, and applied lesson.
-   - Map opening context, per-step context, recap context, prompt examples, security markers, and dashboard candidates without relying on one hard-coded phrase.
+1. `tools/lesson-context status` validates all context files and prints topic counts.
+2. `tools/lesson-context opening|step|recap` renders scoped learning-context rows for `lesson-7`, `lesson-14`, `applied`, or `all`.
+3. `tools/lesson-context workflow` renders workflow context rows for Free Development Mode, Product Improvement, External Integration, and lesson maintenance.
+4. `tools/lesson` status prints the 7-day learner-context summary and the current-step context command.
+5. `tools/lesson14` status prints the 14-day learner-context summary through the shared runtime status path.
+6. Existing approval gates, ordered progression, learner-selected start positions, menu prerequisites, Git workflow settings, dashboard views, CI, pre-commit, and repository-boundary behavior remain unchanged.
 
-2. Add a workflow context map.
-   - Add `WORKFLOW_CONTEXT_MAP.tsv` for Free Development Mode, Product Improvement, External Integration, and lesson repository maintenance.
-   - Keep workflow targets separate from lesson targets.
-   - Make Free Development Mode a product-development workflow that applies the learned process.
+### Implemented Verification
 
-3. Add a shared context library.
-   - Add `tools/lib/lesson_context.sh`.
-   - Reuse `tools/lib/lesson_common.sh` for learning mode, workflow display language, product development language, and common path handling.
-   - Load maps generically so future topics can be added without one-off shell branches.
-
-4. Add a standalone context CLI.
-   - Add `tools/lesson-context status`.
-   - Add `tools/lesson-context opening lesson-7|lesson-14|applied`.
-   - Add `tools/lesson-context step lesson-7|lesson-14 <step_id>`.
-   - Add `tools/lesson-context recap lesson-7|lesson-14|applied`.
-   - Add `tools/lesson-context workflow free-development|product-improvement|external-integration|lesson-maintenance`.
-
-5. Connect structured and applied learning.
-   - Integrate context display into `tools/lesson`, `tools/lesson14`, and `tools/team-development`.
-   - Preserve approval gates, ordered progression, learner-selected start positions, and current lesson state files.
-
-6. Connect product-facing workflows.
-   - Integrate workflow context into `tools/free-development`, `tools/product-improvement`, and `tools/external-integration`.
-   - Show purpose, required documents, safety checks, and copy-paste prompts before product-facing work starts.
-   - Preserve product repository boundary checks and Git workflow settings.
-
-7. Connect menu and dashboard views.
-   - Keep menu categories distinct: learning, building/extending, and lesson maintenance.
-   - Show learning context and workflow context separately in dashboard output.
-
-8. Add validation.
-   - Add `tools/test_lesson_context.sh`.
-   - Wire the new test into `tools/test_lesson_repository.sh`, `.githooks/pre-commit`, `.github/workflows/ci.yml`, and `.github/workflows/lesson14-ci.yml`.
-   - Keep the test runnable standalone and through aggregate checks.
-
-9. Synchronize from planned to implemented only after runtime integration passes.
-   - Update the sync-contract row artifacts and tests to the implemented runtime files.
-   - Update all five synchronized documents from `planned` to `implemented`.
-   - Keep unrelated content unchanged.
-
-### Planned Verification
-
-Run, after implementation:
+Run:
 
 ```bash
 ./tools/lesson-context status
@@ -675,31 +628,31 @@ Run, after implementation:
 ./tools/test_lesson_context.sh
 ./tools/test_lesson.sh
 ./tools/test_lesson14.sh
-./tools/test_menu_prerequisites.sh
+./tools/check_lesson_structure.sh
+./tools/check_lesson14_structure.sh
 ./tools/check_as_built_sync_contract.sh
 ./tools/check_as_built_docs.sh
+./tools/check_test_plan_coverage.sh
+./tools/check_ci_workflow_structure.sh
 ./tools/test_lesson_repository.sh
-./tools/git-hooks run --mode full --no-cache
 ```
 
 CI and Lesson14 CI must also pass after push.
 
-### Planned Failure Recovery
+### Failure Recovery
 
 - If context map parsing fails, fix `tools/lesson-context` and `tools/lib/lesson_context.sh` before touching lesson commands.
-- If lesson progression regresses, temporarily disconnect lesson command integration and keep the standalone context CLI stable.
-- If Free Development Mode is displayed as a lesson, move that mapping to workflow context and correct menu/dashboard labels.
-- If output is too verbose, adjust learning-mode display policy without rewriting the source context.
+- If lesson progression regresses, temporarily disconnect lesson command status integration and keep the standalone context CLI stable.
+- If Free Development Mode is displayed as a lesson, move that mapping back to workflow context and correct menu/dashboard labels.
+- If output is too verbose, adjust context summary selection without rewriting the source context.
 - If CI-only failures occur, compare CI logs with local full/no-cache verification and isolate environment-specific behavior.
 
-### Developer Approval Points
+### Future Approval Points
 
-- Whether to add columns to `LESSON_CONTEXT_MAP.tsv` or keep additional binding data in separate TSV files.
-- How broad `WORKFLOW_CONTEXT_MAP.tsv` should be in its first implementation.
-- How much context Free Development Mode should show before product work starts.
-- Which workflow targets must always show security guidance.
-- How much context should appear in CLI dashboard output before browser dashboard work begins.
-- Whether runtime translation remains an agent facilitation instruction or a future translation dictionary is introduced.
+- Deeper dashboard rendering of learner context.
+- Product-facing workflow preambles beyond the read-only `workflow` context command.
+- Runtime translation dictionaries or locale-specific context copy.
+- New columns or step-specific binding tables for `LESSON_CONTEXT_MAP.tsv`.
 
 ## Implemented Git Workflow Policy Implementation Plan
 
@@ -2768,7 +2721,7 @@ Implemented order:
 
 1. Extend the product repository structure policy.
    - Keep `docs/product/`, `docs/workflow/`, `docs/memory/`, `ops/`, `src/`, and `tests/` as reusable scaffold areas.
-   - Keep root-level `AGENT.md`, `README.md`, entry files, and standard control directories discoverable.
+   - Keep legacy root-level `AGENT.md`, `README.md`, entry files, and standard control directories discoverable until the planned product-side `AGENTS.MD` migration replaces the legacy agent entry.
 
 2. Add manifest-backed source authority.
    - Declare entrypoint, runtime source, test source, CI, security, dashboard surfaces, and integration evidence through `ops/` manifests.
@@ -3847,3 +3800,555 @@ Developer approval boundaries:
 
 - Approval is required before adding or changing Git/CI/pre-commit/final-gate behavior.
 - Approval is required before allowing the runner to perform push, PR creation, CI monitoring, merge, main CI waiting, local/remote sync, branch deletion, worktree deletion, remote deletion, product-repository deletion, cleanup execution, or any destructive operation.
+
+## Implemented Product Development Workflow Skill And Alias Implementation Plan
+
+SYNC-ID: product_development_workflow_skill_aliases
+STATUS: implemented
+ARTIFACTS: AGENTS.MD,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/TEST_PLAN_MANIFEST.tsv,skills/SKILL_ALIASES.tsv,skills/product-development-workflow/SKILL.md,skills/product-development-workflow/references/product-development.md,skills/product-development-workflow/agents/openai.yaml,tools/menu,tools/check_agents_skills.sh,tools/test_menu_prerequisites.sh,tools/test_dashboard_settings.sh,dashboard-control-center/src/App.jsx,dashboard-control-center/src/i18n.js,dashboard-control-center/src/styles.css,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_control_center.sh
+TESTS: tools/check_agents_skills.sh,tools/test_menu_prerequisites.sh,tools/test_dashboard_settings.sh,tools/test_dashboard_control_center.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_test_plan_coverage.sh,tools/check_workflow_pair_sync.sh
+
+This implemented plan adds Settings-aware external product workflow guidance and short skill discovery without changing existing product Git usage semantics or repository-development workflow ownership.
+
+Implemented order:
+
+1. Added the `product-development-workflow` skill directory, detailed reference, and agent metadata.
+2. Added `skills/SKILL_ALIASES.tsv` as the alias source of truth.
+3. Updated `tools/menu` with `skills` and `skill-aliases` display commands.
+4. Updated `tools/check_agents_skills.sh` to validate the new skill, reference, AGENTS routing, and alias targets.
+5. Updated `tools/test_menu_prerequisites.sh` to validate skill and alias display output.
+6. Updated AGENTS routing so Free Development, Product Improvement, and External Integration use product workflow guidance while Lesson Repository Improvement routes to repository workflow guidance.
+7. Updated Settings display helpers so only Git workflow action-mode settings use `Prohibited`/`Ask each time`/`Auto` or `禁止`/`都度確認`/`自動` labels.
+8. Kept boolean permission rows, including Developer auto-merge, on `Allowed`/`Not allowed` labels so displayed choices match writer-accepted values.
+9. Added the Settings confirmation note for automatic workflow action values.
+10. Added dashboard-settings coverage proving every editable catalog `allowed_values` entry can be planned by the guarded writer.
+11. Added test-plan coverage and as-built synchronization metadata.
+
+Document synchronization policy:
+
+- Requirements record user-visible outcomes, constraints, and non-scope.
+- Specification records skill, alias, Settings display, and verification contracts.
+- This implementation plan records the implementation order, verification sequence, failure recovery, and approval boundaries.
+- Task tracker records current work state and completion.
+- Handoff records restart context and next safe action.
+
+Verification sequence:
+
+```bash
+bash -n tools/menu tools/check_agents_skills.sh tools/test_menu_prerequisites.sh
+./tools/check_agents_skills.sh
+./tools/test_menu_prerequisites.sh
+./tools/test_dashboard_settings.sh
+./tools/test_dashboard_control_center.sh
+./tools/check_test_plan_coverage.sh
+./tools/check_as_built_sync_contract.sh
+./tools/check_as_built_docs.sh
+./tools/check_workflow_pair_sync.sh
+git diff --check
+```
+
+Failure recovery:
+
+- If alias output and `skills/SKILL_ALIASES.tsv` disagree, fix the TSV-driven menu reader rather than duplicating alias data.
+- If Settings display labels change stored values or policy behavior, revert the display mapping and keep owner-layer settings authoritative.
+- If `check_agents_skills` reports missing routes, repair AGENTS and skill metadata together.
+- If sync checks fail, make `SYNC-ID`, `STATUS`, `ARTIFACTS`, and `TESTS` match exactly across the five synchronized documents and the contract row.
+
+Developer approval boundaries:
+
+- Approval is required before changing product Git usage mode semantics, Git workflow action semantics, Dashboard mutation authority, CI/pre-commit behavior, destructive cleanup, external-service authority, credentials, OAuth, push, merge, main CI, or any existing-feature tradeoff.
+
+## Implemented External Product Workflow Release Readiness Implementation Plan
+
+SYNC-ID: external_product_workflow_release_readiness
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/TEST_PLAN_MANIFEST.tsv,free-development/FREE_DEVELOPMENT_MODE.md,skills/product-development-workflow/SKILL.md,skills/product-development-workflow/references/product-development.md,skills/worklog-doc-sync/SKILL.md,skills/worklog-doc-sync/references/worklog-sync.md,skills/task-tracker-docs/SKILL.md,skills/task-tracker-docs/references/product-docs.md,tools/lib/product_workflow_git_usage.sh,tools/product-profile,tools/menu,tools/dashboard-data,tools/test_product_git_usage_modes.sh,tools/test_menu_prerequisites.sh,tools/test_dashboard_data.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_product_git_usage_modes.sh,tools/test_menu_prerequisites.sh,tools/test_dashboard_data.sh,tools/check_agents_skills.sh,tools/check_test_plan_coverage.sh,tools/test_test_plan.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh
+
+Implemented order:
+
+1. Preserve `repository-development-workflow` as the active lesson-repository development protocol and keep this work in the approved implementation scope.
+2. Synchronize the new `external_product_workflow_release_readiness` contract across requirements, specification, implementation plan, task tracker, handoff, and sync contract.
+3. Harden `tools/lib/product_workflow_git_usage.sh` so runtime mode selection cannot silently bypass Dashboard Settings through an environment variable.
+4. Update `tools/product-profile` to use the shared product workflow boundary gate for external-product menus while preserving strict structured lesson behavior.
+5. Update `tools/menu` so items 4, 5, and 6 use product workflow context and mode for repository boundary and Git workflow readiness.
+6. Update `tools/dashboard-data` so selected external-product Git operation rows reflect product mode applicability.
+7. Update Free Development and skill guidance so configured product workspace is the rule and task-tracker is the structured lesson default example.
+8. Extend focused tests for product Git usage modes, menu prerequisites, Dashboard data, skills wiring, and test-plan coverage.
+
+Verification sequence:
+
+```bash
+bash -n tools/lib/product_workflow_git_usage.sh tools/product-profile tools/menu tools/dashboard-data tools/test_product_git_usage_modes.sh tools/test_menu_prerequisites.sh tools/test_dashboard_data.sh
+./tools/test_product_git_usage_modes.sh
+./tools/test_menu_prerequisites.sh
+./tools/test_dashboard_data.sh
+./tools/check_agents_skills.sh
+./tools/check_test_plan_coverage.sh
+./tools/test_test_plan.sh
+./tools/check_as_built_sync_contract.sh
+./tools/check_as_built_docs.sh
+./tools/check_workflow_pair_sync.sh
+git diff --check
+```
+
+Failure recovery:
+
+- If Settings mode and runtime mode disagree, fix `tools/lib/product_workflow_git_usage.sh` first.
+- If Git/CI is still required in `none` mode, repair the shared boundary/applicability helper before patching individual menu output.
+- If Dashboard rows disagree with producer-owned selected context data, fix `tools/dashboard-data` rather than React.
+- If skill text drifts back to a fixed product path, keep the configured product workspace wording and preserve task-tracker only as the structured lesson default.
+- If sync checks fail, make `SYNC-ID`, `STATUS`, `ARTIFACTS`, and `TESTS` match exactly across the contract and five synchronized documents.
+
+Developer approval boundaries:
+
+- Approval is required before changing product Git usage semantics, Git workflow action semantics, Dashboard mutation authority, CI/pre-commit/final-gate behavior, product-security strictness, push, PR creation, merge, main CI waiting, local/remote sync, cleanup execution, OAuth, credentials, external-service authority, or any existing-feature tradeoff.
+
+## Implemented External Product Local Scaffold Controls Implementation Plan
+
+SYNC-ID: external_product_local_scaffold_controls
+STATUS: implemented
+ARTIFACTS: AGENTS.MD,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/PRODUCT_REPOSITORY_STRUCTURE.tsv,docs/workflow/TEST_PLAN_MANIFEST.tsv,free-development/FREE_DEVELOPMENT_MODE.md,templates/TEMPLATES.md,skills/product-development-workflow/SKILL.md,skills/product-development-workflow/references/product-development.md,tools/lib/product_workflow_git_usage.sh,tools/lib/product_repository_registry.sh,tools/lib/product_repository_authority.sh,tools/product-gate-evidence-bootstrap,tools/product-scaffold-check,tools/product-launch-check,tools/dashboard-data,tools/test_product_scaffold_check.sh,tools/test_product_git_usage_modes.sh,tools/test_product_repository_authority.sh,tools/test_product_gate_tools.sh,tools/test_product_launch_check.sh,tools/test_dashboard_data.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_product_scaffold_check.sh,tools/test_product_git_usage_modes.sh,tools/test_product_repository_authority.sh,tools/test_product_gate_tools.sh,tools/test_product_launch_check.sh,tools/test_dashboard_data.sh,tools/check_agents_skills.sh,tools/check_test_plan_coverage.sh,tools/test_test_plan.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh
+
+Implemented order:
+
+1. Confirm `$repository-development-workflow` as the active repository-development protocol and keep implementation scoped to external product local scaffold controls.
+2. Expand `docs/workflow/PRODUCT_REPOSITORY_STRUCTURE.tsv` with product-local `skills/`, `tools/`, memory, verification, security, repository index, and `.gitignore` scaffold rows.
+3. Add `tools/product-gate-evidence-bootstrap` so this repository can install the standard product-local evidence producer into external repositories without making product authority or Dashboard mutate evidence.
+4. Update `tools/lib/product_repository_authority.sh` so evidence tied to an older product HEAD is consumed as stale instead of ready.
+5. Update product fixture builders in focused tests so valid external products include the standard local maintenance controls and evidence producer files.
+6. Update `tools/product-scaffold-check` with `--ci-optional`, while preserving strict Git and CI behavior for direct default execution.
+7. Update `tools/lib/product_workflow_git_usage.sh` so Settings-selected non-Git and non-CI modes pass the matching optional flags into scaffold validation.
+8. Update `tools/product-launch-check` with explicit `--git-optional`, preserving strict default behavior.
+9. Update `tools/dashboard-data` so product-context Git operation modes are read from the configured product repository.
+10. Update AGENTS, Free Development guidance, templates, and product workflow skill guidance so developers and agents share the same product repository scaffold model.
+11. Add test-plan rows for the user-facing scaffold guidance files and synchronize the new contract across requirements, specification, implementation plan, task tracker, handoff, and sync contract.
+
+Verification sequence:
+
+```bash
+bash -n tools/product-gate-evidence-bootstrap tools/product-scaffold-check tools/product-launch-check tools/lib/product_workflow_git_usage.sh tools/lib/product_repository_authority.sh tools/dashboard-data tools/test_product_scaffold_check.sh tools/test_product_git_usage_modes.sh tools/test_product_repository_authority.sh tools/test_product_gate_tools.sh tools/test_product_launch_check.sh tools/test_dashboard_data.sh
+./tools/test_product_scaffold_check.sh
+./tools/test_product_git_usage_modes.sh
+./tools/test_product_repository_authority.sh
+./tools/test_product_gate_tools.sh
+./tools/test_product_launch_check.sh
+./tools/test_dashboard_data.sh
+./tools/check_agents_skills.sh
+./tools/check_test_plan_coverage.sh
+./tools/test_test_plan.sh
+./tools/check_as_built_sync_contract.sh
+./tools/check_as_built_docs.sh
+./tools/check_workflow_pair_sync.sh
+git diff --check
+```
+
+Failure recovery:
+
+- If a valid product fixture fails scaffold validation, repair `PRODUCT_REPOSITORY_STRUCTURE.tsv` or the shared fixture scaffold helper rather than adding a test-only bypass.
+- If non-CI modes still require CI files, repair `product_workflow_git_usage_scaffold_gate` and `tools/product-scaffold-check --ci-optional`.
+- If strict direct scaffold checks stop requiring CI for product-improvement or external-integration, restore the default strict path and keep optional behavior behind `--ci-optional`.
+- If dashboard Git operation modes disagree with product repository settings, fix `tools/dashboard-data` producer logic, not React.
+- If sync checks fail, make `SYNC-ID`, `STATUS`, `ARTIFACTS`, and `TESTS` match exactly across the contract and five synchronized documents.
+
+Developer approval boundaries:
+
+- Approval is required before changing product Git usage semantics, product-security strictness, default strict `ci` behavior, CI/pre-commit/final-gate behavior, Dashboard mutation authority, push, PR creation, merge, main CI waiting, local/remote sync, cleanup execution, product repository deletion, OAuth, credentials, external-service authority, or any existing-feature tradeoff.
+
+## Implemented Dashboard Control Center Design System Implementation Plan
+
+SYNC-ID: dashboard_control_center_design_system
+STATUS: implemented
+ARTIFACTS: docs/design-system/dashboard-control-center/DESIGN_SYSTEM.md,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/TEST_PLAN_MANIFEST.tsv,guides/DOCUMENT_MAP.md,tools/docs-tour,dashboard-control-center/src/App.jsx,dashboard-control-center/src/i18n.js,dashboard-control-center/src/styles.css,tests/playwright/dashboard-control-center.spec.js,tools/test_docs_tour.sh,tools/test_dashboard_control_center.sh,docs/memory/DEVELOPER_MEMORY.md,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_docs_tour.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/check_developer_memory_requirements.sh,tools/check_test_plan_coverage.sh,tools/test_test_plan.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh
+
+Implementation order:
+
+1. Confirm `$repository-development-workflow` as the active repository-development protocol.
+2. Add `docs/design-system/dashboard-control-center/DESIGN_SYSTEM.md` as the design-system source of truth.
+3. Add document-map and docs-tour routing so future developers can find the design-system document.
+4. Add a test-plan rule for design-system document changes.
+5. Add reusable dashboard detail helpers for glossary terms, workflow card details, run references, source roles, evidence roles, and safety policy explanations.
+6. Replace same-page no-op detail links in Development Workflow with useful detail surfaces.
+7. Update Maintenance Sync evidence/source displays so role and purpose appear before raw paths or commands.
+8. Update Safety Actions cards and policy text so non-engineers can identify safe-to-continue, approval-required, dangerous-operation, and blocker states.
+9. Expand Help glossary into categories and per-term detail surfaces.
+10. Extend Playwright coverage for design-system routing, detail surfaces, and glossary interaction.
+11. Update developer memory, task tracker, and handoff after implementation and verification.
+
+Verification sequence:
+
+```bash
+./tools/test_docs_tour.sh
+./tools/test_dashboard_i18n.sh
+./tools/test_dashboard_control_center.sh
+./tools/check_developer_memory_requirements.sh
+./tools/check_test_plan_coverage.sh
+./tools/test_test_plan.sh
+./tools/check_as_built_sync_contract.sh
+./tools/check_as_built_docs.sh
+./tools/check_workflow_pair_sync.sh
+./tools/repository-development-workflow run --phase fast_loop --check-set required --execute --approved
+./tools/repository-development-workflow run --phase mid_tests --check-set required --execute --approved
+```
+
+Failure recovery:
+
+- If glossary or detail strings are missing in any locale, repair `dashboard-control-center/src/i18n.js` before changing rendering logic.
+- If a detail action still links to the same page without showing new information, replace it with a real detail surface or remove the affordance.
+- If source displays become too technical, keep raw paths in copy controls and move role text to the primary label.
+- If command previews look executable, restore display-only labels and remove any action styling.
+- If sync checks fail, make `SYNC-ID`, `STATUS`, `ARTIFACTS`, and `TESTS` match exactly across the contract and five synchronized documents.
+
+Developer approval boundaries:
+
+- Approval is required before changing Settings mutation authority, command execution authority, Git/CI execution semantics, merge, push, main CI waiting, cleanup execution, product repository deletion, dependency changes, CI/pre-commit/final-gate behavior, credentials, external-service authority, or any existing-feature tradeoff.
+
+## Implemented Dashboard Control Center Design Studio Implementation Plan
+
+SYNC-ID: dashboard_control_center_design_studio
+STATUS: implemented
+ARTIFACTS: docs/design-system/dashboard-control-center/DESIGN_SYSTEM.md,docs/design-system/dashboard-control-center/components.json,dashboard-control-center/src/design-system.generated.css,dashboard-control-center/src/design-system.generated.js,dashboard-control-center/src/App.jsx,dashboard-control-center/src/dashboardData.js,dashboard-control-center/src/i18n.js,dashboard-control-center/src/styles.css,vite.config.mjs,tools/dashboard-design-system,tools/check_dashboard_design_system.sh,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_control_center.sh,docs/memory/DEVELOPER_MEMORY.md,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/check_developer_memory_requirements.sh,tools/check_test_plan_coverage.sh,tools/test_test_plan.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+Implementation order:
+
+1. Confirm `$repository-development-workflow` as the active repository-development protocol.
+2. Extend the Dashboard design-system source with the Design Studio and interaction-editing contract.
+3. Extend `components.json` with the shared tooltip/copy interaction contract.
+4. Extend `tools/dashboard-design-system` so it validates interaction presets, emits runtime variables, checks Design Studio wiring, and supports `plan-interaction` and `apply-interaction`.
+5. Add guarded Vite middleware endpoints for Design Studio plan and apply operations, including same-process one-time plan-token enforcement for apply.
+6. Add dashboard data API helpers with response validation for Design Studio mutations.
+7. Add the Design Studio route, preview UI, plan/apply flow, confirmation gate, and i18n labels.
+8. Replace copy-control native title popups with generated top-positioned copy popups whose duration and shift collision presets affect runtime behavior.
+9. Extend focused Playwright and middleware coverage for Design Studio plan/apply behavior, plan-token enforcement, and tooltip/copy popup interaction.
+10. Synchronize requirements, specification, implementation plan, task tracker, handoff, sync contract, and developer memory.
+
+Verification sequence:
+
+```bash
+./tools/check_dashboard_design_system.sh
+./tools/test_dashboard_i18n.sh
+./tools/test_dashboard_control_center.sh
+./tools/check_developer_memory_requirements.sh
+./tools/check_test_plan_coverage.sh
+./tools/test_test_plan.sh
+./tools/check_as_built_sync_contract.sh
+./tools/check_as_built_docs.sh
+./tools/check_workflow_pair_sync.sh
+./tools/check_repository_development_workflow.sh
+./tools/test_repository_development_workflow.sh
+git diff --check
+```
+
+Failure recovery:
+
+- If Vite reports a JSX parse error around an arrow marker, render the arrow as JSX-safe text such as `{" -> "}`.
+- If Design Studio apply writes stale generated files, run `./tools/dashboard-design-system write` and rerun the drift check.
+- If the plan or apply endpoint accepts an unapproved value, tighten the Vite payload whitelist and rerun Dashboard focused tests.
+- If apply succeeds without a matching current plan token, repair Vite middleware token enforcement before continuing.
+- If copy popups appear under the pointer or native title behavior returns, restore `data-copy-tooltip` and the generated top-placement pseudo-element contract.
+- If copy popup duration or collision options do not change generated runtime behavior, repair the generator before changing the UI.
+- If pointer leave does not hide a tooltip, repair the generated hover-only CSS rule instead of adding page-local exceptions.
+- If sync checks fail, make `SYNC-ID`, `STATUS`, `ARTIFACTS`, and `TESTS` match exactly across the contract and five synchronized documents.
+
+Developer approval boundaries:
+
+- Approval is required before broadening Design Studio beyond whitelisted presets, allowing arbitrary CSS editing, changing Settings mutation authority, changing command execution authority, changing Git/CI execution semantics, merge, push, main CI waiting, cleanup execution, product repository deletion, dependency changes, CI/pre-commit/final-gate behavior, credentials, external-service authority, or any existing-feature tradeoff.
+
+## Implemented Dashboard Control Center Visual Design-System Editor Implementation Plan
+
+SYNC-ID: dashboard_control_center_design_studio_visual_editor
+STATUS: implemented
+ARTIFACTS: docs/design-system/dashboard-control-center/DESIGN_SYSTEM.md,docs/design-system/dashboard-control-center/tokens.json,docs/design-system/dashboard-control-center/components.json,dashboard-control-center/src/design-system.generated.css,dashboard-control-center/src/design-system.generated.js,dashboard-control-center/src/App.jsx,dashboard-control-center/src/dashboardData.js,dashboard-control-center/src/i18n.js,dashboard-control-center/src/styles.css,vite.config.mjs,tools/dashboard-design-system,tools/check_dashboard_design_system.sh,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_control_center.sh,docs/workflow/PRODUCT_REPOSITORY_STRUCTURE.tsv,templates/TEMPLATES.md,tools/test_product_scaffold_check.sh,docs/memory/DEVELOPER_MEMORY.md,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/check_dashboard_design_system.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/test_product_scaffold_check.sh,tools/check_developer_memory_requirements.sh,tools/check_test_plan_coverage.sh,tools/test_test_plan.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+Implementation order:
+
+1. Confirm `$repository-development-workflow` as the active repository-development protocol.
+2. Synchronize the expanded Design Studio requirements, specification, implementation plan, task tracker, handoff, sync contract, and developer memory.
+3. Extend `DESIGN_SYSTEM.md` with the visual editor, target model, foundation editor, atom/molecule/organism preview, and external product source-boundary contract.
+4. Extend `tokens.json` with role-based typography and spacing tokens that generated CSS can expose and shared Dashboard styles can consume.
+5. Extend `tools/dashboard-design-system` with whitelisted foundation presets for theme accent, density, radius, and typography scale.
+6. Extend Design Studio plan/apply payloads and Vite middleware validation so foundation preset changes use the same one-time plan-token boundary as interaction changes.
+7. Extend the React Design Studio page with target awareness, foundation controls, atom/molecule/organism preview, and combined foundation/interaction diffs.
+8. Update i18n strings so the page describes "editing the design source of truth" rather than leading with "do not edit CSS".
+9. Add product-local design-system scaffold entries to `PRODUCT_REPOSITORY_STRUCTURE.tsv`, `templates/TEMPLATES.md`, and product scaffold tests.
+10. Regenerate generated CSS/JS and run focused fast-loop and synchronization checks.
+
+Verification sequence:
+
+```bash
+./tools/check_dashboard_design_system.sh
+./tools/test_dashboard_i18n.sh
+./tools/test_dashboard_control_center.sh
+./tools/test_product_scaffold_check.sh
+./tools/check_developer_memory_requirements.sh
+./tools/check_test_plan_coverage.sh
+./tools/test_test_plan.sh
+./tools/check_as_built_sync_contract.sh
+./tools/check_as_built_docs.sh
+./tools/check_workflow_pair_sync.sh
+./tools/check_repository_development_workflow.sh
+./tools/test_repository_development_workflow.sh
+git diff --check
+```
+
+Failure recovery:
+
+- If foundation presets do not change generated CSS variables, repair `tools/dashboard-design-system` before changing UI labels.
+- If generated files drift, run `./tools/dashboard-design-system write` and rerun `./tools/check_dashboard_design_system.sh`.
+- If Vite accepts unsupported foundation values, tighten middleware validation and rerun focused Dashboard tests.
+- If apply succeeds without a current matching plan token, stop and repair plan-token fingerprinting before continuing.
+- If the visual preview changes without source-backed token changes, remove the page-local styling path and wire it through tokens/components.
+- If product scaffold tests fail after adding design-system files, update the shared fixture helper and structure policy together.
+- If an external product write is needed, stop for explicit product workflow approval; this sync does not grant cross-repository write authority.
+
+Developer approval boundaries:
+
+- Approval is required before arbitrary CSS editing, arbitrary script execution, external product repository writes, Settings authority changes, command execution authority changes, Git/CI/merge/sync behavior changes, dependency changes, credential handling, or any existing-feature tradeoff.
+
+## Implemented Dashboard Control Center Design System Full-Application Implementation Plan
+
+SYNC-ID: dashboard_control_center_design_system_full_application
+STATUS: implemented
+ARTIFACTS: docs/design-system/dashboard-control-center/DESIGN_SYSTEM.md,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,dashboard-control-center/src/App.jsx,dashboard-control-center/src/i18n.js,dashboard-control-center/src/styles.css,tests/playwright/dashboard-control-center.spec.js,docs/memory/DEVELOPER_MEMORY.md,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_docs_tour.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/check_developer_memory_requirements.sh,tools/check_test_plan_coverage.sh,tools/test_test_plan.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh
+
+Implementation order:
+
+1. Confirm `$repository-development-workflow` as the active repository-development protocol.
+2. Extend the design-system document with the full-application tooltip, source, evidence, copy, and detail split.
+3. Synchronize this new full-application contract across the sync contract and five required documents.
+4. Add a reusable Dashboard design-system application layer for page headers, decision summaries, common cards, operational rows, detail panels, technical chips, tooltip surfaces, focus rings, spacing, borders, and radius.
+5. Update shared Dashboard source/evidence/reference helpers so raw paths, commands, and technical IDs remain visible where they are the field value.
+6. Shorten tooltip text to role-focused explanations and move longer meaning into existing detail surfaces.
+7. Update Dashboard i18n for any new role or tooltip labels without hard-coded visible strings.
+8. Extend Playwright coverage for representative computed style, raw source visibility, short tooltip roles, copy affordances, and detail popups.
+9. Update developer memory, task tracker, and handoff after implementation and verification.
+
+Verification sequence:
+
+```bash
+./tools/test_docs_tour.sh
+./tools/test_dashboard_i18n.sh
+./tools/test_dashboard_control_center.sh
+./tools/check_developer_memory_requirements.sh
+./tools/check_test_plan_coverage.sh
+./tools/test_test_plan.sh
+./tools/check_as_built_sync_contract.sh
+./tools/check_as_built_docs.sh
+./tools/check_workflow_pair_sync.sh
+./tools/repository-development-workflow run --phase fast_loop --check-set required --execute --approved
+./tools/repository-development-workflow run --phase mid_tests --check-set required --execute --approved
+```
+
+Failure recovery:
+
+- If the running Dashboard visually looks unchanged after a design-system sync, add or repair shared presentation rules and computed-style browser assertions before marking the sync complete.
+- If tooltip text clips or becomes long, shorten the tooltip and move content to the shared detail surface.
+- If raw paths or commands disappear from the field value, restore visible inspectable values and keep explanatory text in tooltip or detail.
+- If i18n keys leak to the UI, repair `dashboard-control-center/src/i18n.js` before changing rendering logic.
+- If command previews look executable, restore display-only styling and labels.
+- If sync checks fail, make `SYNC-ID`, `STATUS`, `ARTIFACTS`, and `TESTS` match exactly across the contract and five synchronized documents.
+
+Developer approval boundaries:
+
+- Approval is required before changing Settings mutation authority, command execution authority, Git/CI execution semantics, merge, push, main CI waiting, cleanup execution, product repository deletion, dependency changes, CI/pre-commit/final-gate behavior, credentials, external-service authority, or any existing-feature tradeoff.
+
+## Implemented Dashboard Control Center Design System Source-To-Runtime Implementation Plan
+
+SYNC-ID: dashboard_control_center_design_system_source_runtime
+STATUS: implemented
+ARTIFACTS: docs/design-system/dashboard-control-center/DESIGN_SYSTEM.md,docs/design-system/dashboard-control-center/tokens.json,docs/design-system/dashboard-control-center/components.json,dashboard-control-center/src/design-system.generated.css,dashboard-control-center/src/design-system.generated.js,dashboard-control-center/src/main.jsx,dashboard-control-center/src/App.jsx,dashboard-control-center/src/styles.css,tools/dashboard-design-system,tools/check_dashboard_design_system.sh,tools/test_dashboard_control_center.sh,tools/test_lesson_repository.sh,docs/workflow/GIT_HOOK_CHECKS.tsv,docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv,docs/workflow/TEST_PLAN_MANIFEST.tsv,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,tests/playwright/dashboard-control-center.spec.js,docs/memory/DEVELOPER_MEMORY.md,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/check_developer_memory_requirements.sh,tools/check_test_plan_coverage.sh,tools/test_test_plan.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+Implementation order:
+
+1. Confirm `$repository-development-workflow` as the active repository-development protocol.
+2. Extend `DESIGN_SYSTEM.md` with the source-to-runtime, prototype preview, and drift-check contract from the video-analysis findings.
+3. Add machine-readable `tokens.json` and `components.json` next to the design-system source document.
+4. Add `tools/dashboard-design-system` to validate sources and generate runtime CSS/JS without adding dependencies.
+5. Add `tools/check_dashboard_design_system.sh` as the standalone drift check.
+6. Generate `dashboard-control-center/src/design-system.generated.css` and `dashboard-control-center/src/design-system.generated.js`.
+7. Import the generated CSS from the React entry and expose a design-system marker on the app shell.
+8. Wire the drift check into Dashboard focused tests, aggregate tests, Git hook check definitions, parallel classification, and test-plan policy.
+9. Update Playwright coverage so browser tests prove the design-system marker and the approved no-left-accent page-header styling.
+10. Synchronize requirements, specification, implementation plan, task tracker, handoff, sync contract, and developer memory.
+
+Verification sequence:
+
+```bash
+./tools/check_dashboard_design_system.sh
+./tools/test_dashboard_i18n.sh
+./tools/test_dashboard_control_center.sh
+./tools/check_developer_memory_requirements.sh
+./tools/check_test_plan_coverage.sh
+./tools/test_test_plan.sh
+./tools/check_as_built_sync_contract.sh
+./tools/check_as_built_docs.sh
+./tools/check_workflow_pair_sync.sh
+./tools/check_repository_development_workflow.sh
+./tools/test_repository_development_workflow.sh
+git diff --check
+```
+
+Failure recovery:
+
+- If Vite cannot resolve `design-system.generated.css`, regenerate with `./tools/dashboard-design-system write` and restart the running Dashboard server.
+- If the generated files drift, update `tokens.json` or `components.json`, run the generator, and rerun the drift check.
+- If browser tests show the old left accent or gradient page header, repair shared design-system runtime styling rather than page-local selectors.
+- If sync checks fail, make `SYNC-ID`, `STATUS`, `ARTIFACTS`, and `TESTS` match exactly across the contract and five synchronized documents.
+
+Developer approval boundaries:
+
+- Approval is required before changing Settings mutation authority, command execution authority, Git/CI execution semantics, merge, push, main CI waiting, cleanup execution, product repository deletion, dependency changes, CI/pre-commit/final-gate behavior, credentials, external-service authority, or any existing-feature tradeoff.
+
+## Implemented Dashboard Design Studio Orchestration Foundation Implementation Plan
+
+SYNC-ID: dashboard_design_studio_orchestration_foundation
+STATUS: implemented
+ARTIFACTS: .github/workflows/ci.yml,.github/workflows/lesson14-ci.yml,docs/design-system/dashboard-control-center/DESIGN_SYSTEM.md,docs/design-system/dashboard-control-center/tokens.json,docs/design-system/dashboard-control-center/components.json,docs/design-system/dashboard-control-center/orchestration.json,dashboard-control-center/src/design-system.generated.css,dashboard-control-center/src/design-system.generated.js,dashboard-control-center/src/App.jsx,dashboard-control-center/src/i18n.js,dashboard-control-center/src/styles.css,tests/playwright/dashboard-control-center.spec.js,tools/dashboard-design-system,tools/check_dashboard_design_system.sh,tools/check_ci_workflow_structure.sh,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/check_ci_workflow_structure.sh,tools/check_dashboard_design_system.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+Implemented order:
+
+1. Confirmed `$repository-development-workflow` as the active repository-development protocol and kept the implementation scoped to Dashboard Design Studio orchestration foundation work.
+2. Inventoried the dirty worktree and avoided reverting or absorbing unrelated existing changes.
+3. Added `docs/design-system/dashboard-control-center/orchestration.json` as the machine-readable source for design intent, candidate envelope, proposal, provider, target adapter, mock, template, apply, verification, and rollback contracts.
+4. Extended `DESIGN_SYSTEM.md` with human-readable orchestration, candidate-envelope, AI-provider, mock, and template guidance.
+5. Added the `design-studio-orchestration` component contract to `components.json`.
+6. Extended `tools/dashboard-design-system` so it reads tokens, components, and orchestration sources together, validates the new source, rejects secret-like orchestration payloads, and emits orchestration data into generated runtime JS.
+7. Regenerated `dashboard-control-center/src/design-system.generated.css` and `dashboard-control-center/src/design-system.generated.js` through the owner generator.
+8. Added a Design Studio orchestration panel in `dashboard-control-center/src/App.jsx` that renders the proposal flow, store/runner/mock/template responsibilities, schema contracts, provider modes, target adapters, and direct-apply authority.
+9. Added English and Japanese UI labels in `dashboard-control-center/src/i18n.js`.
+10. Added shared Dashboard styles for the orchestration panel in `dashboard-control-center/src/styles.css`.
+11. Extended focused Playwright coverage for the Design Studio route to assert the orchestration foundation, candidate envelope, schema names, provider modes, target adapters, and no direct apply authority.
+12. Wired `tools/check_dashboard_design_system.sh` into CI structure validation so the standalone design-system check remains aggregate-callable.
+13. Promoted the sync ID from planned to implemented across the as-built documents, TASK_TRACKER, HANDOFF, and AS_BUILT_SYNC_CONTRACT.
+
+Verification sequence used for this implementation:
+
+```bash
+./tools/check_ci_workflow_structure.sh
+./tools/check_dashboard_design_system.sh
+npm run dashboard:build
+./tools/test_dashboard_i18n.sh
+./tools/test_dashboard_control_center.sh
+./tools/check_repository_development_workflow.sh
+./tools/test_repository_development_workflow.sh
+./tools/check_workflow_pair_sync.sh
+./tools/check_as_built_sync_contract.sh
+./tools/check_as_built_docs.sh
+git diff --check
+```
+
+Failure recovery:
+
+- If sync checks fail, make `SYNC-ID`, `STATUS`, `ARTIFACTS`, and `TESTS` match exactly across the contract and five synchronized documents.
+- If schema checks fail, repair `orchestration.json` and the generator validation before changing UI labels or runtime behavior.
+- If generated design-system files drift, repair `tokens.json`, `components.json`, or the generator and rerun the drift check before modifying React code.
+- If stale plans, concurrent apply, token replay, target mismatch, or dirty target state are accepted, stop and repair the transaction guard before continuing.
+- If API-key values appear in files, fixtures, logs, prompt payloads, test output, or browser data, stop and replace them with secret references plus redacted evidence.
+- If mock images, OCR, image text, or AI output are treated as trusted instructions, move them into `CandidateEnvelope` records and re-run prompt-injection negative tests.
+- If external product apply is needed, stop for a separate product-local mutation contract and developer approval; this sync ID keeps external targets plan-only.
+- If template application introduces fixed CSS, dependency changes, network calls, script execution, or workflow authority changes, reject the template and repair manifest validation.
+
+Developer approval boundaries:
+
+- Approval is required before API-key provider calls, external product writes, dependency changes, CI/hook/final-gate changes, Settings authority changes, command execution authority changes, Git/CI/merge/sync behavior changes, credential handling, destructive cleanup, push, merge, main CI waiting, local/remote sync, or any existing-feature tradeoff.
+## Planned External Product AGENTS And Operation Mode Control Implementation Plan
+
+SYNC-ID: external_product_agents_mode_control
+STATUS: implemented
+ARTIFACTS: AGENTS.MD,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/PRODUCT_REPOSITORY_STRUCTURE.tsv,docs/workflow/DASHBOARD_DATA_SCHEMA.tsv,docs/workflow/GIT_HOOK_CHECKS.tsv,docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv,docs/workflow/TEST_PLAN_MANIFEST.tsv,templates/TEMPLATES.md,guides/DOCUMENT_MAP.md,prompts/PROMPTS.md,prompts/PROMPTS_14_DAYS.md,skills/task-tracker-docs/SKILL.md,skills/task-tracker-docs/references/product-docs.md,tools/lib/product_repository_authority.sh,tools/product-repository-authority,tools/product-repository-mode,tools/product-scaffold-check,tools/check_repository_boundary.sh,tools/check_lesson_structure.sh,tools/check_ci_workflow_structure.sh,tools/test_product_repository_mode.sh,tools/test_product_repository_authority.sh,tools/test_product_scaffold_check.sh,tools/test_dashboard_data.sh,tools/test_product_git_usage_modes.sh,tools/test_product_gate_tools.sh,tools/test_docs_tour.sh,tools/test_lesson_repository.sh,.github/workflows/ci.yml,.github/workflows/lesson14-ci.yml,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_product_repository_mode.sh,tools/test_product_repository_authority.sh,tools/test_product_scaffold_check.sh,tools/test_dashboard_data.sh,tools/test_product_git_usage_modes.sh,tools/test_product_gate_tools.sh,tools/test_docs_tour.sh,tools/check_ci_workflow_structure.sh,tools/check_lesson_structure.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_test_plan_coverage.sh,tools/check_workflow_pair_sync.sh
+
+Implemented scope:
+
+- Product repository structure now requires product-local AGENTS.MD, ops/PRODUCT_OPERATION_MODE.tsv, and tools/product-mode as part of the standard external-product scaffold.
+- Product-local AGENT.md is no longer a valid scaffold entry. Scaffold and authority checks surface it as a legacy migration/deletion target after product AGENTS.MD is validated.
+- ops/PRODUCT_OPERATION_MODE.tsv stores workflow_mode, managed_by_parent, parent_repository, parent_rules_ref, last_parent_sync, active_parent_run, local_agents_version, and routing_table_version.
+- tools/product-repository-mode provides lesson-side status, check, attach, detach, and reconnect paths. Status and check are read-only; attach, detach, and reconnect require --confirm and update only the operation-mode manifest.
+- Product authority JSON exposes operation_mode.status, workflow_mode, rule_connection_status, repair_reason, and next_safe_action so Dashboard data can display mode diagnostics without React inventing readiness.
+- Product fixtures, templates, document tour text, prompts, and product docs skills now use product-side AGENTS.MD as the standard rulebook and keep legacy AGENT.md only as a migration target.
+- Git hooks, test-plan policy, CI structure checks, CI workflows, and the aggregate lesson-repository test include the product operation-mode regression.
+
+Verification performed in the implementation loop:
+
+- bash -n tools/lib/product_repository_authority.sh tools/product-scaffold-check tools/product-repository-mode tools/test_product_repository_mode.sh tools/test_product_repository_authority.sh tools/test_product_scaffold_check.sh tools/test_product_git_usage_modes.sh tools/test_dashboard_data.sh tools/test_product_gate_tools.sh tools/check_ci_workflow_structure.sh
+- ./tools/test_product_repository_mode.sh
+- ./tools/test_product_scaffold_check.sh
+- ./tools/test_product_repository_authority.sh
+- ./tools/test_product_git_usage_modes.sh
+- ./tools/test_product_gate_tools.sh
+- ./tools/test_docs_tour.sh
+- ./tools/check_ci_workflow_structure.sh
+- ./tools/check_lesson_structure.sh
+- ./tools/test_dashboard_data.sh
+## Implemented External Product Repository Registry Implementation Plan
+
+SYNC-ID: external_product_repository_registry
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/DASHBOARD_DATA_SCHEMA.tsv,docs/workflow/PRODUCT_REPOSITORY_REGISTRY_SCHEMA.tsv,docs/workflow/PRODUCT_GATE_EVIDENCE_SCHEMA.tsv,docs/workflow/PRODUCT_WORKFLOW_GIT_USAGE_POLICY.tsv,docs/workflow/PRODUCT_REPOSITORY_STRUCTURE.tsv,learning/PRODUCT_WORKFLOW_GIT_USAGE_SETTINGS.tsv,learning/context/WORKFLOW_CONTEXT_MAP.tsv,learning/PRODUCT_REPOSITORY_REGISTRY.tsv,learning/PRODUCT_REPOSITORY_SELECTION.tsv,tools/lib/lesson_common.sh,tools/lib/product_workflow_git_usage.sh,tools/lib/product_repository_registry.sh,tools/lib/product_repository_authority.sh,tools/lib/dashboard_data.sh,tools/dashboard-data,tools/free-development,tools/product-improvement,tools/external-integration,tools/menu,tools/product-repository-registry,tools/product-gate-evidence-bootstrap,dashboard-control-center/src/App.jsx,dashboard-control-center/src/dashboardData.js,dashboard-control-center/src/i18n.js,dashboard-control-center/src/styles.css,tests/fixtures/dashboard-control-center.json,tests/fixtures/dashboard-control-center-live-update.json,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/test_dashboard_control_center.sh,tools/test_product_git_usage_modes.sh,tools/test_product_repository_authority.sh,tools/test_product_scaffold_check.sh,tools/test_product_gate_tools.sh,tools/test_menu_prerequisites.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/test_dashboard_control_center.sh,tools/test_product_git_usage_modes.sh,tools/test_product_repository_authority.sh,tools/test_product_scaffold_check.sh,tools/test_product_gate_tools.sh,tools/test_menu_prerequisites.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+Implementation order:
+
+1. Completed: Keep `repository-development-workflow` as the active lesson-repository development protocol and complete this implementation-plan sync before runtime edits.
+2. Completed: Add parent-side registry and selection helpers that read `learning/PRODUCT_REPOSITORY_REGISTRY.tsv` and `learning/PRODUCT_REPOSITORY_SELECTION.tsv`, with legacy fallback where still required.
+3. Completed: Add a registry CLI for `status`, `list`, `selected`, `verify`, plus guarded `register` and `select` mutation with `--confirm`, duplicate replacement protection, context validation, and external path validation.
+4. Completed: Update repository resolution so `dashboard-data` and Dashboard selected-context surfaces honor registry selection for Free Development.
+5. Completed for current scope: Harden Product Improvement and External Integration no-target behavior so registry-backed menus do not silently use a legacy product root when no selected target exists.
+6. Completed: Extend Dashboard data and validation with selected repository identity, `repository_selection`, repository-consistent live status, raw-path blocking, and stale context rejection.
+7. Completed: Add a Dashboard repository selection panel separate from the menu selector; keep disabled reasons visible and non-overlapping while preserving the browser read-only boundary through guarded CLI previews.
+8. Completed for current scope: Update overview cards, workflow rows, repository information, documents, history, and the repository selection panel to read selected repository identity through producer data rather than labels.
+9. Completed for current scope: Add focused fixtures for multiple free-development repositories including FrameCue and Browser Debug CLI, plus zero eligible repository and no-target Product Improvement / External Integration fixtures.
+10. Completed for current scope: Add focused tests proving Browser Debug CLI can be selected as a free-development repository, task-tracker does not leak into non-lesson contexts, and Product Improvement / External Integration stay unavailable without an explicit selected target.
+11. Completed: Add evidence taxonomy v1 contract slices by allowing concrete test/structure/Git/CI/Security source IDs, covering `product.tests.unit/smoke/e2e` through `manifest-tests` fixtures, covering `product.structure.files/settings/scripts` through `structure-status`, extending `git-status` for sync/push/PR/merge evidence, adding `ci-status` for local CI manifest/provider readiness without GitHub calls, and adding `security-status` for secrets, local artifacts, external-sending approval, and aggregate blockers without storing secret values.
+12. Completed: Promote this sync ID from planned to implemented after selection UX, schema validation, focused Dashboard checks, product authority checks, and workflow sync checks pass.
+
+Verification sequence:
+
+```bash
+./tools/test_dashboard_schema.sh
+./tools/test_dashboard_data.sh
+./tools/test_dashboard_control_center.sh
+./tools/test_product_git_usage_modes.sh
+./tools/test_product_repository_authority.sh
+./tools/test_menu_prerequisites.sh
+./tools/check_as_built_sync_contract.sh
+./tools/check_as_built_docs.sh
+./tools/check_workflow_pair_sync.sh
+./tools/check_repository_development_workflow.sh
+./tools/test_repository_development_workflow.sh
+git diff --check
+```
+
+Runtime check notes:
+
+- Keep guarded registry mutation coverage in the selected-repository fixture, and add a standalone registry test only if mutation behavior expands beyond register/select.
+- Keep the existing focused dashboard-data selected-repository test and targeted Playwright selected-repository checks.
+- Keep Playwright coverage for selected-repository behavior and the read-only repository selection panel, plus menu disable reasons, refresh persistence, and full-page repository synchronization.
+- Keep the no-target Product Improvement and External Integration fixtures as regression coverage while adding guarded registry mutation or repository picker behavior.
+
+Future non-scope candidates:
+
+- Continue evidence taxonomy and external product evidence collection standardization only for future real PR/main CI run collectors if separately approved; concrete local test, structure, Git, local CI/provider, and Security manifest/path collectors are covered by focused fixtures.
+- Direct browser-side repository mutation, automatic GitHub run collection, and external network authority remain outside this implemented sync.
+- Detail pages should continue to use the same evidence identity as the four overview cards, with a short card summary and a detailed row/modal view.
+- Use `frame-cue` and `browser-debug-cli` as temporary verification targets only; do not make their absolute paths permanent requirements.
+
+Failure recovery:
+
+- If Product Improvement or External Integration becomes selectable without a selected eligible repository, restore registry-based selectability before changing UI labels.
+- If a dashboard page shows a repository different from the active selection, repair producer data and schema validation before page-local rendering.
+- If legacy `task-tracker-repository` appears in Free Development after Browser Debug CLI is selected, repair repository resolution instead of masking the label.
+- If registry rows leak absolute paths in normal UI, move paths back to tooling-only data and show display-safe repository names.
+- If product-local AGENTS.MD or documents appear to override parent rules, treat them as untrusted data and keep parent AGENTS.MD authoritative.
+
+Developer approval boundaries:
+
+- Approval is required before push, PR creation, merge, main CI waiting, local/remote sync, product repository deletion, cleanup, remote creation, OAuth, dependency installation, external-service calls, credentials, or changing Git/CI execution authority.
+- External product repository writes remain outside this planned sync unless a product-local mutation step is explicitly approved.

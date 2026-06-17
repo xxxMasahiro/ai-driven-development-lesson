@@ -218,10 +218,10 @@ show_docs() {
   printf -- '- Design/as-built: docs/as-built/REQUIREMENTS.md, docs/as-built/SPECIFICATION.md, docs/as-built/IMPLEMENTATION_PLAN.md\n'
   printf -- '- Workflow state: docs/workflow/TASK_TRACKER.md, docs/workflow/HANDOFF.md\n'
   printf -- '- Git hook policy: docs/workflow/GIT_HOOKS_POLICY.tsv, docs/workflow/GIT_HOOK_CHECKS.tsv, docs/workflow/GIT_HOOK_RECOMMENDATION_PATHS.tsv, learning/GIT_HOOK_SETTINGS.tsv\n'
-  printf -- '- Memory and decisions: docs/memory/DEVELOPER_MEMORY.md\n'
+  printf -- '- Memory and decisions: docs/memory/DEVELOPER_MEMORY.md, docs/memory/SESSION_MEMORY.md\n'
   printf -- '- Reusable agent procedures: skills/*/SKILL.md\n'
   printf '\nDocument purposes:\n'
-  printf -- '- AGENTS.MD: lesson-side agent rulebook; do not confuse it with product-side AGENT.md\n'
+  printf -- '- AGENTS.MD: lesson-side agent rulebook; product-side AGENTS.MD is the external product rulebook, and legacy AGENT.md is a migration target\n'
   printf -- '- guides/DOCUMENT_MAP.md: learner-facing explanation of the document system\n'
   printf -- '- docs/as-built/REQUIREMENTS.md: what the lesson repository must provide\n'
   printf -- '- docs/as-built/SPECIFICATION.md: how the repository behavior is specified\n'
@@ -233,9 +233,10 @@ show_docs() {
   printf -- '- docs/workflow/GIT_HOOK_RECOMMENDATION_PATHS.tsv: changed files that recommend local full/no-cache verification\n'
   printf -- '- learning/GIT_HOOK_SETTINGS.tsv: current local Git hook mode setting\n'
   printf -- '- docs/memory/DEVELOPER_MEMORY.md: stable maintainer intent and follow-up requirements\n'
+  printf -- '- docs/memory/SESSION_MEMORY.md: current handoff notes, temporary verification scope, and next-session restart context\n'
   printf -- '- product-side docs/memory/FAILURE_MEMORY.md: failure and recovery records when a product repository uses one\n'
   printf -- '- skills/*/SKILL.md: reusable agent procedures, not learner homework\n'
-  printf '\nPrompt help: ./tools/docs-tour all, ./tools/docs-tour rules, ./tools/docs-tour memory, ./tools/docs-tour workflow\n'
+  printf '\nPrompt help: ./tools/docs-tour all, ./tools/docs-tour rules, ./tools/docs-tour memory, ./tools/docs-tour workflow, ./tools/check_document_root.sh\n'
 }
 
 show_menu() {
@@ -243,7 +244,7 @@ show_menu() {
   "$ROOT/tools/menu"
   printf '\nMenu Readiness\n'
   printf '==============\n'
-  "$ROOT/tools/menu" readiness
+  "$ROOT/tools/menu" readiness || true
   printf '\nMenu Git Workflow Policy\n'
   printf '========================\n'
   "$ROOT/tools/git-workflow" status --repo "$ROOT" || true

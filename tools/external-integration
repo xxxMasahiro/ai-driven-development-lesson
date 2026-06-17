@@ -16,6 +16,7 @@ usage() {
 Usage:
   tools/external-integration status
   tools/external-integration start
+  tools/external-integration gate-plan
   tools/external-integration gate
 
 Rules:
@@ -27,7 +28,7 @@ USAGE
 
 check_scope_docs() {
   local product_root missing file
-  product_root="$(lesson_product_repo_root)"
+  product_root="$(product_workflow_git_usage_repository_root_for_context external-integration)"
   missing=0
   for file in REQUIREMENTS.md SPECIFICATION.md IMPLEMENTATION_PLAN.md; do
     if [[ ! -s "$product_root/docs/product/$file" ]]; then
@@ -41,7 +42,7 @@ check_scope_docs() {
 case "$COMMAND" in
   status|現在地)
     printf 'External Integration: optional extension path\n'
-    printf 'Product repository: %s\n' "$(lesson_product_repo_root)"
+    printf 'Product repository: %s\n' "$(product_workflow_git_usage_repository_root_for_context external-integration 2>/dev/null || printf 'not_selected')"
     printf 'Typical targets: calendar, task service, spreadsheet, documentation, API, or MCP-style resource.\n'
     "$LESSON_ROOT/tools/product-security" advise --context external-integration || true
     lesson_menu_print_readiness "External Integration"
@@ -64,6 +65,9 @@ Do not implement until I approve the smallest useful integration plan.
 PROMPT
     printf '\nProduct security guidance:\n'
     "$LESSON_ROOT/tools/product-security" advise --context external-integration || true
+    ;;
+  gate-plan|plan)
+    product_workflow_git_usage_gate_plan external-integration integration
     ;;
   gate|確認)
     lesson_menu_require_settings "External Integration"

@@ -53,6 +53,7 @@ run_settings() {
   DASHBOARD_SETTINGS_TEST_MODE=1 \
   DASHBOARD_SETTINGS_TEST_ROOT="$TMP_DIR" \
   DASHBOARD_SETTINGS_SKIP_SNAPSHOT=1 \
+  DASHBOARD_SETTINGS_CATALOG_FIXTURE="$ROOT/tests/fixtures/dashboard-control-center.json" \
   DASHBOARD_LESSON_CONFIG="$lesson_config" \
   DASHBOARD_LESSON14_CONFIG="$lesson14_config" \
   LESSON_CONFIG="$lesson14_config" \
@@ -98,8 +99,53 @@ awk -F '\t' '$1 !~ /^#/ && $2 == "en" && $3 == "English" { found = 1 } END { exi
 run_settings apply product_language zh-CN --menu step_1_14 --confirm >/dev/null
 awk -F '\t' '$1 !~ /^#/ && $2 == "zh-CN" && $3 != "" { found = 1 } END { exit found ? 0 : 1 }' "$lesson14_product_language"
 
+validate_catalog_allowed_values_for_menu() {
+  local menu_id="$1"
+  local settings_catalog_json
+  settings_catalog_json="$(run_settings catalog --menu "$menu_id")"
+  SETTINGS_CATALOG_JSON="$settings_catalog_json" node <<'NODE'
+const catalog = JSON.parse(process.env.SETTINGS_CATALOG_JSON);
+if (!catalog || !Array.isArray(catalog.items)) {
+  console.error('dashboard-settings catalog must expose settings items');
+  process.exit(1);
+}
+const editableItems = catalog.items.filter((item) => item.editable);
+if (!editableItems.length) {
+  console.error('dashboard-settings catalog must expose editable items');
+  process.exit(1);
+}
+for (const item of editableItems) {
+  if (!Array.isArray(item.allowed_values) || item.allowed_values.length === 0) {
+    console.error(`editable item must expose allowed values: ${item.id}`);
+    process.exit(1);
+  }
+}
+NODE
+  while IFS=$'\t' read -r setting_id allowed_value; do
+    [[ -n "$setting_id" && -n "$allowed_value" ]] || continue
+    run_settings plan "$setting_id" "$allowed_value" --menu "$menu_id" >/dev/null
+  done < <(SETTINGS_CATALOG_JSON="$settings_catalog_json" node <<'NODE'
+const catalog = JSON.parse(process.env.SETTINGS_CATALOG_JSON);
+for (const item of catalog.items.filter((entry) => entry.editable)) {
+  for (const value of item.allowed_values) {
+    process.stdout.write(`${item.id}\t${value}\n`);
+  }
+}
+NODE
+  )
+}
+
+for catalog_menu in step_1_14 free-development product-improvement external-integration lesson-repository-improvement; do
+  validate_catalog_allowed_values_for_menu "$catalog_menu"
+done
+
 run_settings apply git_push_automation manual --menu step_1_14 --confirm >/dev/null
 awk -F '\t' '$1 == "push_automation" && $2 == "manual" { found = 1 } END { exit found ? 0 : 1 }' "$git_settings"
+
+run_settings apply git_developer_auto_merge_allowed false --menu step_1_14 --confirm >/dev/null
+awk -F '\t' '$1 == "developer_auto_merge_allowed" && $2 == "false" { found = 1 } END { exit found ? 0 : 1 }' "$git_settings"
+run_settings apply git_developer_auto_merge_allowed true --menu step_1_14 --confirm >/dev/null
+awk -F '\t' '$1 == "developer_auto_merge_allowed" && $2 == "true" { found = 1 } END { exit found ? 0 : 1 }' "$git_settings"
 
 blocked_git_plan_json="$(run_settings plan git_branch_allowed false --menu step_1_14)"
 BLOCKED_GIT_PLAN_JSON="$blocked_git_plan_json" node <<'NODE'

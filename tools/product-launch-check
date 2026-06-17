@@ -17,12 +17,13 @@ LAUNCH_MODE="auto"
 PROFILE="generic"
 CONTEXT="free-development"
 PRODUCT_TYPE="all"
+GIT_REQUIRED=1
 FAILURES=()
 
 usage() {
   cat <<'USAGE'
 Usage:
-  tools/product-launch-check check [--repo <path>] [--launch direct-index|auto] [--profile generic|task-tracker] [--context <context>] [--product-type <type>]
+  tools/product-launch-check check [--repo <path>] [--launch direct-index|auto] [--profile generic|task-tracker] [--context <context>] [--product-type <type>] [--git-optional]
 
 This command is read-only. It validates that the product repository exposes the
 declared launch path and that a direct index.html launch does not depend on
@@ -176,12 +177,13 @@ run_check() {
   local profile="$3"
   local context="$4"
   local product_type="$5"
+  local git_required="$6"
   local readme index_file entrypoint_path direct_required="false"
   local script_name
 
   if [[ ! -d "$repo" ]]; then
     fail "configured product repository is missing."
-  elif [[ ! -d "$repo/.git" ]]; then
+  elif [[ "$git_required" -eq 1 && ! -d "$repo/.git" ]]; then
     fail "configured product path is not a Git repository."
   fi
 
@@ -273,6 +275,10 @@ while [[ $# -gt 0 ]]; do
       PRODUCT_TYPE="${2:-}"
       shift 2
       ;;
+    --git-optional)
+      GIT_REQUIRED=0
+      shift
+      ;;
     -h|--help|help)
       usage
       exit 0
@@ -291,7 +297,7 @@ fi
 
 case "$COMMAND" in
   check|status|現在地)
-    run_check "$REPO" "$LAUNCH_MODE" "$PROFILE" "$CONTEXT" "$PRODUCT_TYPE"
+    run_check "$REPO" "$LAUNCH_MODE" "$PROFILE" "$CONTEXT" "$PRODUCT_TYPE" "$GIT_REQUIRED"
     ;;
   ""|-h|--help|help)
     usage

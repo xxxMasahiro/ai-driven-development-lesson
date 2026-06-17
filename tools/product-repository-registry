@@ -1,0 +1,485 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck source=tools/lib/lesson_common.sh
+source "$ROOT/tools/lib/lesson_common.sh"
+# shellcheck source=tools/lib/product_repository_registry.sh
+source "$ROOT/tools/lib/product_repository_registry.sh"
+# shellcheck source=tools/lib/product_workflow_git_usage.sh
+source "$ROOT/tools/lib/product_workflow_git_usage.sh"
+
+COMMAND="${1:-status}"
+
+usage() {
+  cat <<'USAGE'
+Usage:
+  tools/product-repository-registry status
+  tools/product-repository-registry list
+  tools/product-repository-registry selected <free-development|product-improvement|external-integration>
+  tools/product-repository-registry register --repo-id <id> --menu <menu-id> --contexts <pipe-list> --name <display-name> --path <path> --product-type <type> --confirm [--replace]
+  tools/product-repository-registry select <free-development|product-improvement|external-integration> <repo-id> --confirm [--source cli]
+  tools/product-repository-registry verify --context <menu-id> [--all] [--require-authority-ready]
+
+Parent-side registry for external product repositories. Write operations require --confirm.
+USAGE
+}
+
+now_utc() {
+  date -u '+%Y-%m-%dT%H:%M:%SZ'
+}
+
+validate_safe_id() {
+  local value="$1"
+  [[ "$value" =~ ^[A-Za-z0-9._-]+$ ]] || {
+    printf 'invalid repository id: %s\n' "$value" >&2
+    return 1
+  }
+}
+
+validate_text_field() {
+  local label="$1"
+  local value="$2"
+  if [[ -z "$value" || "$value" == *$'\t'* || "$value" == *$'\n'* || "$value" == *$'\r'* ]]; then
+    printf 'invalid %s: value must be non-empty single-line text.\n' "$label" >&2
+    return 1
+  fi
+}
+
+validate_product_type() {
+  case "$1" in
+    all|web|api|cli|library|integration|custom|unknown) return 0 ;;
+  esac
+  printf 'invalid product type: %s\n' "$1" >&2
+  return 1
+}
+
+validate_context_list() {
+  local list="$1"
+  local item
+  validate_text_field "contexts" "$list" || return 1
+  IFS='|' read -r -a items <<<"$list"
+  for item in "${items[@]}"; do
+    product_repository_registry_context_supported "$item" || {
+      printf 'invalid registry context: %s\n' "$item" >&2
+      return 1
+    }
+  done
+}
+
+ensure_confirmed() {
+  local confirmed="$1"
+  local action="$2"
+  if [[ "$confirmed" != "true" ]]; then
+    printf 'Refusing to %s without --confirm.\n' "$action" >&2
+    return 1
+  fi
+}
+
+ensure_external_repository_path() {
+  local raw_path="$1"
+  local root
+  validate_text_field "repository path" "$raw_path" || return 1
+  root="$(lesson_expand_path "$raw_path")"
+  if [[ ! -d "$root" ]]; then
+    printf 'registered repository path must exist: %s\n' "$root" >&2
+    return 1
+  fi
+  case "$root/" in
+    "$ROOT/"*)
+      printf 'registered repository must not be inside the lesson repository: %s\n' "$root" >&2
+      return 1
+      ;;
+  esac
+}
+
+registry_header() {
+  printf '# repo_id\tprimary_menu_id\tallowed_contexts\tdisplay_name\trepository_path\tproduct_type\tsource\n'
+}
+
+selection_header() {
+  printf '# menu_id\trepo_id\tselected_at\tselection_source\n'
+}
+
+register_repo() {
+  local repo_id="" menu_id="" contexts="" display_name="" repository_path="" product_type="all" source="explicit"
+  local confirm="false" replace="false" file dir tmp existing_rows existing_match
+  shift
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --repo-id) repo_id="${2:-}"; shift 2 ;;
+      --menu) menu_id="${2:-}"; shift 2 ;;
+      --contexts) contexts="${2:-}"; shift 2 ;;
+      --name) display_name="${2:-}"; shift 2 ;;
+      --path) repository_path="${2:-}"; shift 2 ;;
+      --product-type) product_type="${2:-}"; shift 2 ;;
+      --source) source="${2:-}"; shift 2 ;;
+      --confirm) confirm="true"; shift ;;
+      --replace) replace="true"; shift ;;
+      -h|--help) usage; exit 0 ;;
+      *) printf 'unknown register option: %s\n' "$1" >&2; usage >&2; exit 1 ;;
+    esac
+  done
+
+  ensure_confirmed "$confirm" "register a product repository" || exit 1
+  validate_safe_id "$repo_id" || exit 1
+  product_repository_registry_context_supported "$menu_id" || {
+    printf 'menu id must be free-development, product-improvement, or external-integration.\n' >&2
+    exit 1
+  }
+  validate_context_list "$contexts" || exit 1
+  product_repository_registry_context_allowed "$contexts" "$menu_id" || {
+    printf 'primary menu must be included in allowed contexts.\n' >&2
+    exit 1
+  }
+  validate_text_field "display name" "$display_name" || exit 1
+  ensure_external_repository_path "$repository_path" || exit 1
+  validate_product_type "$product_type" || exit 1
+  case "$source" in explicit|discover|legacy) ;; *)
+    printf 'invalid registry source: %s\n' "$source" >&2
+    exit 1
+    ;;
+  esac
+
+  existing_match="$(product_repository_registry_row_for_id "$repo_id" 2>/dev/null || true)"
+  if [[ -n "$existing_match" && "$replace" != "true" ]]; then
+    printf 'repository id already registered: %s\n' "$repo_id" >&2
+    exit 1
+  fi
+
+  file="$(product_repository_registry_file)"
+  dir="$(dirname "$file")"
+  mkdir -p "$dir"
+  tmp="$(mktemp "$dir/.product-repository-registry.XXXXXX.tmp")"
+  registry_header >"$tmp"
+  existing_rows="$(product_repository_registry_rows)" || {
+    rm -f "$tmp"
+    exit 1
+  }
+  while IFS= read -r row; do
+    [[ -n "$row" ]] || continue
+    [[ "$(printf '%s\n' "$row" | awk -F '\t' '{ print $1 }')" != "$repo_id" ]] || continue
+    printf '%s\n' "$row" >>"$tmp"
+  done <<<"$existing_rows"
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$repo_id" "$menu_id" "$contexts" "$display_name" "$repository_path" "$product_type" "$source" >>"$tmp"
+  product_repository_registry_rows >/dev/null 2>&1 || true
+  awk -F '\t' '
+    /^[[:space:]]*$/ { next }
+    $1 ~ /^#/ { next }
+    NF != 7 { invalid = 1 }
+    END { exit invalid ? 1 : 0 }
+  ' "$tmp"
+  mv "$tmp" "$file"
+  printf 'Registered product repository: %s\t%s\n' "$repo_id" "$(lesson_expand_path "$repository_path")"
+}
+
+select_repo() {
+  local menu_id="${2:-}"
+  local repo_id="${3:-}"
+  local confirm="false" source="cli"
+  local file dir tmp existing_rows row row_menu allowed
+  shift 3 || true
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --confirm) confirm="true"; shift ;;
+      --source) source="${2:-}"; shift 2 ;;
+      -h|--help) usage; exit 0 ;;
+      *) printf 'unknown select option: %s\n' "$1" >&2; usage >&2; exit 1 ;;
+    esac
+  done
+
+  ensure_confirmed "$confirm" "select a product repository" || exit 1
+  product_repository_registry_context_supported "$menu_id" || {
+    printf 'menu id must be free-development, product-improvement, or external-integration.\n' >&2
+    exit 1
+  }
+  validate_safe_id "$repo_id" || exit 1
+  product_repository_registry_row_for_id "$repo_id" >/dev/null || {
+    printf 'unknown repository id: %s\n' "$repo_id" >&2
+    exit 1
+  }
+  allowed="$(product_repository_registry_field_for_id "$repo_id" allowed_contexts)"
+  product_repository_registry_context_allowed "$allowed" "$menu_id" || {
+    printf 'repository %s is not allowed for %s.\n' "$repo_id" "$menu_id" >&2
+    exit 1
+  }
+  case "$source" in dashboard|cli|legacy|repair) ;; *)
+    printf 'invalid selection source: %s\n' "$source" >&2
+    exit 1
+    ;;
+  esac
+
+  file="$(product_repository_registry_selection_file)"
+  dir="$(dirname "$file")"
+  mkdir -p "$dir"
+  tmp="$(mktemp "$dir/.product-repository-selection.XXXXXX.tmp")"
+  selection_header >"$tmp"
+  existing_rows="$(product_repository_registry_selection_rows)" || {
+    rm -f "$tmp"
+    exit 1
+  }
+  while IFS= read -r row; do
+    [[ -n "$row" ]] || continue
+    row_menu="$(printf '%s\n' "$row" | awk -F '\t' '{ print $1 }')"
+    [[ "$row_menu" != "$menu_id" ]] || continue
+    printf '%s\n' "$row" >>"$tmp"
+  done <<<"$existing_rows"
+  printf '%s\t%s\t%s\t%s\n' "$menu_id" "$repo_id" "$(now_utc)" "$source" >>"$tmp"
+  awk -F '\t' '
+    /^[[:space:]]*$/ { next }
+    $1 ~ /^#/ { next }
+    NF != 4 { invalid = 1 }
+    END { exit invalid ? 1 : 0 }
+  ' "$tmp"
+  mv "$tmp" "$file"
+  printf 'Selected product repository: %s\t%s\n' "$menu_id" "$repo_id"
+}
+
+authority_fields_for_repo() {
+  local context="$1"
+  local root="$2"
+  local git_usage_mode="$3"
+  local json_file err_file
+  local -a authority_args
+  json_file="$(mktemp)"
+  err_file="$(mktemp)"
+  authority_args=(status --json --context "$context" --repo "$root")
+  if ! product_workflow_git_usage_requires_git_worktree "$git_usage_mode"; then
+    authority_args+=(--git-optional)
+  fi
+  if ! product_workflow_git_usage_requires_ci "$git_usage_mode"; then
+    authority_args+=(--ci-optional)
+  fi
+  if "$ROOT/tools/product-repository-authority" "${authority_args[@]}" >"$json_file" 2>"$err_file"; then
+    node - "$json_file" <<'NODE'
+const fs = require("node:fs");
+const path = process.argv[2];
+const data = JSON.parse(fs.readFileSync(path, "utf8"));
+const blockers = Array.isArray(data.product_operation_blockers) ? data.product_operation_blockers.length : 0;
+const evidenceIndex = data.evidence_summary?.index_status || "unknown";
+const evidenceItemsList = Array.isArray(data.evidence_summary?.items) ? data.evidence_summary.items : [];
+const requiredMissing = Array.isArray(data.manifest_summary?.required_missing)
+  ? data.manifest_summary.required_missing.length
+  : 0;
+const requiredEvidence = evidenceItemsList.filter((item) => item.required_in_context === true || item.required_in_context === "true");
+const statuses = requiredEvidence.map((item) => item.status || "unknown");
+let evidenceStatus = "not_collected";
+if (requiredEvidence.length) {
+  if (statuses.some((status) => status === "failed" || status === "blocked")) {
+    evidenceStatus = "failed";
+  } else if (statuses.some((status) => status === "stale")) {
+    evidenceStatus = "stale";
+  } else if (statuses.some((status) => status === "not_run")) {
+    evidenceStatus = "not_run";
+  } else if (statuses.some((status) => status === "unknown")) {
+    evidenceStatus = "unknown";
+  } else if (statuses.every((status) => status === "passed" || status === "not_applicable")) {
+    evidenceStatus = "passed";
+  } else {
+    evidenceStatus = statuses[0] || "unknown";
+  }
+}
+process.stdout.write([
+  data.status || "unknown",
+  String(blockers),
+  evidenceStatus,
+  evidenceIndex,
+  String(requiredMissing),
+  String(evidenceItemsList.length)
+].join("\t"));
+NODE
+    rm -f "$json_file" "$err_file"
+    return 0
+  fi
+  rm -f "$json_file"
+  printf 'unreadable\t0\tunknown\tunknown\t0\t0'
+  if [[ -s "$err_file" ]]; then
+    printf '\t%s' "$(tr '\t\r\n' '   ' <"$err_file")"
+  fi
+  rm -f "$err_file"
+  return 1
+}
+
+verify_one_repo() {
+  local context="$1"
+  local require_authority_ready="$2"
+  local repo_id="$3"
+  local allowed="$4"
+  local display_name="$5"
+  local raw_path="$6"
+  local product_type="$7"
+  local root repository_status agents_status scaffold_status bootstrap_status authority_fields
+  local authority_status blockers evidence_status evidence_index required_missing evidence_items git_usage_mode git_status dashboard_readiness
+  local -a scaffold_args
+  local row_rc=0
+
+  root="$(lesson_expand_path "$raw_path")"
+  repository_status="ready"
+  agents_status="ready"
+  scaffold_status="passed"
+  bootstrap_status="ready"
+  authority_status="unknown"
+  blockers="0"
+  evidence_status="unknown"
+  evidence_index="unknown"
+  required_missing="0"
+  evidence_items="0"
+  git_usage_mode="$(product_workflow_git_usage_mode_for_context "$context" 2>/dev/null || printf 'ci')"
+  git_status="not_git"
+  dashboard_readiness="ready"
+
+  if [[ ! -d "$root" ]]; then
+    repository_status="missing"
+    agents_status="skipped"
+    scaffold_status="skipped"
+    bootstrap_status="skipped"
+    authority_status="skipped"
+    dashboard_readiness="blocked"
+    row_rc=1
+  else
+    if [[ ! -s "$root/AGENTS.MD" ]]; then
+      agents_status="missing"
+      row_rc=1
+    elif [[ -e "$root/AGENT.md" ]]; then
+      agents_status="legacy_conflict"
+      row_rc=1
+    fi
+
+    scaffold_args=(check --repo "$root" --context "$context" --product-type "$product_type")
+    if ! product_workflow_git_usage_requires_git_worktree "$git_usage_mode"; then
+      scaffold_args+=(--git-optional)
+    fi
+    if ! product_workflow_git_usage_requires_ci "$git_usage_mode"; then
+      scaffold_args+=(--ci-optional)
+    fi
+    if ! "$ROOT/tools/product-scaffold-check" "${scaffold_args[@]}" >/dev/null 2>&1; then
+      scaffold_status="failed"
+      row_rc=1
+    fi
+
+    if ! "$ROOT/tools/product-gate-evidence-bootstrap" status --repo "$root" >/dev/null 2>&1; then
+      bootstrap_status="missing"
+      row_rc=1
+    fi
+
+    authority_fields="$(authority_fields_for_repo "$context" "$root" "$git_usage_mode" || true)"
+    IFS=$'\t' read -r authority_status blockers evidence_status evidence_index required_missing evidence_items _authority_error <<<"$authority_fields"
+    if [[ "$authority_status" == "unreadable" ]]; then
+      row_rc=1
+    fi
+
+    if git -C "$root" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+      if [[ -z "$(git -C "$root" status --short 2>/dev/null)" ]]; then
+        git_status="clean"
+      else
+        git_status="dirty"
+      fi
+    fi
+  fi
+
+  if [[ "$repository_status" != "ready" || "$agents_status" != "ready" || "$scaffold_status" != "passed" || "$bootstrap_status" != "ready" || "$authority_status" == "unreadable" ]]; then
+    dashboard_readiness="blocked"
+  fi
+  if [[ "$require_authority_ready" == "true" && ( "$authority_status" != "ready" || "$blockers" != "0" ) ]]; then
+    dashboard_readiness="blocked"
+    row_rc=1
+  fi
+
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
+    "$repo_id" "$display_name" "$context" "$root" "$repository_status" "$agents_status" \
+    "$scaffold_status" "$bootstrap_status" "$authority_status" "$blockers" "$evidence_status" \
+    "$evidence_index" "$evidence_items" "$git_usage_mode" "$git_status" "$dashboard_readiness"
+  return "$row_rc"
+}
+
+verify_registry() {
+  local context="" verify_all="false" require_authority_ready="false" repo_id row
+  local overall_rc=0 selected_id=""
+  shift
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --context)
+        context="${2:-}"
+        shift 2
+        ;;
+      --all)
+        verify_all="true"
+        shift
+        ;;
+      --require-authority-ready)
+        require_authority_ready="true"
+        shift
+        ;;
+      -h|--help)
+        usage
+        exit 0
+        ;;
+      *)
+        printf 'unknown verify option: %s\n' "$1" >&2
+        usage >&2
+        exit 1
+        ;;
+    esac
+  done
+  if ! product_repository_registry_context_supported "$context"; then
+    printf 'verify requires --context free-development, product-improvement, or external-integration.\n' >&2
+    exit 1
+  fi
+
+  printf 'Product repository verification: %s\n' "$context"
+  printf '# repo_id\tdisplay_name\tcontext\trepository_path\trepository_status\tagents_status\tscaffold_status\tbootstrap_status\tauthority_status\tblockers\tevidence_status\tevidence_index\tevidence_items\tgit_usage_mode\tgit_status\tdashboard_readiness\n'
+
+  if [[ "$verify_all" == "true" ]]; then
+    while IFS=$'\t' read -r repo_id _primary allowed display_name raw_path product_type _source; do
+      [[ -n "$repo_id" ]] || continue
+      verify_one_repo "$context" "$require_authority_ready" "$repo_id" "$allowed" "$display_name" "$raw_path" "$product_type" || overall_rc=1
+    done < <(product_repository_registry_rows_for_context "$context")
+  else
+    selected_id="$(product_repository_registry_id_for_menu "$context" 2>/dev/null || true)"
+    if [[ -z "$selected_id" ]]; then
+      printf 'No repository selected for %s.\n' "$context" >&2
+      exit 1
+    fi
+    row="$(product_repository_registry_row_for_id "$selected_id")"
+    IFS=$'\t' read -r repo_id _primary allowed display_name raw_path product_type _source <<<"$row"
+    verify_one_repo "$context" "$require_authority_ready" "$repo_id" "$allowed" "$display_name" "$raw_path" "$product_type" || overall_rc=1
+  fi
+
+  return "$overall_rc"
+}
+
+case "$COMMAND" in
+  status|list)
+    product_repository_registry_print_status
+    ;;
+  selected)
+    menu_id="${2:-}"
+    if ! product_repository_registry_context_supported "$menu_id"; then
+      printf 'menu id must be free-development, product-improvement, or external-integration.\n' >&2
+      exit 1
+    fi
+    repo_id="$(product_repository_registry_id_for_menu "$menu_id" 2>/dev/null || true)"
+    if [[ -z "$repo_id" ]]; then
+      printf 'No repository selected for %s.\n' "$menu_id" >&2
+      exit 1
+    fi
+    printf '%s\t%s\t%s\n' "$menu_id" "$repo_id" "$(product_repository_registry_root_for_id "$repo_id")"
+    ;;
+  register)
+    register_repo "$@"
+    ;;
+  select)
+    select_repo "$@"
+    ;;
+  verify)
+    verify_registry "$@"
+    ;;
+  -h|--help|help)
+    usage
+    ;;
+  *)
+    printf 'unknown command: %s\n' "$COMMAND" >&2
+    usage >&2
+    exit 1
+    ;;
+esac
