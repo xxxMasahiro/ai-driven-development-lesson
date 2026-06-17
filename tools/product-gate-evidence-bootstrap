@@ -1,0 +1,1532 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck source=tools/lib/lesson_common.sh
+source "$ROOT/tools/lib/lesson_common.sh"
+# shellcheck source=tools/lib/product_repository_registry.sh
+source "$ROOT/tools/lib/product_repository_registry.sh"
+
+COMMAND="${1:-status}"
+if [[ $# -gt 0 ]]; then
+  shift
+fi
+
+REPO=""
+CONTEXT=""
+CONFIRM="false"
+FORCE="false"
+
+usage() {
+  cat <<'USAGE'
+Usage:
+  tools/product-gate-evidence-bootstrap status [--repo <path>|--product <path>|--context <menu-id>]
+  tools/product-gate-evidence-bootstrap install [--repo <path>|--product <path>|--context <menu-id>] --confirm [--force]
+
+Menu ids:
+  free-development
+  product-improvement
+  external-integration
+
+This parent-repository tool installs the product-local evidence producer used by
+Dashboard and product authority. It writes only:
+  tools/lib/product_gate_evidence.sh
+  tools/product-gate-evidence
+  ops/EVIDENCE_DETAIL_MANIFEST.tsv
+
+The installed product-local command records Dashboard-readable rows in:
+  .git/product-gate-evidence/index.tsv
+  .git/product-gate-evidence/ledger.jsonl
+  .git/product-gate-evidence/details/<source-id>/*.json
+USAGE
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --repo|--product)
+      REPO="${2:-}"
+      shift 2
+      ;;
+    --context)
+      CONTEXT="${2:-}"
+      shift 2
+      ;;
+    --confirm)
+      CONFIRM="true"
+      shift
+      ;;
+    --force)
+      FORCE="true"
+      shift
+      ;;
+    -h|--help|help)
+      usage
+      exit 0
+      ;;
+    *)
+      printf 'unknown option: %s\n' "$1" >&2
+      usage >&2
+      exit 1
+      ;;
+  esac
+done
+
+resolve_repo() {
+  if [[ -n "$REPO" && -n "$CONTEXT" ]]; then
+    printf 'Use either --repo/--product or --context, not both.\n' >&2
+    exit 1
+  fi
+  if [[ -n "$CONTEXT" ]]; then
+    if ! product_repository_registry_context_supported "$CONTEXT"; then
+      printf 'context must be free-development, product-improvement, or external-integration.\n' >&2
+      exit 1
+    fi
+    REPO="$(product_repository_registry_root_for_menu "$CONTEXT" 2>/dev/null || true)"
+    if [[ -z "$REPO" ]]; then
+      printf 'No repository selected for %s.\n' "$CONTEXT" >&2
+      exit 1
+    fi
+    return
+  fi
+  if [[ -z "$REPO" ]]; then
+    REPO="$(lesson_product_repo_root)"
+  fi
+}
+
+resolve_repo
+
+helper_path() {
+  printf '%s/tools/lib/product_gate_evidence.sh\n' "$REPO"
+}
+
+command_path() {
+  printf '%s/tools/product-gate-evidence\n' "$REPO"
+}
+
+detail_manifest_path() {
+  printf '%s/ops/EVIDENCE_DETAIL_MANIFEST.tsv\n' "$REPO"
+}
+
+require_repo() {
+  if [[ ! -d "$REPO" ]]; then
+    printf 'product repository is missing: %s\n' "$REPO" >&2
+    exit 1
+  fi
+}
+
+require_confirm_for_write() {
+  if [[ "$CONFIRM" != "true" ]]; then
+    printf 'This command would install product gate evidence tooling into %s.\n' "$REPO" >&2
+    printf 'Run again with --confirm after the product repository write is approved.\n' >&2
+    exit 1
+  fi
+}
+
+write_helper() {
+  local path
+  path="$(helper_path)"
+  mkdir -p "$(dirname "$path")"
+  if [[ -e "$path" && "$FORCE" != "true" ]]; then
+    printf 'kept existing: %s\n' "${path#$REPO/}"
+    return
+  fi
+  cat >"$path" <<'PRODUCT_GATE_EVIDENCE_HELPER'
+#!/usr/bin/env bash
+
+product_gate_evidence_repo_root() {
+  if [[ -n "${PRODUCT_REPO_ROOT:-}" ]]; then
+    printf '%s\n' "$PRODUCT_REPO_ROOT"
+    return
+  fi
+  cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd
+}
+
+product_gate_evidence_index() {
+  local repo
+  repo="$(product_gate_evidence_repo_root)"
+  printf '%s/.git/product-gate-evidence/index.tsv\n' "$repo"
+}
+
+product_gate_evidence_dir() {
+  local repo
+  repo="$(product_gate_evidence_repo_root)"
+  printf '%s/.git/product-gate-evidence\n' "$repo"
+}
+
+product_gate_evidence_ledger() {
+  printf '%s/ledger.jsonl\n' "$(product_gate_evidence_dir)"
+}
+
+product_gate_evidence_details_dir() {
+  printf '%s/details\n' "$(product_gate_evidence_dir)"
+}
+
+product_gate_evidence_sanitize() {
+  local value="${1:-}"
+  value="${value//$'\t'/ }"
+  value="${value//$'\r'/ }"
+  value="${value//$'\n'/ }"
+  printf '%s' "$value"
+}
+
+product_gate_evidence_json_escape() {
+  local value="${1:-}"
+  value="$(product_gate_evidence_sanitize "$value")"
+  value="${value//\\/\\\\}"
+  value="${value//\"/\\\"}"
+  printf '%s' "$value"
+}
+
+product_gate_evidence_safe_id() {
+  local value="${1:-}"
+  value="$(product_gate_evidence_sanitize "$value")"
+  value="${value//[^A-Za-z0-9._-]/-}"
+  value="${value#-}"
+  value="${value%-}"
+  if [[ -z "$value" ]]; then
+    value="unknown"
+  fi
+  printf '%s' "$value"
+}
+
+product_gate_evidence_validate_source_id() {
+  case "$1" in
+    repositories.product|repositories.product.*|product.docs|product.docs.*|product.workflow|product.workflow.*|product.structure|product.structure.*|product.git|product.git.*|product.ci|product.ci.*|product.security|product.security.*|product.approvals|product.approvals.*|product.gates|product.gates.*|product.tests|product.tests.*|product.design_system|product.design_system.*)
+      return 0
+      ;;
+  esac
+  return 1
+}
+
+product_gate_evidence_validate_context() {
+  case "$1" in
+    all|free-development|product-improvement|external-integration|lesson-maintenance|custom)
+      return 0
+      ;;
+  esac
+  return 1
+}
+
+product_gate_evidence_validate_status() {
+  case "$1" in
+    not_run|passed|failed|blocked|unknown|optional|cached|stale|not_applicable)
+      return 0
+      ;;
+  esac
+  return 1
+}
+
+product_gate_evidence_freshness_for_status() {
+  case "$1" in
+    not_run|not_applicable)
+      printf 'not_collected'
+      ;;
+    stale)
+      printf 'stale'
+      ;;
+    *)
+      printf 'current'
+      ;;
+  esac
+}
+
+product_gate_evidence_now() {
+  date -u '+%Y-%m-%dT%H:%M:%SZ'
+}
+
+product_gate_evidence_head() {
+  local repo
+  repo="$(product_gate_evidence_repo_root)"
+  git -C "$repo" rev-parse --short=12 HEAD 2>/dev/null || printf 'none'
+}
+
+product_gate_evidence_root_label() {
+  local repo
+  repo="$(product_gate_evidence_repo_root)"
+  printf '[external-product-repository]/%s' "$(basename "$repo")"
+}
+
+product_gate_evidence_header() {
+  printf '# source_id\tcontext\tstatus\tfreshness_state\trequired_in_context\tauthority\tobserved_at\tmax_age_seconds\tproduct_root\tproduct_head\tsource_artifacts\tblocked_by\tnext_command\n'
+}
+
+product_gate_evidence_detail_code() {
+  printf '%s.detail' "$(product_gate_evidence_safe_id "$1")"
+}
+
+product_gate_evidence_event_id() {
+  local source_id="$1"
+  local context="$2"
+  local observed_at="$3"
+  local nonce
+  nonce="$(date -u '+%s%N' 2>/dev/null || date -u '+%s')"
+  printf '%s-%s-%s-%s' \
+    "$(product_gate_evidence_safe_id "$observed_at")" \
+    "$(product_gate_evidence_safe_id "$source_id")" \
+    "$(product_gate_evidence_safe_id "$context")" \
+    "$(product_gate_evidence_safe_id "$nonce")"
+}
+
+product_gate_evidence_summary_for_status() {
+  local source_id="$1"
+  local status="$2"
+  local label
+  case "$source_id" in
+    product.tests.*)
+      label="${source_id#product.tests.}"
+      label="${label//_/ }"
+      label="${label//-/ }"
+      case "$status" in
+        passed) printf 'Product test %s passed.' "$label"; return ;;
+        failed|blocked) printf 'Product test %s needs review.' "$label"; return ;;
+        stale) printf 'Product test %s evidence is stale.' "$label"; return ;;
+        not_run) printf 'Product test %s has not run.' "$label"; return ;;
+      esac
+      ;;
+    product.structure.*)
+      label="${source_id#product.structure.}"
+      label="${label//_/ }"
+      label="${label//-/ }"
+      case "$status" in
+        passed) printf 'Product structure %s check passed.' "$label"; return ;;
+        failed|blocked) printf 'Product structure %s check needs review.' "$label"; return ;;
+        stale) printf 'Product structure %s evidence is stale.' "$label"; return ;;
+        not_run) printf 'Product structure %s check has not run.' "$label"; return ;;
+      esac
+      ;;
+    product.git.*)
+      label="${source_id#product.git.}"
+      label="${label//_/ }"
+      label="${label//-/ }"
+      case "$status" in
+        passed) printf 'Product Git %s evidence passed.' "$label"; return ;;
+        failed|blocked) printf 'Product Git %s evidence needs review.' "$label"; return ;;
+        stale) printf 'Product Git %s evidence is stale.' "$label"; return ;;
+        not_run) printf 'Product Git %s evidence has not run.' "$label"; return ;;
+        not_applicable) printf 'Product Git %s evidence is not applicable.' "$label"; return ;;
+      esac
+      ;;
+    product.ci.*)
+      label="${source_id#product.ci.}"
+      label="${label//_/ }"
+      label="${label//-/ }"
+      case "$status" in
+        passed) printf 'Product CI %s evidence passed.' "$label"; return ;;
+        failed|blocked) printf 'Product CI %s evidence needs review.' "$label"; return ;;
+        stale) printf 'Product CI %s evidence is stale.' "$label"; return ;;
+        not_run) printf 'Product CI %s evidence has not run.' "$label"; return ;;
+        not_applicable) printf 'Product CI %s evidence is not applicable.' "$label"; return ;;
+      esac
+      ;;
+    product.security.*)
+      label="${source_id#product.security.}"
+      label="${label//_/ }"
+      label="${label//-/ }"
+      case "$status" in
+        passed) printf 'Product security %s evidence passed.' "$label"; return ;;
+        failed|blocked) printf 'Product security %s evidence needs review.' "$label"; return ;;
+        stale) printf 'Product security %s evidence is stale.' "$label"; return ;;
+        not_run) printf 'Product security %s evidence has not run.' "$label"; return ;;
+        not_applicable) printf 'Product security %s evidence is not applicable.' "$label"; return ;;
+      esac
+      ;;
+    product.design_system.*)
+      case "$status" in
+        passed) printf 'Product design-system check passed.'; return ;;
+        failed|blocked) printf 'Product design-system check needs review.'; return ;;
+        stale) printf 'Product design-system evidence is stale.'; return ;;
+        not_run) printf 'Product design-system check has not run.'; return ;;
+      esac
+      ;;
+  esac
+  printf '%s %s' "$source_id" "$status"
+}
+
+product_gate_evidence_reason_for_status() {
+  local status="$1"
+  local source_artifacts="$2"
+  local blocked_by="$3"
+  case "$status" in
+    passed)
+      printf 'Recorded evidence passed using %s.' "${source_artifacts:-declared product checks}"
+      ;;
+    failed|blocked)
+      printf 'Recorded evidence requires attention; blocked_by=%s.' "${blocked_by:-none}"
+      ;;
+    not_run)
+      printf 'No evidence has been recorded for this source yet.'
+      ;;
+    stale)
+      printf 'Recorded evidence is stale for the selected product state.'
+      ;;
+    *)
+      printf 'Recorded evidence status is %s.' "$status"
+      ;;
+  esac
+}
+
+product_gate_evidence_next_action_for_status() {
+  local status="$1"
+  local next_command="$2"
+  case "$status" in
+    passed|not_applicable)
+      printf 'Inspect details when a workflow decision needs supporting evidence.'
+      ;;
+    *)
+      printf 'Review the source-specific detail and rerun the displayed command preview: %s' "${next_command:-not_applicable}"
+      ;;
+  esac
+}
+
+product_gate_evidence_write_detail() {
+  local event_id="$1"
+  local source_id="$2"
+  local context="$3"
+  local status="$4"
+  local freshness_state="$5"
+  local authority="$6"
+  local observed_at="$7"
+  local product_root="$8"
+  local product_head="$9"
+  local source_artifacts="${10}"
+  local blocked_by="${11}"
+  local next_command="${12}"
+  local detail_code safe_summary reason next_action detail_dir detail_path ledger
+
+  detail_code="$(product_gate_evidence_detail_code "$source_id")"
+  safe_summary="$(product_gate_evidence_summary_for_status "$source_id" "$status")"
+  reason="$(product_gate_evidence_reason_for_status "$status" "$source_artifacts" "$blocked_by")"
+  next_action="$(product_gate_evidence_next_action_for_status "$status" "$next_command")"
+  detail_dir="$(product_gate_evidence_details_dir)/$(product_gate_evidence_safe_id "$source_id")"
+  detail_path="$detail_dir/$(product_gate_evidence_safe_id "$event_id").json"
+  ledger="$(product_gate_evidence_ledger)"
+  mkdir -p "$detail_dir" "$(dirname "$ledger")"
+
+  {
+    printf '{\n'
+    printf '  "artifact_schema_version": "1.0.0",\n'
+    printf '  "event_id": "%s",\n' "$(product_gate_evidence_json_escape "$event_id")"
+    printf '  "source_id": "%s",\n' "$(product_gate_evidence_json_escape "$source_id")"
+    printf '  "context": "%s",\n' "$(product_gate_evidence_json_escape "$context")"
+    printf '  "status": "%s",\n' "$(product_gate_evidence_json_escape "$status")"
+    printf '  "freshness_state": "%s",\n' "$(product_gate_evidence_json_escape "$freshness_state")"
+    printf '  "authority": "%s",\n' "$(product_gate_evidence_json_escape "$authority")"
+    printf '  "observed_at": "%s",\n' "$(product_gate_evidence_json_escape "$observed_at")"
+    printf '  "product_root": "%s",\n' "$(product_gate_evidence_json_escape "$product_root")"
+    printf '  "product_head": "%s",\n' "$(product_gate_evidence_json_escape "$product_head")"
+    printf '  "detail_code": "%s",\n' "$(product_gate_evidence_json_escape "$detail_code")"
+    printf '  "safe_summary": "%s",\n' "$(product_gate_evidence_json_escape "$safe_summary")"
+    printf '  "reason": "%s",\n' "$(product_gate_evidence_json_escape "$reason")"
+    printf '  "next_action": "%s",\n' "$(product_gate_evidence_json_escape "$next_action")"
+    printf '  "source_artifacts": "%s",\n' "$(product_gate_evidence_json_escape "$source_artifacts")"
+    printf '  "blocked_by": "%s",\n' "$(product_gate_evidence_json_escape "$blocked_by")"
+    printf '  "next_command": "%s"\n' "$(product_gate_evidence_json_escape "$next_command")"
+    printf '}\n'
+  } >"$detail_path"
+
+  printf '{"event_id":"%s","source_id":"%s","context":"%s","status":"%s","freshness_state":"%s","authority":"%s","observed_at":"%s","product_head":"%s","detail_artifact_path":"%s"}\n' \
+    "$(product_gate_evidence_json_escape "$event_id")" \
+    "$(product_gate_evidence_json_escape "$source_id")" \
+    "$(product_gate_evidence_json_escape "$context")" \
+    "$(product_gate_evidence_json_escape "$status")" \
+    "$(product_gate_evidence_json_escape "$freshness_state")" \
+    "$(product_gate_evidence_json_escape "$authority")" \
+    "$(product_gate_evidence_json_escape "$observed_at")" \
+    "$(product_gate_evidence_json_escape "$product_head")" \
+    "$(product_gate_evidence_json_escape "${detail_path#$(product_gate_evidence_repo_root)/}")" >>"$ledger"
+}
+
+product_gate_evidence_record() {
+  local source_id="${1:-}"
+  local context="${2:-}"
+  local status="${3:-}"
+  local required_in_context="${4:-true}"
+  local authority="${5:-authoritative}"
+  local max_age_seconds="${6:-3600}"
+  local source_artifacts="${7:-}"
+  local blocked_by="${8:-}"
+  local next_command="${9:-}"
+  local freshness_state observed_at product_root product_head event_id index dir tmp
+
+  product_gate_evidence_validate_source_id "$source_id" || {
+    printf 'invalid product gate evidence source_id: %s\n' "$source_id" >&2
+    return 1
+  }
+  product_gate_evidence_validate_context "$context" || {
+    printf 'invalid product gate evidence context: %s\n' "$context" >&2
+    return 1
+  }
+  product_gate_evidence_validate_status "$status" || {
+    printf 'invalid product gate evidence status: %s\n' "$status" >&2
+    return 1
+  }
+  case "$required_in_context" in true|false) ;; *)
+    printf 'invalid product gate evidence required flag: %s\n' "$required_in_context" >&2
+    return 1
+    ;;
+  esac
+  case "$authority" in authoritative|manual_required|advisory|not_collected) ;; *)
+    printf 'invalid product gate evidence authority: %s\n' "$authority" >&2
+    return 1
+    ;;
+  esac
+  [[ "$max_age_seconds" =~ ^[0-9]+$ ]] || {
+    printf 'invalid product gate evidence max age: %s\n' "$max_age_seconds" >&2
+    return 1
+  }
+
+  index="$(product_gate_evidence_index)"
+  dir="$(dirname "$index")"
+  if [[ ! -d "$(product_gate_evidence_repo_root)/.git" ]]; then
+    printf 'product gate evidence requires a Git repository: %s\n' "$(product_gate_evidence_repo_root)" >&2
+    return 1
+  fi
+  mkdir -p "$dir"
+  tmp="$(mktemp "$dir/index.tsv.XXXXXX")"
+  freshness_state="$(product_gate_evidence_freshness_for_status "$status")"
+  observed_at="$(product_gate_evidence_now)"
+  product_root="$(product_gate_evidence_root_label)"
+  product_head="$(product_gate_evidence_head)"
+  event_id="$(product_gate_evidence_event_id "$source_id" "$context" "$observed_at")"
+  source_artifacts="$(product_gate_evidence_sanitize "$source_artifacts")"
+  blocked_by="$(product_gate_evidence_sanitize "$blocked_by")"
+  next_command="$(product_gate_evidence_sanitize "$next_command")"
+
+  product_gate_evidence_header >"$tmp"
+  if [[ -f "$index" ]]; then
+    awk -F '\t' -v source_id="$source_id" -v context="$context" '
+      /^[[:space:]]*$/ { next }
+      $1 ~ /^#/ { next }
+      NF == 13 && !($1 == source_id && $2 == context) { print }
+    ' "$index" >>"$tmp"
+  fi
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
+    "$source_id" "$context" "$status" "$freshness_state" "$required_in_context" "$authority" \
+    "$observed_at" "$max_age_seconds" "$product_root" "$product_head" "$source_artifacts" \
+    "$blocked_by" "$next_command" >>"$tmp"
+  mv "$tmp" "$index"
+  product_gate_evidence_write_detail "$event_id" "$source_id" "$context" "$status" "$freshness_state" \
+    "$authority" "$observed_at" "$product_root" "$product_head" "$source_artifacts" "$blocked_by" "$next_command"
+  printf 'Product gate evidence recorded: %s %s %s %s\n' "$source_id" "$context" "$status" "$event_id"
+}
+
+product_gate_evidence_run() {
+  local source_id="${1:-}"
+  local context="${2:-}"
+  local source_artifacts="${3:-}"
+  local next_command="${4:-}"
+  local max_age_seconds="${5:-3600}"
+  local had_errexit=0
+  local rc
+  shift 5 || true
+  if [[ "${1:-}" == "--" ]]; then
+    shift
+  fi
+  if [[ "$#" -eq 0 ]]; then
+    product_gate_evidence_record "$source_id" "$context" "blocked" "true" "manual_required" "$max_age_seconds" "$source_artifacts" "$source_id" "$next_command"
+    return 2
+  fi
+  case "$-" in
+    *e*)
+      had_errexit=1
+      set +e
+      ;;
+  esac
+  "$@"
+  rc=$?
+  if [[ "$had_errexit" -eq 1 ]]; then
+    set -e
+  fi
+  if [[ "$rc" -eq 0 ]]; then
+    product_gate_evidence_record "$source_id" "$context" "passed" "true" "authoritative" "$max_age_seconds" "$source_artifacts" "" "$next_command"
+  else
+    product_gate_evidence_record "$source_id" "$context" "failed" "true" "authoritative" "$max_age_seconds" "$source_artifacts" "$source_id" "$next_command"
+  fi
+  return "$rc"
+}
+
+product_gate_evidence_structure_record() {
+  local source_id="$1"
+  local context="$2"
+  local max_age_seconds="$3"
+  local next_command="$4"
+  local repo source_artifacts missing rel spec kind status authority blocked_by
+  local missing_count=0
+  shift 4
+
+  repo="$(product_gate_evidence_repo_root)"
+  source_artifacts=""
+  missing=""
+  for spec in "$@"; do
+    kind="file"
+    rel="$spec"
+    case "$spec" in
+      dir:*)
+        kind="dir"
+        rel="${spec#dir:}"
+        ;;
+      exists:*)
+        kind="exists"
+        rel="${spec#exists:}"
+        ;;
+      file:*)
+        kind="file"
+        rel="${spec#file:}"
+        ;;
+    esac
+    if [[ -z "$source_artifacts" ]]; then
+      source_artifacts="$rel"
+    else
+      source_artifacts="$source_artifacts;$rel"
+    fi
+    case "$kind" in
+      dir)
+        [[ -d "$repo/$rel" ]] || {
+          missing_count=$((missing_count + 1))
+          missing="${missing:+$missing,}$rel"
+        }
+        ;;
+      exists)
+        [[ -e "$repo/$rel" ]] || {
+          missing_count=$((missing_count + 1))
+          missing="${missing:+$missing,}$rel"
+        }
+        ;;
+      *)
+        [[ -s "$repo/$rel" ]] || {
+          missing_count=$((missing_count + 1))
+          missing="${missing:+$missing,}$rel"
+        }
+        ;;
+    esac
+  done
+
+  if [[ "$missing_count" -eq 0 ]]; then
+    status="passed"
+    authority="authoritative"
+    blocked_by=""
+  else
+    status="blocked"
+    authority="manual_required"
+    blocked_by="$source_id"
+    source_artifacts="$source_artifacts;missing=$missing"
+  fi
+  product_gate_evidence_record "$source_id" "$context" "$status" "true" "$authority" "$max_age_seconds" "$source_artifacts" "$blocked_by" "$next_command"
+  [[ "$status" == "passed" ]]
+}
+
+product_gate_evidence_structure_status() {
+  local context="${1:-free-development}"
+  local max_age_seconds="${2:-3600}"
+  local rc=0
+  local -a files_paths settings_paths scripts_paths
+  product_gate_evidence_validate_context "$context" || {
+    printf 'invalid product gate evidence context: %s\n' "$context" >&2
+    return 1
+  }
+
+  files_paths=(
+    "AGENTS.MD"
+    "README.md"
+    ".gitignore"
+    "docs/product/REQUIREMENTS.md"
+    "docs/product/SPECIFICATION.md"
+    "docs/product/IMPLEMENTATION_PLAN.md"
+    "docs/workflow/TASK_TRACKER.md"
+    "docs/workflow/HANDOFF.md"
+    "docs/workflow/SECURITY.md"
+    "docs/workflow/VERIFICATION.md"
+    "dir:docs/memory"
+    "docs/memory/README.md"
+    "docs/design-system/DESIGN_SYSTEM.md"
+    "docs/design-system/tokens.json"
+    "docs/design-system/components.json"
+  )
+  settings_paths=(
+    "ops/STAGE_MANIFEST.tsv"
+    "ops/TEST_PLAN_MANIFEST.tsv"
+    "ops/DASHBOARD_MANIFEST.tsv"
+    "ops/PRODUCT_MANIFEST.tsv"
+    "ops/DESIGN_SYSTEM_MANIFEST.tsv"
+    "ops/EVIDENCE_DETAIL_MANIFEST.tsv"
+    "ops/PRODUCT_PROFILE.json"
+    "ops/PRODUCT_OPERATION_MODE.tsv"
+    "ops/REPOSITORY_INDEX.json"
+  )
+  scripts_paths=(
+    "dir:tools"
+    "tools/product-gate"
+    "tools/product-gate-evidence"
+    "tools/check_product_structure.sh"
+    "tools/check_product_docs.sh"
+    "tools/check_product_security.sh"
+    "tools/check_product_design_system.sh"
+    "tools/test_product_repository.sh"
+    "tools/product-mode"
+    "dir:tools/lib"
+    "tools/lib/product_common.sh"
+    "tools/lib/product_gate_evidence.sh"
+  )
+
+  case "$context" in
+    all|free-development|product-improvement|external-integration)
+      settings_paths+=("ops/SECURITY_MANIFEST.tsv")
+      ;;
+  esac
+  case "$context" in
+    all|product-improvement|external-integration)
+      settings_paths+=("ops/CI_MANIFEST.tsv")
+      ;;
+  esac
+  case "$context" in
+    external-integration)
+      settings_paths+=("ops/INTEGRATION_MANIFEST.tsv")
+      ;;
+  esac
+
+  product_gate_evidence_structure_record "product.structure.files" "$context" "$max_age_seconds" "tools/check_product_structure.sh" "${files_paths[@]}" || rc=1
+  product_gate_evidence_structure_record "product.structure.settings" "$context" "$max_age_seconds" "tools/check_product_structure.sh" "${settings_paths[@]}" || rc=1
+  product_gate_evidence_structure_record "product.structure.scripts" "$context" "$max_age_seconds" "tools/check_product_structure.sh" "${scripts_paths[@]}" || rc=1
+  return "$rc"
+}
+
+product_gate_evidence_git_status() {
+  local context="${1:-free-development}"
+  local max_age_seconds="${2:-300}"
+  local repo branch porcelain upstream counts ahead behind worktree_status upstream_status local_remote_status sync_status push_status pr_status merge_status
+  local upstream_authority local_remote_authority
+  local worktree_blocker upstream_blocker local_remote_blocker sync_blocker push_blocker pr_blocker merge_blocker
+  local remote_required upstream_required local_remote_required counts_valid source_artifacts
+  repo="$(product_gate_evidence_repo_root)"
+  if [[ ! -d "$repo/.git" ]]; then
+    product_gate_evidence_record "product.git.worktree" "$context" "blocked" "true" "manual_required" "$max_age_seconds" ".git" "repositories.product" "git status --short"
+    return 1
+  fi
+  product_gate_evidence_validate_context "$context" || {
+    printf 'invalid product gate evidence context: %s\n' "$context" >&2
+    return 1
+  }
+
+  case "$context" in
+    product-improvement|external-integration)
+      remote_required="true"
+      ;;
+    *)
+      remote_required="false"
+      ;;
+  esac
+
+  branch="$(git -C "$repo" branch --show-current 2>/dev/null || true)"
+  [[ -n "$branch" ]] || branch="detached"
+  porcelain="$(git -C "$repo" status --short 2>/dev/null || true)"
+  if [[ -z "$porcelain" ]]; then
+    worktree_status="passed"
+    worktree_blocker=""
+  else
+    worktree_status="failed"
+    worktree_blocker="product.git.worktree"
+  fi
+  product_gate_evidence_record "product.git.worktree" "$context" "$worktree_status" "true" "authoritative" "$max_age_seconds" "git status --short;branch=$branch" "$worktree_blocker" "git status --short"
+
+  upstream="$(git -C "$repo" rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>/dev/null || true)"
+  upstream_required="$remote_required"
+  local_remote_required="$remote_required"
+  if [[ -z "$upstream" ]]; then
+    if [[ "$remote_required" == "true" ]]; then
+      upstream_status="blocked"
+      upstream_blocker="product.git.upstream"
+      local_remote_status="blocked"
+      local_remote_blocker="product.git.upstream"
+    else
+      upstream_status="not_run"
+      upstream_blocker="product.git.upstream"
+      local_remote_status="not_run"
+      local_remote_blocker="product.git.upstream"
+    fi
+    ahead=0
+    behind=0
+    counts_valid="false"
+  else
+    upstream_required="true"
+    local_remote_required="true"
+    upstream_status="passed"
+    upstream_blocker=""
+    counts="$(git -C "$repo" rev-list --left-right --count "HEAD...@{u}" 2>/dev/null || true)"
+    read -r ahead behind <<<"$counts"
+    if [[ "$ahead" =~ ^[0-9]+$ && "$behind" =~ ^[0-9]+$ ]]; then
+      counts_valid="true"
+      if [[ "$ahead" -eq 0 && "$behind" -eq 0 ]]; then
+        local_remote_status="passed"
+        local_remote_blocker=""
+      else
+        local_remote_status="failed"
+        local_remote_blocker="product.git.local_remote_sync"
+      fi
+    else
+      counts_valid="false"
+      ahead=0
+      behind=0
+      local_remote_status="blocked"
+      local_remote_blocker="product.git.local_remote_sync"
+    fi
+  fi
+
+  if [[ "$worktree_status" != "passed" ]]; then
+    sync_status="failed"
+    sync_blocker="product.git.worktree"
+  elif [[ "$upstream_status" == "blocked" ]]; then
+    sync_status="blocked"
+    sync_blocker="product.git.upstream"
+  elif [[ "$local_remote_status" == "blocked" ]]; then
+    sync_status="blocked"
+    sync_blocker="product.git.local_remote_sync"
+  elif [[ "$local_remote_status" == "failed" ]]; then
+    sync_status="failed"
+    sync_blocker="product.git.local_remote_sync"
+  else
+    sync_status="passed"
+    sync_blocker=""
+  fi
+  source_artifacts="git status --short;branch=$branch;upstream=${upstream:-none};ahead=$ahead;behind=$behind;remote_required=$remote_required"
+  product_gate_evidence_record "product.git.sync" "$context" "$sync_status" "true" "authoritative" "$max_age_seconds" "$source_artifacts" "$sync_blocker" "git status -sb"
+
+  upstream_authority="authoritative"
+  if [[ "$upstream_status" != "passed" ]]; then
+    upstream_authority="manual_required"
+    [[ "$remote_required" == "true" ]] || upstream_authority="advisory"
+  fi
+  if [[ "$upstream_status" == "passed" ]]; then
+    product_gate_evidence_record "product.git.upstream" "$context" "$upstream_status" "$upstream_required" "$upstream_authority" "$max_age_seconds" "git upstream=$upstream;branch=$branch" "$upstream_blocker" "git branch -vv"
+  else
+    product_gate_evidence_record "product.git.upstream" "$context" "$upstream_status" "$upstream_required" "$upstream_authority" "$max_age_seconds" "git rev-parse --abbrev-ref --symbolic-full-name @{u};remote_required=$remote_required" "$upstream_blocker" "git branch -vv"
+  fi
+
+  local_remote_authority="authoritative"
+  if [[ "$local_remote_status" != "passed" && "$local_remote_status" != "failed" ]]; then
+    local_remote_authority="manual_required"
+    [[ "$remote_required" == "true" ]] || local_remote_authority="advisory"
+  fi
+  if [[ "$local_remote_status" == "passed" || "$local_remote_status" == "failed" ]]; then
+    product_gate_evidence_record "product.git.local_remote_sync" "$context" "$local_remote_status" "$local_remote_required" "$local_remote_authority" "$max_age_seconds" "git ahead=$ahead;behind=$behind;upstream=${upstream:-none}" "$local_remote_blocker" "git status -sb"
+  else
+    product_gate_evidence_record "product.git.local_remote_sync" "$context" "$local_remote_status" "$local_remote_required" "$local_remote_authority" "$max_age_seconds" "git rev-list --left-right --count HEAD...@{u};remote_required=$remote_required" "$local_remote_blocker" "git branch -vv"
+  fi
+
+  if [[ "$remote_required" != "true" ]]; then
+    push_status="not_applicable"
+    push_blocker=""
+    product_gate_evidence_record "product.git.push" "$context" "$push_status" "false" "advisory" "$max_age_seconds" "git push;remote_required=false;context=$context" "$push_blocker" "not_applicable"
+    pr_status="not_applicable"
+    pr_blocker=""
+    product_gate_evidence_record "product.git.pr" "$context" "$pr_status" "false" "advisory" "$max_age_seconds" "gh pr status;remote_required=false;context=$context" "$pr_blocker" "not_applicable"
+    merge_status="not_applicable"
+    merge_blocker=""
+    product_gate_evidence_record "product.git.merge" "$context" "$merge_status" "false" "advisory" "$max_age_seconds" "gh pr checks;remote_required=false;context=$context" "$merge_blocker" "not_applicable"
+    return 0
+  fi
+
+  if [[ -z "$upstream" ]]; then
+    push_status="blocked"
+    push_blocker="product.git.upstream"
+    product_gate_evidence_record "product.git.push" "$context" "$push_status" "true" "manual_required" "$max_age_seconds" "git push;upstream=none;remote_required=true" "$push_blocker" "git branch -vv"
+  elif [[ "$counts_valid" != "true" ]]; then
+    push_status="blocked"
+    push_blocker="product.git.local_remote_sync"
+    product_gate_evidence_record "product.git.push" "$context" "$push_status" "true" "manual_required" "$max_age_seconds" "git push;upstream=$upstream;ahead=unknown;behind=unknown" "$push_blocker" "git status -sb"
+  elif [[ "$ahead" -eq 0 ]]; then
+    push_status="passed"
+    push_blocker=""
+    product_gate_evidence_record "product.git.push" "$context" "$push_status" "true" "authoritative" "$max_age_seconds" "git push;upstream=$upstream;ahead=$ahead;behind=$behind" "$push_blocker" "git status -sb"
+  else
+    push_status="failed"
+    push_blocker="product.git.push"
+    product_gate_evidence_record "product.git.push" "$context" "$push_status" "true" "authoritative" "$max_age_seconds" "git push;upstream=$upstream;ahead=$ahead;behind=$behind" "$push_blocker" "git push"
+  fi
+
+  pr_status="not_run"
+  pr_blocker="product.git.pr"
+  product_gate_evidence_record "product.git.pr" "$context" "$pr_status" "false" "manual_required" "$max_age_seconds" "gh pr status;remote_required=true;branch=$branch" "$pr_blocker" "gh pr status"
+  merge_status="not_run"
+  merge_blocker="product.git.merge"
+  product_gate_evidence_record "product.git.merge" "$context" "$merge_status" "false" "manual_required" "$max_age_seconds" "gh pr checks;remote_required=true;branch=$branch" "$merge_blocker" "gh pr checks"
+}
+
+product_gate_evidence_list_has() {
+  local list="$1"
+  local value="$2"
+  local item
+  local -a items
+  IFS='|' read -r -a items <<<"$list"
+  for item in "${items[@]}"; do
+    if [[ "$item" == "all" || "$item" == "$value" ]]; then
+      return 0
+    fi
+  done
+  return 1
+}
+
+product_gate_evidence_existing_current_passed() {
+  local source_id="$1"
+  local context="$2"
+  local index current_head
+  index="$(product_gate_evidence_index)"
+  [[ -f "$index" ]] || return 1
+  current_head="$(product_gate_evidence_head)"
+  awk -F '\t' -v source_id="$source_id" -v context="$context" -v current_head="$current_head" '
+    /^[[:space:]]*$/ { next }
+    $1 ~ /^#/ { next }
+    NF == 13 && $1 == source_id && ($2 == context || $2 == "all") && $3 == "passed" && $4 == "current" && $6 == "authoritative" {
+      if ($10 == "none" || $10 == current_head || index($10, current_head) == 1 || index(current_head, $10) == 1) {
+        found = 1
+      }
+    }
+    END { exit found ? 0 : 1 }
+  ' "$index"
+}
+
+product_gate_evidence_test_source_id() {
+  local test_id="$1"
+  local source_id="$2"
+  if [[ -z "$source_id" || "$source_id" == "product.gates.tests" ]]; then
+    printf 'product.tests.%s' "$(product_gate_evidence_safe_id "$test_id")"
+    return
+  fi
+  printf '%s' "$source_id"
+}
+
+product_gate_evidence_manifest_command_path() {
+  local command_id="$1"
+  local repo candidate
+  repo="$(product_gate_evidence_repo_root)"
+  case "$command_id" in
+    ""|none|not_applicable)
+      return 1
+      ;;
+    /*)
+      candidate="$command_id"
+      ;;
+    ./*)
+      candidate="$repo/${command_id#./}"
+      ;;
+    tools/*)
+      candidate="$repo/$command_id"
+      ;;
+    *)
+      candidate="$repo/tools/$command_id"
+      if [[ ! -x "$candidate" && -x "$repo/tools/$command_id.sh" ]]; then
+        candidate="$repo/tools/$command_id.sh"
+      fi
+      ;;
+  esac
+  [[ -x "$candidate" ]] || return 1
+  printf '%s' "$candidate"
+}
+
+product_gate_evidence_run_manifest_command() {
+  local source_id="$1"
+  local context="$2"
+  local required_in_context="$3"
+  local source_artifacts="$4"
+  local next_command="$5"
+  local max_age_seconds="$6"
+  local command_path="$7"
+  local had_errexit=0
+  local rc
+  case "$-" in
+    *e*)
+      had_errexit=1
+      set +e
+      ;;
+  esac
+  (cd "$(product_gate_evidence_repo_root)" && "$command_path")
+  rc=$?
+  if [[ "$had_errexit" -eq 1 ]]; then
+    set -e
+  fi
+  if [[ "$rc" -eq 0 ]]; then
+    product_gate_evidence_record "$source_id" "$context" "passed" "$required_in_context" "authoritative" "$max_age_seconds" "$source_artifacts" "" "$next_command"
+  else
+    product_gate_evidence_record "$source_id" "$context" "failed" "$required_in_context" "authoritative" "$max_age_seconds" "$source_artifacts" "$source_id" "$next_command"
+  fi
+  return "$rc"
+}
+
+product_gate_evidence_ci_status() {
+  local context="${1:-product-improvement}"
+  local max_age_seconds="${2:-3600}"
+  local repo manifest rows row ci_id required_mode contexts workflow_file workflow_name branch_policy source_id description
+  local provider_required="false"
+  local provider_status provider_authority provider_blocker provider_artifacts
+  local required_in_context source_artifacts next_command workflow_missing matching_rows=0 missing_workflows=""
+  local emitted_pr=0
+
+  repo="$(product_gate_evidence_repo_root)"
+  manifest="$repo/ops/CI_MANIFEST.tsv"
+  product_gate_evidence_validate_context "$context" || {
+    printf 'invalid product gate evidence context: %s\n' "$context" >&2
+    return 1
+  }
+
+  case "$context" in
+    product-improvement|external-integration) provider_required="true" ;;
+  esac
+
+  if [[ "$provider_required" != "true" ]]; then
+    product_gate_evidence_record "product.ci.github_actions" "$context" "not_applicable" "false" "advisory" "$max_age_seconds" ".github/workflows;context=$context" "" "not_applicable"
+    return 0
+  fi
+
+  if [[ ! -s "$manifest" ]]; then
+    product_gate_evidence_record "product.ci.github_actions" "$context" "blocked" "true" "manual_required" "$max_age_seconds" "ops/CI_MANIFEST.tsv" "product.ci.github_actions" "tools/check_product_structure.sh"
+    if ! product_gate_evidence_existing_current_passed "product.ci.main" "$context"; then
+      product_gate_evidence_record "product.ci.main" "$context" "not_run" "true" "manual_required" "$max_age_seconds" "ops/CI_MANIFEST.tsv" "product.ci.github_actions" "tools/check_ci_status.sh --product --required"
+    fi
+    if ! product_gate_evidence_existing_current_passed "product.ci.pr" "$context"; then
+      product_gate_evidence_record "product.ci.pr" "$context" "not_run" "false" "manual_required" "$max_age_seconds" "ops/CI_MANIFEST.tsv" "product.ci.github_actions" "gh pr checks"
+    fi
+    return 1
+  fi
+
+  rows="$(awk -F '\t' '
+    /^[[:space:]]*$/ { next }
+    $1 ~ /^#/ { next }
+    NF != 8 {
+      printf "invalid product CI manifest row: %s\n", $0 > "/dev/stderr"
+      invalid = 1
+      next
+    }
+    { print }
+    END { exit invalid ? 1 : 0 }
+  ' "$manifest")" || {
+    product_gate_evidence_record "product.ci.github_actions" "$context" "blocked" "true" "manual_required" "$max_age_seconds" "ops/CI_MANIFEST.tsv" "product.ci.github_actions" "tools/check_product_structure.sh"
+    return 1
+  }
+
+  while IFS=$'\t' read -r ci_id required_mode contexts workflow_file workflow_name branch_policy source_id description; do
+    [[ -n "$ci_id" ]] || continue
+    product_gate_evidence_list_has "$contexts" "$context" || continue
+    matching_rows=$((matching_rows + 1))
+    workflow_missing="false"
+    if [[ -z "$workflow_file" || ! -f "$repo/$workflow_file" ]]; then
+      workflow_missing="true"
+      missing_workflows="${missing_workflows:+$missing_workflows,}${workflow_file:-unknown}"
+    fi
+    [[ "$source_id" == "product.ci.pr" ]] && emitted_pr=1
+    if [[ -z "$source_id" ]]; then
+      source_id="product.ci.$(product_gate_evidence_safe_id "$ci_id")"
+    fi
+    if ! product_gate_evidence_validate_source_id "$source_id"; then
+      product_gate_evidence_record "product.ci.github_actions" "$context" "blocked" "true" "manual_required" "$max_age_seconds" "ops/CI_MANIFEST.tsv;ci_id=$ci_id" "product.ci.github_actions" "tools/check_product_structure.sh"
+      continue
+    fi
+    case "$required_mode" in
+      required|contextual) required_in_context="true" ;;
+      optional) required_in_context="false" ;;
+      *) required_in_context="true" ;;
+    esac
+    source_artifacts="ops/CI_MANIFEST.tsv;ci_id=$ci_id;workflow_file=$workflow_file;workflow_name=$workflow_name;branch_policy=$branch_policy"
+    next_command="tools/check_ci_status.sh --product --required"
+    if product_gate_evidence_existing_current_passed "$source_id" "$context"; then
+      continue
+    fi
+    if [[ "$workflow_missing" == "true" ]]; then
+      product_gate_evidence_record "$source_id" "$context" "blocked" "$required_in_context" "manual_required" "$max_age_seconds" "$source_artifacts" "product.ci.github_actions" "tools/check_product_structure.sh"
+    else
+      product_gate_evidence_record "$source_id" "$context" "not_run" "$required_in_context" "manual_required" "$max_age_seconds" "$source_artifacts" "$source_id" "$next_command"
+    fi
+  done <<<"$rows"
+
+  if [[ "$matching_rows" -eq 0 ]]; then
+    provider_status="blocked"
+    provider_authority="manual_required"
+    provider_blocker="product.ci.github_actions"
+    provider_artifacts="ops/CI_MANIFEST.tsv;matching_rows=0;context=$context"
+  elif [[ -n "$missing_workflows" ]]; then
+    provider_status="blocked"
+    provider_authority="manual_required"
+    provider_blocker="product.ci.github_actions"
+    provider_artifacts="ops/CI_MANIFEST.tsv;.github/workflows;missing=$missing_workflows"
+  else
+    provider_status="passed"
+    provider_authority="authoritative"
+    provider_blocker=""
+    provider_artifacts="ops/CI_MANIFEST.tsv;.github/workflows;matching_rows=$matching_rows"
+  fi
+  product_gate_evidence_record "product.ci.github_actions" "$context" "$provider_status" "$provider_required" "$provider_authority" "$max_age_seconds" "$provider_artifacts" "$provider_blocker" "tools/check_ci_status.sh --product --required"
+
+  if [[ "$emitted_pr" -eq 0 ]] && ! product_gate_evidence_existing_current_passed "product.ci.pr" "$context"; then
+    product_gate_evidence_record "product.ci.pr" "$context" "not_run" "false" "manual_required" "$max_age_seconds" "ops/CI_MANIFEST.tsv;source=pr-checks-not-observed" "product.ci.pr" "gh pr checks"
+  fi
+
+  [[ "$provider_status" == "passed" ]]
+}
+
+product_gate_evidence_security_find_sensitive_paths() {
+  local repo="$1"
+  local found="" file rel
+  while IFS= read -r -d '' file; do
+    rel="${file#$repo/}"
+    found="${found:+$found,}$rel"
+  done < <(
+    find "$repo" \
+      \( -path "$repo/.git" -o -path "$repo/node_modules" -o -path "$repo/.venv" -o -path "$repo/venv" -o -path "$repo/dist" -o -path "$repo/build" -o -path "$repo/coverage" -o -path "$repo/playwright-report" -o -path "$repo/test-results" \) -prune \
+      -o -type f \( \
+        -name '.env' -o -name '.env.*' -o -name '*.pem' -o -name '*.key' -o \
+        -name 'id_rsa' -o -name 'id_ed25519' -o -name '.npmrc' -o -name '.pypirc' -o -name '.netrc' \
+      \) -print0
+  )
+  printf '%s' "$found"
+}
+
+product_gate_evidence_security_missing_gitignore_patterns() {
+  local repo="$1"
+  local pattern missing=""
+  if [[ ! -f "$repo/.gitignore" ]]; then
+    printf '.gitignore'
+    return
+  fi
+  for pattern in '.env' '.env.*' 'node_modules/' '.venv/' 'dist/' 'build/' 'coverage/' 'playwright-report/' 'test-results/'; do
+    if ! grep -Fxq "$pattern" "$repo/.gitignore"; then
+      missing="${missing:+$missing,}$pattern"
+    fi
+  done
+  printf '%s' "$missing"
+}
+
+product_gate_evidence_security_tracked_local_artifacts() {
+  local repo="$1"
+  local tracked rel found=""
+  tracked="$(git -C "$repo" ls-files 2>/dev/null || true)"
+  while IFS= read -r rel; do
+    [[ -n "$rel" ]] || continue
+    case "$rel" in
+      .env|.env.*|*.pem|*.key|id_rsa|id_ed25519|.npmrc|.pypirc|.netrc|node_modules/*|.venv/*|venv/*|dist/*|build/*|coverage/*|playwright-report/*|test-results/*)
+        found="${found:+$found,}$rel"
+        ;;
+    esac
+  done <<<"$tracked"
+  printf '%s' "$found"
+}
+
+product_gate_evidence_security_manifest_rows() {
+  local manifest="$1"
+  awk -F '\t' '
+    /^[[:space:]]*$/ { next }
+    $1 ~ /^#/ { next }
+    NF != 7 {
+      printf "invalid product security manifest row: %s\n", $0 > "/dev/stderr"
+      invalid = 1
+      next
+    }
+    { print }
+    END { exit invalid ? 1 : 0 }
+  ' "$manifest"
+}
+
+product_gate_evidence_security_status() {
+  local context="${1:-free-development}"
+  local max_age_seconds="${2:-3600}"
+  local repo security_manifest rows row security_id required_mode contexts policy_source source_id dashboard_group description
+  local secrets_status="passed" secrets_authority="authoritative" secrets_blocker="" secrets_artifacts
+  local local_artifacts_status="passed" local_artifacts_authority="authoritative" local_artifacts_blocker="" local_artifacts_source_artifacts
+  local external_status external_authority external_required external_blocker external_artifacts
+  local blockers_status="passed" blockers_authority="authoritative" blockers_blocker="" blockers_artifacts
+  local sensitive_paths tracked_artifacts missing_ignore matching_secrets=0 missing_policies="" rc=0
+  local integration_manifest integration_rows integration_id integration_required integration_contexts service_kind approval_source security_source integration_group integration_description
+  local matching_integrations=0 missing_integration_sources=""
+
+  repo="$(product_gate_evidence_repo_root)"
+  security_manifest="$repo/ops/SECURITY_MANIFEST.tsv"
+  product_gate_evidence_validate_context "$context" || {
+    printf 'invalid product gate evidence context: %s\n' "$context" >&2
+    return 1
+  }
+
+  if [[ ! -s "$security_manifest" ]]; then
+    secrets_status="blocked"
+    secrets_authority="manual_required"
+    secrets_blocker="product.security.secrets"
+    secrets_artifacts="ops/SECURITY_MANIFEST.tsv;missing=ops/SECURITY_MANIFEST.tsv"
+  elif rows="$(product_gate_evidence_security_manifest_rows "$security_manifest")"; then
+    while IFS=$'\t' read -r security_id required_mode contexts policy_source source_id dashboard_group description; do
+      [[ -n "$security_id" ]] || continue
+      product_gate_evidence_list_has "$contexts" "$context" || continue
+      [[ "$source_id" == "product.security.secrets" ]] || continue
+      matching_secrets=$((matching_secrets + 1))
+      if [[ -z "$policy_source" || ! -s "$repo/$policy_source" ]]; then
+        missing_policies="${missing_policies:+$missing_policies,}${policy_source:-unknown}"
+      fi
+    done <<<"$rows"
+    if [[ "$matching_secrets" -eq 0 ]]; then
+      secrets_status="blocked"
+      secrets_authority="manual_required"
+      secrets_blocker="product.security.secrets"
+      secrets_artifacts="ops/SECURITY_MANIFEST.tsv;matching_secrets=0;context=$context"
+    elif [[ -n "$missing_policies" ]]; then
+      secrets_status="blocked"
+      secrets_authority="manual_required"
+      secrets_blocker="product.security.secrets"
+      secrets_artifacts="ops/SECURITY_MANIFEST.tsv;missing_policy=$missing_policies"
+    else
+      sensitive_paths="$(product_gate_evidence_security_find_sensitive_paths "$repo")"
+      if [[ -n "$sensitive_paths" ]]; then
+        secrets_status="blocked"
+        secrets_authority="manual_required"
+        secrets_blocker="product.security.secrets"
+        secrets_artifacts="ops/SECURITY_MANIFEST.tsv;docs/workflow/SECURITY.md;secret_like_paths=$sensitive_paths"
+      else
+        secrets_artifacts="ops/SECURITY_MANIFEST.tsv;docs/workflow/SECURITY.md;secret_like_paths=none"
+      fi
+    fi
+  else
+    secrets_status="blocked"
+    secrets_authority="manual_required"
+    secrets_blocker="product.security.secrets"
+    secrets_artifacts="ops/SECURITY_MANIFEST.tsv;invalid_manifest=true"
+  fi
+  product_gate_evidence_record "product.security.secrets" "$context" "$secrets_status" "true" "$secrets_authority" "$max_age_seconds" "$secrets_artifacts" "$secrets_blocker" "tools/check_product_security.sh"
+  [[ "$secrets_status" == "passed" ]] || rc=1
+
+  missing_ignore="$(product_gate_evidence_security_missing_gitignore_patterns "$repo")"
+  tracked_artifacts="$(product_gate_evidence_security_tracked_local_artifacts "$repo")"
+  if [[ -n "$missing_ignore" || -n "$tracked_artifacts" ]]; then
+    local_artifacts_status="blocked"
+    local_artifacts_authority="manual_required"
+    local_artifacts_blocker="product.security.local_artifacts"
+  fi
+  local_artifacts_source_artifacts=".gitignore;git ls-files;missing_ignore=${missing_ignore:-none};tracked_local_artifacts=${tracked_artifacts:-none}"
+  product_gate_evidence_record "product.security.local_artifacts" "$context" "$local_artifacts_status" "true" "$local_artifacts_authority" "$max_age_seconds" "$local_artifacts_source_artifacts" "$local_artifacts_blocker" "git ls-files"
+  [[ "$local_artifacts_status" == "passed" ]] || rc=1
+
+  if [[ "$context" == "external-integration" ]]; then
+    external_status="passed"
+    external_authority="authoritative"
+    external_required="true"
+    external_blocker=""
+    integration_manifest="$repo/ops/INTEGRATION_MANIFEST.tsv"
+    if [[ ! -s "$integration_manifest" ]]; then
+      external_status="blocked"
+      external_authority="manual_required"
+      external_blocker="product.security.external_sending"
+      external_artifacts="ops/INTEGRATION_MANIFEST.tsv;missing=ops/INTEGRATION_MANIFEST.tsv"
+    else
+      integration_rows="$(awk -F '\t' '
+        /^[[:space:]]*$/ { next }
+        $1 ~ /^#/ { next }
+        NF != 8 {
+          printf "invalid product integration manifest row: %s\n", $0 > "/dev/stderr"
+          invalid = 1
+          next
+        }
+        { print }
+        END { exit invalid ? 1 : 0 }
+      ' "$integration_manifest")" || {
+        external_status="blocked"
+        external_authority="manual_required"
+        external_blocker="product.security.external_sending"
+        external_artifacts="ops/INTEGRATION_MANIFEST.tsv;invalid_manifest=true"
+      }
+      if [[ "$external_status" == "passed" ]]; then
+        while IFS=$'\t' read -r integration_id integration_required integration_contexts service_kind approval_source security_source integration_group integration_description; do
+          [[ -n "$integration_id" ]] || continue
+          product_gate_evidence_list_has "$integration_contexts" "$context" || continue
+          matching_integrations=$((matching_integrations + 1))
+          if [[ -z "$approval_source" || ! -s "$repo/$approval_source" ]]; then
+            missing_integration_sources="${missing_integration_sources:+$missing_integration_sources,}approval:${approval_source:-unknown}"
+          fi
+          if [[ -z "$security_source" || ! -s "$repo/$security_source" ]]; then
+            missing_integration_sources="${missing_integration_sources:+$missing_integration_sources,}security:${security_source:-unknown}"
+          fi
+        done <<<"$integration_rows"
+        if [[ "$matching_integrations" -eq 0 ]]; then
+          external_status="blocked"
+          external_authority="manual_required"
+          external_blocker="product.security.external_sending"
+          external_artifacts="ops/INTEGRATION_MANIFEST.tsv;matching_integrations=0;context=$context"
+        elif [[ -n "$missing_integration_sources" ]]; then
+          external_status="blocked"
+          external_authority="manual_required"
+          external_blocker="product.security.external_sending"
+          external_artifacts="ops/INTEGRATION_MANIFEST.tsv;missing_sources=$missing_integration_sources"
+        else
+          external_artifacts="ops/INTEGRATION_MANIFEST.tsv;EXTERNAL_INTEGRATION_SECURITY.md;ops/SECURITY_MANIFEST.tsv;matching_integrations=$matching_integrations"
+        fi
+      fi
+    fi
+  else
+    external_status="not_applicable"
+    external_authority="advisory"
+    external_required="false"
+    external_blocker=""
+    external_artifacts="ops/INTEGRATION_MANIFEST.tsv;context=$context"
+  fi
+  product_gate_evidence_record "product.security.external_sending" "$context" "$external_status" "$external_required" "$external_authority" "$max_age_seconds" "$external_artifacts" "$external_blocker" "tools/product-security gate"
+  [[ "$external_status" == "passed" || "$external_status" == "not_applicable" ]] || rc=1
+
+  blockers_artifacts="product.security.secrets=$secrets_status;product.security.local_artifacts=$local_artifacts_status;product.security.external_sending=$external_status"
+  if [[ "$secrets_status" != "passed" ]]; then
+    blockers_blocker="${blockers_blocker:+$blockers_blocker;}product.security.secrets"
+  fi
+  if [[ "$local_artifacts_status" != "passed" ]]; then
+    blockers_blocker="${blockers_blocker:+$blockers_blocker;}product.security.local_artifacts"
+  fi
+  if [[ "$external_status" != "passed" && "$external_status" != "not_applicable" ]]; then
+    blockers_blocker="${blockers_blocker:+$blockers_blocker;}product.security.external_sending"
+  fi
+  if [[ -n "$blockers_blocker" ]]; then
+    blockers_status="blocked"
+    blockers_authority="manual_required"
+  fi
+  product_gate_evidence_record "product.security.blockers" "$context" "$blockers_status" "true" "$blockers_authority" "$max_age_seconds" "$blockers_artifacts" "$blockers_blocker" "tools/product-security gate"
+  return "$rc"
+}
+
+product_gate_evidence_manifest_tests() {
+  local context="${1:-free-development}"
+  local max_age_seconds="${2:-3600}"
+  local product_type="${3:-all}"
+  local repo manifest rows row test_id required_mode contexts product_types command_id evidence_source dashboard_group description source_id required_in_context command_path source_artifacts next_command rc overall_rc=0
+  repo="$(product_gate_evidence_repo_root)"
+  manifest="$repo/ops/TEST_PLAN_MANIFEST.tsv"
+  product_gate_evidence_validate_context "$context" || {
+    printf 'invalid product gate evidence context: %s\n' "$context" >&2
+    return 1
+  }
+  if [[ ! -s "$manifest" ]]; then
+    product_gate_evidence_record "product.tests.manifest" "$context" "blocked" "true" "manual_required" "$max_age_seconds" "ops/TEST_PLAN_MANIFEST.tsv" "product.tests.manifest" "ops/TEST_PLAN_MANIFEST.tsv"
+    return 1
+  fi
+  rows="$(awk -F '\t' '
+    /^[[:space:]]*$/ { next }
+    $1 ~ /^#/ { next }
+    NF != 8 {
+      printf "invalid product test plan manifest row: %s\n", $0 > "/dev/stderr"
+      invalid = 1
+      next
+    }
+    { print }
+    END { exit invalid ? 1 : 0 }
+  ' "$manifest")" || return 1
+  while IFS=$'\t' read -r test_id required_mode contexts product_types command_id evidence_source dashboard_group description; do
+    [[ -n "$test_id" ]] || continue
+    product_gate_evidence_list_has "$contexts" "$context" || continue
+    product_gate_evidence_list_has "$product_types" "$product_type" || continue
+    source_id="$(product_gate_evidence_test_source_id "$test_id" "$evidence_source")"
+    if ! product_gate_evidence_validate_source_id "$source_id"; then
+      printf 'invalid product test evidence source_id: %s\n' "$source_id" >&2
+      overall_rc=1
+      continue
+    fi
+    case "$required_mode" in
+      required|contextual) required_in_context="true" ;;
+      optional) required_in_context="false" ;;
+      *)
+        printf 'invalid product test required mode: %s\n' "$required_mode" >&2
+        overall_rc=1
+        continue
+        ;;
+    esac
+    source_artifacts="ops/TEST_PLAN_MANIFEST.tsv;test_id=$test_id;command_id=$command_id"
+    next_command="$command_id"
+    if command_path="$(product_gate_evidence_manifest_command_path "$command_id")"; then
+      product_gate_evidence_run_manifest_command "$source_id" "$context" "$required_in_context" "$source_artifacts" "$next_command" "$max_age_seconds" "$command_path"
+      rc=$?
+    else
+      product_gate_evidence_record "$source_id" "$context" "blocked" "$required_in_context" "manual_required" "$max_age_seconds" "$source_artifacts" "product.tests.command" "$next_command"
+      rc=127
+    fi
+    if [[ "$rc" -ne 0 ]]; then
+      overall_rc=1
+    fi
+  done <<<"$rows"
+  return "$overall_rc"
+}
+
+product_gate_evidence_status() {
+  local index ledger details
+  index="$(product_gate_evidence_index)"
+  ledger="$(product_gate_evidence_ledger)"
+  details="$(product_gate_evidence_details_dir)"
+  printf 'Product gate evidence index: %s\n' "${index#$(product_gate_evidence_repo_root)/}"
+  if [[ -f "$index" ]]; then
+    printf 'Status: ready\n'
+  else
+    printf 'Status: not_collected\n'
+  fi
+  if [[ -f "$ledger" ]]; then
+    printf 'Ledger: ready\n'
+  else
+    printf 'Ledger: not_collected\n'
+  fi
+  if [[ -d "$details" ]]; then
+    printf 'Details: ready\n'
+  else
+    printf 'Details: not_collected\n'
+  fi
+}
+PRODUCT_GATE_EVIDENCE_HELPER
+  printf 'installed: %s\n' "${path#$REPO/}"
+}
+
+write_command() {
+  local path
+  path="$(command_path)"
+  mkdir -p "$(dirname "$path")"
+  if [[ -e "$path" && "$FORCE" != "true" ]]; then
+    printf 'kept existing: %s\n' "${path#$REPO/}"
+    return
+  fi
+  cat >"$path" <<'PRODUCT_GATE_EVIDENCE_COMMAND'
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck source=tools/lib/product_gate_evidence.sh
+source "$ROOT/tools/lib/product_gate_evidence.sh"
+
+COMMAND="${1:-status}"
+if [[ $# -gt 0 ]]; then
+  shift
+fi
+
+usage() {
+  cat <<'USAGE'
+Usage:
+  tools/product-gate-evidence status
+  tools/product-gate-evidence record <source-id> <context> <status> <source-artifacts> <next-command> [max-age-seconds]
+  tools/product-gate-evidence run <source-id> <context> <source-artifacts> <next-command> [max-age-seconds] -- <command> [args...]
+  tools/product-gate-evidence structure-status <context> [max-age-seconds]
+  tools/product-gate-evidence git-status <context> [max-age-seconds]
+  tools/product-gate-evidence ci-status <context> [max-age-seconds]
+  tools/product-gate-evidence security-status <context> [max-age-seconds]
+  tools/product-gate-evidence manifest-tests <context> [max-age-seconds] [product-type]
+
+Records Dashboard-readable product gate evidence in:
+  .git/product-gate-evidence/index.tsv
+USAGE
+}
+
+case "$COMMAND" in
+  status)
+    product_gate_evidence_status
+    ;;
+  record)
+    if [[ "$#" -lt 5 ]]; then
+      usage >&2
+      exit 1
+    fi
+    product_gate_evidence_record "$1" "$2" "$3" "true" "authoritative" "${6:-3600}" "$4" "" "$5"
+    ;;
+  run)
+    if [[ "$#" -lt 6 ]]; then
+      usage >&2
+      exit 1
+    fi
+    source_id="$1"
+    context="$2"
+    source_artifacts="$3"
+    next_command="$4"
+    max_age_seconds="$5"
+    shift 5
+    product_gate_evidence_run "$source_id" "$context" "$source_artifacts" "$next_command" "$max_age_seconds" "$@"
+    ;;
+  structure-status)
+    product_gate_evidence_structure_status "${1:-free-development}" "${2:-3600}"
+    ;;
+  git-status)
+    product_gate_evidence_git_status "${1:-free-development}" "${2:-300}"
+    ;;
+  ci-status)
+    product_gate_evidence_ci_status "${1:-product-improvement}" "${2:-3600}"
+    ;;
+  security-status)
+    product_gate_evidence_security_status "${1:-free-development}" "${2:-3600}"
+    ;;
+  manifest-tests)
+    product_gate_evidence_manifest_tests "${1:-free-development}" "${2:-3600}" "${3:-all}"
+    ;;
+  -h|--help|help)
+    usage
+    ;;
+  *)
+    printf 'unknown command: %s\n' "$COMMAND" >&2
+    usage >&2
+    exit 1
+    ;;
+esac
+PRODUCT_GATE_EVIDENCE_COMMAND
+  chmod +x "$path"
+  printf 'installed: %s\n' "${path#$REPO/}"
+}
+
+write_detail_manifest() {
+  local path
+  path="$(detail_manifest_path)"
+  mkdir -p "$(dirname "$path")"
+  if [[ -e "$path" && "$FORCE" != "true" ]]; then
+    printf 'kept existing: %s\n' "${path#$REPO/}"
+    return
+  fi
+  cat >"$path" <<'EVIDENCE_DETAIL_MANIFEST'
+# source_id	required_mode	contexts	card_group	detail_page	label_key	detail_code	audience	what_is_checked	why_it_matters	pass_meaning	fail_meaning	not_run_meaning	stale_meaning	next_action_key	risk_level	approval_required	display_order
+product.gates.tests	required	all	local_tests	#workflow	product.evidence.local_tests	product.gates.tests.detail	all	Declared local test commands and latest recorded results.	Shows whether the product was checked locally before the next workflow decision.	Local test evidence is current and passed.	At least one local test failed.	Local test evidence has not been recorded yet.	Local test evidence is older than the configured freshness window or product HEAD.	product.next.inspect_local_tests	high	false	10
+product.tests.unit	required	all	local_tests	#workflow	product.evidence.tests_unit	product.tests.unit.detail	all	Unit test command and latest recorded result.	Shows whether the smallest product behavior checks passed before broader workflow decisions.	Unit test evidence is current and passed.	Unit test evidence failed or was blocked.	Unit test evidence has not been recorded yet.	Unit test evidence is older than the configured freshness window or product HEAD.	product.next.inspect_unit_tests	high	false	11
+product.tests.smoke	contextual	all	local_tests	#workflow	product.evidence.tests_smoke	product.tests.smoke.detail	all	Smoke test command and latest recorded result.	Shows whether the product starts or performs its core path before deeper checks.	Smoke test evidence is current and passed.	Smoke test evidence failed or was blocked.	Smoke test evidence has not been recorded yet.	Smoke test evidence is older than the configured freshness window or product HEAD.	product.next.inspect_smoke_tests	high	false	12
+product.tests.e2e	contextual	all	local_tests	#workflow	product.evidence.tests_e2e	product.tests.e2e.detail	all	End-to-end test command and latest recorded result.	Shows whether the user-facing flow passed for the selected product revision.	End-to-end evidence is current and passed.	End-to-end evidence failed or was blocked.	End-to-end evidence has not been recorded yet.	End-to-end evidence is older than the configured freshness window or product HEAD.	product.next.inspect_e2e_tests	high	false	13
+product.gates.structure	required	all	local_tests	#workflow	product.evidence.structure	product.gates.structure.detail	all	Product structure, required files, manifests, and product-local tools.	Shows whether the repository can be maintained by the product workflow.	Structure evidence is current and passed.	Structure check failed or required files are missing.	Structure evidence has not been recorded yet.	Structure evidence is older than the configured freshness window or product HEAD.	product.next.inspect_structure	high	false	20
+product.structure.files	required	all	local_tests	#workflow	product.evidence.structure_files	product.structure.files.detail	all	Required product files, canonical docs, and source/test authorities.	Shows whether the selected repository has the files needed for product workflow decisions.	Required file evidence is current and passed.	Required file evidence failed or required files are missing.	Required file evidence has not been recorded yet.	Required file evidence is older than the configured freshness window or product HEAD.	product.next.inspect_structure_files	high	false	21
+product.structure.settings	required	all	local_tests	#workflow	product.evidence.structure_settings	product.structure.settings.detail	all	Product workflow settings, operation mode, manifests, and profile files.	Shows whether product workflow settings can be trusted without guessing from repository names.	Structure settings evidence is current and passed.	Structure settings evidence failed or required settings are missing.	Structure settings evidence has not been recorded yet.	Structure settings evidence is older than the configured freshness window or product HEAD.	product.next.inspect_structure_settings	high	false	22
+product.structure.scripts	required	all	local_tests	#workflow	product.evidence.structure_scripts	product.structure.scripts.detail	all	Product-local tools, checks, and workflow scripts.	Shows whether the repository can collect product evidence through local commands.	Structure script evidence is current and passed.	Structure script evidence failed or required scripts are missing.	Structure script evidence has not been recorded yet.	Structure script evidence is older than the configured freshness window or product HEAD.	product.next.inspect_structure_scripts	high	false	23
+product.git.sync	required	all	git_sync	#workflow	product.evidence.git_sync	product.git.sync.detail	all	Worktree, branch, upstream, ahead/behind, push, PR, merge, and local-remote synchronization.	Shows where Git work should move next without guessing from a broad sync label.	Git synchronization evidence is current and passed.	Git synchronization evidence reports a mismatch or blocker.	Git synchronization evidence has not been recorded yet.	Git synchronization evidence is older than the configured freshness window or product HEAD.	product.next.inspect_git_sync	high	true	30
+product.git.worktree	required	all	git_sync	#workflow	product.evidence.git_worktree	product.git.worktree.detail	all	Current branch and uncommitted worktree changes.	Shows whether local changes need commit, review, or cleanup before the next operation.	Worktree evidence is current and clean.	Worktree evidence found uncommitted or untracked changes.	Worktree evidence has not been recorded yet.	Worktree evidence is older than the configured freshness window or product HEAD.	product.next.inspect_git_worktree	high	false	31
+product.git.upstream	contextual	all	git_sync	#workflow	product.evidence.git_upstream	product.git.upstream.detail	all	Configured upstream branch for the current local branch.	Shows whether local and remote comparison is possible without guessing.	Upstream evidence is current and configured.	Upstream evidence found a missing or invalid upstream.	Upstream evidence has not been recorded yet.	Upstream evidence is older than the configured freshness window or product HEAD.	product.next.inspect_git_upstream	medium	false	32
+product.git.local_remote_sync	contextual	all	git_sync	#workflow	product.evidence.git_local_remote_sync	product.git.local_remote_sync.detail	all	Ahead and behind counts between the local branch and upstream.	Shows whether push, pull/rebase, or no synchronization is the next Git concern.	Local and remote synchronization evidence is current and matched.	Local and remote synchronization evidence found ahead or behind commits.	Local and remote synchronization evidence has not been recorded yet.	Local and remote synchronization evidence is older than the configured freshness window or product HEAD.	product.next.inspect_git_local_remote_sync	high	true	33
+product.git.push	contextual	product-improvement|external-integration	git_sync	#workflow	product.evidence.git_push	product.git.push.detail	all	Whether local commits have been pushed to a remote branch.	Shows whether remote review or CI can observe the selected product revision.	Push evidence is current and complete.	Push evidence found unpushed commits or missing remote state.	Push evidence has not been recorded yet.	Push evidence is older than the configured freshness window or product HEAD.	product.next.inspect_git_push	high	true	34
+product.git.pr	contextual	product-improvement|external-integration	git_sync	#workflow	product.evidence.git_pr	product.git.pr.detail	all	Pull request existence and review target for the selected product revision.	Shows whether review and PR CI can start from the current branch.	PR evidence is current and ready.	PR evidence found a missing, stale, or blocked pull request.	PR evidence has not been recorded yet.	PR evidence is older than the configured freshness window or product HEAD.	product.next.inspect_git_pr	high	true	35
+product.git.merge	contextual	product-improvement|external-integration	git_sync	#workflow	product.evidence.git_merge	product.git.merge.detail	all	Merge readiness and approval boundary for the selected product revision.	Shows whether merge is allowed or still blocked by checks and approval.	Merge evidence is current and ready.	Merge evidence found a blocker or missing approval.	Merge evidence has not been recorded yet.	Merge evidence is older than the configured freshness window or product HEAD.	product.next.inspect_git_merge	critical	true	36
+product.ci.pr	contextual	product-improvement|external-integration	ci	#workflow	product.evidence.ci_pr	product.ci.pr.detail	all	Pull request CI workflow, run status, conclusion, and head match.	Shows whether PR checks belong to the selected product revision.	PR CI evidence is current and passed.	PR CI failed or does not match the selected product revision.	PR CI evidence has not been recorded yet.	PR CI evidence is older than the configured freshness window or product HEAD.	product.next.inspect_ci	critical	true	39
+product.ci.main	contextual	product-improvement|external-integration	ci	#workflow	product.evidence.ci_main	product.ci.main.detail	all	Main branch CI workflow, run status, conclusion, and head match.	Shows whether the observed CI result belongs to the selected product revision.	Main CI evidence is current and passed.	Main CI failed or does not match the selected product revision.	Main CI evidence has not been recorded yet.	Main CI evidence is older than the configured freshness window or product HEAD.	product.next.inspect_ci	critical	true	40
+product.ci.github_actions	contextual	product-improvement|external-integration	ci	#workflow	product.evidence.ci_github_actions	product.ci.github_actions.detail	all	GitHub Actions provider visibility and latest relevant workflow run.	Shows whether CI can be observed without treating missing provider data as success.	GitHub Actions evidence is current and observable.	GitHub Actions evidence is failed, unavailable, or mismatched.	GitHub Actions evidence has not been recorded yet.	GitHub Actions evidence is older than the configured freshness window or product HEAD.	product.next.inspect_ci_provider	critical	true	41
+product.security.secrets	required	all	security	#safety	product.evidence.security_secrets	product.security.secrets.detail	all	Secret-bearing files, credentials, and unsafe disclosure risks.	Shows whether work can proceed without exposing secrets or credentials.	Security evidence is current and passed.	Security evidence found a blocker.	Security evidence has not been recorded yet.	Security evidence is older than the configured freshness window or product HEAD.	product.next.inspect_security	critical	true	50
+product.security.local_artifacts	required	all	security	#safety	product.evidence.security_local_artifacts	product.security.local_artifacts.detail	all	Local generated artifacts, ignored outputs, and non-source files.	Shows whether local-only files are safely kept out of committed product source.	Local artifact evidence is current and passed.	Local artifact evidence found a blocker.	Local artifact evidence has not been recorded yet.	Local artifact evidence is older than the configured freshness window or product HEAD.	product.next.inspect_security	high	false	60
+product.security.external_sending	contextual	all	security	#safety	product.evidence.security_external_sending	product.security.external_sending.detail	all	External sending, OAuth, webhook, and integration data boundaries.	Shows whether external communication is approved and safely scoped.	External sending evidence is current and passed.	External sending evidence found a blocker or missing approval.	External sending evidence has not been recorded yet.	External sending evidence is older than the configured freshness window or product HEAD.	product.next.inspect_external_sending	critical	true	70
+product.security.blockers	required	all	security	#safety	product.evidence.security_blockers	product.security.blockers.detail	all	Current security blockers that stop product operations.	Shows what safety condition is actively stopping the workflow.	Security blocker evidence is current and clear.	Security blocker evidence found an active blocker.	Security blocker evidence has not been recorded yet.	Security blocker evidence is older than the configured freshness window or product HEAD.	product.next.inspect_security_blockers	critical	true	80
+EVIDENCE_DETAIL_MANIFEST
+  printf 'installed: %s\n' "${path#$REPO/}"
+}
+
+print_status() {
+  local missing=0
+  local relpath
+  for relpath in "tools/lib/product_gate_evidence.sh" "tools/product-gate-evidence" "ops/EVIDENCE_DETAIL_MANIFEST.tsv"; do
+    if [[ -s "$REPO/$relpath" ]]; then
+      printf 'ready: %s\n' "$relpath"
+    else
+      printf 'missing: %s\n' "$relpath"
+      missing=1
+    fi
+  done
+  return "$missing"
+}
+
+case "$COMMAND" in
+  status|plan)
+    require_repo
+    print_status
+    ;;
+  install)
+    require_repo
+    require_confirm_for_write
+    write_helper
+    write_command
+    write_detail_manifest
+    ;;
+  ""|-h|--help|help)
+    usage
+    ;;
+  *)
+    printf 'unknown command: %s\n' "$COMMAND" >&2
+    usage >&2
+    exit 1
+    ;;
+esac

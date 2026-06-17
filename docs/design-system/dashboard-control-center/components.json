@@ -1,0 +1,319 @@
+{
+  "name": "dashboard-control-center",
+  "version": "2026-06-14.source-runtime",
+  "source": "docs/design-system/dashboard-control-center/DESIGN_SYSTEM.md",
+  "components": [
+    {
+      "id": "page-header",
+      "selectors": [
+        ".page-title",
+        ".detail-page-header"
+      ],
+      "tokens": [
+        "--dcc-surface",
+        "--dcc-border",
+        "--dcc-radius",
+        "--dcc-shadow-raised",
+        "--dcc-page-header-padding",
+        "--dcc-page-icon-size",
+        "--dcc-metadata-gap"
+      ],
+      "contract": [
+        "Use a simple border, not a decorative left accent bar.",
+        "Use a neutral surface over the neutral page background.",
+        "Use a filled page icon with white icon color.",
+        "Expose snapshot and mutation boundary metadata when available."
+      ]
+    },
+    {
+      "id": "status-badge",
+      "selectors": [
+        ".status",
+        ".risk",
+        ".status-chip",
+        ".mode-pill",
+        ".common-mode-pill"
+      ],
+      "tokens": [
+        "--dcc-radius",
+        "--dcc-border",
+        "--dcc-text",
+        "--dcc-muted",
+        "--dcc-badge-gap",
+        "--dcc-badge-padding",
+        "--dcc-mode-badge-padding",
+        "--dcc-common-mode-badge-padding",
+        "--dcc-badge-height",
+        "--dcc-common-mode-badge-height",
+        "--dcc-badge-font-size",
+        "--dcc-mode-badge-font-size",
+        "--dcc-common-mode-badge-font-size"
+      ],
+      "contract": [
+        "State must be readable as text and never depend on color alone.",
+        "Badge shape, height, padding, and icon spacing are generated from the design-system source.",
+        "Permission questions use allowed, prohibited, or not-applicable wording.",
+        "Execution timing questions use prohibited, ask each time, or auto wording."
+      ]
+    },
+    {
+      "id": "operational-card",
+      "selectors": [
+        ".common-status-card",
+        ".overview-status-card",
+        ".workflow-mini-card",
+        ".maintenance-mini-card",
+        ".security-mini-card"
+      ],
+      "tokens": [
+        "--dcc-surface",
+        "--dcc-border",
+        "--dcc-radius",
+        "--dcc-shadow",
+        "--dcc-card-padding",
+        "--dcc-card-gap",
+        "--dcc-page-icon-size"
+      ],
+      "contract": [
+        "Show the practical question before technical evidence.",
+        "Shared card padding and internal gaps are generated from the design-system source.",
+        "Do not nest decorative cards inside decorative cards.",
+        "Keep raw technical values secondary and copyable."
+      ]
+    },
+    {
+      "id": "decision-progress-summary",
+      "selectors": [
+        ".decision-progress-summary",
+        ".decision-progress-summary__row",
+        ".decision-progress-summary__count"
+      ],
+      "tokens": [
+        "--dcc-card-gap",
+        "--dcc-badge-gap",
+        "--dcc-font-size-section-title",
+        "--dcc-page-accent-fallback"
+      ],
+      "contract": [
+        "Use this component for short decision-progress summaries such as local checks, CI stages, sync stages, or safety review groups.",
+        "Each row shows a plain-language label and a progress fraction on one line.",
+        "The label and progress fraction use the same size and weight as other overview-card primary values.",
+        "The progress fraction uses tabular numerals so the user can scan completion quickly.",
+        "Overall pass, review, stale, or blocked state stays in the card status chip or detail surface instead of repeating on every row."
+      ]
+    },
+    {
+      "id": "data-row",
+      "selectors": [
+        ".mock-table-row",
+        ".evidence-row",
+        ".failure-row",
+        ".documents-next-row",
+        ".settings-row",
+        ".lesson-live-row",
+        ".repository-run-row"
+      ],
+      "tokens": [
+        "--dcc-surface",
+        "--dcc-border",
+        "--dcc-radius",
+        "--dcc-row-padding",
+        "--dcc-row-gap"
+      ],
+      "contract": [
+        "Rows must preserve scanability across tables, settings, evidence, and activity lists.",
+        "Shared row padding and internal gaps are generated from the design-system source.",
+        "Row density changes must not change execution authority, evidence meaning, or workflow state."
+      ]
+    },
+    {
+      "id": "detail-surface",
+      "selectors": [
+        ".insight-detail-modal",
+        ".insight-detail-modal__panel"
+      ],
+      "tokens": [
+        "--dcc-surface",
+        "--dcc-border",
+        "--dcc-radius",
+        "--dcc-shadow-raised"
+      ],
+      "contract": [
+        "Support mouse, keyboard, Escape close, focus return, and screen-reader labeling.",
+        "Contain long explanations that do not fit in short role tooltips.",
+        "Keep command and source details display-only."
+      ]
+    },
+    {
+      "id": "tooltip-copy",
+      "selectors": [
+        ".source-boundary__chip",
+        ".source-boundary__chip-value",
+        ".evidence-row__reference-chip",
+        ".evidence-row__reference-value",
+        ".command-preview__command-chip",
+        ".command-preview__command-value",
+        ".sidebar-reference-chip",
+        ".sidebar-reference-chip__value",
+        ".design-studio-preview__chip"
+      ],
+      "tokens": [
+        "--dcc-surface",
+        "--dcc-border",
+        "--dcc-radius",
+        "--dcc-shadow-raised",
+        "--dcc-technical-affordance-gap",
+        "--dcc-technical-source-max-width",
+        "--dcc-technical-evidence-max-width",
+        "--dcc-technical-preview-chip-max-width"
+      ],
+      "interaction": {
+        "tooltip": {
+          "trigger": "hover-only",
+          "hidePolicy": "pointer-leave",
+          "placement": "top",
+          "maxWidth": "300px",
+          "delayMs": 0
+        },
+        "copyFeedback": {
+          "trigger": "hover-only",
+          "hidePolicy": "pointer-leave",
+          "placement": "top",
+          "collision": "shift",
+          "durationMs": 1200
+        }
+      },
+      "contract": [
+        "Visible field bodies may show raw paths, commands, or IDs.",
+        "Tooltips stay short and explain the role of the value.",
+        "Copy controls identify the raw value being copied.",
+        "File/path role tooltips and copy-button popups have separate display-condition settings.",
+        "Tooltip bubbles are visible only while the pointer is over the trigger.",
+        "Copy feedback appears above the copy control and hides when the pointer leaves.",
+        "Technical values and copy controls stay on one row with the design-system affordance gap."
+      ]
+    },
+    {
+      "id": "command-preview",
+      "selectors": [
+        ".command-preview",
+        ".command-preview__command-chip"
+      ],
+      "tokens": [
+        "--dcc-surface",
+        "--dcc-border",
+        "--dcc-radius"
+      ],
+      "contract": [
+        "Command previews are display-only and non-executable.",
+        "They must not look like execution controls.",
+        "They show intent, risk, command text, and copy affordance."
+      ]
+    },
+    {
+      "id": "interactive-control",
+      "selectors": [
+        ".refresh-button",
+        ".detail-page-header__action",
+        ".mini-card-button",
+        ".mock-table-link",
+        ".settings-action-row button",
+        ".settings-modal__footer button",
+        ".settings-value-select select",
+        ".design-studio-action-row button",
+        ".design-studio-form-grid select",
+        ".design-studio-preview__control-field select",
+        ".settings-modal__close"
+      ],
+      "tokens": [
+        "--dcc-border",
+        "--dcc-radius",
+        "--dcc-focus",
+        "--dcc-control-gap",
+        "--dcc-action-control-height",
+        "--dcc-action-control-padding",
+        "--dcc-compact-control-height",
+        "--dcc-compact-control-padding",
+        "--dcc-form-control-height",
+        "--dcc-form-control-padding",
+        "--dcc-icon-button-size",
+        "--dcc-control-font-size"
+      ],
+      "contract": [
+        "Interactive controls must be keyboard reachable and show a visible focus ring.",
+        "Shared control dimensions are generated from the design-system source.",
+        "Semantic colors, disabled behavior, and execution authority remain owned by the feature layer.",
+        "Buttons that look actionable must be real buttons or links."
+      ]
+    },
+    {
+      "id": "design-studio-visual-editor",
+      "selectors": [
+        ".design-studio-target-grid",
+        ".design-studio-foundation-grid",
+        ".design-studio-preview__sample"
+      ],
+      "tokens": [
+        "--dcc-page-accent-fallback",
+        "--dcc-page-soft-fallback",
+        "--dcc-page-border-fallback",
+        "--dcc-font-size-body",
+        "--dcc-font-size-section-title",
+        "--dcc-font-size-page-title",
+        "--dcc-section-gap",
+        "--dcc-panel-padding",
+        "--dcc-card-padding",
+        "--dcc-card-gap",
+        "--dcc-row-padding",
+        "--dcc-row-gap",
+        "--dcc-control-gap",
+        "--dcc-action-control-height",
+        "--dcc-action-control-padding",
+        "--dcc-form-control-height",
+        "--dcc-form-control-padding",
+        "--dcc-icon-button-size",
+        "--dcc-control-font-size",
+        "--dcc-radius"
+      ],
+      "contract": [
+        "Design Studio edits design-system source values through safe visual controls.",
+        "The visual preview must show atom, molecule, and organism examples.",
+        "Upstream token changes must affect downstream preview levels without page-local CSS exceptions.",
+        "External product targets are product-local design-system sources, not Dashboard Control Center source files."
+      ]
+    },
+    {
+      "id": "design-studio-orchestration",
+      "selectors": [
+        ".design-studio-orchestration",
+        ".design-studio-orchestration__flow",
+        ".design-studio-orchestration__card",
+        ".design-studio-contract-table"
+      ],
+      "tokens": [
+        "--dcc-surface",
+        "--dcc-border",
+        "--dcc-radius",
+        "--dcc-shadow",
+        "--dcc-text",
+        "--dcc-muted"
+      ],
+      "contract": [
+        "Show proposal orchestration as a control-plane workflow, not as an apply shortcut.",
+        "Mark AI, mock, template, and external product data as proposal-only until explicit approval and owner-tool verification.",
+        "Expose provider modes and target adapters without exposing credentials or arbitrary command execution.",
+        "External product targets remain plan-only until a separate product-local mutation contract is approved."
+      ]
+    }
+  ],
+  "pipeline": [
+    "DESIGN_SYSTEM.md",
+    "tokens.json and components.json",
+    "dashboard-control-center/src/design-system.generated.css",
+    "dashboard-control-center/src/design-system.generated.js",
+    "prototype or browser preview",
+    "developer visual approval",
+    "Dashboard Control Center implementation",
+    "tools/check_dashboard_design_system.sh drift check"
+  ]
+}

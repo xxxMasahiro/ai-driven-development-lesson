@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+if [[ ! -x "$ROOT/node_modules/.bin/playwright" ]]; then
+  printf 'Playwright dependencies are not installed.\n' >&2
+  printf 'Run npm install, then run the requested Playwright command again.\n' >&2
+  exit 1
+fi
+
+unset NO_COLOR
+export FORCE_COLOR="${FORCE_COLOR:-0}"
+exec "$ROOT/node_modules/.bin/playwright" "$@"

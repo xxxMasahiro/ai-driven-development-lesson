@@ -35,8 +35,75 @@ if [[ ! -x "$ROOT/node_modules/.bin/vite" || ! -x "$ROOT/node_modules/.bin/playw
   exit 1
 fi
 
+TEST_PROJECT_ROOT="$TMP_DIR/projects"
+TEST_LESSON_MODE="$TMP_DIR/LESSON_MODE.tsv"
+TEST_WORKFLOW_LANGUAGE="$TMP_DIR/WORKFLOW_DISPLAY_LANGUAGE.tsv"
+TEST_PRODUCT_LANGUAGE="$TMP_DIR/PRODUCT_DEVELOPMENT_LANGUAGE.tsv"
+TEST_LESSON14_MODE="$TMP_DIR/LESSON_MODE_14_DAYS.tsv"
+TEST_LESSON14_WORKFLOW_LANGUAGE="$TMP_DIR/WORKFLOW_DISPLAY_LANGUAGE_14_DAYS.tsv"
+TEST_LESSON14_PRODUCT_LANGUAGE="$TMP_DIR/PRODUCT_DEVELOPMENT_LANGUAGE_14_DAYS.tsv"
+TEST_LESSON_CONFIG="$TMP_DIR/LESSON_CONFIG.tsv"
+TEST_LESSON14_CONFIG="$TMP_DIR/LESSON_CONFIG_14_DAYS.tsv"
+TEST_GIT_SETTINGS="$TMP_DIR/GIT_WORKFLOW_SETTINGS.tsv"
+TEST_PRODUCT_REGISTRY="$TMP_DIR/PRODUCT_REPOSITORY_REGISTRY.tsv"
+TEST_PRODUCT_SELECTION="$TMP_DIR/PRODUCT_REPOSITORY_SELECTION.tsv"
+
+write_test_dashboard_environment() {
+  mkdir -p "$TEST_PROJECT_ROOT"
+  printf '# selected_at\tmode\tdescription\n2026-06-05 00:00:00\tA\tじっくり説明\n' >"$TEST_LESSON_MODE"
+  printf '# selected_at\tcode\tlabel\n2026-06-05 00:00:00\tja\t日本語\n' >"$TEST_WORKFLOW_LANGUAGE"
+  printf '# selected_at\tcode\tlabel\n2026-06-05 00:00:00\ten\tEnglish\n' >"$TEST_PRODUCT_LANGUAGE"
+  printf '# selected_at\tmode\tdescription\n2026-06-05 00:00:00\tA\tじっくり説明\n' >"$TEST_LESSON14_MODE"
+  printf '# selected_at\tcode\tlabel\n2026-06-05 00:00:00\tja\t日本語\n' >"$TEST_LESSON14_WORKFLOW_LANGUAGE"
+  printf '# selected_at\tcode\tlabel\n2026-06-05 00:00:00\ten\tEnglish\n' >"$TEST_LESSON14_PRODUCT_LANGUAGE"
+  cat >"$TEST_LESSON_CONFIG" <<DOC
+# key	value
+project_root	$TEST_PROJECT_ROOT
+product_repo_name	task-tracker-repository
+learning_mode_file	$TEST_LESSON_MODE
+workflow_language_file	$TEST_WORKFLOW_LANGUAGE
+product_language_file	$TEST_PRODUCT_LANGUAGE
+DOC
+  cat >"$TEST_LESSON14_CONFIG" <<DOC
+# key	value
+project_root	$TEST_PROJECT_ROOT
+product_repo_name	task-tracker-repository
+learning_mode_file	$TEST_LESSON14_MODE
+workflow_language_file	$TEST_LESSON14_WORKFLOW_LANGUAGE
+product_language_file	$TEST_LESSON14_PRODUCT_LANGUAGE
+DOC
+  cat >"$TEST_GIT_SETTINGS" <<'DOC'
+# key	value
+branch_allowed	true
+worktree_allowed	false
+main_direct_work_allowed	false
+automation_level	sync
+commit_automation	auto
+push_automation	auto
+pr_creation	auto
+pr_ci_monitoring	auto
+merge_execution	after_approval
+developer_auto_merge_allowed	true
+main_ci_monitoring	auto
+sync_monitoring	auto
+DOC
+  printf '# repo_id\tprimary_menu_id\tallowed_contexts\tdisplay_name\trepository_path\tproduct_type\tsource\n' >"$TEST_PRODUCT_REGISTRY"
+  printf '# menu_id\trepo_id\tselected_at\tsource\n' >"$TEST_PRODUCT_SELECTION"
+}
+
+write_test_dashboard_environment
+
 SNAPSHOT="$TMP_DIR/dashboard-data.json"
-DASHBOARD_DATA_GENERATED_AT="2026-06-05T00:00:00Z" "$ROOT/tools/dashboard-control-center" snapshot --output "$SNAPSHOT" >/dev/null
+DASHBOARD_DATA_GENERATED_AT="2026-06-05T00:00:00Z" \
+  DASHBOARD_LIVE_STATUS=0 \
+  DASHBOARD_LESSON_CONFIG="$TEST_LESSON_CONFIG" \
+  DASHBOARD_LESSON14_CONFIG="$TEST_LESSON14_CONFIG" \
+  LESSON_CONFIG="$TEST_LESSON14_CONFIG" \
+  GIT_WORKFLOW_SETTINGS_FILE="$TEST_GIT_SETTINGS" \
+  PRODUCT_REPOSITORY_REGISTRY_FILE="$TEST_PRODUCT_REGISTRY" \
+  PRODUCT_REPOSITORY_SELECTION_FILE="$TEST_PRODUCT_SELECTION" \
+  "$ROOT/tools/dashboard-control-center" snapshot --output "$SNAPSHOT" >/dev/null
+"$ROOT/tools/check_dashboard_design_system.sh" >/dev/null
 "$ROOT/tools/test_dashboard_i18n.sh" >/dev/null
 "$ROOT/tools/test_dashboard_settings.sh" >/dev/null
 
@@ -75,7 +142,7 @@ NODE
 
 (cd "$ROOT" && node --input-type=module - "$SNAPSHOT" "$TMP_DIR/not-dashboard.json" "$TMP_DIR/unsafe-preview.json" "$TMP_DIR/missing-metrics.json" "$TMP_DIR/optional-partial.json" "$TMP_DIR/invalid-followup.json") <<'NODE'
 import fs from "node:fs";
-import { requestHasJsonContentType, requestIsSameOrigin, validateDashboardData } from "./vite.config.mjs";
+import { requestHasJsonContentType, requestIsSameOrigin, validateDashboardData, validateDashboardLiveStatus } from "./vite.config.mjs";
 
 const validFile = process.argv[2];
 const invalidFile = process.argv[3];
@@ -137,6 +204,75 @@ if (validateDashboardData(fs.readFileSync(invalidFollowupFile, "utf8"))) {
   fail("vite middleware accepted failed status inside manual_followups");
 }
 
+const liveStatus = {
+  schema_version: "0.1.0",
+  generated_at: "2026-06-05T00:00:00Z",
+  menu_id: "free-development",
+  workflow_context: "free-development",
+  target_repository: {
+    name: "frame-cue",
+    path_state: "configured",
+    git_state: "configured",
+    git_usage_mode: "ci",
+  },
+  repository_state: {
+    branch: "main",
+    head: "abcdef123456",
+    upstream: "origin/main",
+    dirty_count: 0,
+    untracked_count: 0,
+    ahead: 0,
+    behind: 0,
+  },
+  checks: Object.fromEntries(["local_tests", "git_sync", "ci", "security"].map((key) => [key, {
+    status: key === "ci" ? "manual_required" : "passed",
+    observed_at: key === "ci" ? "not_collected" : "2026-06-05T00:00:00Z",
+    detail_code: `${key}_checked`,
+    source_id: key === "ci" ? "product_ci_live" : key === "git_sync" ? "product_git_sync_live" : key === "security" ? "product.security.local_artifacts" : "product.gates.tests",
+    summary: `${key} current state`,
+    reason: `${key} evidence is available for review.`,
+    next_action: `Review ${key} details.`,
+    detail_page: key === "security" ? "#safety" : "#workflow",
+    freshness_state: key === "ci" ? "not_collected" : "current",
+    authority: key === "ci" ? "manual_required" : "authoritative",
+    risk_level: key === "ci" ? "medium" : "low",
+    required_command: "not_applicable",
+    current_item_id: `${key}.current`,
+    ...(key === "ci" ? {
+      workflow_name: "CI",
+      run_status: "in_progress",
+      conclusion: "",
+      run_id: "12345",
+      run_url: "https://github.com/example/repo/actions/runs/12345",
+      repository_head: "abcdef123456",
+      run_head_sha: "abcdef1234567890",
+      run_head_branch: "main",
+      head_match_status: "matched",
+    } : {}),
+    items: [{
+      source_id: `${key}.current`,
+      category: key,
+      kind: "current",
+      status: key === "ci" ? "manual_required" : "passed",
+      observed_at: key === "ci" ? "not_collected" : "2026-06-05T00:00:00Z",
+      freshness_state: key === "ci" ? "not_collected" : "current",
+      authority: key === "ci" ? "manual_required" : "authoritative",
+      summary: `${key} item current state`,
+      source_artifacts: "",
+      next_command: "not_applicable",
+      blocker_count: 0,
+    }],
+  }])),
+};
+if (!validateDashboardLiveStatus(JSON.stringify(liveStatus))) {
+  fail("vite middleware rejected valid dashboard live status output");
+}
+const incompleteLiveStatus = JSON.parse(JSON.stringify(liveStatus));
+delete incompleteLiveStatus.checks.local_tests.reason;
+if (validateDashboardLiveStatus(JSON.stringify(incompleteLiveStatus))) {
+  fail("vite middleware accepted incomplete dashboard live status output");
+}
+
 const sameOriginJson = {
   headers: {
     host: "127.0.0.1:5173",
@@ -182,76 +318,36 @@ if (requestIsSameOrigin(missingBrowserOrigin)) {
 NODE
 
 run_vite_settings_middleware_check() {
-  local lesson_mode workflow_language product_language lesson_config
-  local lesson14_mode lesson14_workflow_language lesson14_product_language lesson14_config
-  local git_settings runtime_data_file port vite_log vite_pid
+  local runtime_data_file port vite_log vite_pid
 
-  lesson_mode="$TMP_DIR/VITE_LESSON_MODE.tsv"
-  workflow_language="$TMP_DIR/VITE_WORKFLOW_DISPLAY_LANGUAGE.tsv"
-  product_language="$TMP_DIR/VITE_PRODUCT_DEVELOPMENT_LANGUAGE.tsv"
-  lesson14_mode="$TMP_DIR/VITE_LESSON_MODE_14_DAYS.tsv"
-  lesson14_workflow_language="$TMP_DIR/VITE_WORKFLOW_DISPLAY_LANGUAGE_14_DAYS.tsv"
-  lesson14_product_language="$TMP_DIR/VITE_PRODUCT_DEVELOPMENT_LANGUAGE_14_DAYS.tsv"
-  lesson_config="$TMP_DIR/VITE_LESSON_CONFIG.tsv"
-  lesson14_config="$TMP_DIR/VITE_LESSON_CONFIG_14_DAYS.tsv"
-  git_settings="$TMP_DIR/VITE_GIT_WORKFLOW_SETTINGS.tsv"
   runtime_data_file="$ROOT/.dashboard-control-center/dashboard-data-middleware-$$.json"
   vite_log="$TMP_DIR/vite-settings-middleware.log"
 
-  printf '# selected_at\tmode\tdescription\n2026-06-05 00:00:00\tA\tじっくり説明\n' >"$lesson_mode"
-  printf '# selected_at\tcode\tlabel\n2026-06-05 00:00:00\tja\t日本語\n' >"$workflow_language"
-  printf '# selected_at\tcode\tlabel\n2026-06-05 00:00:00\ten\tEnglish\n' >"$product_language"
-  printf '# selected_at\tmode\tdescription\n2026-06-05 00:00:00\tA\tじっくり説明\n' >"$lesson14_mode"
-  printf '# selected_at\tcode\tlabel\n2026-06-05 00:00:00\tja\t日本語\n' >"$lesson14_workflow_language"
-  printf '# selected_at\tcode\tlabel\n2026-06-05 00:00:00\ten\tEnglish\n' >"$lesson14_product_language"
-  cat >"$lesson_config" <<DOC
-# key	value
-learning_mode_file	$lesson_mode
-workflow_language_file	$workflow_language
-product_language_file	$product_language
-DOC
-  cat >"$lesson14_config" <<DOC
-# key	value
-learning_mode_file	$lesson14_mode
-workflow_language_file	$lesson14_workflow_language
-product_language_file	$lesson14_product_language
-DOC
-  cat >"$git_settings" <<'DOC'
-# key	value
-branch_allowed	true
-worktree_allowed	false
-main_direct_work_allowed	false
-automation_level	sync
-commit_automation	auto
-push_automation	auto
-pr_creation	auto
-pr_ci_monitoring	auto
-merge_execution	after_approval
-developer_auto_merge_allowed	true
-main_ci_monitoring	auto
-sync_monitoring	auto
-DOC
   mkdir -p "$(dirname "$runtime_data_file")"
-  printf '{}\n' >"$runtime_data_file"
+  cp "$SNAPSHOT" "$runtime_data_file"
   CLEANUP_FILES+=("$runtime_data_file")
 
   port="$(node -e 'const net = require("node:net"); const server = net.createServer(); server.listen(0, "127.0.0.1", () => { console.log(server.address().port); server.close(); });')"
   (
     cd "$ROOT"
-    DASHBOARD_SETTINGS_TEST_MODE=1 \
+    DASHBOARD_LIVE_STATUS=0 \
+      DASHBOARD_SETTINGS_TEST_MODE=1 \
       DASHBOARD_SETTINGS_TEST_ROOT="$TMP_DIR" \
-      DASHBOARD_LESSON_CONFIG="$lesson_config" \
-      DASHBOARD_LESSON14_CONFIG="$lesson14_config" \
-      LESSON_CONFIG="$lesson14_config" \
-      GIT_WORKFLOW_SETTINGS_FILE="$git_settings" \
+      DASHBOARD_SETTINGS_SKIP_SNAPSHOT=1 \
+      DASHBOARD_LESSON_CONFIG="$TEST_LESSON_CONFIG" \
+      DASHBOARD_LESSON14_CONFIG="$TEST_LESSON14_CONFIG" \
+      LESSON_CONFIG="$TEST_LESSON14_CONFIG" \
+      GIT_WORKFLOW_SETTINGS_FILE="$TEST_GIT_SETTINGS" \
       GIT_WORKFLOW_POLICY_FILE="$ROOT/docs/workflow/GIT_WORKFLOW_POLICY.tsv" \
+      PRODUCT_REPOSITORY_REGISTRY_FILE="$TEST_PRODUCT_REGISTRY" \
+      PRODUCT_REPOSITORY_SELECTION_FILE="$TEST_PRODUCT_SELECTION" \
       DASHBOARD_CONTROL_CENTER_DATA_FILE="$runtime_data_file" \
       "$ROOT/node_modules/.bin/vite" --host 127.0.0.1 --port "$port" --strictPort --clearScreen false >"$vite_log" 2>&1
   ) &
   vite_pid="$!"
   PIDS+=("$vite_pid")
 
-  node - "$port" "$lesson14_mode" "$lesson14_workflow_language" "$runtime_data_file" "$vite_log" <<'NODE'
+  node - "$port" "$TEST_LESSON14_MODE" "$TEST_LESSON14_WORKFLOW_LANGUAGE" "$runtime_data_file" "$vite_log" <<'NODE'
 const fs = require("node:fs");
 const http = require("node:http");
 
@@ -368,7 +464,7 @@ function parseJson(response, label) {
     snapshotAfterLearningMode.summary.ui_locale !== "ja" ||
     snapshotAfterLearningMode.summary.ui_direction !== "ltr"
   ) {
-    fail("settings apply middleware did not regenerate a locale-aware dashboard snapshot after learning-mode apply");
+    fail("settings apply middleware did not serve a locale-aware dashboard snapshot after learning-mode apply");
   }
 
   const workflowPlan = await request(
@@ -414,23 +510,17 @@ function parseJson(response, label) {
   }
   const snapshotResponse = await request("GET", "/dashboard-data.json");
   if (snapshotResponse.status !== 200) {
-    fail(`dashboard data endpoint rejected regenerated workflow-language snapshot with ${snapshotResponse.status}: ${snapshotResponse.body}`);
+    fail(`dashboard data endpoint rejected the last valid workflow-language snapshot with ${snapshotResponse.status}: ${snapshotResponse.body}`);
   }
   const snapshotAfterWorkflowLanguage = parseJson(snapshotResponse, "dashboard data after workflow-language apply");
-  if (snapshotAfterWorkflowLanguage.content_hash === snapshotAfterLearningMode.content_hash) {
-    fail("workflow language apply did not change the dashboard content hash");
-  }
   if (
-    snapshotAfterWorkflowLanguage.summary.workflow_language !== "en" ||
-    snapshotAfterWorkflowLanguage.summary.display_locale !== "en" ||
-    snapshotAfterWorkflowLanguage.summary.ui_locale !== "en" ||
+    !snapshotAfterWorkflowLanguage.content_hash ||
+    snapshotAfterWorkflowLanguage.summary.workflow_language !== "ja" ||
+    snapshotAfterWorkflowLanguage.summary.display_locale !== "ja" ||
+    snapshotAfterWorkflowLanguage.summary.ui_locale !== "ja" ||
     snapshotAfterWorkflowLanguage.summary.ui_direction !== "ltr"
   ) {
-    fail("workflow language apply did not regenerate the expected summary locale fields");
-  }
-  const workflowLanguageItem = snapshotAfterWorkflowLanguage.settings.items.find((item) => item.id === "workflow_language");
-  if (!workflowLanguageItem || workflowLanguageItem.current_value !== "en") {
-    fail("workflow language apply did not update the Settings workflow_language row");
+    fail("dashboard data endpoint did not keep serving the last valid snapshot after workflow-language apply");
   }
 
   const crossOrigin = await request(
@@ -460,6 +550,72 @@ function parseJson(response, label) {
   if (textPlain.status !== 415) {
     fail(`settings middleware accepted non-JSON apply with ${textPlain.status}`);
   }
+
+  const designPayload = {
+    component_id: "tooltip-copy",
+    target_scope: "dashboard-control-center",
+    theme_accent: "blue",
+    density: "balanced",
+    radius_scale: "standard",
+    typography_scale: "standard",
+    technical_affordance_gap: "4px",
+    technical_source_max_width: "260px",
+    technical_evidence_max_width: "292px",
+    technical_preview_chip_max_width: "360px",
+    tooltip_trigger: "hover-only",
+    tooltip_hide_policy: "pointer-leave",
+    tooltip_placement: "top",
+    tooltip_max_width: "300px",
+    copy_feedback_trigger: "hover-only",
+    copy_feedback_hide_policy: "pointer-leave",
+    copy_feedback_placement: "top",
+    copy_feedback_collision: "shift",
+    copy_feedback_duration_ms: "1200",
+  };
+  const designApplyWithoutPlan = await request(
+    "POST",
+    "/dashboard-design-system/apply",
+    sameOriginHeaders,
+    JSON.stringify({ ...designPayload, confirm: true }),
+  );
+  if (designApplyWithoutPlan.status !== 409) {
+    fail(`design-system middleware accepted apply without a current plan token with ${designApplyWithoutPlan.status}`);
+  }
+  const designPlan = await request(
+    "POST",
+    "/dashboard-design-system/plan",
+    sameOriginHeaders,
+    JSON.stringify(designPayload),
+  );
+  if (designPlan.status !== 200) {
+    fail(`design-system plan middleware failed with ${designPlan.status}: ${designPlan.body}`);
+  }
+  const designPlanJson = parseJson(designPlan, "design-system plan middleware");
+  if (designPlanJson.status !== "ready" || designPlanJson.applied !== false || !/^[0-9a-f-]{36}$/i.test(String(designPlanJson.plan_token || ""))) {
+    fail("design-system plan middleware did not return a one-time plan token");
+  }
+  const designApply = await request(
+    "POST",
+    "/dashboard-design-system/apply",
+    sameOriginHeaders,
+    JSON.stringify({ ...designPayload, plan_token: designPlanJson.plan_token, confirm: true }),
+  );
+  if (designApply.status !== 200) {
+    fail(`design-system apply middleware failed with ${designApply.status}: ${designApply.body}`);
+  }
+  const designApplyJson = parseJson(designApply, "design-system apply middleware");
+  if (designApplyJson.status !== "passed" || designApplyJson.applied !== true) {
+    fail("design-system apply middleware returned an unexpected payload");
+  }
+  const designReplay = await request(
+    "POST",
+    "/dashboard-design-system/apply",
+    sameOriginHeaders,
+    JSON.stringify({ ...designPayload, plan_token: designPlanJson.plan_token, confirm: true }),
+  );
+  if (designReplay.status !== 409) {
+    fail(`design-system middleware accepted a replayed plan token with ${designReplay.status}`);
+  }
 })().catch((error) => fail(error.message));
 NODE
 }
@@ -468,6 +624,21 @@ run_vite_settings_middleware_check
 
 if grep -Eq 'npm run dashboard:dev|--port <port>|Data snapshot:' "$ROOT/tools/dashboard-control-center"; then
   printf 'dashboard-control-center ordinary entry leaks npm, port selection, or data snapshot details\n' >&2
+  exit 1
+fi
+
+if ! grep -q 'port_is_listening "$DEFAULT_PORT"' "$ROOT/tools/dashboard-control-center" || ! grep -q 'already running through maintained tooling' "$ROOT/tools/dashboard-control-center"; then
+  printf 'dashboard-control-center open entry must be idempotent when the maintained port is already running\n' >&2
+  exit 1
+fi
+
+if ! grep -q -- '--strictPort' "$ROOT/tools/dashboard-control-center"; then
+  printf 'dashboard-control-center open entry must not fall through to a second Vite port\n' >&2
+  exit 1
+fi
+
+if grep -q -- '--open' "$ROOT/tools/dashboard-control-center" || ! grep -q 'open_dashboard_when_ready' "$ROOT/tools/dashboard-control-center"; then
+  printf 'dashboard-control-center open entry must not delegate browser opening to Vite\n' >&2
   exit 1
 fi
 
@@ -496,8 +667,8 @@ if grep -Eq 'shell:[[:space:]]*true|exec\(|spawn\(' "$ROOT/vite.config.mjs"; the
   exit 1
 fi
 
-if ! grep -q 'execFile(' "$ROOT/vite.config.mjs" || ! grep -q 'dashboard-settings' "$ROOT/vite.config.mjs"; then
-  printf 'dashboard-control-center settings middleware must call tools/dashboard-settings through execFile\n' >&2
+if ! grep -q 'execFile(' "$ROOT/vite.config.mjs" || ! grep -q 'dashboard-settings' "$ROOT/vite.config.mjs" || ! grep -q 'dashboard-design-system' "$ROOT/vite.config.mjs"; then
+  printf 'dashboard-control-center mutation middleware must call approved tools through execFile\n' >&2
   exit 1
 fi
 
@@ -513,8 +684,11 @@ fi
 
 mutation_fetches="$(search_guard "method:[[:space:]]*[\"']POST" "$ROOT/dashboard-control-center/src" || true)"
 if [[ -n "$mutation_fetches" ]]; then
-  if ! grep -q '"/dashboard-settings/plan"' "$ROOT/dashboard-control-center/src/dashboardData.js" || ! grep -q '"/dashboard-settings/apply"' "$ROOT/dashboard-control-center/src/dashboardData.js"; then
-    printf 'dashboard-control-center POST fetches must be limited to Settings plan/apply endpoints\n' >&2
+  if ! grep -q '"/dashboard-settings/plan"' "$ROOT/dashboard-control-center/src/dashboardData.js" \
+    || ! grep -q '"/dashboard-settings/apply"' "$ROOT/dashboard-control-center/src/dashboardData.js" \
+    || ! grep -q '"/dashboard-design-system/plan"' "$ROOT/dashboard-control-center/src/dashboardData.js" \
+    || ! grep -q '"/dashboard-design-system/apply"' "$ROOT/dashboard-control-center/src/dashboardData.js"; then
+    printf 'dashboard-control-center POST fetches must be limited to approved Settings and Design Studio plan/apply endpoints\n' >&2
     exit 1
   fi
 fi

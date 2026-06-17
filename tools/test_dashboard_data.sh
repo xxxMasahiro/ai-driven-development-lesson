@@ -14,6 +14,74 @@ assert_contains() {
   fi
 }
 
+TEST_PROJECT_ROOT="$TMP_DIR/projects"
+TEST_LESSON_MODE="$TMP_DIR/LESSON_MODE.tsv"
+TEST_WORKFLOW_LANGUAGE="$TMP_DIR/WORKFLOW_DISPLAY_LANGUAGE.tsv"
+TEST_PRODUCT_LANGUAGE="$TMP_DIR/PRODUCT_DEVELOPMENT_LANGUAGE.tsv"
+TEST_LESSON14_MODE="$TMP_DIR/LESSON_MODE_14_DAYS.tsv"
+TEST_LESSON14_WORKFLOW_LANGUAGE="$TMP_DIR/WORKFLOW_DISPLAY_LANGUAGE_14_DAYS.tsv"
+TEST_LESSON14_PRODUCT_LANGUAGE="$TMP_DIR/PRODUCT_DEVELOPMENT_LANGUAGE_14_DAYS.tsv"
+TEST_LESSON_CONFIG="$TMP_DIR/LESSON_CONFIG.tsv"
+TEST_LESSON14_CONFIG="$TMP_DIR/LESSON_CONFIG_14_DAYS.tsv"
+TEST_GIT_SETTINGS="$TMP_DIR/GIT_WORKFLOW_SETTINGS.tsv"
+TEST_PRODUCT_REGISTRY="$TMP_DIR/PRODUCT_REPOSITORY_REGISTRY.tsv"
+TEST_PRODUCT_SELECTION="$TMP_DIR/PRODUCT_REPOSITORY_SELECTION.tsv"
+
+mkdir -p "$TEST_PROJECT_ROOT"
+printf '# selected_at\tmode\tdescription\n2026-06-05 00:00:00\tA\tじっくり説明\n' >"$TEST_LESSON_MODE"
+printf '# selected_at\tcode\tlabel\n2026-06-05 00:00:00\tja\t日本語\n' >"$TEST_WORKFLOW_LANGUAGE"
+printf '# selected_at\tcode\tlabel\n2026-06-05 00:00:00\ten\tEnglish\n' >"$TEST_PRODUCT_LANGUAGE"
+printf '# selected_at\tmode\tdescription\n2026-06-05 00:00:00\tA\tじっくり説明\n' >"$TEST_LESSON14_MODE"
+printf '# selected_at\tcode\tlabel\n2026-06-05 00:00:00\tja\t日本語\n' >"$TEST_LESSON14_WORKFLOW_LANGUAGE"
+printf '# selected_at\tcode\tlabel\n2026-06-05 00:00:00\ten\tEnglish\n' >"$TEST_LESSON14_PRODUCT_LANGUAGE"
+cat >"$TEST_LESSON_CONFIG" <<DOC
+# key	value
+project_root	$TEST_PROJECT_ROOT
+product_repo_name	task-tracker-repository
+state_file	$ROOT/learning/LESSON_STATE.tsv
+flow_file	$ROOT/lesson/LESSON_FLOW.tsv
+approval_file	$ROOT/learning/LESSON_APPROVALS.tsv
+learning_mode_file	$TEST_LESSON_MODE
+workflow_language_file	$TEST_WORKFLOW_LANGUAGE
+product_language_file	$TEST_PRODUCT_LANGUAGE
+DOC
+cat >"$TEST_LESSON14_CONFIG" <<DOC
+# key	value
+project_root	$TEST_PROJECT_ROOT
+product_repo_name	task-tracker-repository
+state_file	$ROOT/learning/LESSON_STATE_14_DAYS.tsv
+flow_file	$ROOT/lesson/LESSON_FLOW_14_DAYS.tsv
+approval_file	$ROOT/learning/LESSON_APPROVALS_14_DAYS.tsv
+learning_mode_file	$TEST_LESSON14_MODE
+workflow_language_file	$TEST_LESSON14_WORKFLOW_LANGUAGE
+product_language_file	$TEST_LESSON14_PRODUCT_LANGUAGE
+DOC
+cat >"$TEST_GIT_SETTINGS" <<'DOC'
+# key	value
+branch_allowed	true
+worktree_allowed	false
+main_direct_work_allowed	false
+automation_level	sync
+commit_automation	auto
+push_automation	auto
+pr_creation	auto
+pr_ci_monitoring	auto
+merge_execution	after_approval
+developer_auto_merge_allowed	true
+main_ci_monitoring	auto
+sync_monitoring	auto
+DOC
+printf '# repo_id\tprimary_menu_id\tallowed_contexts\tdisplay_name\trepository_path\tproduct_type\tsource\n' >"$TEST_PRODUCT_REGISTRY"
+printf '# menu_id\trepo_id\tselected_at\tsource\n' >"$TEST_PRODUCT_SELECTION"
+
+export DASHBOARD_LESSON_CONFIG="$TEST_LESSON_CONFIG"
+export DASHBOARD_LESSON14_CONFIG="$TEST_LESSON14_CONFIG"
+export GIT_WORKFLOW_SETTINGS_FILE="$TEST_GIT_SETTINGS"
+export PRODUCT_REPOSITORY_REGISTRY_FILE="$TEST_PRODUCT_REGISTRY"
+export PRODUCT_REPOSITORY_SELECTION_FILE="$TEST_PRODUCT_SELECTION"
+export DASHBOARD_LIVE_STATUS=0
+unset LESSON_CONFIG
+
 JSON_FILE="$TMP_DIR/dashboard-data.json"
 DASHBOARD_DATA_GENERATED_AT="2026-06-05T00:00:00Z" "$ROOT/tools/dashboard-data" >"$JSON_FILE"
 
@@ -309,6 +377,17 @@ for (const context of availableContexts) {
   if (!allowedStates.has(context.status)) {
     fail(`invalid available context status: ${context.status}`);
   }
+  if (typeof context.selectable !== 'boolean') {
+    fail(`available context ${context.menu_id} selectable must be boolean`);
+  }
+  for (const field of ['disabled_reason_key', 'disabled_detail', 'required_next_action']) {
+    if (typeof context[field] !== 'string' || context[field].length === 0) {
+      fail(`available context ${context.menu_id} missing ${field}`);
+    }
+  }
+  if (context.selectable === false && (!context.disabled_reason_key.startsWith('context.menuAvailability.') || !context.required_next_action.length)) {
+    fail(`available context ${context.menu_id} unavailable decision is incomplete`);
+  }
   if (typeof context.target_repository_name !== 'string' || context.target_repository_name.length === 0) {
     fail('available context target_repository_name is required');
   }
@@ -336,6 +415,9 @@ for (const context of availableContexts) {
   }
   if (!['configured', 'missing', 'not_applicable', 'unknown'].includes(fullContext.target_repository.path_state)) {
     fail(`invalid contexts_by_menu.${context.menu_id}.target_repository.path_state`);
+  }
+  if (['missing', 'unknown'].includes(fullContext.target_repository.path_state) && context.workflow_context !== 'lesson' && context.selectable !== false) {
+    fail(`available context ${context.menu_id} must not be selectable with target path ${fullContext.target_repository.path_state}`);
   }
   if (!Array.isArray(fullContext.blockers)) {
     fail(`contexts_by_menu.${context.menu_id}.blockers must be an array`);
@@ -431,7 +513,7 @@ if (!Array.isArray(recentRuns) || recentRuns.length < 5) {
   fail('development.recent_runs must include producer-owned recent workflow rows');
 }
 for (const row of recentRuns) {
-  for (const field of ['id', 'time', 'type', 'target', 'detail', 'status', 'reference']) {
+  for (const field of ['id', 'time', 'type', 'target', 'detail', 'status', 'reference', 'source_role', 'required_command', 'scope']) {
     if (!(field in row) || row[field] === '') {
       fail(`recent workflow row missing ${field}`);
     }
@@ -489,7 +571,7 @@ if (!Array.isArray(maintenanceEvidenceRows) || maintenanceEvidenceRows.length < 
   fail('maintenance.evidence_rows must expose dashboard maintenance evidence');
 }
 for (const row of maintenanceEvidenceRows) {
-  for (const field of ['id', 'label', 'importance', 'status', 'reference']) {
+  for (const field of ['id', 'label', 'importance', 'status', 'reference', 'target', 'detail', 'required_command', 'source_role']) {
     if (!(field in row) || row[field] === '') {
       fail(`maintenance evidence row missing ${field}`);
     }
@@ -855,6 +937,18 @@ if (JSON.stringify(productAuthority.product_summary).includes('/tmp/')) {
 if (!Array.isArray(productAuthority.product_summary.source_documents)) {
   fail('product summary source_documents must be an array');
 }
+if (!productAuthority.operation_mode || typeof productAuthority.operation_mode !== 'object' || Array.isArray(productAuthority.operation_mode)) {
+  fail('product authority operation_mode must be an object');
+}
+if (!['missing', 'ready', 'failed', 'unknown', 'repair_required'].includes(productAuthority.operation_mode.status)) {
+  fail(`invalid product operation mode status: ${productAuthority.operation_mode.status}`);
+}
+if (!['parent_managed', 'standalone', 'reconnecting', 'repair_required'].includes(productAuthority.operation_mode.workflow_mode)) {
+  fail(`invalid product workflow_mode: ${productAuthority.operation_mode.workflow_mode}`);
+}
+if (!['ready', 'repair_required', 'not_applicable', 'unknown'].includes(productAuthority.operation_mode.rule_connection_status)) {
+  fail(`invalid product rule connection status: ${productAuthority.operation_mode.rule_connection_status}`);
+}
 if (!Array.isArray(productAuthority.document_paths)) {
   fail('product authority document_paths must be an array');
 }
@@ -904,6 +998,29 @@ for (const blocker of productAuthority.product_operation_blockers) {
   }
   if (!['missing', 'failed', 'blocked', 'unknown', 'stale', 'not_run'].includes(blocker.status)) {
     fail(`invalid product operation blocker status: ${blocker.status}`);
+  }
+}
+const productRepository = requireField('development.product_repository');
+for (const field of ['configured_name', 'workflow_context', 'path_state', 'git_state', 'git_requirement', 'ci_requirement']) {
+  if (!(field in productRepository)) {
+    fail(`product repository missing ${field}`);
+  }
+}
+if (!['configured', 'missing', 'not_applicable', 'unknown'].includes(productRepository.path_state)) {
+  fail(`invalid product repository path_state: ${productRepository.path_state}`);
+}
+if (!['configured', 'missing', 'not_applicable', 'unknown'].includes(productRepository.git_state)) {
+  fail(`invalid product repository git_state: ${productRepository.git_state}`);
+}
+if (!['required', 'not_applicable', 'unknown'].includes(productRepository.git_requirement)) {
+  fail(`invalid product repository git_requirement: ${productRepository.git_requirement}`);
+}
+if (!['required', 'not_applicable', 'unknown'].includes(productRepository.ci_requirement)) {
+  fail(`invalid product repository ci_requirement: ${productRepository.ci_requirement}`);
+}
+if (['step_1_7', 'advanced', 'lesson-repository-improvement'].includes(data.selected_context.menu_id)) {
+  if (productRepository.status !== 'not_applicable' || productRepository.git_requirement !== 'not_applicable' || productRepository.ci_requirement !== 'not_applicable') {
+    fail('lesson-only selected context must keep top-level product repository status not_applicable');
   }
 }
 if (data.development.product_repository.status === 'missing') {
@@ -987,6 +1104,8 @@ LEGACY_LANG_DIR="$TMP_DIR/legacy-language"
 mkdir -p "$LEGACY_LANG_DIR"
 cat >"$LEGACY_LANG_DIR/LESSON_CONFIG_14_DAYS.tsv" <<EOF
 # key	value
+project_root	$TEST_PROJECT_ROOT
+product_repo_name	task-tracker-repository
 learning_mode_file	$LEGACY_LANG_DIR/LESSON_MODE.tsv
 workflow_language_file	$LEGACY_LANG_DIR/WORKFLOW_DISPLAY_LANGUAGE_14_DAYS.tsv
 product_language_file	$LEGACY_LANG_DIR/PRODUCT_DEVELOPMENT_LANGUAGE_14_DAYS.tsv
@@ -1065,6 +1184,109 @@ assert_contains "$output" '"recent_runs"'
 assert_contains "$output" '"contexts_by_menu"'
 assert_contains "$output" '"evidence_rows"'
 
+LIVE_STATUS_FILE="$TMP_DIR/dashboard-live-status.json"
+DASHBOARD_DATA_GENERATED_AT="2026-06-05T00:00:00Z" \
+  DASHBOARD_SELECTED_MENU_ID="free-development" \
+  DASHBOARD_LIVE_STATUS_TIMEOUT_SECONDS="1" \
+  "$ROOT/tools/dashboard-data" live-status >"$LIVE_STATUS_FILE"
+node - "$LIVE_STATUS_FILE" <<'NODE'
+const fs = require('fs');
+const data = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
+const allowedStates = new Set([
+  'missing',
+  'ready',
+  'passed',
+  'failed',
+  'blocked',
+  'unknown',
+  'approval_required',
+  'optional',
+  'cached',
+  'not_run',
+  'stale',
+  'manual_required',
+  'not_applicable',
+]);
+const freshnessStates = new Set(['current', 'stale', 'not_collected', 'unknown']);
+const authorities = new Set(['authoritative', 'manual_required', 'advisory', 'not_collected']);
+const riskLevels = new Set(['low', 'medium', 'high', 'critical']);
+const detailPages = new Set(['#workflow', '#maintenance', '#safety', '#repository-info', '#documents', '#history', '#help']);
+const headMatchStates = new Set(['matched', 'different', 'unknown']);
+function fail(message) {
+  console.error(message);
+  process.exit(1);
+}
+function requireObject(value, label) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    fail(`${label} must be an object`);
+  }
+  return value;
+}
+if (data.schema_version !== '0.1.0') {
+  fail(`unexpected live status schema version: ${data.schema_version}`);
+}
+if (data.generated_at !== '2026-06-05T00:00:00Z') {
+  fail(`live status generated_at override was not honored: ${data.generated_at}`);
+}
+if (data.menu_id !== 'free-development' || data.workflow_context !== 'free-development') {
+  fail(`live status must honor selected free-development context, got ${data.menu_id}/${data.workflow_context}`);
+}
+requireObject(data.target_repository, 'live target_repository');
+requireObject(data.repository_state, 'live repository_state');
+for (const key of ['dirty_count', 'untracked_count', 'ahead', 'behind']) {
+  if (!Number.isFinite(Number(data.repository_state[key])) || Number(data.repository_state[key]) < 0) {
+    fail(`live repository_state ${key} must be non-negative`);
+  }
+}
+const checks = requireObject(data.checks, 'live checks');
+for (const key of ['local_tests', 'git_sync', 'ci', 'security']) {
+  const check = requireObject(checks[key], `live check ${key}`);
+  for (const field of ['status', 'observed_at', 'detail_code', 'source_id', 'summary', 'reason', 'next_action', 'detail_page', 'freshness_state', 'authority', 'risk_level', 'required_command', 'current_item_id']) {
+    if (!(field in check) || check[field] === '') {
+      fail(`live check ${key} missing ${field}`);
+    }
+  }
+  if (!allowedStates.has(check.status)) {
+    fail(`invalid live check status for ${key}: ${check.status}`);
+  }
+  if (!freshnessStates.has(check.freshness_state)) {
+    fail(`invalid live check freshness for ${key}: ${check.freshness_state}`);
+  }
+  if (!authorities.has(check.authority)) {
+    fail(`invalid live check authority for ${key}: ${check.authority}`);
+  }
+  if (!riskLevels.has(check.risk_level)) {
+    fail(`invalid live check risk for ${key}: ${check.risk_level}`);
+  }
+  if (!detailPages.has(check.detail_page)) {
+    fail(`invalid live check detail_page for ${key}: ${check.detail_page}`);
+  }
+  if (!Array.isArray(check.items)) {
+    fail(`live check ${key} items must be an array`);
+  }
+  if (key === 'ci') {
+    for (const field of ['workflow_name', 'run_status', 'conclusion', 'run_id', 'run_url', 'repository_head', 'run_head_sha', 'run_head_branch', 'head_match_status']) {
+      if (!(field in check)) {
+        fail(`live check ci missing ${field}`);
+      }
+    }
+    if (!headMatchStates.has(check.head_match_status)) {
+      fail(`live check ci has invalid head_match_status: ${check.head_match_status}`);
+    }
+  }
+  for (const item of check.items) {
+    for (const field of ['source_id', 'category', 'kind', 'status', 'observed_at', 'freshness_state', 'authority', 'summary', 'next_command', 'blocker_count']) {
+      if (!(field in item) || item[field] === '') {
+        fail(`live check ${key} item missing ${field}`);
+      }
+    }
+    if (!allowedStates.has(item.status) || !freshnessStates.has(item.freshness_state) || !authorities.has(item.authority)) {
+      fail(`live check ${key} item has invalid state vocabulary`);
+    }
+  }
+}
+NODE
+
 for menu_id in step_1_7 free-development lesson-repository-improvement; do
   menu_json="$TMP_DIR/dashboard-data-$menu_id.json"
   DASHBOARD_DATA_GENERATED_AT="2026-06-05T00:00:00Z" DASHBOARD_SELECTED_MENU_ID="$menu_id" "$ROOT/tools/dashboard-data" >"$menu_json"
@@ -1105,6 +1327,7 @@ EMPTY_PRODUCT_NAME_CONFIG="$TMP_DIR/LESSON_CONFIG_EMPTY_PRODUCT_NAME.tsv"
 EMPTY_PRODUCT_NAME_JSON="$TMP_DIR/dashboard-data-empty-product-name.json"
 {
   printf '# key\tvalue\n'
+  printf 'project_root\t%s\n' "$TEST_PROJECT_ROOT"
   printf 'product_repo_name\t\n'
 } >"$EMPTY_PRODUCT_NAME_CONFIG"
 DASHBOARD_DATA_GENERATED_AT="2026-06-05T00:00:00Z" \
@@ -1159,15 +1382,74 @@ NODE
 
 product_project_root="$TMP_DIR/projects"
 product_repo="$product_project_root/dashboard-product"
-mkdir -p "$product_repo/docs/product" "$product_repo/docs/workflow" "$product_repo/docs/memory" "$product_repo/ops" "$product_repo/src" "$product_repo/tests" "$product_repo/.github/workflows" "$product_repo/.git/product-gate-evidence"
+mkdir -p "$product_repo/docs/product" "$product_repo/docs/workflow" "$product_repo/docs/memory" "$product_repo/docs/design-system" "$product_repo/ops" "$product_repo/src" "$product_repo/tests" "$product_repo/.github/workflows" "$product_repo/.git/product-gate-evidence"
+mkdir -p "$product_repo/skills/product-development-workflow" "$product_repo/skills/product-doc-sync" "$product_repo/skills/product-security" "$product_repo/skills/product-test" "$product_repo/skills/product-design-system" "$product_repo/tools/lib"
 git -C "$product_repo" init -q
-printf '# Product Agent\n' >"$product_repo/AGENT.md"
+printf '# Product Agents\n' >"$product_repo/AGENTS.MD"
 printf '# Product\n' >"$product_repo/README.md"
+cat >"$product_repo/.gitignore" <<'DOC'
+.env
+.env.*
+node_modules/
+.venv/
+dist/
+build/
+coverage/
+playwright-report/
+test-results/
+DOC
 printf '# Requirements\n' >"$product_repo/docs/product/REQUIREMENTS.md"
 printf '# Specification\n' >"$product_repo/docs/product/SPECIFICATION.md"
 printf '# Implementation Plan\n' >"$product_repo/docs/product/IMPLEMENTATION_PLAN.md"
 printf '# Task Tracker\n' >"$product_repo/docs/workflow/TASK_TRACKER.md"
 printf '# Handoff\n' >"$product_repo/docs/workflow/HANDOFF.md"
+cat >"$product_repo/docs/memory/README.md" <<'DOC'
+# Product Memory
+
+Optional product memory files live here when the workflow needs them.
+DOC
+cat >"$product_repo/docs/workflow/SECURITY.md" <<'DOC'
+# Product Security
+
+Do not commit secrets, tokens, private keys, or credential-bearing env files.
+DOC
+cat >"$product_repo/docs/workflow/VERIFICATION.md" <<'DOC'
+# Product Verification
+
+Use ops/TEST_PLAN_MANIFEST.tsv to map product test ids to local commands and evidence.
+DOC
+cat >"$product_repo/docs/design-system/DESIGN_SYSTEM.md" <<'DOC'
+# Product Design System
+
+This file is the product-local design-system source of truth.
+DOC
+cat >"$product_repo/docs/design-system/tokens.json" <<'DOC'
+{
+  "schema_version": "1.0.0",
+  "name": "dashboard-product",
+  "tokens": [
+    {
+      "type": "color",
+      "name": "accent",
+      "value": "#1559c7",
+      "role": "Primary product accent"
+    }
+  ]
+}
+DOC
+cat >"$product_repo/docs/design-system/components.json" <<'DOC'
+{
+  "schema_version": "1.0.0",
+  "name": "dashboard-product",
+  "components": [
+    {
+      "id": "button",
+      "tokens": ["accent"],
+      "contract": ["Use product-local tokens."]
+    }
+  ]
+}
+DOC
 printf 'source\n' >"$product_repo/src/index.txt"
 printf 'test\n' >"$product_repo/tests/test.txt"
 cat >"$product_repo/ops/STAGE_MANIFEST.tsv" <<'DOC'
@@ -1185,6 +1467,10 @@ DOC
 cat >"$product_repo/ops/SECURITY_MANIFEST.tsv" <<'DOC'
 # security_id	required_mode	contexts	policy_source	evidence_source	dashboard_group	description
 secrets	required	all	docs/workflow/SECURITY.md	product.security.secrets	security	Secret scan.
+DOC
+cat >"$product_repo/ops/DESIGN_SYSTEM_MANIFEST.tsv" <<'DOC'
+# design_id	required_mode	contexts	source_path	generated_path	check_command	description
+product-design-system	required	all	docs/design-system/DESIGN_SYSTEM.md	none	tools/check_product_design_system.sh	Product-local design-system source and check.
 DOC
 cat >"$product_repo/ops/DASHBOARD_MANIFEST.tsv" <<'DOC'
 # surface_id	required_mode	contexts	source_id	label_key	dashboard_group	description
@@ -1218,10 +1504,67 @@ cat >"$product_repo/ops/PRODUCT_PROFILE.json" <<'DOC'
   ]
 }
 DOC
+cat >"$product_repo/ops/REPOSITORY_INDEX.json" <<'DOC'
+{
+  "schema_version": "1.0.0",
+  "root_name": "dashboard-product",
+  "source": "external_product_repository",
+  "default_expand_depth": 1,
+  "excludes": [
+    { "pattern": "node_modules/", "reason": "dependency cache" },
+    { "pattern": ".env*", "reason": "secret-bearing configuration" }
+  ],
+  "roles": {
+    "repository_file": {
+      "label": "Repository file",
+      "description": "Product repository file"
+    }
+  },
+  "files": []
+}
+DOC
+cat >"$product_repo/ops/PRODUCT_OPERATION_MODE.tsv" <<'DOC'
+# key	value
+workflow_mode	parent_managed
+managed_by_parent	true
+parent_repository	lesson_repository
+parent_rules_ref	AGENTS.MD
+last_parent_sync	2026-06-05T00:00:00Z
+active_parent_run	none
+local_agents_version	1
+routing_table_version	1
+DOC
+for skill in product-development-workflow product-doc-sync product-security product-test product-design-system; do
+  cat >"$product_repo/skills/$skill/SKILL.md" <<DOC
+---
+name: $skill
+description: Product-local $skill guidance.
+---
+
+# $skill
+
+Use this product-local skill inside this product repository.
+DOC
+done
+for tool in product-gate check_product_structure.sh check_product_docs.sh check_product_security.sh check_product_design_system.sh test_product_repository.sh product-mode; do
+  cat >"$product_repo/tools/$tool" <<DOC
+#!/usr/bin/env bash
+set -euo pipefail
+printf '%s passed\n' "$tool"
+DOC
+done
+cat >"$product_repo/tools/lib/product_common.sh" <<'DOC'
+#!/usr/bin/env bash
+product_repo_root() {
+  cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd
+}
+DOC
+"$ROOT/tools/product-gate-evidence-bootstrap" install --repo "$product_repo" --confirm >/dev/null
 cat >"$product_repo/.git/product-gate-evidence/index.tsv" <<'DOC'
 # source_id	context	status	freshness_state	required_in_context	authority	observed_at	max_age_seconds	product_root	product_head	source_artifacts	blocked_by	next_command
 product.git.sync	product-improvement	passed	current	true	authoritative	2026-06-07T00:00:00Z	3600	[external-product-repository]/dashboard-product	none	ops/CI_MANIFEST.tsv		./tools/check_git_sync.sh --product --required
 product.gates.tests	product-improvement	passed	current	true	authoritative	2026-06-07T00:00:00Z	3600	[external-product-repository]/dashboard-product	none	ops/TEST_PLAN_MANIFEST.tsv		npm test
+product.gates.structure	product-improvement	passed	current	true	authoritative	2026-06-07T00:00:01Z	3600	[external-product-repository]/dashboard-product	none	ops/TEST_PLAN_MANIFEST.tsv;tools/check-framecue		./tools/check-framecue
 product.ci.main	product-improvement	failed	current	true	authoritative	2026-06-07T00:00:00Z	3600	[external-product-repository]/dashboard-product	none	ops/CI_MANIFEST.tsv	product.git.sync	./tools/check_ci_status.sh --product --required
 product.security.secrets	product-improvement	passed	current	true	authoritative	2026-06-07T00:00:00Z	3600	[external-product-repository]/dashboard-product	none	ops/SECURITY_MANIFEST.tsv		./tools/product-security gate
 DOC
@@ -1244,8 +1587,24 @@ helpdesk_file	learning/HELP_DESK.md
 sync_gates_file	lesson/SYNC_GATES_14_DAYS.tsv
 prompt_file	prompts/PROMPTS_14_DAYS.md
 DOC
+dashboard_product_registry="$TMP_DIR/dashboard-product-registry.tsv"
+dashboard_product_selection="$TMP_DIR/dashboard-product-selection.tsv"
+cat >"$dashboard_product_registry" <<DOC
+# repo_id	primary_menu_id	allowed_contexts	display_name	repository_path	product_type	source
+dashboard-product	product-improvement	product-improvement	Dashboard Product	$product_repo	web	test
+DOC
+cat >"$dashboard_product_selection" <<'DOC'
+# menu_id	repo_id	selected_at	selection_source
+product-improvement	dashboard-product	2026-06-17T00:00:00Z	test
+DOC
 evidence_backed_context_json="$TMP_DIR/dashboard-data-product-improvement.json"
-DASHBOARD_DATA_GENERATED_AT="2026-06-05T00:00:00Z" DASHBOARD_SELECTED_MENU_ID="product-improvement" DASHBOARD_LESSON14_CONFIG="$dashboard_config" "$ROOT/tools/dashboard-data" >"$evidence_backed_context_json"
+DASHBOARD_DATA_GENERATED_AT="2026-06-05T00:00:00Z" \
+  DASHBOARD_SELECTED_MENU_ID="product-improvement" \
+  DASHBOARD_LESSON14_CONFIG="$dashboard_config" \
+  PRODUCT_REPOSITORY_REGISTRY_FILE="$dashboard_product_registry" \
+  PRODUCT_REPOSITORY_SELECTION_FILE="$dashboard_product_selection" \
+  PRODUCT_REPOSITORY_AUTHORITY_NOW="2026-06-07T00:30:00Z" \
+  "$ROOT/tools/dashboard-data" >"$evidence_backed_context_json"
 node - "$evidence_backed_context_json" "$product_repo/ops/PRODUCT_MANIFEST.tsv" <<'NODE'
 const fs = require('fs');
 const data = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
@@ -1320,12 +1679,123 @@ if (data.development.product_authority.product_summary.display_name.ja !== 'タ�
 if (data.development.product_authority.product_summary.source_path !== 'ops/PRODUCT_PROFILE.json') {
   fail('product summary did not use PRODUCT_PROFILE.json as the canonical source');
 }
+if (data.development.product_authority.operation_mode.status !== 'ready') {
+  fail(`expected product operation mode ready, got ${data.development.product_authority.operation_mode.status}`);
+}
+if (data.development.product_authority.operation_mode.workflow_mode !== 'parent_managed') {
+  fail('product operation mode did not preserve parent_managed');
+}
 if (!data.selected_context.blockers.some((blocker) => blocker.source === 'product.ci.main' && blocker.status === 'failed')) {
   fail('failed product CI evidence must remain in selected_context.blockers');
 }
 const matchingFailure = data.partial_failures.find((failure) => failure.source === 'product.ci.main');
 if (!matchingFailure || matchingFailure.status !== 'failed') {
   fail('failed product CI evidence must appear as a current-context partial failure');
+}
+NODE
+
+product_git_usage_settings="$TMP_DIR/product-git-usage-settings.tsv"
+cat >"$product_git_usage_settings" <<'DOC'
+# context	mode	selected_at
+product-improvement	none	2026-06-05T00:00:00Z
+DOC
+product_none_context_json="$TMP_DIR/dashboard-data-product-improvement-none.json"
+DASHBOARD_DATA_GENERATED_AT="2026-06-05T00:00:00Z" \
+  DASHBOARD_SELECTED_MENU_ID="product-improvement" \
+  DASHBOARD_LESSON14_CONFIG="$dashboard_config" \
+  PRODUCT_WORKFLOW_GIT_USAGE_SETTINGS_FILE="$product_git_usage_settings" \
+  PRODUCT_REPOSITORY_REGISTRY_FILE="$dashboard_product_registry" \
+  PRODUCT_REPOSITORY_SELECTION_FILE="$dashboard_product_selection" \
+  PRODUCT_REPOSITORY_AUTHORITY_NOW="2026-06-07T00:30:00Z" \
+  "$ROOT/tools/dashboard-data" >"$product_none_context_json"
+node - "$product_none_context_json" <<'NODE'
+const fs = require('fs');
+const data = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
+function fail(message) {
+  console.error(message);
+  process.exit(1);
+}
+if (data.selected_context.git_usage_mode !== 'none') {
+  fail(`expected product-improvement none mode, got ${data.selected_context.git_usage_mode}`);
+}
+if (data.selected_context.git_requirement !== 'not_applicable' || data.selected_context.ci_requirement !== 'not_applicable') {
+  fail(`none mode must make Git and CI not_applicable, got ${data.selected_context.git_requirement}/${data.selected_context.ci_requirement}`);
+}
+if (data.selected_context.git_status !== 'not_applicable' || data.selected_context.ci_status !== 'not_applicable') {
+  fail(`none mode must report selected Git/CI status as not_applicable, got ${data.selected_context.git_status}/${data.selected_context.ci_status}`);
+}
+if (data.selected_context.blockers.some((blocker) => blocker.source === 'product.ci.main')) {
+  fail('none mode must not keep CI evidence as a selected-context blocker');
+}
+for (const row of data.development.git_operations) {
+  if (row.status !== 'not_applicable' || row.mode !== 'not_applicable') {
+    fail(`none mode must mark Git operation rows not_applicable, got ${row.id}:${row.status}/${row.mode}`);
+  }
+}
+NODE
+
+product_nogit_project_root="$TMP_DIR/no-git-product-project"
+product_nogit_repo="$product_nogit_project_root/dashboard-product-nogit"
+mkdir -p "$product_nogit_project_root"
+cp -R "$product_repo" "$product_nogit_repo"
+rm -rf "$product_nogit_repo/.git"
+product_nogit_config="$TMP_DIR/dashboard-lesson-config-nogit.tsv"
+cat >"$product_nogit_config" <<DOC
+# key	value
+lesson_repo_name	ai-driven-development-lesson
+product_repo_name	dashboard-product-nogit
+project_root	$product_nogit_project_root
+flow_file	lesson/LESSON_FLOW_14_DAYS.tsv
+state_file	learning/LESSON_STATE_14_DAYS.tsv
+learning_tracker_file	learning/LEARNING_TASK_TRACKER_14_DAYS.md
+learning_handoff_file	learning/LEARNING_HANDOFF_14_DAYS.md
+approval_file	learning/LESSON_APPROVALS_14_DAYS.tsv
+learning_mode_file	learning/LESSON_MODE_14_DAYS.tsv
+workflow_language_file	learning/WORKFLOW_DISPLAY_LANGUAGE_14_DAYS.tsv
+product_language_file	learning/PRODUCT_DEVELOPMENT_LANGUAGE_14_DAYS.tsv
+roadmap_file	learning/ROADMAP.md
+helpdesk_file	learning/HELP_DESK.md
+sync_gates_file	lesson/SYNC_GATES_14_DAYS.tsv
+prompt_file	prompts/PROMPTS_14_DAYS.md
+DOC
+product_nogit_registry="$TMP_DIR/dashboard-product-nogit-registry.tsv"
+product_nogit_selection="$TMP_DIR/dashboard-product-nogit-selection.tsv"
+cat >"$product_nogit_registry" <<DOC
+# repo_id	primary_menu_id	allowed_contexts	display_name	repository_path	product_type	source
+dashboard-product-nogit	product-improvement	product-improvement	Dashboard Product No Git	$product_nogit_repo	web	test
+DOC
+cat >"$product_nogit_selection" <<'DOC'
+# menu_id	repo_id	selected_at	selection_source
+product-improvement	dashboard-product-nogit	2026-06-17T00:00:00Z	test
+DOC
+product_none_nogit_context_json="$TMP_DIR/dashboard-data-product-improvement-none-nogit.json"
+DASHBOARD_DATA_GENERATED_AT="2026-06-05T00:00:00Z" \
+  DASHBOARD_SELECTED_MENU_ID="product-improvement" \
+  DASHBOARD_LESSON14_CONFIG="$product_nogit_config" \
+  PRODUCT_WORKFLOW_GIT_USAGE_SETTINGS_FILE="$product_git_usage_settings" \
+  PRODUCT_REPOSITORY_REGISTRY_FILE="$product_nogit_registry" \
+  PRODUCT_REPOSITORY_SELECTION_FILE="$product_nogit_selection" \
+  PRODUCT_REPOSITORY_AUTHORITY_NOW="2026-06-07T00:30:00Z" \
+  "$ROOT/tools/dashboard-data" >"$product_none_nogit_context_json"
+node - "$product_none_nogit_context_json" <<'NODE'
+const fs = require('fs');
+const data = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
+function fail(message) {
+  console.error(message);
+  process.exit(1);
+}
+const repository = data.development.product_repository;
+if (data.selected_context.target_repository.path_state !== 'configured') {
+  fail(`none mode with an existing non-Git product path must keep target path configured, got ${data.selected_context.target_repository.path_state}`);
+}
+if (repository.status !== 'ready' || repository.path_state !== 'configured') {
+  fail(`none mode with an existing non-Git product path must report repository ready/configured, got ${repository.status}/${repository.path_state}`);
+}
+if (repository.git_state !== 'missing' || repository.git_requirement !== 'not_applicable') {
+  fail(`none mode must separate missing Git from Git requirement, got ${repository.git_state}/${repository.git_requirement}`);
+}
+if (data.selected_context.git_status !== 'not_applicable' || data.selected_context.ci_status !== 'not_applicable') {
+  fail(`none mode without .git must keep selected Git/CI not_applicable, got ${data.selected_context.git_status}/${data.selected_context.ci_status}`);
 }
 NODE
 
@@ -1410,6 +1880,8 @@ cat >"$COMPLETED_STATE" <<'EOF_STATE'
 EOF_STATE
 {
   printf '# key\tvalue\n'
+  printf 'project_root\t%s\n' "$TEST_PROJECT_ROOT"
+  printf 'product_repo_name\ttask-tracker-repository\n'
   printf 'state_file\t%s\n' "$COMPLETED_STATE"
 } >"$COMPLETED_CONFIG"
 DASHBOARD_DATA_GENERATED_AT="2026-06-05T00:00:00Z" DASHBOARD_LESSON14_CONFIG="$COMPLETED_CONFIG" "$ROOT/tools/dashboard-data" >"$COMPLETED_JSON"

@@ -95,6 +95,17 @@
       "status": "unknown"
     }
   ],
+  "repository_selection": {
+    "status": "not_applicable",
+    "menu_id": "step_1_14",
+    "workflow_context": "lesson",
+    "current_repo_id": "not_applicable",
+    "current_repository_name": "not_applicable",
+    "selection_state": "not_applicable",
+    "registry_file": "learning/PRODUCT_REPOSITORY_REGISTRY.tsv",
+    "selection_file": "learning/PRODUCT_REPOSITORY_SELECTION.tsv",
+    "options": []
+  },
   "partial_failures": [
     {
       "source": "product.gates.evidence_index",
@@ -244,7 +255,12 @@
   "development": {
     "product_repository": {
       "status": "ready",
-      "configured_name": "example-product"
+      "configured_name": "example-product",
+      "workflow_context": "lesson",
+      "path_state": "not_applicable",
+      "git_state": "not_applicable",
+      "git_requirement": "not_applicable",
+      "ci_requirement": "not_applicable"
     },
     "documents": {
       "status": "ready"
@@ -291,7 +307,7 @@
         "id": "merge",
         "label": "Merge",
         "status": "approval_required",
-        "mode": "gated",
+        "mode": "after_approval",
         "detail": "Merge remains approval-gated."
       }
     ],
@@ -313,6 +329,40 @@
           "resolved_source": "canonical"
         }
       ],
+      "product_summary": {
+        "status": "ready",
+        "name": "Example Product",
+        "display_name": {
+          "ja": "サンプル成果物",
+          "en": "Example Product"
+        },
+        "description": {
+          "ja": "ダッシュボード検証用の成果物プロファイルです。",
+          "en": "Product profile for dashboard fixture validation."
+        },
+        "source_documents": [
+          "docs/product/REQUIREMENTS.md"
+        ],
+        "source_path": "ops/PRODUCT_PROFILE.json"
+      },
+      "operation_mode": {
+        "status": "ready",
+        "workflow_mode": "parent_managed",
+        "rule_connection_status": "ready",
+        "repair_reason": "none",
+        "next_safe_action": "Review the product operation mode before changing product files."
+      },
+      "repository_index": {
+        "status": "not_run",
+        "path": "ops/REPOSITORY_INDEX.json",
+        "summary": {
+          "directories": 0,
+          "files": 0,
+          "total": 0
+        },
+        "files": [],
+        "roles": {}
+      },
       "manifest_summary": {
         "required_total": 1,
         "required_ready": 1,
@@ -350,7 +400,10 @@
         "target": "main",
         "detail": "Current snapshot CI evidence",
         "status": "optional",
-        "reference": "CI evidence"
+        "reference": "CI evidence",
+        "source_role": "ci",
+        "required_command": "not_applicable",
+        "scope": "lesson"
       },
       {
         "id": "git-sync",
@@ -359,7 +412,10 @@
         "target": "main",
         "detail": "Current snapshot Git synchronization evidence",
         "status": "unknown",
-        "reference": "Git sync evidence"
+        "reference": "Git sync evidence",
+        "source_role": "git_sync",
+        "required_command": "not_applicable",
+        "scope": "lesson"
       },
       {
         "id": "product-authority",
@@ -368,7 +424,10 @@
         "target": "lesson",
         "detail": "Product authority and manifest evidence",
         "status": "not_run",
-        "reference": "Product authority"
+        "reference": "Product authority",
+        "source_role": "product_authority",
+        "required_command": "./tools/product-repository-authority status --json",
+        "scope": "lesson"
       },
       {
         "id": "security-gate",
@@ -377,7 +436,10 @@
         "target": "lesson",
         "detail": "Product security gate snapshot",
         "status": "unknown",
-        "reference": "Security gate"
+        "reference": "Security gate",
+        "source_role": "security_gate",
+        "required_command": "not_applicable",
+        "scope": "lesson"
       },
       {
         "id": "next-step",
@@ -386,7 +448,10 @@
         "target": "step_1_14",
         "detail": "day12.subagents-plan",
         "status": "manual_required",
-        "reference": "Selected context"
+        "reference": "Selected context",
+        "source_role": "selected_context",
+        "required_command": "not_applicable",
+        "scope": "step_1_14"
       }
     ]
   },

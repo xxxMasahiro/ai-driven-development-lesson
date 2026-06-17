@@ -66,6 +66,48 @@ refresh_snapshots_loop() {
   done
 }
 
+dashboard_url() {
+  printf 'http://127.0.0.1:%s/' "$DEFAULT_PORT"
+}
+
+port_is_listening() {
+  local port="$1"
+  if command -v ss >/dev/null 2>&1; then
+    local listeners
+    listeners="$(ss -ltn "sport = :$port" 2>/dev/null || true)"
+    [[ "$listeners" == *LISTEN* ]]
+    return
+  fi
+  (exec 3<>"/dev/tcp/127.0.0.1/$port") >/dev/null 2>&1
+}
+
+open_dashboard_browser_once() {
+  local url="$1"
+  if [[ -x /mnt/c/Windows/System32/cmd.exe ]]; then
+    /mnt/c/Windows/System32/cmd.exe /C start "" "$url" >/dev/null 2>&1 && return 0
+  fi
+  if command -v sensible-browser >/dev/null 2>&1; then
+    sensible-browser "$url" >/dev/null 2>&1 &
+    return 0
+  fi
+  printf 'Open Dashboard Control Center manually: %s\n' "$url" >&2
+}
+
+open_dashboard_when_ready() {
+  local url="$1"
+  local port="$2"
+  local attempt=0
+  while [[ "$attempt" -lt 50 ]]; do
+    if port_is_listening "$port"; then
+      open_dashboard_browser_once "$url"
+      return 0
+    fi
+    attempt=$((attempt + 1))
+    sleep 0.2 || return 1
+  done
+  printf 'Dashboard control center is starting. Open manually if the browser does not appear: %s\n' "$url" >&2
+}
+
 build_control_center() {
   require_node_tools
   (cd "$ROOT" && npm run dashboard:build)
@@ -90,14 +132,23 @@ open_control_center() {
   fi
 
   require_node_tools
+  if port_is_listening "$DEFAULT_PORT"; then
+    write_snapshot "$DATA_FILE"
+    printf 'Dashboard control center is already running through maintained tooling.\n'
+    printf 'Refresh the existing browser tab: %s\n' "$(dashboard_url)"
+    return 0
+  fi
+
   write_snapshot "$DATA_FILE"
   refresh_snapshots_loop "$DATA_FILE" &
   refresh_pid="$!"
-  trap 'kill "$refresh_pid" 2>/dev/null || true' EXIT INT TERM
+  open_dashboard_when_ready "$(dashboard_url)" "$DEFAULT_PORT" &
+  opener_pid="$!"
+  trap 'kill "$refresh_pid" "$opener_pid" 2>/dev/null || true' EXIT INT TERM
   printf 'Dashboard control center is opening through maintained tooling.\n'
   (
     cd "$ROOT"
-    DASHBOARD_CONTROL_CENTER_DATA_FILE="$DATA_FILE" "$ROOT/node_modules/.bin/vite" --host 127.0.0.1 --port "$DEFAULT_PORT" --open / --clearScreen false
+    DASHBOARD_CONTROL_CENTER_DATA_FILE="$DATA_FILE" "$ROOT/node_modules/.bin/vite" --host 127.0.0.1 --port "$DEFAULT_PORT" --strictPort --clearScreen false
   ) 2>&1 | sed -E '/Local:|Network:|ready in|VITE|press h \+ enter/d'
 }
 

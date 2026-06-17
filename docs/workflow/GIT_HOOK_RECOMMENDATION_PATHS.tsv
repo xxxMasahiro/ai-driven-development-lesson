@@ -34,6 +34,7 @@ tools/check_test_plan_coverage.sh	full-no-cache	Test plan coverage checker chang
 tools/fixture-copy	full-no-cache	Fixture-copy command changes affect test runtime setup.
 tools/lib/fixture_copy.sh	full-no-cache	Fixture-copy helper changes affect test runtime setup.
 tools/product-security	full-no-cache	Product security gate changes affect product workflow verification.
+tools/product-gate-evidence-bootstrap	full-no-cache	Product gate evidence bootstrap changes affect external product evidence producer installation.
 tools/lib/security_invariants.sh	full-no-cache	Security guard helper changes affect mechanical security validation.
 tools/lib/product_security.sh	full-no-cache	Product security helper changes affect product workflow verification.
 tools/check_*.sh	full-no-cache	Checker changes affect mechanical verification behavior.

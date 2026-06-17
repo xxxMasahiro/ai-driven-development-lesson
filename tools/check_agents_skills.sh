@@ -63,6 +63,7 @@ require_pre_commit_check() {
 }
 
 require_file "AGENTS.MD"
+require_file "tools/check_document_root.sh"
 require_pattern "AGENTS.MD" '^## 不変ルール$' "immutable rules heading"
 require_pattern "AGENTS.MD" '^## 起動手順$' "bootstrap heading"
 require_pattern "AGENTS.MD" '^## ルーティングテーブル$' "routing table heading"
@@ -76,19 +77,28 @@ require_pattern "AGENTS.MD" 'STEP 1-7: 基礎レッスン: index\.md' "STEP 1-7 
 require_pattern "AGENTS.MD" 'STEP 1-14: 実践レッスン: index-14-days\.md' "STEP 1-14 default entry"
 require_pattern "AGENTS.MD" 'index-14-days\.md' "14-day entry route"
 require_pattern "AGENTS.MD" 'skills/github-login-onboarding/SKILL\.md' "github login skill route"
+require_pattern "AGENTS.MD" 'skills/decision-driven-implementation/SKILL\.md' "decision-driven implementation skill route"
 require_pattern "AGENTS.MD" 'skills/learning-progress-helpdesk/SKILL\.md' "learning progress skill route"
 require_pattern "AGENTS.MD" 'skills/lesson14-facilitator/SKILL\.md' "lesson14 skill route"
 require_pattern "AGENTS.MD" 'skills/lesson-sync-gate/SKILL\.md' "sync skill route"
+require_pattern "AGENTS.MD" 'skills/product-development-workflow/SKILL\.md' "product development workflow skill route"
 require_pattern "AGENTS.MD" 'skills/repository-development-workflow/SKILL\.md' "repository development workflow skill route"
 require_pattern "AGENTS.MD" 'skills/task-tracker-docs/SKILL\.md' "task docs skill route"
 require_pattern "AGENTS.MD" 'skills/worklog-doc-sync/SKILL\.md' "worklog sync skill route"
 require_pattern "AGENTS.MD" 'tools/check_agents_skills\.sh' "agents skills check"
+require_pattern "AGENTS.MD" 'tools/check_document_root\.sh' "document root check"
+
+if ! "$ROOT/tools/check_document_root.sh"; then
+  missing=1
+fi
 
 skills=(
   "github-login-onboarding"
+  "decision-driven-implementation"
   "learning-progress-helpdesk"
   "lesson14-facilitator"
   "lesson-sync-gate"
+  "product-development-workflow"
   "repository-development-workflow"
   "task-tracker-docs"
   "worklog-doc-sync"
@@ -122,11 +132,15 @@ require_file "skills/github-login-onboarding/references/github-login.md"
 require_file "skills/learning-progress-helpdesk/references/progress-helpdesk.md"
 require_file "skills/lesson14-facilitator/references/routes.md"
 require_file "skills/lesson-sync-gate/references/sync-gates.md"
+require_file "skills/product-development-workflow/references/product-development.md"
 require_file "skills/repository-development-workflow/references/repository-development.md"
 require_file "skills/task-tracker-docs/references/product-docs.md"
 require_file "skills/worklog-doc-sync/references/worklog-sync.md"
 
 require_pattern "skills/github-login-onboarding/SKILL.md" 'github-login-setup-guide\.md' "github login guide route"
+require_pattern "skills/decision-driven-implementation/SKILL.md" 'user decision' "decision-driven user decision"
+require_pattern "skills/decision-driven-implementation/SKILL.md" 'real evidence' "decision-driven real evidence"
+require_pattern "skills/decision-driven-implementation/SKILL.md" 'acceptance checks' "decision-driven acceptance checks"
 require_pattern "skills/learning-progress-helpdesk/SKILL.md" 'tools/helpdesk' "helpdesk command"
 require_pattern "skills/lesson14-facilitator/SKILL.md" 'tools/lesson14 status' "lesson14 status command"
 require_pattern "skills/lesson14-facilitator/SKILL.md" 'check_agents_skills\.sh' "lesson14 facilitator agents check"
@@ -134,6 +148,15 @@ require_pattern "skills/lesson14-facilitator/SKILL.md" 'separate Ubuntu/WSL CLI 
 require_pattern "skills/lesson-sync-gate/SKILL.md" 'check_ci_status\.sh --required' "required CI check"
 require_pattern "skills/lesson-sync-gate/SKILL.md" 'check_git_sync\.sh --product --required' "required product git check"
 require_pattern "skills/lesson-sync-gate/SKILL.md" 'separate Ubuntu/WSL CLI window' "sync gate product CLI prompt"
+require_pattern "skills/product-development-workflow/SKILL.md" 'Dashboard Settings are the source of truth' "product development settings source"
+require_pattern "skills/product-development-workflow/SKILL.md" 'Free Development' "product development free development route"
+require_pattern "skills/product-development-workflow/SKILL.md" 'Product Improvement' "product development improvement route"
+require_pattern "skills/product-development-workflow/SKILL.md" 'External Integration' "product development external integration route"
+require_pattern "skills/product-development-workflow/SKILL.md" 'repository-development-workflow' "product development repository route"
+require_pattern "skills/product-development-workflow/SKILL.md" 'separate Ubuntu/WSL CLI window' "product development product CLI prompt"
+require_pattern "skills/product-development-workflow/references/product-development.md" 'Git usage mode' "product development git mode reference"
+require_pattern "skills/product-development-workflow/references/product-development.md" 'Settings source of truth' "product development settings reference"
+require_pattern "skills/product-development-workflow/references/product-development.md" 'separate Ubuntu/WSL CLI window' "product development reference product CLI prompt"
 require_pattern "skills/repository-development-workflow/SKILL.md" 'repository-development-workflow status' "repository development workflow status"
 require_pattern "skills/repository-development-workflow/SKILL.md" 'worklog-doc-sync' "repository development worklog route"
 require_pattern "skills/repository-development-workflow/SKILL.md" 'lesson-sync-gate' "repository development lesson sync route"
@@ -180,6 +203,47 @@ require_pattern "tools/check_git_sync.sh" '--product' "git sync product option"
 require_pattern "tools/check_git_sync.sh" '--clean-required' "git sync clean required option"
 require_pattern "tools/check_ci_status.sh" '--product' "ci status product option"
 require_pattern "tools/check_ci_status.sh" '--commit' "ci status commit option"
+require_file "skills/SKILL_ALIASES.tsv"
+require_pattern "skills/SKILL_ALIASES.tsv" '^repo-dev[[:space:]]+repository-development-workflow[[:space:]]+' "repository development alias"
+require_pattern "skills/SKILL_ALIASES.tsv" '^product-dev[[:space:]]+product-development-workflow[[:space:]]+' "product development alias"
+require_pattern "skills/SKILL_ALIASES.tsv" '^decision[[:space:]]+decision-driven-implementation[[:space:]]+' "decision driven implementation alias"
+require_pattern "skills/SKILL_ALIASES.tsv" '^doc-sync[[:space:]]+worklog-doc-sync[[:space:]]+' "worklog sync alias"
+require_pattern "tools/menu" 'tools/menu skills' "menu skills usage"
+require_pattern "tools/menu" 'tools/menu skill-aliases' "menu skill aliases usage"
+
+if [[ -f "$ROOT/skills/SKILL_ALIASES.tsv" ]]; then
+  declare -A alias_seen=()
+  declare -A alias_skill_seen=()
+  while IFS= read -r line; do
+    [[ "$line" =~ ^[[:space:]]*$ || "$line" =~ ^[[:space:]]*# ]] && continue
+    IFS=$'\t' read -r alias skill _display_name _description extra <<<"$line"
+    if [[ -z "$alias" || -z "$skill" || -z "$_display_name" || -z "$_description" || -n "${extra:-}" ]]; then
+      printf 'malformed skill alias row: %s -> %s\n' "$alias" "$skill" >&2
+      missing=1
+      continue
+    fi
+    if [[ -n "${alias_seen[$alias]+set}" ]]; then
+      printf 'duplicate skill alias: %s\n' "$alias" >&2
+      missing=1
+    fi
+    alias_seen[$alias]=1
+    if [[ -n "${alias_skill_seen[$skill]+set}" ]]; then
+      printf 'duplicate skill alias target: %s\n' "$skill" >&2
+      missing=1
+    fi
+    alias_skill_seen[$skill]=1
+    if [[ ! -f "$ROOT/skills/$skill/SKILL.md" ]]; then
+      printf 'skill alias points to missing skill: %s -> %s\n' "$alias" "$skill" >&2
+      missing=1
+    fi
+  done <"$ROOT/skills/SKILL_ALIASES.tsv"
+  for skill in "${skills[@]}"; do
+    if [[ -z "${alias_skill_seen[$skill]+set}" ]]; then
+      printf 'missing skill alias for: %s\n' "$skill" >&2
+      missing=1
+    fi
+  done
+fi
 
 if [[ $missing -ne 0 ]]; then
   printf '\nAGENTS and skills check failed.\n' >&2

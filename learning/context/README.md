@@ -1,8 +1,8 @@
 # Learner Context Foundation
 
 This directory contains source context for learner-facing AI-driven development lessons.
-The files here are not runtime lesson logic.
-They are the structured teaching foundation that future lesson implementation can connect to `index.md`, `index-14-days.md`, applied lessons, Free Development Mode, dashboards, and review material.
+The files here are structured teaching source, and `tools/lesson-context` validates and renders read-only views from them.
+Lesson commands can reference this context without treating the source documents as generated lesson text.
 
 Repository source documents stay in English.
 When a learner selects a workflow display language, the lesson facilitator or runtime output can translate and summarize this source context for that language.
@@ -15,7 +15,7 @@ When a learner selects a workflow display language, the lesson facilitator or ru
 | `SECURITY_FOUNDATION.md` | Staged security context for 7-day, 14-day, and applied lessons. |
 | `LESSON_CONTEXT_MAP.tsv` | A machine-readable map that connects context topics to lesson phases. |
 
-## How Future Lesson Work Should Use This Directory
+## How Runtime Lesson Work Uses This Directory
 
 Use these documents in three lesson moments:
 
@@ -32,10 +32,20 @@ Use these documents in three lesson moments:
    - Summarize what the learner can now do.
    - Connect structured lessons to Free Development Mode, applied lessons, and product improvement.
 
+## Runtime Integration
+
+Use `tools/lesson-context` for read-only runtime views:
+
+- `tools/lesson-context status`
+- `tools/lesson-context opening lesson-7|lesson-14|applied`
+- `tools/lesson-context step lesson-7|lesson-14 <step_id>`
+- `tools/lesson-context recap lesson-7|lesson-14|applied`
+- `tools/lesson-context workflow free-development|product-improvement|external-integration|lesson-maintenance`
+
 ## Synchronization Rules
 
-These context files are synchronized as planned foundation material, not as implemented runtime lesson behavior.
-Future implementation plans should decide how each context topic is rendered in:
+These context files are synchronized with the runtime context CLI and tests.
+Future lesson-content work may decide how deeply each context topic is rendered in:
 
 - `index.md`
 - `index-14-days.md`
@@ -46,5 +56,5 @@ Future implementation plans should decide how each context topic is rendered in:
 - `tools/dashboard`
 - future browser dashboard views
 
-Do not treat the context files as proof that runtime output has already changed.
-Runtime integration requires a separate implementation plan and verification pass.
+Do not bypass `tools/lesson-context` when adding new runtime references.
+Keep learning contexts and product workflow contexts separated by the two context maps.

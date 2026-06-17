@@ -46,6 +46,38 @@ JS
 "$ROOT/tools/product-launch-check" check --repo "$good_repo" --launch direct-index --profile task-tracker \
   | grep 'Product launch check passed'
 
+no_git_repo="$TMP_DIR/no-git"
+mkdir -p "$no_git_repo"
+cat >"$no_git_repo/README.md" <<'DOC'
+# Task Tracker
+
+Open `index.html` directly to start the product.
+DOC
+cat >"$no_git_repo/index.html" <<'HTML'
+<!doctype html>
+<html lang="en">
+  <body>
+    <form id="task-form">
+      <input id="task-title" name="title" />
+      <button type="submit">Add Task</button>
+    </form>
+    <ul id="task-list"></ul>
+    <script src="app.js"></script>
+  </body>
+</html>
+HTML
+cat >"$no_git_repo/app.js" <<'JS'
+document.querySelector("#task-form").addEventListener("submit", (event) => {
+  event.preventDefault();
+  document.querySelector("#task-list").appendChild(document.createElement("li"));
+});
+JS
+"$ROOT/tools/product-launch-check" check --repo "$no_git_repo" --launch direct-index --profile task-tracker --git-optional \
+  | grep 'Product launch check passed'
+"$ROOT/tools/product-launch-check" check --repo "$no_git_repo" --launch direct-index --profile task-tracker \
+  >/tmp/product-launch-no-git-strict.out 2>&1 && exit 1 || true
+grep 'not a Git repository' /tmp/product-launch-no-git-strict.out >/dev/null
+
 module_repo="$TMP_DIR/module"
 make_repo "$module_repo"
 printf '# Task Tracker\n\nOpen `index.html` directly.\n' >"$module_repo/README.md"

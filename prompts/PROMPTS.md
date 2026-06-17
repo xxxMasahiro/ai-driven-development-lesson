@@ -98,7 +98,7 @@ tools/lesson 現在地で現在項目を確認してください。
 ```text
 guides/DOCUMENT_MAP.md と tools/docs-tour status を確認してください。
 AGENTS.MD、docs/as-built/、docs/workflow/、docs/memory/、skills/ の役割を、初めて見る人にも分かるように短く説明してください。
-AGENTS.MDは教材側のルールブック、AGENT.mdは成果物リポジトリ側の文脈メモである違いも説明してください。
+AGENTS.MDは教材側と成果物リポジトリ側の両方にある標準ルールブックであり、成果物側の旧AGENT.mdは移行対象である違いも説明してください。
 docs/memory/FAILURE_MEMORY.mdは成果物側の失敗復旧記録として扱い、教材リポジトリ側のdocs/memory/FAILURE_MEMORY.mdがあるとは説明しないでください。
 この依頼ではファイルを編集しないでください。
 ```

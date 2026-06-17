@@ -9,6 +9,8 @@ trap 'rm -rf "$work"' EXIT
 
 fixture_copy_repo "$ROOT" "$work/lesson"
 cd "$work/lesson"
+export PRODUCT_REPOSITORY_REGISTRY_FILE="$work/EMPTY_PRODUCT_REPOSITORY_REGISTRY.tsv"
+export PRODUCT_REPOSITORY_SELECTION_FILE="$work/EMPTY_PRODUCT_REPOSITORY_SELECTION.tsv"
 git init -b main >/dev/null
 git config user.name "Menu Test"
 git config user.email "menu-test@example.com"
@@ -68,6 +70,19 @@ grep '3\. 応用レッスン' <<<"$menu_output" >/dev/null
 grep '3\. 発展・応用レッスン' <<<"$menu_output" >/dev/null && exit 1 || true
 grep './tools/product-improvement status' <<<"$menu_output" >/dev/null
 grep './tools/git-workflow status' <<<"$menu_output" >/dev/null
+
+skills_output="$(./tools/menu skills)"
+grep '^Skills$' <<<"$skills_output" >/dev/null
+grep '^repository-development-workflow$' <<<"$skills_output" >/dev/null
+grep '^product-development-workflow$' <<<"$skills_output" >/dev/null
+grep 'Alias: repo-dev' <<<"$skills_output" >/dev/null
+grep 'Alias: product-dev' <<<"$skills_output" >/dev/null
+
+skill_aliases_output="$(./tools/menu skill-aliases)"
+grep '^Skill aliases$' <<<"$skill_aliases_output" >/dev/null
+grep '^repo-dev -> repository-development-workflow$' <<<"$skill_aliases_output" >/dev/null
+grep '^product-dev -> product-development-workflow$' <<<"$skill_aliases_output" >/dev/null
+grep '^doc-sync -> worklog-doc-sync$' <<<"$skill_aliases_output" >/dev/null
 
 for item in 1 2 3 4 5 6; do
   ./tools/menu start "$item" --confirm >/tmp/menu-missing-prerequisite-"$item".out 2>&1 && exit 1 || true
@@ -129,6 +144,21 @@ expected_sync_monitoring="$(setting_value sync_monitoring)"
 ./tools/lesson14 学習モード B >/dev/null
 ./tools/lesson14 表示言語 en >/dev/null
 ./tools/lesson14 開発言語 en >/dev/null
+
+no_git_product_name="menu-no-git-product"
+no_git_product_repo="$project_root/$no_git_product_name"
+mkdir -p "$no_git_product_repo"
+cp lesson/LESSON_CONFIG.tsv "$work/LESSON_CONFIG.tsv.git-product"
+awk -F '\t' -v OFS='\t' -v product_name="$no_git_product_name" '$1 == "product_repo_name" { $2 = product_name } { print }' \
+  "$work/LESSON_CONFIG.tsv.git-product" > lesson/LESSON_CONFIG.tsv
+cat > learning/PRODUCT_WORKFLOW_GIT_USAGE_SETTINGS.tsv <<'CONFIG'
+# context	mode	selected_at
+free-development	none	2026-06-12T00:00:00Z
+CONFIG
+./tools/product-profile set --menu 4 --name-ja "Git なし成果物" --confirm >/dev/null
+./tools/menu check 4 | grep 'Menu prerequisite check passed' >/dev/null
+./tools/menu readiness | grep 'Product workflow Git usage mode: none' >/dev/null
+cp "$work/LESSON_CONFIG.tsv.git-product" lesson/LESSON_CONFIG.tsv
 
 git -c init.defaultBranch=main init "$product_repo" >/dev/null
 git -C "$product_repo" config user.name "Menu Test"

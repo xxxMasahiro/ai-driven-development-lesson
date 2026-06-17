@@ -16,6 +16,7 @@ usage() {
 Usage:
   tools/free-development status
   tools/free-development start
+  tools/free-development gate-plan
   tools/free-development gate
 
 Rules:
@@ -30,7 +31,7 @@ case "$COMMAND" in
   status|現在地)
     printf 'Free Development Mode: optional\n'
     printf 'Guide: %s\n' "$LESSON_ROOT/free-development/FREE_DEVELOPMENT_MODE.md"
-    printf 'Product repository: %s\n' "$(lesson_product_repo_root)"
+    printf 'Product repository: %s\n' "$(product_workflow_git_usage_repository_root_for_context free-development 2>/dev/null || printf 'not_selected')"
     "$LESSON_ROOT/tools/product-security" advise --context free-development || true
     lesson_menu_print_readiness "Free Development Mode"
     lesson_product_profile_print_readiness 4 "Product name"
@@ -44,6 +45,9 @@ case "$COMMAND" in
     sed -n '/^## Product Setup Prompt$/,/^## Completion Gate$/p' "$LESSON_ROOT/free-development/FREE_DEVELOPMENT_MODE.md" | sed '$d'
     printf '\nProduct security guidance:\n'
     "$LESSON_ROOT/tools/product-security" advise --context free-development || true
+    ;;
+  gate-plan|plan)
+    product_workflow_git_usage_gate_plan free-development all
     ;;
   gate|確認)
     lesson_menu_require_settings "Free Development Mode"

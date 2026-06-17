@@ -1,12 +1,13 @@
 # Product Document Reference
 
 The product repository is separate from this lesson repository.
-Before product-repository development, prompt the learner to open a separate Ubuntu/WSL CLI window for `$HOME/projects/task-tracker-repository/`.
+Before product-repository development, prompt the learner to open a separate Ubuntu/WSL CLI window for the configured product workspace.
+`$HOME/projects/task-tracker-repository/` is the structured lesson default for the task-tracker product; external-product work must use the workspace selected by lesson configuration and Dashboard Settings.
 
 Standard product files:
 
 ```text
-AGENT.md
+AGENTS.MD
 docs/product/REQUIREMENTS.md
 docs/product/SPECIFICATION.md
 docs/product/IMPLEMENTATION_PLAN.md

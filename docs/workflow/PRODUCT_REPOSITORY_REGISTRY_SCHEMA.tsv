@@ -1,0 +1,22 @@
+# record_type	field	required	allowed_values	owner	source	description
+registry	repo_id	true	safe-id	parent-registry	generated-or-explicit	Stable local identifier for an external product repository; must not rely on basename alone.
+registry	primary_menu_id	true	free-development|product-improvement|external-integration	parent-registry	user-selection	Default workflow menu that created or owns the repository registration.
+registry	allowed_contexts	true	free-development|product-improvement|external-integration pipe list	parent-registry	policy-and-selection	Workflow contexts that may select this repository.
+registry	display_name	true	safe-text	product-profile	ops/PRODUCT_PROFILE.json	User-confirmed product display name shown by Dashboard and CLI.
+registry	repository_path	true	local-path	parent-registry	explicit-register	Local absolute path stored in learning state and never shown directly in normal Dashboard UI.
+registry	path_state	true	configured|missing|unknown	parent-registry	filesystem-check	Whether the registered path exists as a readable directory.
+registry	git_state	true	configured|missing|not_applicable|unknown	parent-registry	git-check	Whether the registered path has Git metadata when the selected mode needs Git.
+registry	workflow_mode	true	parent_managed|standalone|reconnecting|repair_required	product-operation-mode	ops/PRODUCT_OPERATION_MODE.tsv	Product-local operation mode observed from the registered repository.
+registry	git_usage_mode	true	none|local|remote_sync|ci|unknown	parent-registry	workflow-settings	Git/CI usage mode applied to this repository and context.
+registry	product_type	true	all|web|api|cli|library|integration|custom|unknown	product-manifest	ops/PRODUCT_MANIFEST.tsv	Product type used by scaffold and evidence requirements.
+registry	profile_path	true	relative-path	product-profile	ops/PRODUCT_PROFILE.json	Relative profile source used to verify display identity.
+registry	operation_mode_path	true	relative-path	product-operation-mode	ops/PRODUCT_OPERATION_MODE.tsv	Relative operation-mode source used to verify parent management.
+registry	agents_path	true	relative-path	product-agents	AGENTS.MD	Relative product-local agent rulebook path.
+registry	status	true	ready|blocked|missing|repair_required|unknown	parent-registry	derived	Registry readiness for dashboard selection and workflow gates.
+registry	last_verified_at	true	iso8601|not_collected	parent-registry	generated	Last parent-side verification time for the registration.
+registry	source	true	explicit|discover|legacy	parent-registry	registration-method	How the row entered the registry.
+selection	menu_id	true	free-development|product-improvement|external-integration	parent-registry	user-selection	Workflow menu whose active repository is selected by this row.
+selection	repo_id	true	safe-id	parent-registry	registry	Selected repository identifier for the menu.
+selection	selected_at	true	iso8601	parent-registry	generated	Time the active repository selection was changed.
+selection	selection_source	true	dashboard|cli|legacy|repair	parent-registry	user-or-tool	Surface that selected the repository.
+selection	status	true	active|missing|stale|repair_required	parent-registry	derived	Selection validity after comparing registry, path, and operation-mode data.

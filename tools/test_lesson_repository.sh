@@ -79,6 +79,7 @@ WORKFLOW_PAIR_SINGLE_FILE_REASON="aggregate test may run while remediation docum
 ./tools/check_review_protocol.sh
 ./tools/check_developer_memory_requirements.sh
 ./tools/check_repository_development_workflow.sh
+./tools/check_dashboard_design_system.sh
 ./tools/repository-development-workflow status >/dev/null
 ./tools/menu >/dev/null
 ./tools/dashboard all >/dev/null
@@ -100,6 +101,7 @@ WORKFLOW_PAIR_SINGLE_FILE_REASON="aggregate test may run while remediation docum
 ./tools/test_resource_cleanup.sh
 ./tools/test_git_hooks_parallel.sh
 ./tools/test_fixture_copy.sh
+./tools/test_lesson_context.sh
 ./tools/test_ci_evidence.sh
 ./tools/test_ci_timing.sh
 ./tools/dashboard-data >/dev/null
@@ -127,6 +129,7 @@ fi
 ./tools/test_product_scaffold_check.sh
 ./tools/test_product_repository_cleanup.sh
 ./tools/test_product_repository_authority.sh
+./tools/test_product_repository_mode.sh
 ./tools/test_product_security.sh
 ./tools/test_product_git_usage_modes.sh
 ./tools/test_lesson_start_position.sh

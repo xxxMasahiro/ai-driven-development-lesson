@@ -115,17 +115,19 @@ show_status() {
     "$(file_presence docs/workflow/GIT_HOOK_CHECKS.tsv)" \
     "$(file_presence docs/workflow/GIT_HOOK_RECOMMENDATION_PATHS.tsv)" \
     "$(file_presence learning/GIT_HOOK_SETTINGS.tsv)"
-  printf 'Memory docs: %s\n' "$(file_presence docs/memory/DEVELOPER_MEMORY.md)"
+  printf 'Memory docs: %s, %s\n' \
+    "$(file_presence docs/memory/DEVELOPER_MEMORY.md)" \
+    "$(file_presence docs/memory/SESSION_MEMORY.md)"
   printf '\n'
   printf 'Quick role overview:\n'
   printf '%s\n' '- AGENTS.MD: lesson-side agent rulebook'
-  printf '%s\n' '- product-side AGENT.md: product repository context'
+  printf '%s\n' '- product-side AGENTS.MD: product repository rulebook; legacy AGENT.md is a migration target'
   printf '%s\n' '- docs/as-built/: requirements, specification, and implementation plan'
   printf '%s\n' '- docs/workflow/: TASK_TRACKER and HANDOFF paired work state'
   printf '%s\n' '- docs/workflow/GIT_HOOKS_POLICY.tsv and GIT_HOOK_CHECKS.tsv: what pre-commit checks run'
   printf '%s\n' '- docs/workflow/GIT_HOOK_RECOMMENDATION_PATHS.tsv: when local full/no-cache verification is recommended'
   printf '%s\n' '- learning/GIT_HOOK_SETTINGS.tsv: current local Git hook mode'
-  printf '%s\n' '- docs/memory/: stable lesson-side maintainer memory'
+  printf '%s\n' '- docs/memory/: stable lesson-side maintainer memory and current session handoff notes'
   printf '%s\n' '- product-side docs/memory/FAILURE_MEMORY.md: failure and recovery records when a product repository uses one'
   printf '%s\n' '- skills/*/SKILL.md: reusable agent procedures'
   printf '\n'
@@ -156,8 +158,9 @@ show_rules() {
   printf 'Key files:\n'
   printf '%s\n' '- AGENTS.MD'
   printf '%s\n' '- guides/DOCUMENT_MAP.md'
+  printf '%s\n' '- tools/check_document_root.sh'
   printf '%s\n' '- skills/*/SKILL.md'
-  printf '\nDo not confuse AGENTS.MD with product-side AGENT.md.\n'
+  printf '\nDo not confuse lesson-side AGENTS.MD with product-side AGENTS.MD; legacy product AGENT.md is a migration target.\n'
 }
 
 show_design() {
@@ -177,6 +180,7 @@ show_design() {
   printf '%s\n' '- docs/as-built/REQUIREMENTS.md: what the lesson repository must provide'
   printf '%s\n' '- docs/as-built/SPECIFICATION.md: how the repository behavior is specified'
   printf '%s\n' '- docs/as-built/IMPLEMENTATION_PLAN.md: how implementation and verification are organized'
+  printf '%s\n' '- docs/design-system/dashboard-control-center/DESIGN_SYSTEM.md: control-center visual, interaction, accessibility, and safety-display rules'
   printf '\n'
   sync_status 'tools/check_as_built_docs.sh' 'As-built document set'
 }
@@ -211,17 +215,18 @@ show_memory() {
   print_section 'Memory And Decisions'
   case "$(current_mode_code)" in
     A)
-      printf 'Developer memory preserves stable maintainer intent, review findings, and follow-up requirements. It is different from a learner progress log.\n'
+      printf 'Developer memory preserves stable maintainer intent, review findings, and follow-up requirements. Session memory preserves current handoff notes and temporary verification context.\n'
       printf 'Failure memory is usually product-side: a product repository can use docs/memory/FAILURE_MEMORY.md to record failures and recovery steps.\n\n'
       ;;
     B)
-      printf 'Developer memory stores stable maintainer intent. Product-side failure memory stores failures and recovery notes.\n\n'
+      printf 'Developer memory stores stable maintainer intent. Session memory stores restart context. Product-side failure memory stores failures and recovery notes.\n\n'
       ;;
     C)
-      printf 'DEVELOPER_MEMORY.md: maintainer intent. Product docs/memory/FAILURE_MEMORY.md: failure recovery.\n\n'
+      printf 'DEVELOPER_MEMORY.md: maintainer intent. SESSION_MEMORY.md: restart context. Product docs/memory/FAILURE_MEMORY.md: failure recovery.\n\n'
       ;;
   esac
   printf '%s\n' '- docs/memory/DEVELOPER_MEMORY.md'
+  printf '%s\n' '- docs/memory/SESSION_MEMORY.md'
   printf '%s\n' '- product-side docs/memory/FAILURE_MEMORY.md when a product repository uses one'
   printf '\nThis lesson repository does not currently define docs/memory/FAILURE_MEMORY.md.\n'
 }

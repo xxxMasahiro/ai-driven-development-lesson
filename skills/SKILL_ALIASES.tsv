@@ -1,0 +1,10 @@
+# alias	skill	display_name	description
+repo-dev	repository-development-workflow	Repository Development Workflow	Use for this lesson repository's own development workflow.
+product-dev	product-development-workflow	Product Development Workflow	Use for Settings-aware external product development.
+decision	decision-driven-implementation	Decision-Driven Implementation	Use for implementation grounded in user decisions and real evidence.
+doc-sync	worklog-doc-sync	Worklog Document Sync	Use for synchronized task tracker and handoff updates.
+sync-gate	lesson-sync-gate	Lesson Sync Gate	Use for STEP 1-14 gate and synchronization checks.
+lesson14	lesson14-facilitator	Lesson 14 Facilitator	Use for STEP 1-14 lesson guidance.
+docs	task-tracker-docs	Task Tracker Docs	Use for product requirements, specification, and plan documents.
+helpdesk	learning-progress-helpdesk	Learning Progress Helpdesk	Use for learning progress, restart, and stuck-point support.
+github-login	github-login-onboarding	GitHub Login Onboarding	Use for GitHub authentication setup.

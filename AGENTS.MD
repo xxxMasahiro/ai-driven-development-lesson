@@ -10,7 +10,7 @@
 
 ```text
 1. AGENTS.MDを読む
-2. ユーザーが `STEP 1-7: 基礎レッスン` か `STEP 1-14: 実践レッスン` を明示していない場合は、先にどちらで進めるか質問する
+2. レッスン開始または再開の意図で、ユーザーが `STEP 1-7: 基礎レッスン` か `STEP 1-14: 実践レッスン` を明示していない場合は、先にどちらで進めるか質問する。自由開発、成果物改善、外部連携、教材改善など明示された非レッスン作業は、該当メニューとワークフローへ直接進む
 3. 選んだ版で学習モード、表示言語、成果物開発言語が未指定の場合は確認する
 4. ルーティングテーブルで入口を選ぶ
 5. 選んだ入口ドキュメントを読む
@@ -30,7 +30,7 @@ STEP 1-14: 実践レッスン: index-14-days.md
 ## 不変ルール
 
 1. 学習用リポジトリと成果物リポジトリは、2つのUbuntu/WSL CLI画面で分けて扱う。
-   学習用は `$HOME/projects/ai-driven-development-lesson/`、成果物は `$HOME/projects/task-tracker-repository/` です。両方を同時並行で使うため、エージェントは作業前にどちらのCLI画面、どちらのGitリポジトリにいるか確認し、Git管理を混線させません。
+   学習用は `$HOME/projects/ai-driven-development-lesson/`、成果物は設定済みの product workspace です。構造化レッスンの標準例は `$HOME/projects/task-tracker-repository/` ですが、自由開発、成果物改善、外部連携では Dashboard Settings と `LESSON_CONFIG.tsv` が指す成果物リポジトリを使います。両方を同時並行で使うため、エージェントは作業前にどちらのCLI画面、どちらのGitリポジトリにいるか確認し、Git管理を混線させません。
    成果物リポジトリの開発に入る前には、必ず学習者へ別画面でUbuntu/WSL CLIを起動し、成果物リポジトリ専用画面として使うよう促します。
 
 2. 既存機能とのトレードオフは一切禁止する。
@@ -39,8 +39,8 @@ STEP 1-14: 実践レッスン: index-14-days.md
 3. 実装とテストは、リファクタリング性、エコシステム性、再利用性、汎用性を満たす。
    固定値や場当たり的な分岐を増やさず、既存の設定ファイル、共通ライブラリ、検査コマンド、repo-local skills と接続できる設計にします。新しい検査は単体でも集約テストからでも使えるようにし、特定の成果物スタックだけに依存させません。
 
-4. `AGENTS.MD` と `AGENT.md` を混同しない。
-   `AGENTS.MD` は本教材リポジトリで最初に読むエージェント入口です。`AGENT.md` は成果物リポジトリ側で作るメモリー文書です。
+4. `AGENTS.MD` を本体・外部リポジトリ共通のエージェント入口として扱う。
+   `AGENTS.MD` は本教材リポジトリで最初に読むエージェント入口です。外部成果物リポジトリでも標準入口は `AGENTS.MD` に統一します。既存の外部成果物 `AGENT.md` は廃止対象の旧ファイルであり、新規 scaffold では生成せず、外部成果物 `AGENTS.MD` へ安全に移行した後に削除候補として扱います。
 
 5. 既存のSTEP 1-7: 基礎レッスンは正本として残す。
    `index.md`、`lesson/LESSON_FLOW.tsv`、`learning/LESSON_STATE.tsv`、`tools/lesson` はSTEP 1-7の導線です。
@@ -96,6 +96,9 @@ STEP 1-14: 実践レッスン: index-14-days.md
 22. 非破壊の実画面確認や環境制約回避に必要な権限付き実行は、最初から権限付きで行う。
     Playwright/Chromium による実画面確認、スクリーンショット取得、ブラウザ起動、ポート確認など、サンドボックス制限で通常実行が失敗すると分かっている非破壊の検証・観測は、失敗後の再試行ではなく最初から権限付き実行として扱います。これらは開発者への追加方針確認を挟まず、必要な視覚確認や検証を完了してから判断を報告します。ただし、認証、秘密情報、OAuth、外部サービス連携、依存関係変更、外部リポジトリ書き込み、push/merge/cleanup/delete、破壊的操作、CI不良時のマージ、既存ゲートの弱体化はこの例外に含めず、12、20、21の承認・安全境界を維持します。
 
+23. Dashboard Control Center のデザイン変更はデザインシステムを正本として適用する。
+    CSS、レイアウト、余白、カード、チップ、ポップアップ、アイコン、プレビューなど Control Center の見た目と操作感を変える場合は、`docs/design-system/dashboard-control-center/DESIGN_SYSTEM.md`、`tokens.json`、`components.json` を正本とし、Design Studio と `tools/dashboard-design-system` の plan/apply/generate 経路を通して runtime CSS/JS へ反映します。`dashboard-control-center/src/design-system.generated.css` と `dashboard-control-center/src/design-system.generated.js` は生成物なので直接編集しません。`dashboard-control-center/src/styles.css` などの手書き適用層を触る場合も、デザインシステムの契約、トークン、コンポーネント定義と対応する範囲に限定し、ページ単位の場当たり的な CSS 例外を正本にしません。Design Studio はデザインシステム正本を編集・プレビュー・計画・承認・適用するための安全な入口であり、任意CSS編集画面にはしません。外部成果物リポジトリの見た目は、その成果物リポジトリ内の product-local design-system を正本候補として扱い、教材側 Control Center の CSS を外部成果物の正本にしません。
+
 ## ドキュメントルート
 
 | 用途 | 入口 |
@@ -107,16 +110,21 @@ STEP 1-14: 実践レッスン: index-14-days.md
 | STEP 1-7体験開発 | `ai-driven-task-tracker-scenario.md` |
 | STEP 1-14ロードマップ | `learning/ROADMAP.md` |
 | 文書マップ | `guides/DOCUMENT_MAP.md` |
+| リポジトリ設計・実装根拠 | `docs/as-built/REQUIREMENTS.md`、`docs/as-built/SPECIFICATION.md`、`docs/as-built/IMPLEMENTATION_PLAN.md` |
+| 作業状態・引継ぎ | `docs/workflow/TASK_TRACKER.md`、`docs/workflow/HANDOFF.md` |
+| 開発者・セッションメモリ | `docs/memory/DEVELOPER_MEMORY.md`、`docs/memory/SESSION_MEMORY.md` |
 | STEP 1-14進行台本 | `playbooks/AGENT_PLAYBOOK_14_DAYS.md` |
 | STEP 1-14プロンプト | `prompts/PROMPTS_14_DAYS.md` |
 | STEP 1-14フロー | `lesson/LESSON_FLOW_14_DAYS.tsv` |
 | STEP 1-14同期ゲート | `lesson/SYNC_GATES_14_DAYS.tsv` |
 | STEP 1-14ヘルプデスク | `learning/HELP_DESK.md` |
 | Gitワークフロー設定 | `docs/workflow/GIT_WORKFLOW_POLICY.tsv`、`learning/GIT_WORKFLOW_SETTINGS.tsv` |
+| 成果物ワークフローGit利用設定 | `docs/workflow/PRODUCT_WORKFLOW_GIT_USAGE_POLICY.tsv`、`learning/PRODUCT_WORKFLOW_GIT_USAGE_SETTINGS.tsv` |
 | Git hooks設定 | `docs/workflow/GIT_HOOKS_POLICY.tsv`、`docs/workflow/GIT_HOOK_CHECKS.tsv`、`learning/GIT_HOOK_SETTINGS.tsv` |
 | Security guard方針 | `docs/workflow/SAFEFLOW_SECURITY_BACKFILL.tsv`、`docs/workflow/PRODUCT_SECURITY_POLICY.tsv`、`learning/context/WORKFLOW_CONTEXT_MAP.tsv` |
+| Dashboard Control Center デザインシステム | `docs/design-system/dashboard-control-center/DESIGN_SYSTEM.md`、`docs/design-system/dashboard-control-center/tokens.json`、`docs/design-system/dashboard-control-center/components.json` |
 | 成果物文書雛形 | `templates/TEMPLATES.md` |
-| repo-local skills | `skills/*/SKILL.md` |
+| repo-local skills | `skills/*/SKILL.md`。詳細参照は親の `SKILL.md` から `skills/*/references/*.md` を辿る |
 
 ## ルーティングテーブル
 
@@ -124,7 +132,7 @@ STEP 1-14: 実践レッスン: index-14-days.md
 | --- | --- | --- | --- |
 | メニューを表示したい | `docs/memory/DEVELOPER_MEMORY.md` のメニュー方針、`README.md` | なし | `./tools/menu` |
 | ダッシュボードを見たい | `docs/memory/DEVELOPER_MEMORY.md` のダッシュボード方針 | なし | `./tools/dashboard all` |
-| 文書の役割を知りたい | `guides/DOCUMENT_MAP.md`、`AGENTS.MD` | なし | `./tools/docs-tour status`、`./tools/dashboard docs` |
+| 文書の役割を知りたい | `guides/DOCUMENT_MAP.md`、`AGENTS.MD` | なし | `./tools/docs-tour status`、`./tools/dashboard docs`、`./tools/check_document_root.sh` |
 | 公開リポジトリから開始したい | `README.md` | なし | `git clone`、`./tools/lesson status` |
 | レッスン開始、再開、現在地確認 | 意図に応じて `index.md` または `index-14-days.md` | STEP 1-14なら `skills/lesson14-facilitator/SKILL.md` | `./tools/lesson status` または `./tools/lesson14 status` |
 | STEP 1-7: 基礎レッスンを進めたい | `index.md` | なし | `./tools/check_lesson_structure.sh`、`./tools/lesson 学習モード <A\|B\|C>`、`./tools/lesson status` |
@@ -137,28 +145,32 @@ STEP 1-14: 実践レッスン: index-14-days.md
 | Git/CI同期を確認したい | `lesson/SYNC_GATES_14_DAYS.tsv` | `skills/lesson-sync-gate/SKILL.md` | `./tools/check_git_sync.sh --required`、`./tools/check_ci_status.sh --required` |
 | Git管理設定を確認・変更したい | `docs/workflow/GIT_WORKFLOW_POLICY.tsv`、`learning/GIT_WORKFLOW_SETTINGS.tsv` | なし | `./tools/git-workflow status`、`./tools/git-workflow configure`、`./tools/git-workflow check` |
 | Git hooks/pre-commit設定を確認・変更したい | `docs/workflow/GIT_HOOKS_POLICY.tsv`、`docs/workflow/GIT_HOOK_CHECKS.tsv`、`learning/GIT_HOOK_SETTINGS.tsv` | なし | `./tools/git-hooks status`、`./tools/git-hooks mode <full\|fast\|minimal>`、`./tools/git-hooks run --mode full --no-cache` |
+| 表示・自動化・文書を判断起点で実装したい | 要件、実データ、検証対象の該当ドキュメント | `skills/decision-driven-implementation/SKILL.md` | ユーザー判断、根拠、受け入れ条件を先に定義 |
+| Dashboard Control Center のデザインを変更したい | `docs/design-system/dashboard-control-center/DESIGN_SYSTEM.md`、`docs/design-system/dashboard-control-center/tokens.json`、`docs/design-system/dashboard-control-center/components.json` | `skills/decision-driven-implementation/SKILL.md` | `./tools/dashboard-design-system plan-interaction`、`./tools/dashboard-design-system apply-interaction --confirm`、`./tools/check_dashboard_design_system.sh` |
 | 成果物文書を作りたい | `templates/TEMPLATES.md` | `skills/task-tracker-docs/SKILL.md` | 境界確認後に更新案を提示 |
 | TASK_TRACKER/HANDOFFを同期したい | `ai-driven-task-tracker-scenario.md`、`lesson/SYNC_GATES_14_DAYS.tsv` | `skills/worklog-doc-sync/SKILL.md`、`skills/lesson-sync-gate/SKILL.md` | 更新案、同期チェック、通過 |
 | 3文書とTASK_TRACKER/HANDOFFの同期契約を確認したい | `docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv`、`docs/as-built/REQUIREMENTS.md`、`docs/as-built/SPECIFICATION.md`、`docs/as-built/IMPLEMENTATION_PLAN.md`、`docs/workflow/TASK_TRACKER.md`、`docs/workflow/HANDOFF.md` | なし | `./tools/as-built-sync status`、`./tools/check_as_built_sync_contract.sh` |
 | Playwright E2Eを扱う | `prompts/PROMPTS_14_DAYS.md` Step 10/14からStep 11/14 | `skills/lesson-sync-gate/SKILL.md` | ローカルE2E、CI、失敗復旧 |
 | サブエージェントで精査する | `playbooks/AGENT_PLAYBOOK_14_DAYS.md` Step 12/14 | `skills/lesson-sync-gate/SKILL.md` | レビュー、テスト、同期確認 |
 | スキル/MCPを体験する | `prompts/PROMPTS_14_DAYS.md` Step 13/14 | `skills/lesson14-facilitator/SKILL.md` | 最小構成で実施 |
-| 全レッスン後に自由開発したい | `free-development/FREE_DEVELOPMENT_MODE.md` | `skills/worklog-doc-sync/SKILL.md`、`skills/lesson-sync-gate/SKILL.md` | `./tools/free-development start`、`./tools/free-development gate` |
-| 成果物を改善したい | 成果物リポジトリの `docs/product/REQUIREMENTS.md`、`docs/product/SPECIFICATION.md`、`docs/product/IMPLEMENTATION_PLAN.md`、`docs/workflow/TASK_TRACKER.md`、`docs/workflow/HANDOFF.md` | `skills/worklog-doc-sync/SKILL.md`、`skills/lesson-sync-gate/SKILL.md` | `./tools/product-improvement start --confirm`、`./tools/product-improvement gate` |
+| 全レッスン後に自由開発したい | `free-development/FREE_DEVELOPMENT_MODE.md` | `skills/product-development-workflow/SKILL.md`、`skills/worklog-doc-sync/SKILL.md`、`skills/lesson-sync-gate/SKILL.md` | `./tools/free-development start`、`./tools/free-development gate` |
+| 成果物を改善したい | 成果物リポジトリの `docs/product/REQUIREMENTS.md`、`docs/product/SPECIFICATION.md`、`docs/product/IMPLEMENTATION_PLAN.md`、`docs/workflow/TASK_TRACKER.md`、`docs/workflow/HANDOFF.md` | `skills/product-development-workflow/SKILL.md`、`skills/worklog-doc-sync/SKILL.md`、`skills/lesson-sync-gate/SKILL.md` | `./tools/product-improvement start --confirm`、`./tools/product-improvement gate` |
 | 成果物リポジトリを削除したい | `docs/as-built/SPECIFICATION.md` の product repository cleanup、`docs/workflow/HANDOFF.md` | なし | `./tools/product-repository-cleanup status`、`./tools/product-repository-cleanup plan`、必要時のみ `local --confirm` または `remote --confirm` |
-| 外部連携へ発展させたい | `free-development/FREE_DEVELOPMENT_MODE.md`、`prompts/PROMPTS_14_DAYS.md` Step 13/14 | `skills/lesson14-facilitator/SKILL.md`、`skills/worklog-doc-sync/SKILL.md` | 自由開発または既存成果物の要件・仕様から連携設計 |
+| 外部連携へ発展させたい | `free-development/FREE_DEVELOPMENT_MODE.md`、`prompts/PROMPTS_14_DAYS.md` Step 13/14 | `skills/product-development-workflow/SKILL.md`、`skills/lesson14-facilitator/SKILL.md`、`skills/worklog-doc-sync/SKILL.md` | 自由開発または既存成果物の要件・仕様から連携設計 |
 | product-securityを確認したい | `docs/workflow/PRODUCT_SECURITY_POLICY.tsv`、`learning/context/WORKFLOW_CONTEXT_MAP.tsv` | なし | `./tools/product-security status`、`./tools/product-security advise`、`./tools/product-security check`、`./tools/product-security gate` |
-| 教材リポジトリ開発の提案・計画・実装を進めたい | `docs/workflow/REPOSITORY_DEVELOPMENT_WORKFLOW.tsv`、`docs/memory/DEVELOPER_MEMORY.md` | `skills/repository-development-workflow/SKILL.md` | `./tools/repository-development-workflow status`、`./tools/check_repository_development_workflow.sh` |
-| 教材そのものを改善したい | `docs/memory/DEVELOPER_MEMORY.md`、`docs/workflow/TASK_TRACKER.md`、`docs/workflow/HANDOFF.md` | `skills/lesson-sync-gate/SKILL.md` | `./tools/dashboard all`、各種チェック |
+| 教材リポジトリ開発の提案・計画・実装を進めたい | `docs/workflow/REPOSITORY_DEVELOPMENT_WORKFLOW.tsv`、`docs/memory/DEVELOPER_MEMORY.md`、`docs/memory/SESSION_MEMORY.md` | `skills/repository-development-workflow/SKILL.md` | `./tools/repository-development-workflow status`、`./tools/check_repository_development_workflow.sh` |
+| 教材そのものを改善したい | `docs/memory/DEVELOPER_MEMORY.md`、`docs/workflow/TASK_TRACKER.md`、`docs/workflow/HANDOFF.md` | `skills/repository-development-workflow/SKILL.md`、`skills/lesson-sync-gate/SKILL.md` | `./tools/dashboard all`、各種チェック |
 | `3. 応用レッスン` でチーム開発とDockerを学びたい | `advanced/TEAM_DEVELOPMENT_DOCKER.md` | `skills/lesson-sync-gate/SKILL.md`、`skills/worklog-doc-sync/SKILL.md` | `./tools/team-development start --confirm`、`./tools/team-development gate` |
 
 ## repo-local skills
 
 ```text
 skills/github-login-onboarding/SKILL.md
+skills/decision-driven-implementation/SKILL.md
 skills/learning-progress-helpdesk/SKILL.md
 skills/lesson14-facilitator/SKILL.md
 skills/lesson-sync-gate/SKILL.md
+skills/product-development-workflow/SKILL.md
 skills/repository-development-workflow/SKILL.md
 skills/task-tracker-docs/SKILL.md
 skills/worklog-doc-sync/SKILL.md

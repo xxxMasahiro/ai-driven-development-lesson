@@ -1,13 +1,13 @@
 ---
 name: task-tracker-docs
-description: Create, review, and synchronize the task-tracker product repository documents used by the lesson. Use when working on docs/product/REQUIREMENTS.md, docs/product/SPECIFICATION.md, docs/product/IMPLEMENTATION_PLAN.md, docs/workflow/TASK_TRACKER.md, docs/workflow/HANDOFF.md, AGENT.md, docs/memory/SESSION_MEMORY.md, docs/memory/FAILURE_MEMORY.md, docs/memory/DEVELOPER_MEMORY.md, or README.md for the task-tracker product, especially when converting learner answers into approved document drafts.
+description: Create, review, and synchronize the task-tracker product repository documents used by the lesson. Use when working on docs/product/REQUIREMENTS.md, docs/product/SPECIFICATION.md, docs/product/IMPLEMENTATION_PLAN.md, docs/workflow/TASK_TRACKER.md, docs/workflow/HANDOFF.md, product-local AGENTS.MD, docs/memory/SESSION_MEMORY.md, docs/memory/FAILURE_MEMORY.md, docs/memory/DEVELOPER_MEMORY.md, or README.md for the task-tracker product, especially when converting learner answers into approved document drafts.
 ---
 
 # Task Tracker Docs
 
 ## Workflow
 
-1. Before product-repository development, prompt the learner to open a separate Ubuntu/WSL CLI window for `$HOME/projects/task-tracker-repository/`.
+1. Before product-repository development, prompt the learner to open a separate Ubuntu/WSL CLI window for the configured product workspace. This skill is task-tracker oriented; `$HOME/projects/task-tracker-repository/` is the structured lesson default, while Free Development, Product Improvement, and External Integration must use the selected external-product workspace.
 2. Confirm repository boundary:
 
 ```bash
@@ -29,7 +29,7 @@ git rev-parse --show-toplevel
 
 ## Edit Policy
 
-- `AGENT.md` and `docs/memory/DEVELOPER_MEMORY.md` may be agent-maintained according to lesson rules.
+- Product-local `AGENTS.MD` and `docs/memory/DEVELOPER_MEMORY.md` may be agent-maintained according to lesson rules. Legacy product `AGENT.md` is a migration target, not the durable product rulebook.
 - Other product memory/history/design files require developer approval before writing.
 - Keep learner-facing explanations short and non-engineer friendly.
 - Keep generated product docs consistent with current implementation state.

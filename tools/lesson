@@ -213,6 +213,12 @@ status() {
   else
     printf 'Current step: all steps completed\n'
   fi
+  printf '\nLearner context:\n'
+  "$ROOT/tools/lesson-context" summary --scope lesson-7
+  if [[ -n "$current" ]]; then
+    printf 'Current step context command:\n'
+    printf './tools/lesson-context step lesson-7 %s\n' "$current"
+  fi
   printf '\nUse:\n'
   printf '  ./tools/lesson 学習モード <A|B|C>\n'
   printf '  ./tools/lesson 表示言語 <%s>\n' "$LANGUAGE_CODES"

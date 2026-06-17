@@ -69,7 +69,7 @@ docs/workflow/TASK_TRACKER.md、docs/workflow/HANDOFF.md、docs/product/REQUIREM
 guides/DOCUMENT_MAP.md と tools/docs-tour status を確認してください。
 AGENTS.MDの不変ルール、ドキュメントルート、ルーティングテーブル、skills、
 docs/as-built/、docs/workflow/、docs/memory/の役割を、初めて見る人にも分かるように短く説明してください。
-AGENTS.MDは教材側のルールブック、AGENT.mdは成果物リポジトリ側の文脈メモである違いも説明してください。
+AGENTS.MDは教材側と成果物リポジトリ側の両方にある標準ルールブックであり、成果物側の旧AGENT.mdは移行対象である違いも説明してください。
 FAILURE_MEMORY.mdは成果物側の失敗復旧記録として扱い、教材側のdocs/memory/FAILURE_MEMORY.mdがあるとは説明しないでください。
 この依頼ではファイルを編集しないでください。
 ```
@@ -112,7 +112,7 @@ Step 2/14として、Gitのstatus、add、commit、GitHubのgh、SSH、push、pu
 ```text
 Step 3/14として、成果物リポジトリを教材リポジトリの外に作る理由を確認し、
 成果物リポジトリの開発に入る前に、別画面でUbuntu/WSL CLIを起動するよう促してください。
-AGENT.md、docs/memory/SESSION_MEMORY.md、docs/memory/FAILURE_MEMORY.md、docs/memory/DEVELOPER_MEMORY.mdの役割を整理してください。
+成果物リポジトリ側のAGENTS.MD、旧AGENT.md、docs/memory/SESSION_MEMORY.md、docs/memory/FAILURE_MEMORY.md、docs/memory/DEVELOPER_MEMORY.mdの役割を整理してください。
 更新案を提示してから、承認後に作業してください。
 ```
 

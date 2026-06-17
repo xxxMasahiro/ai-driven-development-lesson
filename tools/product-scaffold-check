@@ -16,17 +16,18 @@ REPO=""
 CONTEXT="free-development"
 PRODUCT_TYPE="all"
 GIT_REQUIRED=1
+CI_REQUIRED=1
 FAILURES=()
 
 usage() {
   cat <<'USAGE'
 Usage:
-  tools/product-scaffold-check check [--repo <path>] [--context <context>] [--product-type <type>] [--git-optional]
+  tools/product-scaffold-check check [--repo <path>] [--context <context>] [--product-type <type>] [--git-optional] [--ci-optional]
 
 This command is read-only. It validates the product repository standard scaffold:
-docs/product, docs/workflow, ops, src, tests, and ops/PRODUCT_MANIFEST.tsv.
-The product manifest declares entrypoint, source, and test authorities without
-hard-coding one technology stack.
+docs/product, docs/workflow, docs/memory, ops, product-local skills/tools, src,
+tests, and ops/PRODUCT_MANIFEST.tsv. The product manifest declares entrypoint,
+source, and test authorities without hard-coding one technology stack.
 USAGE
 }
 
@@ -47,6 +48,7 @@ validate_required_structure() {
   local repo="$1"
   local context="$2"
   local product_type="$3"
+  local ci_required="$4"
   local scope item lifecycle_status required_mode contexts product_types validation_rule dashboard_visibility canonical_path legacy_paths requirement
   local resolved resolved_status resolved_path resolved_source source_id required_in_context
 
@@ -59,6 +61,13 @@ validate_required_structure() {
     required_in_context=0
     if product_repository_authority_required_for_context "$required_mode" "$contexts" "$product_types" "$context" "$product_type"; then
       required_in_context=1
+    fi
+    if [[ "$ci_required" -eq 0 ]]; then
+      case "${scope}.${item}" in
+        product_ops.ci_manifest|product_ci.github_workflows)
+          required_in_context=0
+          ;;
+      esac
     fi
     resolved="$(product_repository_authority_resolve_structure_path "$repo" "$validation_rule" "$canonical_path" "$legacy_paths")"
     IFS=$'\t' read -r resolved_status resolved_path resolved_source <<<"$resolved"
@@ -144,7 +153,7 @@ validate_product_manifest() {
       *) fail "product manifest row has unsupported path_role for $authority_id: $path_role"; continue ;;
     esac
     case "$validation_rule" in
-      file_exists|file_nonempty|path_exists|tsv_valid|product_profile_valid) ;;
+      file_exists|file_nonempty|path_exists|tsv_valid|product_profile_valid|product_operation_mode_valid) ;;
       *) fail "product manifest row has unsupported validation_rule for $authority_id: $validation_rule"; continue ;;
     esac
     if ! path_is_safe_relative "$path"; then
@@ -176,15 +185,19 @@ run_check() {
   local context="$2"
   local product_type="$3"
   local git_required="$4"
+  local ci_required="$5"
 
   if [[ ! -d "$repo" ]]; then
     fail "configured product repository is missing."
   elif [[ "$git_required" -eq 1 && ! -d "$repo/.git" ]]; then
     fail "configured product path is not a Git repository."
   fi
+  if [[ -e "$repo/AGENT.md" ]]; then
+    fail "legacy product AGENT.md is present; validate product AGENTS.MD and plan approved deletion of AGENT.md."
+  fi
 
   if [[ "${#FAILURES[@]}" -eq 0 ]]; then
-    validate_required_structure "$repo" "$context" "$product_type"
+    validate_required_structure "$repo" "$context" "$product_type" "$ci_required"
     validate_product_manifest "$repo" "$context" "$product_type"
   fi
 
@@ -220,6 +233,10 @@ while [[ $# -gt 0 ]]; do
       GIT_REQUIRED=0
       shift
       ;;
+    --ci-optional)
+      CI_REQUIRED=0
+      shift
+      ;;
     -h|--help|help)
       usage
       exit 0
@@ -238,7 +255,7 @@ fi
 
 case "$COMMAND" in
   check|status|現在地)
-    run_check "$REPO" "$CONTEXT" "$PRODUCT_TYPE" "$GIT_REQUIRED"
+    run_check "$REPO" "$CONTEXT" "$PRODUCT_TYPE" "$GIT_REQUIRED" "$CI_REQUIRED"
     ;;
   ""|-h|--help|help)
     usage

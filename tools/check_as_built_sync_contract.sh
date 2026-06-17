@@ -85,13 +85,34 @@ require_list_matches() {
   local actual="$1"
   local expected="$2"
   local context="$3"
-  local item
-  IFS=',' read -r -a expected_items <<<"$expected"
-  for item in "${expected_items[@]}"; do
-    item="$(trim "$item")"
-    require_list_contains "$actual" "$item" "$context"
+  local item actual_item expected_item
+  local -a actual_values=()
+  local -a expected_values=()
+  declare -A actual_items=()
+  declare -A expected_items=()
+
+  IFS=',' read -r -a actual_values <<<"$actual"
+  for item in "${actual_values[@]}"; do
+    actual_item="$(trim "$item")"
+    [[ -n "$actual_item" ]] || continue
+    actual_items["$actual_item"]=1
   done
-  require_list_no_extras "$actual" "$expected" "$context"
+
+  IFS=',' read -r -a expected_values <<<"$expected"
+  for item in "${expected_values[@]}"; do
+    expected_item="$(trim "$item")"
+    [[ -n "$expected_item" ]] || continue
+    expected_items["$expected_item"]=1
+    if [[ -z "${actual_items[$expected_item]+set}" ]]; then
+      report_missing "missing $expected_item in $context"
+    fi
+  done
+
+  for actual_item in "${!actual_items[@]}"; do
+    if [[ -z "${expected_items[$actual_item]+set}" ]]; then
+      report_missing "unexpected $actual_item in $context"
+    fi
+  done
 }
 
 block_field() {
