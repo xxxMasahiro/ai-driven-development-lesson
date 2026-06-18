@@ -2564,6 +2564,26 @@ STATUS: implemented
 ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/TEST_PLAN_MANIFEST.tsv,docs/workflow/GIT_HOOK_CHECKS.tsv,docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv,docs/workflow/FINAL_GATE_COVERAGE.tsv,tools/dashboard-browser-debug-manifest,tools/test_dashboard_browser_debug_manifest.sh,tools/test_lesson_repository.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
 TESTS: tools/test_dashboard_browser_debug_manifest.sh,tools/check_test_plan_coverage.sh,tools/test_test_plan.sh,tools/test_git_hooks.sh,tools/test_git_hooks_parallel.sh,tools/test_ci_final_gate.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh
 
+## Implemented Dashboard Browser Debug Agent Handoff
+
+Sync ID: `dashboard_browser_debug_agent_handoff`.
+Current status: `implemented`.
+
+Dashboard Control Center now exposes a read-only Browser Debug agent handoff panel in Maintenance Sync.
+`tools/dashboard-data` emits `browser_debug` with the selected Browser Debug CLI repository state, target manifest state, review artifact state, agent package state, ingest result state, report state, and explicit false boundary flags for browser execution, upload, provider API calls, credential storage, and product repository mutation.
+
+Resume notes:
+
+- This is a lesson-repository Dashboard integration only. It does not change Browser Debug CLI core behavior.
+- The Dashboard panel is status display and command preview only; it does not run Browser Debug CLI or model/provider APIs.
+- If future work adds execution, upload, profile reuse, provider dispatch, or external product mutation, create a separate sync ID and keep this boundary intact.
+- Focused checks are `./tools/test_dashboard_schema.sh`, `./tools/test_dashboard_data.sh`, `./tools/test_dashboard_i18n.sh`, and `./tools/test_dashboard_control_center.sh`.
+
+SYNC-ID: dashboard_browser_debug_agent_handoff
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/DASHBOARD_DATA_SCHEMA.tsv,tools/dashboard-data,dashboard-control-center/src/dashboardData.js,dashboard-control-center/src/App.jsx,dashboard-control-center/src/i18n.js,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
 ## Implemented Dashboard Design Studio Event Runner And Request Store Handoff
 
 SYNC-ID: dashboard_design_studio_event_runner_store

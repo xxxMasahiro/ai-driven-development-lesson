@@ -4502,3 +4502,21 @@ TESTS: tools/test_dashboard_browser_debug_manifest.sh,tools/check_test_plan_cove
 4. Keep Git, CI, blocker, repository-selection, workflow-state, and next-safe-action semantics in this repository.
 5. Add a focused manifest contract test and wire it into the lesson repository aggregate test.
 6. Preserve existing Dashboard runtime behavior, Browser Debug CLI generic runtime boundaries, and all existing checks.
+
+## Implemented Dashboard Browser Debug Agent Handoff Plan
+
+SYNC-ID: dashboard_browser_debug_agent_handoff
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/DASHBOARD_DATA_SCHEMA.tsv,tools/dashboard-data,dashboard-control-center/src/dashboardData.js,dashboard-control-center/src/App.jsx,dashboard-control-center/src/i18n.js,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+1. Add `browser_debug` producer JSON to `tools/dashboard-data` with stage status, artifact paths, command previews, and explicit false boundary flags.
+2. Add Dashboard schema rows and producer tests for the Browser Debug handoff contract.
+3. Validate the optional section in `dashboard-control-center/src/dashboardData.js` without requiring older fixtures to fail.
+4. Add a Maintenance Sync handoff panel using existing cards, tables, status pills, command chips, and localized strings.
+5. Extend the Browser Debug CLI free-development Playwright fixture so the selected repository page proves handoff state is visible and does not leak absolute paths.
+6. Synchronize requirements, specification, implementation plan, TASK_TRACKER, HANDOFF, and the as-built sync contract.
+
+Boundary:
+
+- Do not run Browser Debug CLI, launch browsers, call provider APIs, upload artifacts, persist credentials, mutate product repositories, or change existing Git/CI/product authority behavior in this sync.

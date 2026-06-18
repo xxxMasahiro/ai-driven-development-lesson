@@ -823,6 +823,71 @@ function freeDevelopmentRepositoryFixture(baseFixture, repoName = "frame-cue") {
       warnings: ["Repository index needs refresh before operational decisions."],
     },
   };
+  if (repoName === "browser-debug-cli") {
+    data.browser_debug = {
+      schema_version: "0.1.0",
+      status: "manual_required",
+      target: "Dashboard Control Center",
+      selected_cli_repository: "browser-debug-cli",
+      tool: {
+        status: "ready",
+        command: "node product:bin/browser-debug.js",
+        source: "selected_free_development_repository",
+      },
+      manifest: {
+        status: "ready",
+        path: "tools/dashboard-browser-debug-manifest",
+        command: "tools/dashboard-browser-debug-manifest --output .tmp/dashboard-browser-debug-target.json",
+      },
+      review: {
+        status: "passed",
+        artifact_index_path: ".browser-debug/review-artifacts/dashboard-review-index.json",
+        command: "node product:bin/browser-debug.js review --target .tmp/dashboard-browser-debug-target.json --json",
+      },
+      agent_package: {
+        status: "passed",
+        path: ".browser-debug/agent-packages/dashboard-review/packet.json",
+        command: "node product:bin/browser-debug.js agent package --review-index .browser-debug/review-artifacts/dashboard-review-index.json --surface local-subscription-agent --json",
+      },
+      agent_result: {
+        status: "manual_required",
+        path: "not_collected",
+        command: "node product:bin/browser-debug.js agent ingest --package .browser-debug/agent-packages/dashboard-review/packet.json --input .browser-debug/agent-results/agent-advisory-result.json --json",
+      },
+      agent_report: {
+        status: "not_run",
+        path: "not_collected",
+        command: "node product:bin/browser-debug.js agent report --review-index .browser-debug/review-artifacts/dashboard-review-index.json --agent-result .browser-debug/agent-results/agent-advisory-result.json --json",
+      },
+      boundary: {
+        dashboard_executes_browser_debug: false,
+        external_upload: false,
+        provider_api: false,
+        credential_storage: false,
+        product_repository_mutated: false,
+      },
+    };
+    data.maintenance.evidence_rows = [
+      ...data.maintenance.evidence_rows,
+      {
+        id: "browser_debug_agent_handoff",
+        label: "Browser Debug agent handoff",
+        importance: "optional",
+        status: "manual_required",
+        reference: "tools/dashboard-browser-debug-manifest;.browser-debug/agent-packages;.browser-debug/agent-results",
+        target: "Dashboard Control Center review handoff",
+        detail: "Confirms Browser Debug CLI review package, agent ingest, and report handoff state without executing provider APIs from the dashboard.",
+        required_command: "tools/dashboard-browser-debug-manifest --output .tmp/dashboard-browser-debug-target.json",
+        source_role: "browser_debug",
+        observed_at: "2026-06-05T00:02:30Z",
+        impact: "",
+        completion_condition: "",
+        priority: "medium",
+        source_artifacts: "tools/dashboard-browser-debug-manifest;.browser-debug/review-artifacts;.browser-debug/agent-packages;.browser-debug/agent-results;.browser-debug/reports",
+        unresolved_count: 0,
+      },
+    ];
+  }
   return data;
 }
 
@@ -1777,6 +1842,15 @@ test.describe("English dashboard control center", () => {
     await expect(page.locator("#documents")).toContainText("browser-debug-cli");
     await expect(page.locator("#documents")).not.toContainText("frame-cue");
     await expect(page.locator("#documents")).not.toContainText("task-tracker-repository");
+
+    await page.getByRole("navigation", { name: "Dashboard categories" }).getByRole("link", { name: "Maintenance Sync", exact: true }).click();
+    const browserDebugPanel = page.locator("[data-browser-debug-handoff='true']");
+    await expect(browserDebugPanel).toBeVisible();
+    await expect(browserDebugPanel).toContainText("Browser Debug agent handoff");
+    await expect(browserDebugPanel).toContainText("Agent package");
+    await expect(browserDebugPanel).toContainText("Command preview");
+    await expect(browserDebugPanel).toContainText("node product:bin/browser-debug.js agent package");
+    await expect(browserDebugPanel).not.toContainText("/home/");
 
     await page.getByRole("navigation", { name: "Other" }).getByRole("link", { name: "Update History", exact: true }).click();
     await expect(page.locator("#history .mock-table-row--workflow")).toHaveCount(5);
