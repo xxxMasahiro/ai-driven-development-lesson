@@ -162,6 +162,7 @@ Next recommended work:
 - The generator keeps workflow, Git, CI, blocker, repository-selection, evidence-freshness, and next-safe-action semantics in bounded lesson-side `sourceData`, user questions, review brief, and rubric.
 - Browser Debug CLI remains generic; it consumes the generated manifest without adding Dashboard-specific runtime branches or lesson file loaders.
 - Added `tools/test_dashboard_browser_debug_manifest.sh` and wired it into `tools/test_lesson_repository.sh`.
+- Added matching `docs/workflow/FINAL_GATE_COVERAGE.tsv` coverage so the aggregate/final-gate relationship remains explicit.
 
 ## 2026-06-17 Concrete Product Test Evidence Slice
 
