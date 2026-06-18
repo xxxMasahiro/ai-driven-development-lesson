@@ -395,6 +395,7 @@ lesson_context_print_topic_detail() {
   }
   lesson_context_rows | awk -F '\t' -v context_id="$context_id" '
     $1 == context_id {
+      if (found) next
       printf "Context: %s\n", $1
       printf "Title: %s\n", $2
       printf "Opening: %s\n", $3
@@ -407,7 +408,6 @@ lesson_context_print_topic_detail() {
       printf "Prompt example required: %s\n", $10
       printf "Dashboard candidate: %s\n", $11
       found = 1
-      exit
     }
     END {
       if (!found) {
