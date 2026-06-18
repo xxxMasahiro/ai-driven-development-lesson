@@ -4352,3 +4352,40 @@ Developer approval boundaries:
 
 - Approval is required before push, PR creation, merge, main CI waiting, local/remote sync, product repository deletion, cleanup, remote creation, OAuth, dependency installation, external-service calls, credentials, or changing Git/CI execution authority.
 - External product repository writes remain outside this planned sync unless a product-local mutation step is explicitly approved.
+
+## Implemented Product CI Run Evidence Collector Implementation Plan
+
+SYNC-ID: product_ci_run_evidence_collector
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/PRODUCT_GATE_EVIDENCE_SCHEMA.tsv,docs/workflow/TEST_PLAN_MANIFEST.tsv,tools/product-gate-evidence-bootstrap,tools/test_product_gate_tools.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_product_gate_tools.sh,tools/test_product_scaffold_check.sh,tools/test_product_repository_authority.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_test_plan_coverage.sh,tools/test_test_plan.sh
+
+Implementation order:
+
+1. Keep `repository-development-workflow` as the active protocol and preserve the Dashboard read-only boundary from the prior product authority work.
+2. Extend the generated product-local helper in `tools/product-gate-evidence-bootstrap` with reusable CI manifest parsing, branch-policy resolution, structured GitHub run parsing, and PR status parsing helpers.
+3. Add `tools/product-gate-evidence ci-runs` as the explicit network-observing collector for `product.ci.main`, optional `product.ci.pr`, and `product.ci.github_actions`.
+4. Leave existing `ci-status` behavior intact as local manifest/provider-readiness evidence without GitHub calls.
+5. Extend `tools/test_product_gate_tools.sh` fake `gh` coverage to return structured JSON for `gh run list --json` and `gh pr view --json`.
+6. Verify that a generated product-local command records current-head main CI and PR CI as authoritative pass evidence, and that parent-side authority reads the resulting detail metadata.
+7. Synchronize the evidence schema, test-plan policy, sync contract, as-built docs, tracker, handoff, and session memory.
+
+Verification sequence:
+
+```bash
+bash -n tools/product-gate-evidence-bootstrap
+bash -n tools/test_product_gate_tools.sh
+./tools/test_product_gate_tools.sh
+./tools/test_product_scaffold_check.sh
+./tools/test_product_repository_authority.sh
+./tools/check_as_built_sync_contract.sh
+./tools/check_as_built_docs.sh
+./tools/check_workflow_pair_sync.sh
+./tools/check_test_plan_coverage.sh
+./tools/test_test_plan.sh
+git diff --check
+```
+
+Boundary:
+
+- No Dashboard UI, Dashboard CSS, generated dashboard design-system output, browser mutation, push, merge, cleanup, or credential storage is part of this sync ID.

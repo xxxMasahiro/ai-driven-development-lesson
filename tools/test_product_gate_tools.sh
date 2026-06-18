@@ -391,7 +391,19 @@ case "${1:-}" in
     ;;
   run)
     if [[ "${2:-}" == "list" ]]; then
+      if [[ " $* " == *" --json "* ]]; then
+        head_sha="$(git rev-parse HEAD 2>/dev/null || printf 'deadbeef')"
+        printf '[{"status":"completed","conclusion":"success","workflowName":"CI","event":"push","headSha":"%s","createdAt":"2026-06-02T00:00:00Z","url":"https://example.invalid/actions/runs/1","databaseId":1,"headBranch":"main"}]\n' "$head_sha"
+        exit 0
+      fi
       printf 'completed\tsuccess\tCI\tCI\tmain\t1\t0\t1s\t2026-06-02T00:00:00Z\n'
+      exit 0
+    fi
+    ;;
+  pr)
+    if [[ "${2:-}" == "view" ]]; then
+      head_sha="$(git rev-parse HEAD 2>/dev/null || printf 'deadbeef')"
+      printf '{"number":12,"url":"https://example.invalid/pull/12","state":"OPEN","mergeStateStatus":"CLEAN","headRefOid":"%s","statusCheckRollup":[{"name":"CI","status":"COMPLETED","conclusion":"SUCCESS","workflowName":"CI","detailsUrl":"https://example.invalid/actions/runs/1"}]}\n' "$head_sha"
       exit 0
     fi
     ;;
@@ -437,6 +449,13 @@ awk -F '\t' '$1 == "product.ci.github_actions" && $2 == "product-improvement" &&
 awk -F '\t' '$1 == "product.ci.main" && $2 == "all" && $3 == "passed" && $5 == "true" && $6 == "authoritative" { found = 1 } END { exit found ? 0 : 1 }' \
   "$product_repo/.git/product-gate-evidence/index.tsv"
 awk -F '\t' '$1 == "product.ci.pr" && $2 == "product-improvement" && $3 == "not_run" && $5 == "false" && $6 == "manual_required" { found = 1 } END { exit found ? 0 : 1 }' \
+  "$product_repo/.git/product-gate-evidence/index.tsv"
+PATH="$fake_bin:$PATH" "$product_repo/tools/product-gate-evidence" ci-runs product-improvement 3600 --pr 12 >/dev/null
+awk -F '\t' '$1 == "product.ci.github_actions" && $2 == "product-improvement" && $3 == "passed" && $5 == "true" && $6 == "authoritative" { found = 1 } END { exit found ? 0 : 1 }' \
+  "$product_repo/.git/product-gate-evidence/index.tsv"
+awk -F '\t' '$1 == "product.ci.main" && $2 == "product-improvement" && $3 == "passed" && $5 == "true" && $6 == "authoritative" { found = 1 } END { exit found ? 0 : 1 }' \
+  "$product_repo/.git/product-gate-evidence/index.tsv"
+awk -F '\t' '$1 == "product.ci.pr" && $2 == "product-improvement" && $3 == "passed" && $5 == "true" && $6 == "authoritative" { found = 1 } END { exit found ? 0 : 1 }' \
   "$product_repo/.git/product-gate-evidence/index.tsv"
 "$product_repo/tools/product-gate-evidence" security-status external-integration 3600 >/dev/null
 awk -F '\t' '$1 == "product.security.secrets" && $2 == "external-integration" && $3 == "passed" && $5 == "true" && $6 == "authoritative" { found = 1 } END { exit found ? 0 : 1 }' \
@@ -526,7 +545,7 @@ process.stdin.on("end", () => {
     throw new Error(`unexpected product.ci.main state: ${JSON.stringify(ciMain)}`);
   }
   const ciPr = data.evidence_summary.items.find((row) => row.source_id === "product.ci.pr");
-  if (!ciPr || ciPr.status !== "not_run" || ciPr.required_in_context !== false || ciPr.authority !== "manual_required" || ciPr.detail_manifest_source !== "ops/EVIDENCE_DETAIL_MANIFEST.tsv" || ciPr.risk_level !== "critical") {
+  if (!ciPr || ciPr.status !== "passed" || ciPr.required_in_context !== true || ciPr.authority !== "authoritative" || ciPr.detail_manifest_source !== "ops/EVIDENCE_DETAIL_MANIFEST.tsv" || ciPr.risk_level !== "critical") {
     throw new Error(`unexpected product.ci.pr state: ${JSON.stringify(ciPr)}`);
   }
 });

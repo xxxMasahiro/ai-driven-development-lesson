@@ -884,6 +884,397 @@ product_gate_evidence_existing_current_passed() {
   ' "$index"
 }
 
+product_gate_evidence_head_full() {
+  local repo
+  repo="$(product_gate_evidence_repo_root)"
+  git -C "$repo" rev-parse HEAD 2>/dev/null || printf 'none'
+}
+
+product_gate_evidence_ci_manifest_rows() {
+  local manifest="$1"
+  awk -F '\t' '
+    /^[[:space:]]*$/ { next }
+    $1 ~ /^#/ { next }
+    NF != 8 {
+      printf "invalid product CI manifest row: %s\n", $0 > "/dev/stderr"
+      invalid = 1
+      next
+    }
+    { print }
+    END { exit invalid ? 1 : 0 }
+  ' "$manifest"
+}
+
+product_gate_evidence_ci_required_flag() {
+  case "$1" in
+    required|contextual) printf 'true' ;;
+    optional) printf 'false' ;;
+    *) printf 'true' ;;
+  esac
+}
+
+product_gate_evidence_ci_branch_for_policy() {
+  local branch_policy="$1"
+  local override_branch="${2:-}"
+  local repo branch
+  if [[ -n "$override_branch" ]]; then
+    printf '%s' "$override_branch"
+    return
+  fi
+  repo="$(product_gate_evidence_repo_root)"
+  case "$branch_policy" in
+    ""|main)
+      printf 'main'
+      ;;
+    current|current_branch|HEAD)
+      branch="$(git -C "$repo" branch --show-current 2>/dev/null || true)"
+      printf '%s' "${branch:-main}"
+      ;;
+    *)
+      printf '%s' "$branch_policy"
+      ;;
+  esac
+}
+
+product_gate_evidence_ci_select_run() {
+  local json_path="$1"
+  local workflow_name="$2"
+  local expected_head="$3"
+  node - "$json_path" "$workflow_name" "$expected_head" <<'NODE'
+const fs = require("node:fs");
+const [jsonPath, workflowName, expectedHead] = process.argv.slice(2);
+const sanitize = (value) => String(value ?? "none").replace(/[\t\r\n]/g, " ").slice(0, 240);
+const raw = fs.readFileSync(jsonPath, "utf8").trim();
+const runs = raw ? JSON.parse(raw) : [];
+if (!Array.isArray(runs)) {
+  throw new Error("gh run list did not return an array");
+}
+const workflowRuns = runs.filter((run) => !workflowName || workflowName === "all" || run.workflowName === workflowName);
+const matchesHead = (run) => {
+  const head = String(run.headSha ?? "");
+  if (!expectedHead || expectedHead === "none" || !head) return false;
+  return head === expectedHead || head.startsWith(expectedHead) || expectedHead.startsWith(head);
+};
+const match = workflowRuns.find(matchesHead);
+const fallback = workflowRuns[0] || runs[0];
+const run = match || fallback;
+if (!run) {
+  console.log(["none", "none", "none", workflowName || "none", "none", "none", "none", "none", "none"].join("\t"));
+  process.exit(0);
+}
+console.log([
+  match ? "match" : "no_match",
+  run.status,
+  run.conclusion,
+  run.workflowName,
+  run.event,
+  run.headSha,
+  run.createdAt,
+  run.url,
+  run.databaseId,
+].map(sanitize).join("\t"));
+NODE
+}
+
+product_gate_evidence_ci_select_pr_checks() {
+  local json_path="$1"
+  local expected_head="$2"
+  node - "$json_path" "$expected_head" <<'NODE'
+const fs = require("node:fs");
+const [jsonPath, expectedHead] = process.argv.slice(2);
+const sanitize = (value) => String(value ?? "none").replace(/[\t\r\n;]/g, " ").slice(0, 240);
+const data = JSON.parse(fs.readFileSync(jsonPath, "utf8") || "{}");
+const head = String(data.headRefOid ?? "");
+const headMatch = !expectedHead || expectedHead === "none" || !head
+  ? "unknown"
+  : (head === expectedHead || head.startsWith(expectedHead) || expectedHead.startsWith(head) ? "match" : "mismatch");
+const checks = Array.isArray(data.statusCheckRollup) ? data.statusCheckRollup : [];
+let passed = 0;
+let failed = 0;
+let pending = 0;
+const names = [];
+for (const check of checks) {
+  const name = check.name || check.context || check.workflowName || "check";
+  names.push(name);
+  const conclusion = String(check.conclusion || check.state || "").toUpperCase();
+  const status = String(check.status || "").toUpperCase();
+  if (["SUCCESS", "PASSED", "NEUTRAL", "SKIPPED"].includes(conclusion)) {
+    passed += 1;
+  } else if (["FAILURE", "FAILED", "ERROR", "TIMED_OUT", "ACTION_REQUIRED", "CANCELLED"].includes(conclusion)) {
+    failed += 1;
+  } else if (status === "COMPLETED") {
+    failed += 1;
+  } else {
+    pending += 1;
+  }
+}
+console.log([
+  headMatch,
+  checks.length,
+  passed,
+  failed,
+  pending,
+  data.number,
+  data.url,
+  data.state,
+  data.mergeStateStatus,
+  names.map(sanitize).join(",").slice(0, 240),
+].map(sanitize).join("\t"));
+NODE
+}
+
+product_gate_evidence_ci_collect_main_row() {
+  local context="$1"
+  local max_age_seconds="$2"
+  local ci_id="$3"
+  local required_mode="$4"
+  local workflow_file="$5"
+  local workflow_name="$6"
+  local branch_policy="$7"
+  local source_id="$8"
+  local main_branch_override="$9"
+  local limit="${10}"
+  local repo required_in_context branch head_full source_artifacts next_command runs_json tmp_json selection
+  local match run_status conclusion selected_workflow event head_sha created_at url run_id status authority blocked_by
+
+  repo="$(product_gate_evidence_repo_root)"
+  [[ -n "$source_id" ]] || source_id="product.ci.$(product_gate_evidence_safe_id "$ci_id")"
+  required_in_context="$(product_gate_evidence_ci_required_flag "$required_mode")"
+  branch="$(product_gate_evidence_ci_branch_for_policy "$branch_policy" "$main_branch_override")"
+  head_full="$(product_gate_evidence_head_full)"
+  source_artifacts="ops/CI_MANIFEST.tsv;ci_id=$ci_id;workflow_file=$workflow_file;workflow_name=$workflow_name;branch=$branch;head_sha=$(product_gate_evidence_head)"
+  next_command="tools/product-gate-evidence ci-runs $context $max_age_seconds --main-branch $branch"
+
+  if [[ -z "$workflow_file" || ! -f "$repo/$workflow_file" ]]; then
+    product_gate_evidence_record "$source_id" "$context" "blocked" "$required_in_context" "manual_required" "$max_age_seconds" "$source_artifacts;missing_workflow=${workflow_file:-unknown}" "product.ci.github_actions" "tools/check_product_structure.sh"
+    return 1
+  fi
+
+  if ! runs_json="$(cd "$repo" && gh run list --branch "$branch" --limit "$limit" --json status,conclusion,workflowName,event,headSha,createdAt,url,databaseId,headBranch 2>/dev/null)"; then
+    product_gate_evidence_record "$source_id" "$context" "blocked" "$required_in_context" "manual_required" "$max_age_seconds" "$source_artifacts;gh_run_list=failed" "product.ci.github_actions" "$next_command"
+    return 2
+  fi
+  tmp_json="$(mktemp "${TMPDIR:-/tmp}/product-ci-runs.XXXXXX")"
+  printf '%s' "$runs_json" >"$tmp_json"
+  if ! selection="$(product_gate_evidence_ci_select_run "$tmp_json" "$workflow_name" "$head_full" 2>/dev/null)"; then
+    rm -f "$tmp_json"
+    product_gate_evidence_record "$source_id" "$context" "blocked" "$required_in_context" "manual_required" "$max_age_seconds" "$source_artifacts;gh_run_list=parse_failed" "product.ci.github_actions" "$next_command"
+    return 2
+  fi
+  rm -f "$tmp_json"
+  IFS=$'\t' read -r match run_status conclusion selected_workflow event head_sha created_at url run_id <<<"$selection"
+  source_artifacts="$source_artifacts;match=$match;run_status=$run_status;conclusion=$conclusion;selected_workflow=$selected_workflow;event=$event;run_id=$run_id;run_url=$url;run_head_sha=$head_sha;created_at=$created_at"
+
+  case "$match" in
+    match)
+      if [[ "$run_status" != "completed" ]]; then
+        status="unknown"
+        authority="manual_required"
+        blocked_by="$source_id"
+      elif [[ "$conclusion" == "success" ]]; then
+        status="passed"
+        authority="authoritative"
+        blocked_by=""
+      else
+        status="failed"
+        authority="authoritative"
+        blocked_by="$source_id"
+      fi
+      ;;
+    none|no_match|*)
+      status="not_run"
+      authority="manual_required"
+      blocked_by="$source_id"
+      ;;
+  esac
+  product_gate_evidence_record "$source_id" "$context" "$status" "$required_in_context" "$authority" "$max_age_seconds" "$source_artifacts" "$blocked_by" "$next_command"
+  [[ "$status" == "passed" ]]
+}
+
+product_gate_evidence_ci_record_pr_not_run() {
+  local context="$1"
+  local max_age_seconds="$2"
+  product_gate_evidence_record "product.ci.pr" "$context" "not_run" "false" "manual_required" "$max_age_seconds" "ops/CI_MANIFEST.tsv;source=pr-checks-not-observed" "product.ci.pr" "tools/product-gate-evidence ci-runs $context $max_age_seconds --pr <number>"
+}
+
+product_gate_evidence_ci_collect_pr() {
+  local context="$1"
+  local max_age_seconds="$2"
+  local pr_ref="$3"
+  local repo head_full pr_json tmp_json selection
+  local head_match check_count pass_count fail_count pending_count number url state merge_state check_names
+  local source_artifacts status authority blocked_by next_command
+
+  if [[ -z "$pr_ref" ]]; then
+    product_gate_evidence_ci_record_pr_not_run "$context" "$max_age_seconds"
+    return 0
+  fi
+
+  repo="$(product_gate_evidence_repo_root)"
+  head_full="$(product_gate_evidence_head_full)"
+  next_command="tools/product-gate-evidence ci-runs $context $max_age_seconds --pr $pr_ref"
+  if ! pr_json="$(cd "$repo" && gh pr view "$pr_ref" --json statusCheckRollup,headRefOid,url,number,state,mergeStateStatus 2>/dev/null)"; then
+    product_gate_evidence_record "product.ci.pr" "$context" "blocked" "true" "manual_required" "$max_age_seconds" "gh pr view;pr=$pr_ref;status=failed" "product.ci.github_actions" "$next_command"
+    return 2
+  fi
+  tmp_json="$(mktemp "${TMPDIR:-/tmp}/product-ci-pr.XXXXXX")"
+  printf '%s' "$pr_json" >"$tmp_json"
+  if ! selection="$(product_gate_evidence_ci_select_pr_checks "$tmp_json" "$head_full" 2>/dev/null)"; then
+    rm -f "$tmp_json"
+    product_gate_evidence_record "product.ci.pr" "$context" "blocked" "true" "manual_required" "$max_age_seconds" "gh pr view;pr=$pr_ref;parse_failed=true" "product.ci.github_actions" "$next_command"
+    return 2
+  fi
+  rm -f "$tmp_json"
+  IFS=$'\t' read -r head_match check_count pass_count fail_count pending_count number url state merge_state check_names <<<"$selection"
+  source_artifacts="gh pr view;pr=$pr_ref;number=$number;url=$url;state=$state;merge_state=$merge_state;head_match=$head_match;checks=$check_count;passed=$pass_count;failed=$fail_count;pending=$pending_count;check_names=$check_names"
+
+  if [[ "$head_match" == "mismatch" ]]; then
+    status="failed"
+    authority="authoritative"
+    blocked_by="product.ci.pr"
+  elif [[ "$check_count" -eq 0 ]]; then
+    status="not_run"
+    authority="manual_required"
+    blocked_by="product.ci.pr"
+  elif [[ "$fail_count" -gt 0 ]]; then
+    status="failed"
+    authority="authoritative"
+    blocked_by="product.ci.pr"
+  elif [[ "$pending_count" -gt 0 ]]; then
+    status="unknown"
+    authority="manual_required"
+    blocked_by="product.ci.pr"
+  else
+    status="passed"
+    authority="authoritative"
+    blocked_by=""
+  fi
+  product_gate_evidence_record "product.ci.pr" "$context" "$status" "true" "$authority" "$max_age_seconds" "$source_artifacts" "$blocked_by" "$next_command"
+  [[ "$status" == "passed" ]]
+}
+
+product_gate_evidence_ci_runs() {
+  local context="${1:-product-improvement}"
+  local max_age_seconds="${2:-3600}"
+  local repo manifest rows row ci_id required_mode contexts workflow_file workflow_name branch_policy source_id description
+  local provider_required="false"
+  local pr_ref="" main_branch_override="" limit="20"
+  local provider_blocked=0 overall_rc=0 matching_rows=0 collect_rc
+  shift 2 || true
+
+  while [[ "$#" -gt 0 ]]; do
+    case "$1" in
+      --pr)
+        pr_ref="${2:-}"
+        shift 2
+        ;;
+      --main-branch|--branch)
+        main_branch_override="${2:-}"
+        shift 2
+        ;;
+      --limit)
+        limit="${2:-20}"
+        shift 2
+        ;;
+      *)
+        printf 'unknown ci-runs option: %s\n' "$1" >&2
+        return 1
+        ;;
+    esac
+  done
+  [[ "$limit" =~ ^[0-9]+$ ]] || {
+    printf 'invalid ci-runs limit: %s\n' "$limit" >&2
+    return 1
+  }
+
+  repo="$(product_gate_evidence_repo_root)"
+  manifest="$repo/ops/CI_MANIFEST.tsv"
+  product_gate_evidence_validate_context "$context" || {
+    printf 'invalid product gate evidence context: %s\n' "$context" >&2
+    return 1
+  }
+
+  case "$context" in
+    product-improvement|external-integration) provider_required="true" ;;
+  esac
+  if [[ "$provider_required" != "true" ]]; then
+    product_gate_evidence_record "product.ci.github_actions" "$context" "not_applicable" "false" "advisory" "$max_age_seconds" ".github/workflows;context=$context" "" "not_applicable"
+    product_gate_evidence_record "product.ci.pr" "$context" "not_applicable" "false" "advisory" "$max_age_seconds" "gh pr view;context=$context" "" "not_applicable"
+    return 0
+  fi
+
+  if [[ ! -s "$manifest" ]]; then
+    product_gate_evidence_record "product.ci.github_actions" "$context" "blocked" "true" "manual_required" "$max_age_seconds" "ops/CI_MANIFEST.tsv;missing=ops/CI_MANIFEST.tsv" "product.ci.github_actions" "tools/check_product_structure.sh"
+    product_gate_evidence_record "product.ci.main" "$context" "not_run" "true" "manual_required" "$max_age_seconds" "ops/CI_MANIFEST.tsv" "product.ci.github_actions" "tools/product-gate-evidence ci-runs $context $max_age_seconds"
+    product_gate_evidence_ci_record_pr_not_run "$context" "$max_age_seconds"
+    return 1
+  fi
+  rows="$(product_gate_evidence_ci_manifest_rows "$manifest")" || {
+    product_gate_evidence_record "product.ci.github_actions" "$context" "blocked" "true" "manual_required" "$max_age_seconds" "ops/CI_MANIFEST.tsv;invalid_manifest=true" "product.ci.github_actions" "tools/check_product_structure.sh"
+    return 1
+  }
+
+  if ! command -v gh >/dev/null 2>&1; then
+    provider_blocked=1
+  elif ! (cd "$repo" && gh auth token >/dev/null 2>&1); then
+    provider_blocked=1
+  elif ! (cd "$repo" && gh repo view >/dev/null 2>&1); then
+    provider_blocked=1
+  fi
+  if ! command -v node >/dev/null 2>&1; then
+    provider_blocked=1
+  fi
+
+  if [[ "$provider_blocked" -eq 1 ]]; then
+    while IFS=$'\t' read -r ci_id required_mode contexts workflow_file workflow_name branch_policy source_id description; do
+      [[ -n "$ci_id" ]] || continue
+      product_gate_evidence_list_has "$contexts" "$context" || continue
+      [[ -n "$source_id" ]] || source_id="product.ci.$(product_gate_evidence_safe_id "$ci_id")"
+      product_gate_evidence_record "$source_id" "$context" "blocked" "$(product_gate_evidence_ci_required_flag "$required_mode")" "manual_required" "$max_age_seconds" "ops/CI_MANIFEST.tsv;ci_id=$ci_id;gh_or_node=unavailable" "product.ci.github_actions" "tools/product-gate-evidence ci-runs $context $max_age_seconds"
+      matching_rows=$((matching_rows + 1))
+    done <<<"$rows"
+    [[ "$matching_rows" -gt 0 ]] || product_gate_evidence_record "product.ci.main" "$context" "not_run" "true" "manual_required" "$max_age_seconds" "ops/CI_MANIFEST.tsv;matching_rows=0" "product.ci.github_actions" "tools/product-gate-evidence ci-runs $context $max_age_seconds"
+    product_gate_evidence_ci_record_pr_not_run "$context" "$max_age_seconds"
+    product_gate_evidence_record "product.ci.github_actions" "$context" "blocked" "true" "manual_required" "$max_age_seconds" "gh auth token;gh repo view;node;collector=ci-runs" "product.ci.github_actions" "gh auth status"
+    return 1
+  fi
+
+  while IFS=$'\t' read -r ci_id required_mode contexts workflow_file workflow_name branch_policy source_id description; do
+    [[ -n "$ci_id" ]] || continue
+    product_gate_evidence_list_has "$contexts" "$context" || continue
+    [[ -n "$source_id" ]] || source_id="product.ci.$(product_gate_evidence_safe_id "$ci_id")"
+    [[ "$source_id" == "product.ci.pr" ]] && continue
+    matching_rows=$((matching_rows + 1))
+    if product_gate_evidence_ci_collect_main_row "$context" "$max_age_seconds" "$ci_id" "$required_mode" "$workflow_file" "$workflow_name" "$branch_policy" "$source_id" "$main_branch_override" "$limit"; then
+      :
+    else
+      collect_rc=$?
+      overall_rc=1
+      [[ "$collect_rc" -eq 2 ]] && provider_blocked=1
+    fi
+  done <<<"$rows"
+
+  if [[ "$matching_rows" -eq 0 ]]; then
+    overall_rc=1
+    product_gate_evidence_record "product.ci.main" "$context" "not_run" "true" "manual_required" "$max_age_seconds" "ops/CI_MANIFEST.tsv;matching_rows=0;context=$context" "product.ci.main" "tools/product-gate-evidence ci-runs $context $max_age_seconds"
+  fi
+
+  if product_gate_evidence_ci_collect_pr "$context" "$max_age_seconds" "$pr_ref"; then
+    :
+  else
+    collect_rc=$?
+    overall_rc=1
+    [[ "$collect_rc" -eq 2 ]] && provider_blocked=1
+  fi
+
+  if [[ "$provider_blocked" -eq 1 ]]; then
+    product_gate_evidence_record "product.ci.github_actions" "$context" "blocked" "true" "manual_required" "$max_age_seconds" "gh auth token;gh repo view;gh run list;gh pr view;collector=ci-runs" "product.ci.github_actions" "tools/product-gate-evidence ci-runs $context $max_age_seconds"
+  else
+    product_gate_evidence_record "product.ci.github_actions" "$context" "passed" "true" "authoritative" "$max_age_seconds" "gh auth token;gh repo view;gh run list;collector=ci-runs;main_rows=$matching_rows;pr_ref=${pr_ref:-none}" "" "tools/product-gate-evidence ci-runs $context $max_age_seconds"
+  fi
+  return "$overall_rc"
+}
+
 product_gate_evidence_test_source_id() {
   local test_id="$1"
   local source_id="$2"
@@ -1398,6 +1789,7 @@ Usage:
   tools/product-gate-evidence structure-status <context> [max-age-seconds]
   tools/product-gate-evidence git-status <context> [max-age-seconds]
   tools/product-gate-evidence ci-status <context> [max-age-seconds]
+  tools/product-gate-evidence ci-runs <context> [max-age-seconds] [--main-branch <branch>] [--pr <number-or-url>] [--limit <count>]
   tools/product-gate-evidence security-status <context> [max-age-seconds]
   tools/product-gate-evidence manifest-tests <context> [max-age-seconds] [product-type]
 
@@ -1438,6 +1830,9 @@ case "$COMMAND" in
     ;;
   ci-status)
     product_gate_evidence_ci_status "${1:-product-improvement}" "${2:-3600}"
+    ;;
+  ci-runs)
+    product_gate_evidence_ci_runs "${1:-product-improvement}" "${2:-3600}" "${@:3}"
     ;;
   security-status)
     product_gate_evidence_security_status "${1:-free-development}" "${2:-3600}"
