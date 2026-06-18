@@ -4424,3 +4424,30 @@ Boundary:
 
 - Do not alter required CI workflow or job names, `tools/test_lesson_repository.sh`, full/no-cache hook semantics, same-run evidence identity checks, final-gap command contents, Dashboard UI, Playwright layout, or product repository behavior in this sync.
 - No existing-feature tradeoff is allowed. If a regression appears, repair this safety layer or its tests before advancing.
+## Implemented Product Authority Evidence Detail Contract Plan
+
+SYNC-ID: product_authority_evidence_detail_contract
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/DASHBOARD_DATA_SCHEMA.tsv,tools/lib/product_repository_authority.sh,tools/product-repository-authority,dashboard-control-center/src/dashboardData.js,tests/fixtures/dashboard-control-center.json,tests/fixtures/dashboard-control-center-live-update.json,tools/test_product_repository_authority.sh,tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md,docs/memory/SESSION_MEMORY.md
+TESTS: tools/test_product_repository_authority.sh,tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh
+
+1. Confirmed `tools/lib/product_repository_authority.sh` already emits detail fields for product authority evidence items.
+2. Promoted the matching Dashboard schema rows from `planned` to `implemented` and added implemented rows for `context`, `max_age_seconds`, and `product_root`.
+3. Strengthened `dashboard-control-center/src/dashboardData.js` validation for the detail contract without changing UI rendering or evidence collection.
+4. Updated Dashboard Control Center fixtures to carry the same item detail fields as the producer output.
+5. Strengthened `tools/test_product_repository_authority.sh`, `tools/test_dashboard_schema.sh`, and `tools/test_dashboard_data.sh` so missing or malformed evidence detail fields fail locally and in aggregate checks.
+6. Synchronized this implemented state across the as-built documents, workflow tracker, handoff, sync contract, and session memory.
+
+## Implemented Dashboard Browser Debug Manifest Boundary Plan
+
+SYNC-ID: dashboard_browser_debug_manifest
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/TEST_PLAN_MANIFEST.tsv,docs/workflow/GIT_HOOK_CHECKS.tsv,docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv,docs/workflow/FINAL_GATE_COVERAGE.tsv,tools/dashboard-browser-debug-manifest,tools/test_dashboard_browser_debug_manifest.sh,tools/test_lesson_repository.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_dashboard_browser_debug_manifest.sh,tools/check_test_plan_coverage.sh,tools/test_test_plan.sh,tools/test_git_hooks.sh,tools/test_git_hooks_parallel.sh,tools/test_ci_final_gate.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh
+
+1. Add a lesson-owned Browser Debug target-manifest generator for Dashboard Control Center review.
+2. Project `tools/dashboard-data` into bounded inline `dashboard_context` source data instead of making Browser Debug CLI read lesson files.
+3. Declare Control Center routes, page roles, source bindings, user questions, review brief, and rubric in the lesson manifest.
+4. Keep Git, CI, blocker, repository-selection, workflow-state, and next-safe-action semantics in this repository.
+5. Add a focused manifest contract test and wire it into the lesson repository aggregate test.
+6. Preserve existing Dashboard runtime behavior, Browser Debug CLI generic runtime boundaries, and all existing checks.

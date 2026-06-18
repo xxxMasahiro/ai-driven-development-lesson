@@ -2148,3 +2148,27 @@ Non-scope:
 
 - Do not change required CI check names, branch-protection contexts, full/no-cache meaning, final-gap command semantics, same-run evidence metadata, Dashboard behavior, Playwright coverage, or product repository behavior in this sync ID.
 - Do not make changed-only CI authoritative or introduce persistent verification-result caching.
+## Implemented Product Authority Evidence Detail Contract Requirements
+
+SYNC-ID: product_authority_evidence_detail_contract
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/DASHBOARD_DATA_SCHEMA.tsv,tools/lib/product_repository_authority.sh,tools/product-repository-authority,dashboard-control-center/src/dashboardData.js,tests/fixtures/dashboard-control-center.json,tests/fixtures/dashboard-control-center-live-update.json,tools/test_product_repository_authority.sh,tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md,docs/memory/SESSION_MEMORY.md
+TESTS: tools/test_product_repository_authority.sh,tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh
+
+Dashboard product authority evidence items must expose producer-owned detail fields instead of requiring the UI to infer operational judgment from `status` alone.
+Each evidence item must include context, requirement status, observation time, max age, sanitized product root, product head, source artifacts, blockers, next command, detail code, current item id, optional detail manifest/artifact references, summary, reason, next action, and risk level.
+
+The contract must remain additive.
+It must not change product evidence collection behavior, external repository mutation, browser-side command execution, existing Dashboard routes, existing status vocabulary, or existing product-operation blocker semantics.
+
+## Implemented Dashboard Browser Debug Manifest Boundary Requirements
+
+SYNC-ID: dashboard_browser_debug_manifest
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/TEST_PLAN_MANIFEST.tsv,docs/workflow/GIT_HOOK_CHECKS.tsv,docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv,docs/workflow/FINAL_GATE_COVERAGE.tsv,tools/dashboard-browser-debug-manifest,tools/test_dashboard_browser_debug_manifest.sh,tools/test_lesson_repository.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_dashboard_browser_debug_manifest.sh,tools/check_test_plan_coverage.sh,tools/test_test_plan.sh,tools/test_git_hooks.sh,tools/test_git_hooks_parallel.sh,tools/test_ci_final_gate.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh
+
+Dashboard Control Center Browser Debug review must keep lesson-specific workflow, Git, CI, blocker, repository-selection, evidence-freshness, and next-safe-action meaning in this repository rather than in Browser Debug CLI runtime code.
+
+The manifest generator must project `tools/dashboard-data` into bounded inline `sourceData` for Browser Debug CLI target review.
+It must not add arbitrary external loaders to Browser Debug CLI, expose secrets or raw warnings, execute browser-side commands, mutate product repositories, or require Vite/Playwright startup to validate the manifest contract.

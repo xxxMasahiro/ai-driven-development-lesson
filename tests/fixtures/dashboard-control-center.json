@@ -386,7 +386,15 @@
             "product_head": "none",
             "source_artifacts": "docs/workflow/PRODUCT_GATE_EVIDENCE_SCHEMA.tsv",
             "blocked_by": "",
-            "next_command": "./tools/product-repository-authority status --json"
+            "next_command": "./tools/product-repository-authority status --json",
+            "detail_code": "product.gates.evidence_index.detail",
+            "current_item_id": "product.gates.evidence_index",
+            "detail_manifest_source": "",
+            "detail_artifact_path": "",
+            "summary": "product.gates.evidence_index not_run",
+            "reason": "docs/workflow/PRODUCT_GATE_EVIDENCE_SCHEMA.tsv",
+            "next_action": "./tools/product-repository-authority status --json",
+            "risk_level": "medium"
           }
         ]
       },

@@ -971,11 +971,38 @@ if (!Array.isArray(productAuthority.manifest_summary.optional_missing)) {
 if (!Array.isArray(productAuthority.evidence_summary.items)) {
   fail('product authority evidence items must be an array');
 }
+const productEvidenceRiskLevels = new Set(['low', 'medium', 'high', 'critical']);
+const productHeadPattern = /^(none|[a-f0-9]{40}|[a-f0-9]{64})$/;
 for (const item of productAuthority.evidence_summary.items) {
-  for (const field of ['source_id', 'status', 'freshness_state', 'authority', 'product_root']) {
+  for (const field of [
+    'source_id',
+    'context',
+    'status',
+    'freshness_state',
+    'required_in_context',
+    'authority',
+    'observed_at',
+    'max_age_seconds',
+    'product_root',
+    'product_head',
+    'source_artifacts',
+    'blocked_by',
+    'next_command',
+    'detail_code',
+    'current_item_id',
+    'detail_manifest_source',
+    'detail_artifact_path',
+    'summary',
+    'reason',
+    'next_action',
+    'risk_level',
+  ]) {
     if (!(field in item)) {
       fail(`product authority evidence item missing ${field}`);
     }
+  }
+  if (!['all', 'none', 'lesson', 'free-development', 'product-improvement', 'external-integration', 'lesson-maintenance', 'custom', 'unknown'].includes(item.context)) {
+    fail(`invalid product evidence context: ${item.context}`);
   }
   if (!allowedStates.has(item.status)) {
     fail(`invalid product evidence status: ${item.status}`);
@@ -983,8 +1010,36 @@ for (const item of productAuthority.evidence_summary.items) {
   if (!['current', 'stale', 'not_collected', 'unknown'].includes(item.freshness_state)) {
     fail(`invalid product evidence freshness: ${item.freshness_state}`);
   }
+  if (typeof item.required_in_context !== 'boolean') {
+    fail('product evidence required_in_context must be a boolean');
+  }
   if (!['authoritative', 'manual_required', 'advisory', 'not_collected'].includes(item.authority)) {
     fail(`invalid product evidence authority: ${item.authority}`);
+  }
+  if (typeof item.observed_at !== 'string' || item.observed_at.length === 0) {
+    fail('product evidence observed_at is missing');
+  }
+  if (!Number.isInteger(Number(item.max_age_seconds)) || Number(item.max_age_seconds) < 0) {
+    fail(`invalid product evidence max_age_seconds: ${item.max_age_seconds}`);
+  }
+  if (typeof item.product_root !== 'string' || item.product_root.includes('/tmp/')) {
+    fail(`invalid product evidence product_root: ${item.product_root}`);
+  }
+  if (!productHeadPattern.test(item.product_head)) {
+    fail(`invalid product evidence product_head: ${item.product_head}`);
+  }
+  for (const field of ['source_artifacts', 'blocked_by', 'next_command', 'detail_manifest_source', 'detail_artifact_path']) {
+    if (typeof item[field] !== 'string') {
+      fail(`product evidence ${field} must be a string`);
+    }
+  }
+  for (const field of ['detail_code', 'current_item_id', 'summary', 'reason', 'next_action']) {
+    if (typeof item[field] !== 'string' || item[field].length === 0) {
+      fail(`product evidence ${field} is missing`);
+    }
+  }
+  if (!productEvidenceRiskLevels.has(item.risk_level)) {
+    fail(`invalid product evidence risk_level: ${item.risk_level}`);
   }
 }
 if (!Array.isArray(productAuthority.product_operation_blockers)) {
