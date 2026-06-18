@@ -4256,6 +4256,57 @@ Failure recovery:
 - If external product apply is needed, stop for a separate product-local mutation contract and developer approval; this sync ID keeps external targets plan-only.
 - If template application introduces fixed CSS, dependency changes, network calls, script execution, or workflow authority changes, reject the template and repair manifest validation.
 
+## Implemented Dashboard Design Studio Event Runner And Request Store Implementation Plan
+
+SYNC-ID: dashboard_design_studio_event_runner_store
+STATUS: implemented
+ARTIFACTS: .gitignore,.github/workflows/ci.yml,.github/workflows/lesson14-ci.yml,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/TEST_PLAN_MANIFEST.tsv,docs/workflow/GIT_HOOK_CHECKS.tsv,docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv,docs/workflow/FINAL_GATE_COVERAGE.tsv,tools/dashboard-design-system,tools/test_dashboard_design_studio_events.sh,tools/test_lesson_repository.sh,tools/check_ci_workflow_structure.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md,docs/memory/DEVELOPER_MEMORY.md
+TESTS: tools/test_dashboard_design_studio_events.sh,tools/check_dashboard_design_system.sh,tools/check_ci_workflow_structure.sh,tools/check_test_plan_coverage.sh,tools/test_test_plan.sh,tools/test_git_hooks.sh,tools/test_git_hooks_parallel.sh,tools/test_ci_final_gate.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh
+
+Implemented order:
+
+1. Used `$repository-development-workflow` and AGENTS.MD as the active protocol for this lesson-repository change.
+2. Chose `dashboard_design_studio_event_runner_store` as a separate sync ID so the existing orchestration foundation remains stable and this work does not absorb provider APIs, mock editing, external product writes, or Git/CI automation.
+3. Extended `tools/dashboard-design-system` with local event-store commands: `queue-request`, `list-events`, `event-status`, `cancel-event`, `dead-letter-event`, and `retry-event`.
+4. Reused the existing orchestration source to validate provider modes, target adapters, runner capabilities, and forbidden capabilities instead of adding fixed one-off command branches.
+5. Added append-only JSONL persistence with durable event IDs, request IDs, idempotency keys, base snapshot hashes, lifecycle state, retry count, event order, timestamps, and audit receipts.
+6. Kept persisted payloads to metadata, hashes, and bounded previews; raw `intent_text`, secret-like payloads, direct apply fields, shell commands, credential values, and external product apply authority are not persisted.
+7. Added `.dashboard-design-studio-events/` to `.gitignore` for repo-local runtime state while keeping tests isolated through `DASHBOARD_DESIGN_STUDIO_EVENT_STORE_DIR`.
+8. Added `tools/test_dashboard_design_studio_events.sh` for standalone regression coverage across queue, idempotency, read, transition, blocked provider, plan-only target, and secret rejection behavior.
+9. Wired the new standalone test into `tools/test_lesson_repository.sh`, Git hooks checks, Git hooks parallel classification, final-gate coverage, test-plan policy, both CI workflows, and the CI workflow structure checker.
+10. Synchronized the implemented sync ID across the as-built sync contract, requirements, specification, implementation plan, task tracker, handoff, and developer memory.
+
+Verification sequence for this implementation:
+
+```bash
+node --check tools/dashboard-design-system
+bash -n tools/test_dashboard_design_studio_events.sh
+./tools/test_dashboard_design_studio_events.sh
+./tools/check_dashboard_design_system.sh
+./tools/check_ci_workflow_structure.sh
+./tools/check_test_plan_coverage.sh
+./tools/test_test_plan.sh
+./tools/test_git_hooks_parallel.sh
+./tools/test_ci_final_gate.sh
+./tools/check_as_built_sync_contract.sh
+./tools/check_as_built_docs.sh
+./tools/check_workflow_pair_sync.sh
+git diff --check
+```
+
+Failure recovery:
+
+- If event records grant write, direct apply, or external product apply authority, restore those fields to false before adding any new event feature.
+- If API-key mode queues successfully, restore the blocked provider boundary and keep API/provider work behind a separate approved sync ID.
+- If raw `intent_text`, secret-like payloads, credentials, shell commands, or direct apply fields appear in the JSONL store, stop and repair persistence before changing tests.
+- If external product events are not plan-only/manual-required, repair target-adapter validation before touching product workflows.
+- If duplicate idempotency keys append records, repair the idempotency lookup before adding retry or provider features.
+- If CI or hook wiring fails, restore the standalone test row across Git hooks, final-gate coverage, test-plan policy, aggregate, CI workflows, and CI structure checks.
+
+Stop and ask before:
+
+- Provider API dispatch, subscription-agent background execution, raw-secret handling, OAuth, imagegen calls, mock image mutation, product-local source writes, arbitrary shell execution, Dashboard browser command execution, dependency changes, Git push, PR creation, merge, main CI waiting, cleanup/delete, or any existing-feature tradeoff.
+
 Developer approval boundaries:
 
 - Approval is required before API-key provider calls, external product writes, dependency changes, CI/hook/final-gate changes, Settings authority changes, command execution authority changes, Git/CI/merge/sync behavior changes, credential handling, destructive cleanup, push, merge, main CI waiting, local/remote sync, or any existing-feature tradeoff.

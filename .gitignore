@@ -8,6 +8,7 @@ Thumbs.db
 *.tmp
 *.bak
 .repository-development-runs/
+.dashboard-design-studio-events/
 
 # Node and Playwright generated files
 node_modules/

@@ -2207,6 +2207,57 @@ Verification state:
 - [x] `tools/check_workflow_pair_sync.sh` passed.
 - [x] `git diff --check` passed.
 
+## Dashboard Design Studio Event Runner And Request Store
+
+SYNC-ID: dashboard_design_studio_event_runner_store
+STATUS: implemented
+ARTIFACTS: .gitignore,.github/workflows/ci.yml,.github/workflows/lesson14-ci.yml,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/TEST_PLAN_MANIFEST.tsv,docs/workflow/GIT_HOOK_CHECKS.tsv,docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv,docs/workflow/FINAL_GATE_COVERAGE.tsv,tools/dashboard-design-system,tools/test_dashboard_design_studio_events.sh,tools/test_lesson_repository.sh,tools/check_ci_workflow_structure.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md,docs/memory/DEVELOPER_MEMORY.md
+TESTS: tools/test_dashboard_design_studio_events.sh,tools/check_dashboard_design_system.sh,tools/check_ci_workflow_structure.sh,tools/check_test_plan_coverage.sh,tools/test_test_plan.sh,tools/test_git_hooks.sh,tools/test_git_hooks_parallel.sh,tools/test_ci_final_gate.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh
+
+Implemented goal:
+
+- Added the local owner-tool event runner and request/proposal metadata store for Dashboard Design Studio.
+- Kept Design Studio request handling proposal-only and outside provider API calls, browser command execution, external product writes, Git/CI automation, dependency changes, and direct apply authority.
+- Preserved the existing Design Studio plan/apply and source-to-runtime design-system behavior.
+
+Implemented tasks:
+
+- [x] Select the new sync ID `dashboard_design_studio_event_runner_store`.
+- [x] Add append-only local JSONL event persistence behind `tools/dashboard-design-system`.
+- [x] Add durable event IDs, request IDs, idempotency keys, base snapshot hashes, lifecycle state, retry count, event order, timestamps, and audit receipts.
+- [x] Add `queue-request`, `list-events`, `event-status`, `cancel-event`, `dead-letter-event`, and `retry-event` command paths.
+- [x] Keep `cancel-event`, `dead-letter-event`, and `retry-event` confirmation-gated.
+- [x] Reject API-key provider mode and secret-like request payloads before persistence.
+- [x] Keep external product events plan-only/manual-required.
+- [x] Persist metadata, hashes, and bounded previews only; do not persist raw `intent_text`.
+- [x] Add `.dashboard-design-studio-events/` to `.gitignore`.
+- [x] Add standalone regression coverage in `tools/test_dashboard_design_studio_events.sh`.
+- [x] Wire the standalone regression into aggregate tests, Git hooks, Git hooks parallel classification, final-gate coverage, test-plan policy, CI workflows, and CI structure checks.
+- [x] Synchronize this implemented sync ID across the as-built contract and five required synchronized documents.
+
+Verification state:
+
+- [x] `node --check tools/dashboard-design-system` passed.
+- [x] `bash -n tools/test_dashboard_design_studio_events.sh` passed.
+- [x] `tools/test_dashboard_design_studio_events.sh` passed.
+- [x] `tools/check_dashboard_design_system.sh` passed.
+- [x] `tools/check_ci_workflow_structure.sh` passed.
+- [x] `tools/check_test_plan_coverage.sh` passed.
+- [x] `tools/test_test_plan.sh` passed.
+- [x] `tools/test_git_hooks.sh` passed.
+- [x] `tools/test_git_hooks_parallel.sh` passed.
+- [x] `tools/test_ci_final_gate.sh` passed.
+- [x] `tools/check_as_built_sync_contract.sh` passed.
+- [x] `tools/check_as_built_docs.sh` passed.
+- [x] `tools/check_workflow_pair_sync.sh` passed.
+- [x] `tools/test_ci_pipeline_acceleration.sh` passed.
+- [x] `tools/check_repository_development_workflow.sh` passed.
+- [x] `tools/test_repository_development_workflow.sh` passed.
+- [x] `tools/test_lesson_repository.sh --use-evidence` passed.
+- [x] `tools/git-hooks run --mode full --no-cache --jobs 4` passed.
+- [x] `tools/ci-final-gate` passed with same-run Git hook evidence inside full/no-cache hooks.
+- [x] `git diff --check` passed.
+
 Next Step:
 
 - No remaining local implementation work is known for this sync ID. Do not run push, merge, main CI, cleanup, API-key provider calls, or external product writes without explicit developer approval.

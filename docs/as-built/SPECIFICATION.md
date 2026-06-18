@@ -2434,6 +2434,40 @@ Verification contract:
 - Focused Dashboard tests verify the Design Studio route renders the orchestration foundation, schema names, provider modes, target adapters, and no direct apply authority.
 - i18n tests verify the new user-facing labels are covered.
 - As-built sync checks, workflow-pair checks, CI-structure checks, and repository-development workflow checks remain owner-layer verification anchors.
+
+## Implemented Dashboard Design Studio Event Runner And Request Store Specification
+
+SYNC-ID: dashboard_design_studio_event_runner_store
+STATUS: implemented
+ARTIFACTS: .gitignore,.github/workflows/ci.yml,.github/workflows/lesson14-ci.yml,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/TEST_PLAN_MANIFEST.tsv,docs/workflow/GIT_HOOK_CHECKS.tsv,docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv,docs/workflow/FINAL_GATE_COVERAGE.tsv,tools/dashboard-design-system,tools/test_dashboard_design_studio_events.sh,tools/test_lesson_repository.sh,tools/check_ci_workflow_structure.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md,docs/memory/DEVELOPER_MEMORY.md
+TESTS: tools/test_dashboard_design_studio_events.sh,tools/check_dashboard_design_system.sh,tools/check_ci_workflow_structure.sh,tools/check_test_plan_coverage.sh,tools/test_test_plan.sh,tools/test_git_hooks.sh,tools/test_git_hooks_parallel.sh,tools/test_ci_final_gate.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh
+
+The Dashboard Design Studio event runner and request store is implemented in the design-system owner tool.
+It persists proposal-request metadata as append-only local JSONL records and keeps every event outside direct apply, external product mutation, provider API dispatch, shell execution, Git, CI, and browser-command authority.
+
+Command surface:
+
+- `queue-request` accepts `--target-ref`, `--provider-mode`, `--request-kind`, `--intent-text`, optional `--purpose`, optional `--idempotency-key`, and optional `--base-snapshot-hash`.
+- `list-events` reads the append-only store and can filter by current lifecycle state.
+- `event-status` reads one current event by durable event ID.
+- `cancel-event`, `dead-letter-event`, and `retry-event` append transition records and require `--confirm`.
+- The default store is `.dashboard-design-studio-events/events.jsonl`; tests and controlled fixtures can override it with `DASHBOARD_DESIGN_STUDIO_EVENT_STORE_DIR`.
+
+Record contract:
+
+- Each event record carries `sync_id`, `record_version`, `event_id`, `request_id`, `idempotency_key`, `target_ref`, `target_apply_mode`, `provider_mode`, `provider_status`, `request_kind`, `lifecycle_state`, `job_state`, `proposal_state`, `base_snapshot_hash`, `retry_count`, `event_order`, timestamps, and `audit_receipt`.
+- `writes_allowed`, `direct_apply_authority`, and `external_product_apply` are always false.
+- `intent_text` is not persisted. The store keeps an intent digest, intent length, bounded preview, purpose digest, bounded purpose preview, and `payload_policy=metadata_and_redacted_preview_only`.
+- Secret-like payloads are rejected before persistence using the same design-system secret-like validation boundary used for orchestration payloads.
+- Duplicate idempotency keys return the existing event and do not append a new record.
+- API-key provider mode is blocked. Subscription-agent provider mode records a manual-required proposal/import state instead of dispatching an agent.
+- External product targets are recorded as plan-only and manual-required.
+
+Verification contract:
+
+- `tools/test_dashboard_design_studio_events.sh` covers queueing, idempotency, status/list reads, confirm-required cancellation, dead-letter and retry transitions, external-product plan-only state, subscription-agent manual-required state, API-key blocking, and secret-like payload rejection.
+- `tools/check_dashboard_design_system.sh` continues to validate the orchestration contract that supplies the runner capabilities and forbidden capabilities shown in event outputs.
+- Git hooks, CI workflows, CI workflow structure checks, final-gate coverage, aggregate tests, test-plan policy, and the as-built sync contract all include the new standalone event-store regression.
 ## Planned External Product AGENTS And Operation Mode Control Specification
 
 SYNC-ID: external_product_agents_mode_control

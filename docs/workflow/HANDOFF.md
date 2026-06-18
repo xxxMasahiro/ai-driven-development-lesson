@@ -2563,3 +2563,30 @@ SYNC-ID: dashboard_browser_debug_manifest
 STATUS: implemented
 ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/TEST_PLAN_MANIFEST.tsv,docs/workflow/GIT_HOOK_CHECKS.tsv,docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv,docs/workflow/FINAL_GATE_COVERAGE.tsv,tools/dashboard-browser-debug-manifest,tools/test_dashboard_browser_debug_manifest.sh,tools/test_lesson_repository.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
 TESTS: tools/test_dashboard_browser_debug_manifest.sh,tools/check_test_plan_coverage.sh,tools/test_test_plan.sh,tools/test_git_hooks.sh,tools/test_git_hooks_parallel.sh,tools/test_ci_final_gate.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh
+
+## Implemented Dashboard Design Studio Event Runner And Request Store Handoff
+
+SYNC-ID: dashboard_design_studio_event_runner_store
+STATUS: implemented
+ARTIFACTS: .gitignore,.github/workflows/ci.yml,.github/workflows/lesson14-ci.yml,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/TEST_PLAN_MANIFEST.tsv,docs/workflow/GIT_HOOK_CHECKS.tsv,docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv,docs/workflow/FINAL_GATE_COVERAGE.tsv,tools/dashboard-design-system,tools/test_dashboard_design_studio_events.sh,tools/test_lesson_repository.sh,tools/check_ci_workflow_structure.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md,docs/memory/DEVELOPER_MEMORY.md
+TESTS: tools/test_dashboard_design_studio_events.sh,tools/check_dashboard_design_system.sh,tools/check_ci_workflow_structure.sh,tools/check_test_plan_coverage.sh,tools/test_test_plan.sh,tools/test_git_hooks.sh,tools/test_git_hooks_parallel.sh,tools/test_ci_final_gate.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh
+
+Restart context:
+
+- `$repository-development-workflow` remains the active protocol for this repository change.
+- `tools/dashboard-design-system` now owns a local Design Studio event runner/request-store surface: `queue-request`, `list-events`, `event-status`, `cancel-event`, `dead-letter-event`, and `retry-event`.
+- The default runtime store is `.dashboard-design-studio-events/events.jsonl`, which is ignored. Tests use `DASHBOARD_DESIGN_STUDIO_EVENT_STORE_DIR` so no repository runtime state is left behind.
+- Event records are append-only JSONL metadata. They include IDs, idempotency, target/provider state, lifecycle state, base snapshot hash, retry count, event order, timestamps, and audit receipt.
+- Raw `intent_text` is not persisted. Secret-like payloads are rejected before writing.
+- Manual and subscription-agent modes are proposal/import boundaries only. API-key mode is blocked.
+- Dashboard Control Center events remain owner-tool mediated and do not gain direct apply authority. External product events remain plan-only/manual-required.
+- The focused regression is `./tools/test_dashboard_design_studio_events.sh`; it is also wired into aggregate tests, Git hooks, final-gate coverage, test-plan policy, CI workflows, and CI structure checks.
+
+Next safe action:
+
+- Continue future Design Studio work as separate sync IDs. Template persistence, mock library operations, imagegen calls, provider dispatch, and external product design-system adapters must stay behind their own contracts.
+- Playwright visual review is not required for this sync because no Dashboard UI, CSS, or layout files changed.
+
+Stop and ask before:
+
+- Provider API dispatch, subscription-agent background execution, raw-secret handling, OAuth, imagegen calls, mock image mutation, external product writes, arbitrary shell execution, browser command execution, dependency changes, Git push, PR creation, merge, main CI waiting, cleanup/delete, or any existing-feature tradeoff.

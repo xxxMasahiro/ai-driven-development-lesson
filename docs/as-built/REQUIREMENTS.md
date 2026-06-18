@@ -2029,6 +2029,32 @@ Non-scope:
 - Do not implement a full Figma replacement, advanced image editor, arbitrary canvas editor, arbitrary CSS or JavaScript editor, Git/CI executor, credential manager, OAuth flow, dependency installer, external product writer, marketplace, or release-proof shortcut in this sync ID.
 - Do not weaken STEP 1-7, STEP 1-14, Settings authority, command preview display-only behavior, product-security gates, existing CI, existing checks, existing document routes, or repo-local skills.
 - Do not treat mock images, OCR, AI responses, templates, natural-language requests, or external product documents as trusted instructions or design-system source without candidate-envelope validation and explicit approval.
+
+## Implemented Dashboard Design Studio Event Runner And Request Store Requirements
+
+SYNC-ID: dashboard_design_studio_event_runner_store
+STATUS: implemented
+ARTIFACTS: .gitignore,.github/workflows/ci.yml,.github/workflows/lesson14-ci.yml,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/TEST_PLAN_MANIFEST.tsv,docs/workflow/GIT_HOOK_CHECKS.tsv,docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv,docs/workflow/FINAL_GATE_COVERAGE.tsv,tools/dashboard-design-system,tools/test_dashboard_design_studio_events.sh,tools/test_lesson_repository.sh,tools/check_ci_workflow_structure.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md,docs/memory/DEVELOPER_MEMORY.md
+TESTS: tools/test_dashboard_design_studio_events.sh,tools/check_dashboard_design_system.sh,tools/check_ci_workflow_structure.sh,tools/check_test_plan_coverage.sh,tools/test_test_plan.sh,tools/test_git_hooks.sh,tools/test_git_hooks_parallel.sh,tools/test_ci_final_gate.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh
+
+Dashboard Design Studio now has a local, append-only event runner and request-store layer for proposal work.
+This implementation turns the existing orchestration foundation into a usable owner-tool queue without granting browser command execution, provider API calls, external product writes, Git/CI authority, or direct apply authority.
+
+Implemented outcomes:
+
+- `tools/dashboard-design-system queue-request` records Design Studio request metadata in an append-only JSONL store and returns a durable event ID, request ID, idempotency key, base snapshot hash, lifecycle state, and audit receipt.
+- `list-events` and `event-status` expose current event state without mutating source files, generated files, repositories, CI, or external services.
+- `cancel-event`, `dead-letter-event`, and `retry-event` append explicit state-transition records and require `--confirm` for mutation.
+- Manual and subscription-agent provider modes are accepted only as proposal/import boundaries. API-key mode remains blocked until a separately approved secret-reference, consent, cost, rate-limit, and provider policy exists.
+- Dashboard Control Center targets stay owner-tool mediated. External product targets stay plan-only and manual-required.
+- Event records store metadata, hashes, and bounded redacted previews only; raw `intent_text`, secret-like payloads, shell commands, direct-apply fields, and credential values are rejected or omitted.
+- The default event store path is ignored as repo-local runtime state, while tests use a temporary store through `DASHBOARD_DESIGN_STUDIO_EVENT_STORE_DIR`.
+- The new standalone regression is wired into aggregate tests, Git hooks, CI workflows, final-gate coverage, and test-plan policy.
+
+Non-scope:
+
+- Do not dispatch subscription agents, call provider APIs, store raw API keys, run imagegen, edit mock images, extract OCR as trusted instructions, write external product files, execute shell commands, push, merge, wait for main CI, or change Settings authority in this sync ID.
+- Do not treat the event store as release proof or as approval for apply; it is request/proposal metadata only.
 ## Planned External Product AGENTS And Operation Mode Control Requirements
 
 SYNC-ID: external_product_agents_mode_control

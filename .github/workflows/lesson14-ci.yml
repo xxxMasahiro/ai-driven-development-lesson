@@ -77,6 +77,7 @@ jobs:
           bash -n tools/test_dashboard_settings.sh
           bash -n tools/test_dashboard_i18n.sh
           bash -n tools/test_dashboard_browser_debug_manifest.sh
+          bash -n tools/test_dashboard_design_studio_events.sh
           bash -n tools/test_dashboard_control_center.sh
           bash -n tools/product-launch-check
           bash -n tools/test_product_launch_check.sh
@@ -166,6 +167,7 @@ jobs:
           ./tools/test_menu_prerequisites.sh
           ./tools/test_dashboard_settings.sh
           ./tools/test_dashboard_browser_debug_manifest.sh
+          ./tools/test_dashboard_design_studio_events.sh
           printf 'Lesson14 CI keeps the policy-regression-tests job context; common policy regressions are provided by CI / policy-regression-tests for the same commit.\n'
 
   lesson14-cli-tests:

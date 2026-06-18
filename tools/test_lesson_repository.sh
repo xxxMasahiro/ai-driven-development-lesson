@@ -80,6 +80,7 @@ WORKFLOW_PAIR_SINGLE_FILE_REASON="aggregate test may run while remediation docum
 ./tools/check_developer_memory_requirements.sh
 ./tools/check_repository_development_workflow.sh
 ./tools/check_dashboard_design_system.sh
+./tools/test_dashboard_design_studio_events.sh
 ./tools/repository-development-workflow status >/dev/null
 ./tools/menu >/dev/null
 ./tools/dashboard all >/dev/null
