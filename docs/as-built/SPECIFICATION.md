@@ -2570,3 +2570,31 @@ Boundary:
 
 - This sync does not change final-gap command definitions, hook row classifications, CI workflow names, Lesson14 compatibility contexts, Playwright evidence reuse, as-built evidence reuse, or product-local CI evidence collection.
 - Existing behavior is preserved as a hard requirement; no coverage reduction or existing-feature tradeoff is accepted.
+## Implemented Product Authority Evidence Detail Contract Specification
+
+SYNC-ID: product_authority_evidence_detail_contract
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/DASHBOARD_DATA_SCHEMA.tsv,tools/lib/product_repository_authority.sh,tools/product-repository-authority,dashboard-control-center/src/dashboardData.js,tests/fixtures/dashboard-control-center.json,tests/fixtures/dashboard-control-center-live-update.json,tools/test_product_repository_authority.sh,tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md,docs/memory/SESSION_MEMORY.md
+TESTS: tools/test_product_repository_authority.sh,tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh
+
+`development.product_authority.evidence_summary.items[]` now has an implemented Dashboard schema contract for the product authority detail fields that were already emitted by the producer path.
+The implemented item contract includes:
+
+- `context`, `required_in_context`, `observed_at`, `max_age_seconds`, `product_root`, `product_head`, `source_artifacts`, `blocked_by`, and `next_command`.
+- `detail_code`, `current_item_id`, `detail_manifest_source`, `detail_artifact_path`, `summary`, `reason`, `next_action`, and `risk_level`.
+
+`dashboard-control-center/src/dashboardData.js` validates the item shape, accepted evidence context, boolean requirement flag, nonnegative max age, sanitized product root label, git head token, optional detail paths, required decision text, and risk vocabulary.
+The Dashboard remains a read-only consumer: it does not collect evidence, call GitHub, mutate product repositories, or execute the command previews.
+
+## Implemented Dashboard Browser Debug Manifest Boundary Specification
+
+SYNC-ID: dashboard_browser_debug_manifest
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/TEST_PLAN_MANIFEST.tsv,docs/workflow/GIT_HOOK_CHECKS.tsv,docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv,tools/dashboard-browser-debug-manifest,tools/test_dashboard_browser_debug_manifest.sh,tools/test_lesson_repository.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_dashboard_browser_debug_manifest.sh,tools/check_test_plan_coverage.sh,tools/test_test_plan.sh,tools/test_git_hooks.sh,tools/test_git_hooks_parallel.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh
+
+`tools/dashboard-browser-debug-manifest` generates a Browser Debug CLI target manifest for the Dashboard Control Center.
+It reads either the maintained `tools/dashboard-data json` output or a test fixture, projects only bounded fields into inline `sourceData`, and declares the Control Center page routes, page roles, source bindings, user questions, review brief, and rubric owned by this lesson repository.
+
+The generated rubric intentionally keeps lesson-specific categories such as workflow-state clarity and next-action clarity in the target manifest.
+Browser Debug CLI consumes those as manifest data; it does not need Dashboard-specific runtime branches or external source loaders.

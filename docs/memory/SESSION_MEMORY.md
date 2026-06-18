@@ -1,5 +1,33 @@
 # Session Memory
 
+## 2026-06-18 Product Authority Evidence Detail Contract Slice
+
+This continuation stayed under `repository-development-workflow` after PR #13 for `ci_final_gate_gap_only_safety` was merged to `main` and main CI/local aggregate verification passed.
+The active constraint remains that existing Dashboard routes, product authority behavior, evidence collection, browser command execution boundaries, and CI/final-gate semantics must not be weakened.
+
+Completed in this slice so far:
+
+- Promoted product authority evidence detail fields in `docs/workflow/DASHBOARD_DATA_SCHEMA.tsv` from `planned` to `implemented`.
+- Added implemented schema rows for emitted `context`, `max_age_seconds`, and `product_root` fields.
+- Strengthened `dashboard-control-center/src/dashboardData.js` validation so evidence items must carry context, required flag, observation time, max age, sanitized product root, product head, artifacts, blockers, command preview, detail ids, detail references, summary, reason, next action, and risk level.
+- Updated Dashboard Control Center fixtures to match the producer-owned evidence item detail contract.
+- Strengthened `tools/test_product_repository_authority.sh`, `tools/test_dashboard_schema.sh`, and `tools/test_dashboard_data.sh` for this contract.
+- Added `product_authority_evidence_detail_contract` to the as-built sync contract and synchronized requirements, specification, implementation plan, TASK_TRACKER, and HANDOFF.
+
+Verification passed so far:
+
+- `bash -n tools/test_dashboard_data.sh`
+- `bash -n tools/test_dashboard_schema.sh`
+- `bash -n tools/test_product_repository_authority.sh`
+- `node --check dashboard-control-center/src/dashboardData.js`
+- `./tools/test_dashboard_schema.sh`
+- `./tools/test_product_repository_authority.sh`
+- `./tools/test_dashboard_data.sh`
+
+Next recommended work:
+
+- Run the as-built/workflow sync checks, repository-development fast_loop/mid_tests checks, and then release-gate proof for this slice.
+
 ## 2026-06-18 CI Final Gate Gap-Only Safety Slice
 
 This continuation stays under `repository-development-workflow` after the product CI run evidence collector slice.
@@ -127,6 +155,13 @@ Next recommended work:
 - Treat future real PR/main CI run collectors as a separate approval-bound scope.
 - Stop at the `release_gate` phase boundary unless PR CI/push/merge/main-sync/cleanup is explicitly requested as that phase.
 - Keep `frame-cue` and `browser-debug-cli` as temporary verification targets only.
+
+## 2026-06-18 Dashboard Browser Debug Manifest Boundary
+
+- Added `tools/dashboard-browser-debug-manifest` so ai-driven-development-lesson owns the Dashboard Control Center Browser Debug target manifest.
+- The generator keeps workflow, Git, CI, blocker, repository-selection, evidence-freshness, and next-safe-action semantics in bounded lesson-side `sourceData`, user questions, review brief, and rubric.
+- Browser Debug CLI remains generic; it consumes the generated manifest without adding Dashboard-specific runtime branches or lesson file loaders.
+- Added `tools/test_dashboard_browser_debug_manifest.sh` and wired it into `tools/test_lesson_repository.sh`.
 
 ## 2026-06-17 Concrete Product Test Evidence Slice
 

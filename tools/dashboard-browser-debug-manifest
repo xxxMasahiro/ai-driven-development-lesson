@@ -1,0 +1,500 @@
+#!/usr/bin/env node
+import { spawnSync } from 'node:child_process';
+import { readFileSync, writeFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const DEFAULT_BASE_URL = 'http://127.0.0.1:5173/';
+const SCHEMA_VERSION = '0.1.0';
+
+function usage() {
+  return [
+    'Usage:',
+    '  ./tools/dashboard-browser-debug-manifest [--base-url <url>] [--source <json-file>] [--output <json-file>]',
+    '',
+    'Build a Browser Debug CLI target manifest for Dashboard Control Center content UX review.',
+    'The generated manifest keeps lesson-specific Control Center semantics in this repository and passes bounded inline sourceData to Browser Debug CLI.'
+  ].join('\n');
+}
+
+function parseArgs(argv) {
+  const options = {
+    baseUrl: DEFAULT_BASE_URL,
+    source: null,
+    output: null
+  };
+  for (let index = 0; index < argv.length; index += 1) {
+    const token = argv[index];
+    if (token === '-h' || token === '--help' || token === 'help') {
+      options.help = true;
+    } else if (token === '--base-url') {
+      options.baseUrl = requireValue(argv, index += 1, token);
+    } else if (token === '--source') {
+      options.source = requireValue(argv, index += 1, token);
+    } else if (token === '--output') {
+      options.output = requireValue(argv, index += 1, token);
+    } else {
+      throw new Error(`unknown argument: ${token}`);
+    }
+  }
+  return options;
+}
+
+function requireValue(argv, index, flag) {
+  const value = argv[index];
+  if (!value || value.startsWith('--')) {
+    throw new Error(`${flag} requires a value`);
+  }
+  return value;
+}
+
+function readDashboardData(source) {
+  if (source) {
+    return JSON.parse(readFileSync(resolve(ROOT, source), 'utf8'));
+  }
+  const result = spawnSync(resolve(ROOT, 'tools/dashboard-data'), ['json'], {
+    cwd: ROOT,
+    encoding: 'utf8',
+    maxBuffer: 4 * 1024 * 1024
+  });
+  if (result.status !== 0) {
+    throw new Error(`tools/dashboard-data failed: ${result.stderr || result.stdout || result.status}`);
+  }
+  return JSON.parse(result.stdout);
+}
+
+function normalizeBaseUrl(value) {
+  const url = new URL(value);
+  return url.href;
+}
+
+function pageUrl(baseUrl, hash) {
+  const url = new URL(baseUrl);
+  url.hash = hash;
+  return url.href;
+}
+
+function safeText(value, fallback = 'unknown', maxLength = 240) {
+  const raw = value === undefined || value === null ? fallback : String(value);
+  return redact(raw.replace(/\s+/g, ' ').trim()).slice(0, maxLength) || fallback;
+}
+
+function safeNumber(value, fallback = 0) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : fallback;
+}
+
+function safeList(value, limit = 8) {
+  return Array.isArray(value) ? value.slice(0, limit) : [];
+}
+
+function redact(value) {
+  return value
+    .replace(/\b(token|password|secret|api[_-]?key)=\S+/gi, '$1=[REDACTED]')
+    .replace(/\bBearer\s+[A-Za-z0-9._~+/=-]{8,}/g, 'Bearer [REDACTED]');
+}
+
+function projectAction(action = {}) {
+  return {
+    title: safeText(action.title),
+    description: safeText(action.description),
+    target: safeText(action.target),
+    expected_result: safeText(action.expected_result),
+    risk_level: safeText(action.risk_level, 'unknown'),
+    status: safeText(action.status),
+    source: safeText(action.source)
+  };
+}
+
+function projectBlocker(blocker = {}) {
+  return {
+    source: safeText(blocker.source),
+    status: safeText(blocker.status),
+    reason: safeText(blocker.reason),
+    required_command: safeText(blocker.required_command, 'not_applicable')
+  };
+}
+
+function projectEvidenceItem(item = {}) {
+  return {
+    source_id: safeText(item.source_id),
+    status: safeText(item.status),
+    freshness_state: safeText(item.freshness_state),
+    authority: safeText(item.authority),
+    required_in_context: item.required_in_context === true,
+    summary: safeText(item.summary),
+    reason: safeText(item.reason),
+    next_action: safeText(item.next_action),
+    risk_level: safeText(item.risk_level, 'unknown'),
+    next_command: safeText(item.next_command, 'not_applicable')
+  };
+}
+
+function projectRepositorySelection(selection = {}) {
+  return {
+    status: safeText(selection.status),
+    menu_id: safeText(selection.menu_id),
+    workflow_context: safeText(selection.workflow_context),
+    current_repo_id: safeText(selection.current_repo_id),
+    current_repository_name: safeText(selection.current_repository_name),
+    selection_state: safeText(selection.selection_state),
+    options: safeList(selection.options, 8).map((option) => ({
+      repo_id: safeText(option.repo_id),
+      display_name: safeText(option.display_name),
+      product_type: safeText(option.product_type),
+      status: safeText(option.status),
+      selected: option.selected === true,
+      selectable: option.selectable === true,
+      disabled_reason_key: safeText(option.disabled_reason_key, 'not_applicable')
+    }))
+  };
+}
+
+function projectDashboardData(data) {
+  const selected = data.selected_context && typeof data.selected_context === 'object' ? data.selected_context : {};
+  const summary = data.summary && typeof data.summary === 'object' ? data.summary : {};
+  const authority = data.development?.product_authority && typeof data.development.product_authority === 'object'
+    ? data.development.product_authority
+    : {};
+  const blockers = safeList(selected.blockers, 12).map(projectBlocker);
+  return {
+    snapshot: {
+      schema_version: safeText(data.schema_version),
+      generated_at: safeText(data.generated_at),
+      snapshot_id: safeText(data.snapshot_id),
+      source_commands: safeList(data.source_commands, 12).map((command) => safeText(command))
+    },
+    selected_context: {
+      menu_id: safeText(selected.menu_id),
+      workflow_context: safeText(selected.workflow_context),
+      target_repository: {
+        name: safeText(selected.target_repository?.name),
+        path_state: safeText(selected.target_repository?.path_state)
+      },
+      product_type: safeText(selected.product_type),
+      current_step_id: safeText(selected.current_step_id),
+      current_step_label: safeText(selected.current_step_label),
+      current_step_index: safeNumber(selected.current_step_index),
+      current_step_total: safeNumber(selected.current_step_total),
+      updated_at: safeText(selected.updated_at),
+      git_status: safeText(selected.git_status),
+      ci_status: safeText(selected.ci_status),
+      security_status: safeText(selected.security_status),
+      evidence_status: safeText(selected.evidence_status),
+      git_usage_mode: safeText(selected.git_usage_mode),
+      git_requirement: safeText(selected.git_requirement),
+      ci_requirement: safeText(selected.ci_requirement),
+      next_safe_action: projectAction(selected.next_safe_action),
+      blockers,
+      blocker_count: blockers.length
+    },
+    repository_selection: projectRepositorySelection(data.repository_selection),
+    summary: {
+      mode: safeText(summary.mode),
+      next_safe_action: safeText(summary.next_safe_action),
+      primary_action: projectAction(summary.primary_action),
+      category_metrics: Object.fromEntries(
+        Object.entries(summary.category_metrics || {}).map(([key, value]) => [key, {
+          label: safeText(value?.label, key),
+          total: safeNumber(value?.total),
+          healthy: safeNumber(value?.healthy),
+          warning: safeNumber(value?.warning),
+          problem: safeNumber(value?.problem),
+          percent: safeNumber(value?.percent),
+          status: safeText(value?.status)
+        }])
+      )
+    },
+    product_authority: {
+      status: safeText(authority.status),
+      repository: {
+        status: safeText(authority.repository?.status),
+        configured_name: safeText(authority.repository?.configured_name)
+      },
+      evidence_items: safeList(authority.evidence_summary?.items, 12).map(projectEvidenceItem),
+      product_operation_blockers: safeList(authority.product_operation_blockers, 12).map(projectBlocker)
+    }
+  };
+}
+
+function buildManifest({ baseUrl, data }) {
+  const normalizedBaseUrl = normalizeBaseUrl(baseUrl);
+  const sourceData = projectDashboardData(data);
+  const routes = [
+    ['overview', 'overview', 'workflow_overview', 'Overview'],
+    ['lessons', 'lessons', 'lesson_progress_detail', 'Lessons'],
+    ['workflow', 'workflow', 'workflow_detail', 'Development Workflow'],
+    ['maintenance', 'maintenance', 'maintenance_detail', 'Maintenance Sync'],
+    ['safety', 'safety', 'safety_detail', 'Safety Confirmation'],
+    ['repository-info', 'repository-info', 'repository_detail', 'Repository Info'],
+    ['documents', 'documents', 'document_catalog', 'Documents'],
+    ['settings', 'settings', 'settings_boundary', 'Settings'],
+    ['design-studio', 'design-studio', 'design_system_editor', 'Design Studio'],
+    ['history', 'history', 'history_detail', 'History'],
+    ['help', 'help', 'help_detail', 'Help']
+  ];
+
+  return {
+    schemaVersion: SCHEMA_VERSION,
+    name: 'ai-driven-development-lesson-dashboard-control-center',
+    baseUrl: normalizedBaseUrl,
+    scope: {
+      sameOrigin: true,
+      include: [],
+      exclude: []
+    },
+    seeds: [normalizedBaseUrl],
+    expectedRoutes: [normalizedBaseUrl, ...routes.filter(([id]) => id !== 'overview').map(([id]) => pageUrl(normalizedBaseUrl, id))],
+    pages: routes.map(([id, hash, role, name]) => ({
+      name,
+      url: id === 'overview' ? normalizedBaseUrl : pageUrl(normalizedBaseUrl, hash),
+      role,
+      priority: ['overview', 'workflow', 'repository-info'].includes(id) ? 'high' : 'medium',
+      expectations: pageExpectations(id)
+    })),
+    sourceData: [{
+      id: 'dashboard_context',
+      data: sourceData,
+      required: true
+    }],
+    localContentUxAdvisory: {
+      enabled: true,
+      audience: [
+        'non-engineer',
+        'early-career engineer',
+        'intermediate engineer',
+        'maintainer'
+      ],
+      goal: 'Help users understand Dashboard Control Center state, repository scope, blockers, evidence freshness, and the next safe action without reading CLI output directly.',
+      checks: [
+        'content_contract',
+        'source_data_alignment',
+        'selector_scoped_state',
+        'workflow_state_clarity',
+        'information_architecture',
+        'user_journey',
+        'next_action_clarity',
+        'navigation_clarity',
+        'decision_support',
+        'explanation_clarity'
+      ],
+      requiredUserQuestions: [
+        {
+          id: 'selected-context-awareness',
+          pageId: 'overview',
+          question: 'Can the user identify the selected menu, target repository, and current workflow context?',
+          expectedEvidence: [
+            sourceData.selected_context.menu_id,
+            sourceData.selected_context.target_repository.name,
+            sourceData.selected_context.workflow_context
+          ],
+          matchMode: 'any',
+          severity: 'medium'
+        },
+        {
+          id: 'blocker-awareness',
+          pageId: 'overview',
+          question: 'Can the user tell whether blockers or evidence gaps exist before continuing?',
+          expectedEvidence: [
+            sourceData.selected_context.evidence_status,
+            'blocker',
+            'required',
+            'not run',
+            'failed'
+          ],
+          matchMode: 'any',
+          severity: 'medium'
+        },
+        {
+          id: 'next-safe-action-awareness',
+          pageId: 'overview',
+          question: 'Can the user identify the next safe action and its risk before acting?',
+          expectedEvidence: [
+            sourceData.selected_context.next_safe_action.title,
+            sourceData.selected_context.next_safe_action.status,
+            sourceData.selected_context.next_safe_action.risk_level
+          ],
+          matchMode: 'any',
+          severity: 'medium'
+        }
+      ],
+      reviewBrief: {
+        summary: 'Dashboard Control Center must explain the selected repository, workflow state, evidence, blockers, and next safe action clearly enough for non-engineers and early-career engineers to make development decisions.',
+        userRoles: [
+          'non-engineer',
+          'early-career engineer',
+          'intermediate engineer',
+          'maintainer'
+        ],
+        decisionNeeds: [
+          {
+            id: 'overview-operational-decision',
+            pageId: 'overview',
+            question: 'Can the user decide whether the current workflow can proceed or needs intervention?',
+            expectedEvidence: [
+              sourceData.selected_context.evidence_status,
+              sourceData.summary.primary_action.status,
+              sourceData.summary.next_safe_action
+            ],
+            matchMode: 'any',
+            severity: 'medium'
+          },
+          {
+            id: 'repository-scope-decision',
+            pageId: 'repository-info',
+            question: 'Can the user confirm which repository and product context the dashboard is describing?',
+            expectedEvidence: [
+              sourceData.selected_context.target_repository.name,
+              sourceData.repository_selection.current_repository_name,
+              sourceData.selected_context.product_type
+            ],
+            matchMode: 'any',
+            severity: 'medium'
+          }
+        ]
+      },
+      rubric: [
+        {
+          id: 'workflow-state-rubric',
+          category: 'workflow_state_clarity',
+          pageId: 'overview',
+          criterion: 'The page communicates selected workflow state, evidence state, and blocker risk without requiring CLI context.',
+          expectedEvidence: [
+            sourceData.selected_context.evidence_status,
+            sourceData.selected_context.git_status,
+            sourceData.selected_context.ci_status
+          ],
+          matchMode: 'any',
+          severity: 'medium'
+        },
+        {
+          id: 'next-safe-action-rubric',
+          category: 'next_action_clarity',
+          pageId: 'overview',
+          criterion: 'The page gives a clear next safe action and distinguishes display-only command previews from executable actions.',
+          expectedEvidence: [
+            sourceData.selected_context.next_safe_action.title,
+            sourceData.selected_context.next_safe_action.status,
+            sourceData.selected_context.next_safe_action.risk_level
+          ],
+          matchMode: 'any',
+          severity: 'medium'
+        },
+        {
+          id: 'repository-selection-rubric',
+          category: 'decision_support',
+          pageId: 'repository-info',
+          criterion: 'Repository detail pages identify the selected repository and avoid confusing it with other product candidates.',
+          expectedEvidence: [
+            sourceData.selected_context.target_repository.name,
+            sourceData.repository_selection.current_repository_name,
+            sourceData.product_authority.repository.configured_name
+          ],
+          matchMode: 'any',
+          severity: 'medium'
+        }
+      ]
+    },
+    viewportMatrix: ['desktop', 'mobile'],
+    actionPolicy: {
+      allow: ['navigation', 'state_revealing']
+    },
+    budgets: {
+      maxRoutes: 80
+    },
+    artifacts: {
+      screenshots: true
+    },
+    masks: [],
+    regions: [],
+    appHints: {
+      reviewGoal: 'ai_driven_development_lesson_control_center_review',
+      notes: [
+        'This manifest is owned by ai-driven-development-lesson, not Browser Debug CLI core.',
+        'Dashboard-specific workflow, Git, CI, blocker, repository-selection, and next-safe-action semantics are intentionally declared here as target-owned sourceData and rubric.',
+        'Browser Debug CLI should consume this as a generic target manifest without adding runtime branches for this repository.'
+      ]
+    }
+  };
+}
+
+function pageExpectations(id) {
+  const common = {
+    text: [],
+    selectors: [`#${id}`, '.category-nav [aria-current="page"]'],
+    dataBindings: [],
+    userQuestions: []
+  };
+  if (id === 'overview') {
+    common.text.push('Overview');
+    common.dataBindings.push(
+      {
+        id: 'overview-evidence-status',
+        sourceId: 'dashboard_context',
+        pointer: '/selected_context/evidence_status',
+        selector: '#overview',
+        target: 'text',
+        match: 'contains',
+        severity: 'medium'
+      },
+      {
+        id: 'overview-risk-level',
+        sourceId: 'dashboard_context',
+        pointer: '/selected_context/next_safe_action/risk_level',
+        selector: '#overview [data-risk]',
+        target: 'data-risk',
+        match: 'exact',
+        severity: 'medium',
+        required: false
+      }
+    );
+  } else if (id === 'workflow') {
+    common.text.push('Workflow');
+    common.dataBindings.push({
+      id: 'workflow-current-step',
+      sourceId: 'dashboard_context',
+      pointer: '/selected_context/current_step_label',
+      selector: '#workflow',
+      target: 'text',
+      match: 'contains',
+      severity: 'medium',
+      required: false
+    });
+  } else if (id === 'repository-info') {
+    common.text.push('Repository');
+    common.dataBindings.push({
+      id: 'repository-selected-name',
+      sourceId: 'dashboard_context',
+      pointer: '/selected_context/target_repository/name',
+      selector: '#repository-info',
+      target: 'text',
+      match: 'contains',
+      severity: 'medium'
+    });
+  }
+  return common;
+}
+
+function main() {
+  try {
+    const options = parseArgs(process.argv.slice(2));
+    if (options.help) {
+      process.stdout.write(`${usage()}\n`);
+      return;
+    }
+    const data = readDashboardData(options.source);
+    const manifest = buildManifest({ baseUrl: options.baseUrl, data });
+    const json = `${JSON.stringify(manifest, null, 2)}\n`;
+    if (options.output) {
+      writeFileSync(resolve(ROOT, options.output), json, 'utf8');
+    } else {
+      process.stdout.write(json);
+    }
+  } catch (error) {
+    process.stderr.write(`${error.message}\n`);
+    process.exitCode = 1;
+  }
+}
+
+main();

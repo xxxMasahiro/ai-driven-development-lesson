@@ -375,6 +375,27 @@ function fail(message) {
 if (data.status !== "not_run") fail(`expected not_run authority when required evidence is missing, got ${data.status}`);
 const item = data.evidence_summary.items.find((entry) => entry.source_id === "product.git.sync");
 if (!item) fail("evidence item was not parsed");
+for (const field of [
+  "context",
+  "required_in_context",
+  "observed_at",
+  "max_age_seconds",
+  "product_root",
+  "product_head",
+  "source_artifacts",
+  "blocked_by",
+  "next_command",
+  "detail_code",
+  "current_item_id",
+  "detail_manifest_source",
+  "detail_artifact_path",
+  "summary",
+  "reason",
+  "next_action",
+  "risk_level",
+]) {
+  if (!(field in item)) fail(`evidence item missing detail field ${field}`);
+}
 if (item.product_root !== "[external-product-repository]/product") fail("evidence product_root was not preserved");
 if (item.status !== "passed" || item.freshness_state !== "current" || item.detail_manifest_source !== "ops/EVIDENCE_DETAIL_MANIFEST.tsv" || item.risk_level !== "high") fail("evidence status/freshness/detail metadata was not preserved");
 const push = data.evidence_summary.items.find((entry) => entry.source_id === "product.git.push");

@@ -54,6 +54,7 @@ const PRODUCT_GIT_USAGE_MODES = new Set(["none", "local", "remote_sync", "ci", "
 const PRODUCT_GIT_REQUIREMENTS = new Set(["required", "not_applicable", "unknown"]);
 const EVIDENCE_FRESHNESS_STATES = new Set(["current", "stale", "not_collected", "unknown"]);
 const EVIDENCE_AUTHORITIES = new Set(["authoritative", "manual_required", "advisory", "not_collected"]);
+const PRODUCT_HEAD_PATTERN = /^(none|[a-f0-9]{40}|[a-f0-9]{64})$/;
 const LIVE_CHECK_KEYS = ["local_tests", "git_sync", "ci", "security"];
 const LIVE_DETAIL_PAGES = new Set(["#workflow", "#maintenance", "#safety", "#repository-info", "#documents", "#history", "#help"]);
 const CI_HEAD_MATCH_STATES = new Set(["matched", "different", "unknown"]);
@@ -451,8 +452,38 @@ function validateProductAuthority(development) {
     if (!item || typeof item !== "object" || Array.isArray(item)) {
       throw new Error("dashboard product evidence item must be an object");
     }
+    assertAllowedKeys(
+      item,
+      new Set([
+        "source_id",
+        "context",
+        "status",
+        "freshness_state",
+        "required_in_context",
+        "authority",
+        "observed_at",
+        "max_age_seconds",
+        "product_root",
+        "product_head",
+        "source_artifacts",
+        "blocked_by",
+        "next_command",
+        "detail_code",
+        "current_item_id",
+        "detail_manifest_source",
+        "detail_artifact_path",
+        "summary",
+        "reason",
+        "next_action",
+        "risk_level",
+      ]),
+      "dashboard product evidence item",
+    );
     if (!displayText(item.source_id, "")) {
       throw new Error("dashboard product evidence item source_id is missing");
+    }
+    if (!WORKFLOW_CONTEXTS.has(displayText(item.context, "")) && displayText(item.context, "") !== "all") {
+      throw new Error("dashboard product evidence item context is invalid");
     }
     if (!ALLOWED_STATES.has(displayText(item.status, ""))) {
       throw new Error("dashboard product evidence item status is invalid");
@@ -460,8 +491,42 @@ function validateProductAuthority(development) {
     if (!EVIDENCE_FRESHNESS_STATES.has(displayText(item.freshness_state, ""))) {
       throw new Error("dashboard product evidence item freshness state is invalid");
     }
+    if (typeof item.required_in_context !== "boolean") {
+      throw new Error("dashboard product evidence item required_in_context must be a boolean");
+    }
     if (!EVIDENCE_AUTHORITIES.has(displayText(item.authority, ""))) {
       throw new Error("dashboard product evidence item authority is invalid");
+    }
+    if (!displayText(item.observed_at, "")) {
+      throw new Error("dashboard product evidence item observed_at is missing");
+    }
+    if (!Number.isInteger(Number(item.max_age_seconds)) || Number(item.max_age_seconds) < 0) {
+      throw new Error("dashboard product evidence item max_age_seconds is invalid");
+    }
+    if (!displayText(item.product_root, "") || displayText(item.product_root, "").includes("[absolute-path]")) {
+      throw new Error("dashboard product evidence item product_root is invalid");
+    }
+    if (!PRODUCT_HEAD_PATTERN.test(displayText(item.product_head, ""))) {
+      throw new Error("dashboard product evidence item product_head is invalid");
+    }
+    for (const field of ["source_artifacts", "blocked_by", "next_command"]) {
+      if (typeof item[field] !== "string") {
+        throw new Error(`dashboard product evidence item ${field} must be a string`);
+      }
+    }
+    for (const field of ["detail_code", "current_item_id", "summary", "reason", "next_action"]) {
+      if (!displayText(item[field], "")) {
+        throw new Error(`dashboard product evidence item ${field} is missing`);
+      }
+    }
+    if (item.detail_manifest_source && !safeRelativePath(item.detail_manifest_source)) {
+      throw new Error("dashboard product evidence item detail_manifest_source is invalid");
+    }
+    if (item.detail_artifact_path && !safeRelativePath(item.detail_artifact_path)) {
+      throw new Error("dashboard product evidence item detail_artifact_path is invalid");
+    }
+    if (!RISK_LEVELS.has(displayText(item.risk_level, ""))) {
+      throw new Error("dashboard product evidence item risk_level is invalid");
     }
   }
   for (const blocker of asArray(authority.product_operation_blockers)) {

@@ -2321,3 +2321,63 @@ Next Step:
 
 - Continue remaining approved implementation slices as separate sync IDs.
 - Do not accept any existing-feature tradeoff, CI-name change, full/no-cache reduction, Dashboard behavior change, or product repository behavior change in later slices.
+## Implemented Product Authority Evidence Detail Contract Work
+
+Sync ID: `product_authority_evidence_detail_contract`.
+Current status: `implemented`.
+Priority: 2.
+
+Implemented task state:
+
+- [x] Confirm product authority evidence detail fields are producer-owned and already emitted by the authority layer.
+- [x] Promote Dashboard schema rows for evidence item detail fields to `implemented`.
+- [x] Add schema rows for emitted `context`, `max_age_seconds`, and `product_root`.
+- [x] Strengthen Dashboard runtime validation for evidence item context, requirement flag, freshness support fields, product head, safe paths, decision text, and risk level.
+- [x] Update Dashboard fixtures to include the detail contract fields.
+- [x] Add focused tests for producer output, Dashboard schema, and Dashboard data validation.
+
+Required implemented verification:
+
+```bash
+./tools/test_product_repository_authority.sh
+./tools/test_dashboard_schema.sh
+./tools/test_dashboard_data.sh
+./tools/check_as_built_sync_contract.sh
+./tools/check_as_built_docs.sh
+./tools/check_workflow_pair_sync.sh
+```
+
+SYNC-ID: product_authority_evidence_detail_contract
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/DASHBOARD_DATA_SCHEMA.tsv,tools/lib/product_repository_authority.sh,tools/product-repository-authority,dashboard-control-center/src/dashboardData.js,tests/fixtures/dashboard-control-center.json,tests/fixtures/dashboard-control-center-live-update.json,tools/test_product_repository_authority.sh,tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md,docs/memory/SESSION_MEMORY.md
+TESTS: tools/test_product_repository_authority.sh,tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh
+
+## Implemented Dashboard Browser Debug Manifest Boundary Work
+
+Sync ID: `dashboard_browser_debug_manifest`.
+Current status: `implemented`.
+Priority: 2.
+
+Implemented task state:
+
+- [x] Add `tools/dashboard-browser-debug-manifest` as the lesson-owned generator for Browser Debug CLI Dashboard Control Center review manifests.
+- [x] Keep workflow, Git, CI, blocker, repository-selection, and next-safe-action semantics in bounded lesson-side `sourceData` and rubric configuration.
+- [x] Add `tools/test_dashboard_browser_debug_manifest.sh` for standalone manifest-contract validation.
+- [x] Wire the focused test into `tools/test_lesson_repository.sh`.
+- [x] Register the test in `docs/workflow/TEST_PLAN_MANIFEST.tsv` and the sync in `docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv`.
+
+Required implemented verification:
+
+```bash
+./tools/test_dashboard_browser_debug_manifest.sh
+./tools/check_test_plan_coverage.sh
+./tools/test_test_plan.sh
+./tools/check_as_built_sync_contract.sh
+./tools/check_as_built_docs.sh
+./tools/check_workflow_pair_sync.sh
+```
+
+SYNC-ID: dashboard_browser_debug_manifest
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/TEST_PLAN_MANIFEST.tsv,docs/workflow/GIT_HOOK_CHECKS.tsv,docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv,tools/dashboard-browser-debug-manifest,tools/test_dashboard_browser_debug_manifest.sh,tools/test_lesson_repository.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_dashboard_browser_debug_manifest.sh,tools/check_test_plan_coverage.sh,tools/test_test_plan.sh,tools/test_git_hooks.sh,tools/test_git_hooks_parallel.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh

@@ -66,27 +66,58 @@ dashboard_data_control_chars=(
   $'\034' $'\035' $'\036' $'\037'
 )
 
+declare -gA DASHBOARD_JSON_ESCAPE_CACHE=()
+
+dashboard_data_has_unsafe_control_chars() {
+  local value="$1"
+  local char
+  for char in "${dashboard_data_control_chars[@]}"; do
+    [[ "$value" == *"$char"* ]] && return 0
+  done
+  return 1
+}
+
 dashboard_data_strip_unsafe_control_chars() {
   local value="$1"
   local char
+  if ! dashboard_data_has_unsafe_control_chars "$value"; then
+    printf '%s' "$value"
+    return
+  fi
   for char in "${dashboard_data_control_chars[@]}"; do
     value="${value//$char/}"
   done
   printf '%s' "$value"
 }
 
+dashboard_data_may_contain_secret_like_data() {
+  local value="$1"
+  local lower
+  lower="${value,,}"
+  case "$lower" in
+    *secret*|*token*|*api_key*|*password*|*private_key*|*ghp_*|*gho_*|*ghu_*|*ghs_*|*ghr_*|*sk-*|*akia*|*begin*private*key*)
+      return 0
+      ;;
+  esac
+  return 1
+}
+
 dashboard_data_safe_text() {
   local value="$1"
   local secret_pattern
-  value="$(dashboard_data_strip_unsafe_control_chars "$value")"
+  if dashboard_data_has_unsafe_control_chars "$value"; then
+    value="$(dashboard_data_strip_unsafe_control_chars "$value")"
+  fi
   value="${value//$'\r'/ }"
   value="${value//$'\n'/ }"
   value="${value//$'\t'/ }"
 
-  secret_pattern='([sS][eE][cC][rR][eE][tT]|[tT][oO][kK][eE][nN]|[aA][pP][iI]_[kK][eE][yY]|[pP][aA][sS][sS][wW][oO][rR][dD]|[pP][rR][iI][vV][aA][tT][eE]_[kK][eE][yY])[[:space:]]*[:=][[:space:]]*[^[:space:]#]{8,}|gh[pousr]_[A-Za-z0-9_]{20,}|sk-[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16}|BEGIN[[:space:]]+(RSA[[:space:]]+|OPENSSH[[:space:]]+|EC[[:space:]]+|DSA[[:space:]]+)?PRIVATE[[:space:]]+KEY'
-  if [[ "$value" =~ $secret_pattern ]]; then
-    printf '[redacted secret-like data]'
-    return
+  if dashboard_data_may_contain_secret_like_data "$value"; then
+    secret_pattern='([sS][eE][cC][rR][eE][tT]|[tT][oO][kK][eE][nN]|[aA][pP][iI]_[kK][eE][yY]|[pP][aA][sS][sS][wW][oO][rR][dD]|[pP][rR][iI][vV][aA][tT][eE]_[kK][eE][yY])[[:space:]]*[:=][[:space:]]*[^[:space:]#]{8,}|gh[pousr]_[A-Za-z0-9_]{20,}|sk-[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16}|BEGIN[[:space:]]+(RSA[[:space:]]+|OPENSSH[[:space:]]+|EC[[:space:]]+|DSA[[:space:]]+)?PRIVATE[[:space:]]+KEY'
+    if [[ "$value" =~ $secret_pattern ]]; then
+      printf '[redacted secret-like data]'
+      return
+    fi
   fi
 
   case "$value" in
@@ -100,18 +131,33 @@ dashboard_data_safe_text() {
 }
 
 dashboard_json_escape() {
-  local value escaped
+  local value escaped cacheable
+  local cache_key
+  cacheable=0
+  cache_key="$1"
+  if [[ -n "$cache_key" && "${#cache_key}" -le 512 ]]; then
+    if [[ -n "${DASHBOARD_JSON_ESCAPE_CACHE[$cache_key]+set}" ]]; then
+      printf '%s' "${DASHBOARD_JSON_ESCAPE_CACHE[$cache_key]}"
+      return
+    fi
+    cacheable=1
+  fi
   value="$(dashboard_data_safe_text "$1")"
   escaped="${value//\\/\\\\}"
   escaped="${escaped//\"/\\\"}"
   escaped="${escaped//$'\r'/\\r}"
   escaped="${escaped//$'\n'/\\n}"
   escaped="${escaped//$'\t'/\\t}"
+  if [[ "$cacheable" -eq 1 ]]; then
+    DASHBOARD_JSON_ESCAPE_CACHE[$cache_key]="$escaped"
+  fi
   printf '%s' "$escaped"
 }
 
 dashboard_json_string() {
-  printf '"%s"' "$(dashboard_json_escape "$1")"
+  printf '"'
+  dashboard_json_escape "$1"
+  printf '"'
 }
 
 dashboard_json_bool() {

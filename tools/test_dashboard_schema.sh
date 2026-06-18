@@ -33,6 +33,16 @@ require_enum_contains() {
   fi
 }
 
+require_implemented_status() {
+  local path="$1"
+  if ! awk -F '\t' -v path="$path" '
+    $1 !~ /^#/ && $2 == path && $3 == "implemented" { found = 1 }
+    END { exit found ? 0 : 1 }
+  ' "$SCHEMA"; then
+    report "dashboard schema path is not implemented: $path"
+  fi
+}
+
 [[ -f "$SCHEMA" ]] || {
   printf 'missing dashboard schema: %s\n' "$SCHEMA" >&2
   exit 1
@@ -329,11 +339,14 @@ required_paths=(
   "development.product_authority.manifest_summary.optional_missing"
   "development.product_authority.evidence_summary"
   "development.product_authority.evidence_summary.items[].source_id"
+  "development.product_authority.evidence_summary.items[].context"
   "development.product_authority.evidence_summary.items[].status"
   "development.product_authority.evidence_summary.items[].freshness_state"
   "development.product_authority.evidence_summary.items[].authority"
   "development.product_authority.evidence_summary.items[].required_in_context"
   "development.product_authority.evidence_summary.items[].observed_at"
+  "development.product_authority.evidence_summary.items[].max_age_seconds"
+  "development.product_authority.evidence_summary.items[].product_root"
   "development.product_authority.evidence_summary.items[].product_head"
   "development.product_authority.evidence_summary.items[].source_artifacts"
   "development.product_authority.evidence_summary.items[].blocked_by"
@@ -460,6 +473,26 @@ require_enum_contains "development.product_authority.evidence_summary.items[].st
 require_enum_contains "development.product_authority.evidence_summary.items[].freshness_state" "not_collected"
 require_enum_contains "development.product_authority.evidence_summary.items[].authority" "not_collected"
 require_enum_contains "development.product_authority.evidence_summary.items[].risk_level" "critical"
+for product_evidence_detail_path in \
+  "development.product_authority.evidence_summary.items[].context" \
+  "development.product_authority.evidence_summary.items[].required_in_context" \
+  "development.product_authority.evidence_summary.items[].observed_at" \
+  "development.product_authority.evidence_summary.items[].max_age_seconds" \
+  "development.product_authority.evidence_summary.items[].product_root" \
+  "development.product_authority.evidence_summary.items[].product_head" \
+  "development.product_authority.evidence_summary.items[].source_artifacts" \
+  "development.product_authority.evidence_summary.items[].blocked_by" \
+  "development.product_authority.evidence_summary.items[].next_command" \
+  "development.product_authority.evidence_summary.items[].detail_code" \
+  "development.product_authority.evidence_summary.items[].current_item_id" \
+  "development.product_authority.evidence_summary.items[].detail_manifest_source" \
+  "development.product_authority.evidence_summary.items[].detail_artifact_path" \
+  "development.product_authority.evidence_summary.items[].summary" \
+  "development.product_authority.evidence_summary.items[].reason" \
+  "development.product_authority.evidence_summary.items[].next_action" \
+  "development.product_authority.evidence_summary.items[].risk_level"; do
+  require_implemented_status "$product_evidence_detail_path"
+done
 require_enum_contains "development.product_authority.product_operation_blockers[].status" "not_run"
 require_enum_contains "development.product_authority.product_operation_blockers[].status" "stale"
 require_enum_contains "live_status.menu_id" "free-development"

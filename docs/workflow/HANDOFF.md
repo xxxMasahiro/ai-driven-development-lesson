@@ -2525,3 +2525,41 @@ Recovery notes:
 Stop and ask before:
 
 - Required CI name changes, branch-protection context changes, full/no-cache reduction, changed-only authoritative CI, persistent verification-result caching, Dashboard action execution, product repository writes, push, PR creation, merge, cleanup, credentials, OAuth, or any existing-feature tradeoff.
+## Implemented Product Authority Evidence Detail Contract Handoff
+
+Sync ID: `product_authority_evidence_detail_contract`.
+Current status: `implemented`.
+
+The Dashboard product authority evidence detail contract is now implemented.
+`DASHBOARD_DATA_SCHEMA.tsv` marks the detail fields as implemented, including context, requirement flag, observation time, max age, sanitized product root, product head, artifacts, blockers, command preview, detail references, summary, reason, next action, and risk level.
+`dashboardData.js` validates these fields before the Control Center accepts a snapshot.
+
+Resume notes:
+
+- This slice is validation and contract hardening only; it does not change evidence collection, product repository mutation, browser command execution, or Dashboard route behavior.
+- Focused verification already targets `tools/test_product_repository_authority.sh`, `tools/test_dashboard_schema.sh`, and `tools/test_dashboard_data.sh`.
+- If future product evidence fields are added, update the producer, Dashboard schema, runtime validator, fixtures, and focused tests together.
+
+SYNC-ID: product_authority_evidence_detail_contract
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/DASHBOARD_DATA_SCHEMA.tsv,tools/lib/product_repository_authority.sh,tools/product-repository-authority,dashboard-control-center/src/dashboardData.js,tests/fixtures/dashboard-control-center.json,tests/fixtures/dashboard-control-center-live-update.json,tools/test_product_repository_authority.sh,tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md,docs/memory/SESSION_MEMORY.md
+TESTS: tools/test_product_repository_authority.sh,tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh
+
+## Implemented Dashboard Browser Debug Manifest Boundary Handoff
+
+Sync ID: `dashboard_browser_debug_manifest`.
+Current status: `implemented`.
+
+`tools/dashboard-browser-debug-manifest` now generates a Browser Debug CLI target manifest owned by ai-driven-development-lesson.
+It keeps Dashboard Control Center workflow/Git/CI/blocker/repository-selection/next-safe-action meaning in lesson-side bounded `sourceData`, user questions, review brief, and rubric instead of requiring Browser Debug CLI runtime branches.
+
+Resume notes:
+
+- Use `./tools/dashboard-browser-debug-manifest --base-url <url>` to print the manifest, or `--output <path>` to write it.
+- The focused contract check is `./tools/test_dashboard_browser_debug_manifest.sh`.
+- This is a manifest boundary only; it does not start Vite, run Playwright, mutate repositories, or send evidence outside the local process.
+
+SYNC-ID: dashboard_browser_debug_manifest
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/TEST_PLAN_MANIFEST.tsv,docs/workflow/GIT_HOOK_CHECKS.tsv,docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv,tools/dashboard-browser-debug-manifest,tools/test_dashboard_browser_debug_manifest.sh,tools/test_lesson_repository.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_dashboard_browser_debug_manifest.sh,tools/check_test_plan_coverage.sh,tools/test_test_plan.sh,tools/test_git_hooks.sh,tools/test_git_hooks_parallel.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh
