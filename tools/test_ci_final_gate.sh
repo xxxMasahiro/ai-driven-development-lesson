@@ -161,6 +161,11 @@ if run_final_gate >/tmp/final-gate-uncovered.out 2>&1; then
   exit 1
 fi
 grep 'missing final-gate coverage for aggregate requirement: ./tools/uncovered.sh' /tmp/final-gate-uncovered.out >/dev/null
+if run_final_gate --gap-only >/tmp/final-gate-gap-only-uncovered.out 2>&1; then
+  printf 'gap-only accepted uncovered aggregate requirement unexpectedly\n' >&2
+  exit 1
+fi
+grep 'missing final-gate coverage for aggregate requirement: ./tools/uncovered.sh' /tmp/final-gate-gap-only-uncovered.out >/dev/null
 
 cat >"$AGGREGATE_FILE" <<'EOF'
 #!/usr/bin/env bash
@@ -170,6 +175,9 @@ set -euo pipefail
 ./tools/gap.sh
 ./tools/resource-guard summary --short >/dev/null
 EOF
+
+gap_only_output="$(run_final_gate --gap-only)"
+[[ "$gap_only_output" == *"CI final gate gap-only coverage and commands passed."* ]]
 
 cat >"$GAP_FILE" <<'EOF'
 # command_id	command	description

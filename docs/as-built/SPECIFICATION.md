@@ -304,6 +304,7 @@ SYNC-ID: as_built_sync_contract
 STATUS: implemented
 ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv, tools/check_as_built_sync_contract.sh, tools/as-built-sync, tools/test_as_built_sync_contract.sh
 TESTS: tools/check_as_built_sync_contract.sh, tools/test_as_built_sync_contract.sh
+NOTE: `tools/as-built-sync status` caches repeated active-command and Git hook runner lookups so status reporting remains usable as the sync contract grows; output and pass/fail semantics stay unchanged.
 
 SYNC-ID: git_workflow_policy
 STATUS: implemented
@@ -2539,3 +2540,33 @@ Boundary:
 
 - `ci-status` remains the local manifest/provider-readiness check and does not call GitHub.
 - `ci-runs` is the explicit network-observing collector and is not invoked by `tools/dashboard-data`.
+
+## Implemented CI Final Gate Gap-Only Safety Specification
+
+SYNC-ID: ci_final_gate_gap_only_safety
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/FINAL_GATE_COVERAGE.tsv,docs/workflow/FINAL_GATE_GAP_COMMANDS.tsv,tools/ci-final-gate,tools/test_ci_final_gate.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md,docs/memory/SESSION_MEMORY.md
+TESTS: tools/test_ci_final_gate.sh,tools/check_ci_workflow_structure.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh
+
+`tools/ci-final-gate --gap-only` now uses the same aggregate coverage validation as the default final gate before executing final-gap commands.
+This keeps optimized final-gate paths additive and fail-closed rather than creating a weaker alternate route.
+
+Behavior:
+
+- `--gap-only` calls `validate_aggregate_coverage` before `run_gap_commands`.
+- Aggregate requirements are parsed from `tools/test_lesson_repository.sh` or the configured aggregate file.
+- Coverage is valid only when every aggregate requirement is covered by a non-final-gate hook row or a configured gap command.
+- Coverage rows that reference unknown aggregate requirements, malformed coverage rows, malformed gap rows, missing hooks, missing gap commands, or the final-gate hook itself are rejected before any gap command can count as success.
+- After successful validation and gap command execution, gap-only mode reports `CI final gate gap-only coverage and commands passed.`
+- The default final gate keeps the existing order: validate aggregate coverage, verify same-run Git hook evidence, run gap commands on valid evidence, or fall back to the exhaustive aggregate command when strict evidence is not required.
+
+Regression coverage:
+
+- `tools/test_ci_final_gate.sh` creates a fixture aggregate with an uncovered requirement and proves both default final-gate mode and `--gap-only` reject it.
+- The same fixture restores valid coverage and proves `--gap-only` succeeds only after coverage validation and gap command execution.
+- The existing malformed gap-row failure path remains covered.
+
+Boundary:
+
+- This sync does not change final-gap command definitions, hook row classifications, CI workflow names, Lesson14 compatibility contexts, Playwright evidence reuse, as-built evidence reuse, or product-local CI evidence collection.
+- Existing behavior is preserved as a hard requirement; no coverage reduction or existing-feature tradeoff is accepted.

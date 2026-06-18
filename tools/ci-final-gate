@@ -238,8 +238,9 @@ while [[ $# -gt 0 ]]; do
 done
 
 if [[ "$gap_only" == "true" ]]; then
+  validate_aggregate_coverage
   run_gap_commands
-  printf 'CI final gate gap commands passed.\n'
+  printf 'CI final gate gap-only coverage and commands passed.\n'
   exit 0
 fi
 

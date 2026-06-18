@@ -263,6 +263,7 @@ SYNC-ID: as_built_sync_contract
 STATUS: implemented
 ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv, tools/check_as_built_sync_contract.sh, tools/as-built-sync, tools/test_as_built_sync_contract.sh
 TESTS: tools/check_as_built_sync_contract.sh, tools/test_as_built_sync_contract.sh
+NOTE: `tools/as-built-sync status` caches repeated active-command and Git hook runner lookups so status reporting remains usable as the sync contract grows; output and pass/fail semantics stay unchanged.
 
 SYNC-ID: git_workflow_policy
 STATUS: implemented
@@ -2493,3 +2494,34 @@ Recovery notes:
 Stop and ask before:
 
 - Browser-triggered CI collection, background polling, push, PR creation, merge, main CI waiting, local/remote sync, product repository cleanup/deletion, credential storage, OAuth, external product source writes, or any existing-feature tradeoff.
+
+## Implemented CI Final Gate Gap-Only Safety Handoff
+
+SYNC-ID: ci_final_gate_gap_only_safety
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/FINAL_GATE_COVERAGE.tsv,docs/workflow/FINAL_GATE_GAP_COMMANDS.tsv,tools/ci-final-gate,tools/test_ci_final_gate.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md,docs/memory/SESSION_MEMORY.md
+TESTS: tools/test_ci_final_gate.sh,tools/check_ci_workflow_structure.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh
+
+Current State:
+
+- `tools/ci-final-gate --gap-only` now validates aggregate coverage before running final-gap commands.
+- Missing aggregate coverage now fails in gap-only mode with the same fail-closed error used by the default final gate.
+- Valid gap-only mode reports `CI final gate gap-only coverage and commands passed.` after validation and gap command execution.
+- The default final-gate path still validates coverage, then uses same-run Git hook evidence or the existing aggregate fallback.
+- `tools/as-built-sync status` now caches repeated active-command and Git hook runner lookups; status output and pass/fail semantics remain unchanged.
+- No Dashboard UI, Playwright layout, product repository, required CI name, full/no-cache, or final-gap command behavior changed in this sync.
+- Local focused, fast-loop, mid-test, aggregate, full/no-cache Git hooks, and pre-commit verification passed after the cache follow-up.
+
+Next Step:
+
+- After this safety slice is clean, continue remaining approved implementation slices as separate sync IDs rather than folding broad roadmap work into this gate change.
+
+Recovery notes:
+
+- If `--gap-only` accepts an uncovered aggregate requirement, restore the coverage validation call before investigating other final-gate behavior.
+- If valid gap-only fixtures fail because coverage parsing is too strict, repair coverage parsing or the fixture while preserving aggregate coverage proof.
+- If a proposed fix reduces full/no-cache scope, hides a final-gate failure, removes an existing standalone command, or changes required CI names, reject that fix as an existing-feature tradeoff.
+
+Stop and ask before:
+
+- Required CI name changes, branch-protection context changes, full/no-cache reduction, changed-only authoritative CI, persistent verification-result caching, Dashboard action execution, product repository writes, push, PR creation, merge, cleanup, credentials, OAuth, or any existing-feature tradeoff.

@@ -17,6 +17,9 @@ wiring_relpaths=(
   ".github/workflows/lesson14-ci.yml"
 )
 
+declare -A active_command_reference_cache=()
+declare -A git_hooks_runner_reference_cache=()
+
 usage() {
   cat <<'EOF'
 Usage:
@@ -105,6 +108,25 @@ active_command_reference() {
   return 1
 }
 
+active_command_reference_cached() {
+  local file="$1"
+  local test_relpath="$2"
+  local key="$file|$test_relpath"
+
+  if [[ -n "${active_command_reference_cache[$key]+set}" ]]; then
+    [[ "${active_command_reference_cache[$key]}" == "1" ]]
+    return
+  fi
+
+  if active_command_reference "$file" "$test_relpath"; then
+    active_command_reference_cache["$key"]="1"
+    return 0
+  fi
+
+  active_command_reference_cache["$key"]="0"
+  return 1
+}
+
 git_hooks_runner_reference() {
   local wiring_file="$1"
   local test_relpath="$2"
@@ -114,7 +136,7 @@ git_hooks_runner_reference() {
   local hook_mode="full"
 
   [[ -f "$wiring_file" && -f "$checks_file" && -f "$policy_file" ]] || return 1
-  active_command_reference "$wiring_file" "tools/git-hooks" || return 1
+  active_command_reference_cached "$wiring_file" "tools/git-hooks" || return 1
   allowed_modes="$(awk -F '\t' '$1 == "hook_mode" { print $2; found = 1 } END { if (!found) exit 1 }' "$policy_file")" || return 1
   case "|$allowed_modes|" in
     *"|$hook_mode|"*) ;;
@@ -162,6 +184,25 @@ git_hooks_runner_reference() {
   ' "$checks_file"
 }
 
+git_hooks_runner_reference_cached() {
+  local wiring_file="$1"
+  local test_relpath="$2"
+  local key="$wiring_file|$test_relpath"
+
+  if [[ -n "${git_hooks_runner_reference_cache[$key]+set}" ]]; then
+    [[ "${git_hooks_runner_reference_cache[$key]}" == "1" ]]
+    return
+  fi
+
+  if git_hooks_runner_reference "$wiring_file" "$test_relpath"; then
+    git_hooks_runner_reference_cache["$key"]="1"
+    return 0
+  fi
+
+  git_hooks_runner_reference_cache["$key"]="0"
+  return 1
+}
+
 test_wiring_status() {
   local tests="$1"
   local test_relpath wiring_relpath total present
@@ -173,9 +214,9 @@ test_wiring_status() {
     [[ -n "$test_relpath" && "$test_relpath" != "none" ]] || continue
     for wiring_relpath in "${wiring_relpaths[@]}"; do
       total=$((total + 1))
-      if [[ -f "$ROOT/$wiring_relpath" ]] && active_command_reference "$ROOT/$wiring_relpath" "$test_relpath"; then
+      if [[ -f "$ROOT/$wiring_relpath" ]] && active_command_reference_cached "$ROOT/$wiring_relpath" "$test_relpath"; then
         present=$((present + 1))
-      elif [[ -f "$ROOT/$wiring_relpath" ]] && git_hooks_runner_reference "$ROOT/$wiring_relpath" "$test_relpath"; then
+      elif [[ -f "$ROOT/$wiring_relpath" ]] && git_hooks_runner_reference_cached "$ROOT/$wiring_relpath" "$test_relpath"; then
         present=$((present + 1))
       fi
     done

@@ -1,5 +1,43 @@
 # Session Memory
 
+## 2026-06-18 CI Final Gate Gap-Only Safety Slice
+
+This continuation stays under `repository-development-workflow` after the product CI run evidence collector slice.
+The active constraint is that no existing-feature tradeoff is allowed: required CI names, full/no-cache behavior, standalone aggregate verification, final-gap command semantics, Dashboard behavior, Playwright coverage, and product repository behavior must remain intact.
+
+Completed in this slice so far:
+
+- Added aggregate coverage validation to `tools/ci-final-gate --gap-only` before final-gap commands run.
+- Kept the default final-gate path aligned with the existing evidence and aggregate fallback behavior.
+- Extended `tools/test_ci_final_gate.sh` so an uncovered aggregate requirement fails in both default and gap-only modes.
+- Added a valid gap-only assertion for `CI final gate gap-only coverage and commands passed.`
+- Added `ci_final_gate_gap_only_safety` to the as-built sync contract and synchronized requirements, specification, implementation plan, TASK_TRACKER, and HANDOFF.
+- Added `tools/as-built-sync status` lookup caching after aggregate release proof exposed repeated active-command and Git hook runner scans; output and pass/fail semantics are unchanged.
+
+Verification passed:
+
+- `bash -n tools/ci-final-gate`
+- `bash -n tools/test_ci_final_gate.sh`
+- `bash -n tools/as-built-sync`
+- `./tools/test_ci_final_gate.sh`
+- `./tools/test_as_built_sync_contract.sh`
+- `./tools/check_ci_workflow_structure.sh`
+- `./tools/check_as_built_sync_contract.sh`
+- `./tools/check_as_built_docs.sh`
+- `./tools/check_workflow_pair_sync.sh`
+- `./tools/check_test_plan_coverage.sh`
+- `./tools/test_test_plan.sh`
+- `./tools/repository-development-workflow run --phase fast_loop --check-set required --execute --approved`
+- `./tools/repository-development-workflow run --phase mid_tests --check-set required --execute --approved`
+- `./tools/test_lesson_repository.sh`
+- `./tools/git-hooks run --mode full --no-cache`
+- `.githooks/pre-commit`
+- `git diff --check`
+
+Next recommended work:
+
+- Continue remaining approved roadmap slices as separate sync IDs after this slice is clean.
+
 ## 2026-06-18 Product CI Run Evidence Collector Slice
 
 This continuation stayed under `repository-development-workflow` after PR #11 for `external_product_repository_registry` was merged to `main` and local/remote sync was clean.
