@@ -14,6 +14,7 @@ as_built_evidence_run_sync_contract_check	hook	check_as_built_sync_contract	Aggr
 ./tools/check_developer_memory_requirements.sh	hook	check_developer_memory_requirements	Aggregate developer-memory coverage is provided by the matching Git hook row.
 ./tools/check_repository_development_workflow.sh	hook	check_repository_development_workflow	Aggregate repository development workflow coverage is provided by the matching Git hook row.
 ./tools/check_dashboard_design_system.sh	hook	check_dashboard_design_system	Aggregate Dashboard design-system coverage is provided by the matching Git hook row.
+./tools/test_dashboard_design_studio_events.sh	hook	test_dashboard_design_studio_events	Aggregate Design Studio event runner/store coverage is provided by the matching Git hook row.
 ./tools/test_docs_tour.sh	hook	test_docs_tour	Aggregate documentation tour coverage is provided by the matching Git hook row.
 ./tools/test_as_built_sync_contract.sh	hook	test_as_built_sync_contract	Aggregate sync-contract regression coverage is provided by the matching Git hook row.
 ./tools/test_test_plan.sh	hook	test_test_plan	Aggregate test-plan regression coverage is provided by the matching Git hook row.

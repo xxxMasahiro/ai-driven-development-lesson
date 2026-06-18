@@ -1779,6 +1779,7 @@ test.describe("English dashboard control center", () => {
     await expect(page.locator("#documents")).not.toContainText("task-tracker-repository");
 
     await page.getByRole("navigation", { name: "Other" }).getByRole("link", { name: "Update History", exact: true }).click();
+    await expect(page.locator("#history .mock-table-row--workflow")).toHaveCount(5);
     const historyTargets = await page.locator("#history .mock-table-row--workflow [data-label='Target / branch']").allTextContents();
     expect(historyTargets).toEqual(Array(5).fill("browser-debug-cli"));
   });

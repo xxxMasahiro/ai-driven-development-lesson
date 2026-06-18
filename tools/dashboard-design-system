@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import fs from "node:fs";
 import path from "node:path";
+import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -13,6 +14,13 @@ const generatedCssPath = path.join(root, "dashboard-control-center/src/design-sy
 const generatedJsPath = path.join(root, "dashboard-control-center/src/design-system.generated.js");
 const mainPath = path.join(root, "dashboard-control-center/src/main.jsx");
 const appPath = path.join(root, "dashboard-control-center/src/App.jsx");
+const eventStoreDir = process.env.DASHBOARD_DESIGN_STUDIO_EVENT_STORE_DIR
+  ? path.resolve(process.env.DASHBOARD_DESIGN_STUDIO_EVENT_STORE_DIR)
+  : path.join(root, ".dashboard-design-studio-events");
+const eventStorePath = path.join(eventStoreDir, "events.jsonl");
+const eventStoreSyncId = "dashboard_design_studio_event_runner_store";
+const eventStoreRecordVersion = "2026-06-18.design-studio-event-store";
+const secretLikePattern = /(SECRET|TOKEN|API_KEY|PASSWORD|PRIVATE_KEY)\s*[:=]\s*[^",\s]{8,}|sk-[A-Za-z0-9]{20,}|BEGIN (RSA |OPENSSH |EC |DSA )?PRIVATE KEY/i;
 const supportedInteractionValues = {
   component: new Set(["tooltip-copy"]),
   tooltip_trigger: new Set(["hover-only", "disabled"]),
@@ -121,6 +129,11 @@ function readJson(file) {
 function fail(message) {
   console.error(message);
   process.exitCode = 1;
+}
+
+function stop(message, code = 2) {
+  console.error(message);
+  process.exit(code);
 }
 
 function sortedTokenRows(tokens) {
@@ -1118,8 +1131,15 @@ function requireBoolean(value, label) {
 
 function validateNoSecretLikePayload(value, label) {
   const text = JSON.stringify(value);
-  if (/(SECRET|TOKEN|API_KEY|PASSWORD|PRIVATE_KEY)\s*[:=]\s*[^",\s]{8,}|sk-[A-Za-z0-9]{20,}|BEGIN (RSA |OPENSSH |EC |DSA )?PRIVATE KEY/i.test(text)) {
+  if (secretLikePattern.test(text)) {
     fail(`${label} must not contain secret-like payloads`);
+  }
+}
+
+function assertNoSecretLikePayload(value, label) {
+  const text = JSON.stringify(value);
+  if (secretLikePattern.test(text)) {
+    stop(`${label} must not contain secret-like payloads`);
   }
 }
 
@@ -1388,7 +1408,7 @@ function loadSources() {
 }
 
 function usage() {
-  console.error("Usage: ./tools/dashboard-design-system <check|write|emit-css|emit-js|emit-orchestration|plan-interaction|apply-interaction> [--component tooltip-copy] [--target-scope dashboard-control-center] [--theme-accent blue|teal|slate] [--density compact|balanced|comfortable] [--radius-scale compact|standard|soft] [--typography-scale standard|large] [--action-control-height 32px|34px|38px] [--action-control-padding '6px 10px'|'8px 11px'|'9px 13px'] [--compact-control-height 30px|32px|34px] [--compact-control-padding '4px 8px'|'5px 10px'|'6px 12px'] [--form-control-height 38px|40px|44px] [--form-control-padding '0 9px'|'0 10px'|'0 12px'] [--icon-button-size 34px|38px|42px] [--control-font-size 0.82rem|0.84rem|0.9rem] [--card-padding 12px|14px|16px] [--card-gap 8px|10px|12px] [--row-padding '9px 10px'|'10px 12px'|'12px 14px'] [--row-gap 8px|10px|12px] [--technical-affordance-gap 4px|6px|8px] [--technical-source-max-width 220px|260px|300px] [--technical-evidence-max-width 260px|292px|320px] [--technical-preview-chip-max-width 320px|360px|420px] [--page-header-padding '16px 18px'|'18px 20px'|'20px 22px'] [--metadata-gap 6px|8px|10px] [--page-icon-size 44px|52px|56px] [--badge-gap 4px|5px|6px] [--badge-height 24px|26px|28px] [--mode-badge-padding '3px 10px'|'4px 14px'|'5px 16px'] [--badge-font-size 0.72rem|0.76rem|0.8rem] [--mode-badge-font-size 0.74rem|0.78rem|0.82rem] [--tooltip-trigger hover-only|disabled] [--tooltip-hide-policy pointer-leave] [--tooltip-placement top] [--copy-feedback-trigger hover-only|disabled] [--copy-feedback-placement top] [--confirm]");
+  console.error("Usage: ./tools/dashboard-design-system <check|write|emit-css|emit-js|emit-orchestration|plan-interaction|apply-interaction|queue-request|list-events|event-status|cancel-event|retry-event|dead-letter-event> [--component tooltip-copy] [--target-scope dashboard-control-center] [--theme-accent blue|teal|slate] [--density compact|balanced|comfortable] [--radius-scale compact|standard|soft] [--typography-scale standard|large] [--action-control-height 32px|34px|38px] [--action-control-padding '6px 10px'|'8px 11px'|'9px 13px'] [--compact-control-height 30px|32px|34px] [--compact-control-padding '4px 8px'|'5px 10px'|'6px 12px'] [--form-control-height 38px|40px|44px] [--form-control-padding '0 9px'|'0 10px'|'0 12px'] [--icon-button-size 34px|38px|42px] [--control-font-size 0.82rem|0.84rem|0.9rem] [--card-padding 12px|14px|16px] [--card-gap 8px|10px|12px] [--row-padding '9px 10px'|'10px 12px'|'12px 14px'] [--row-gap 8px|10px|12px] [--technical-affordance-gap 4px|6px|8px] [--technical-source-max-width 220px|260px|300px] [--technical-evidence-max-width 260px|292px|320px] [--technical-preview-chip-max-width 320px|360px|420px] [--page-header-padding '16px 18px'|'18px 20px'|'20px 22px'] [--metadata-gap 6px|8px|10px] [--page-icon-size 44px|52px|56px] [--badge-gap 4px|5px|6px] [--badge-height 24px|26px|28px] [--mode-badge-padding '3px 10px'|'4px 14px'|'5px 16px'] [--badge-font-size 0.72rem|0.76rem|0.8rem] [--mode-badge-font-size 0.74rem|0.78rem|0.82rem] [--tooltip-trigger hover-only|disabled] [--tooltip-hide-policy pointer-leave] [--tooltip-placement top] [--copy-feedback-trigger hover-only|disabled] [--copy-feedback-placement top] [--target-ref dashboard-control-center|external-product] [--provider-mode manual|subscription-agent|api-key] [--request-kind design-intent|mock|template|manual-proposal] [--intent-text text] [--event-id id] [--reason text] [--confirm]");
   process.exit(2);
 }
 
@@ -1412,6 +1432,414 @@ function parseOptionArgs(args) {
     index += 1;
   }
   return parsed;
+}
+
+function sha256Text(value) {
+  return crypto.createHash("sha256").update(value).digest("hex");
+}
+
+function isoNow() {
+  if (process.env.DASHBOARD_DESIGN_STUDIO_EVENT_NOW) {
+    const forced = new Date(process.env.DASHBOARD_DESIGN_STUDIO_EVENT_NOW);
+    if (Number.isNaN(forced.getTime())) {
+      stop(`invalid DASHBOARD_DESIGN_STUDIO_EVENT_NOW: ${process.env.DASHBOARD_DESIGN_STUDIO_EVENT_NOW}`);
+    }
+    return forced.toISOString();
+  }
+  return new Date().toISOString();
+}
+
+function relativeStorePath() {
+  const relative = path.relative(root, eventStorePath);
+  if (!relative.startsWith("..") && !path.isAbsolute(relative)) {
+    return relative;
+  }
+  return "external-test-store/events.jsonl";
+}
+
+function compactPreview(value, limit = 160) {
+  const normalized = String(value || "").replace(/\s+/g, " ").trim();
+  if (normalized.length <= limit) {
+    return normalized;
+  }
+  return `${normalized.slice(0, limit - 3)}...`;
+}
+
+function rejectUnknownOptions(options, allowedKeys, command) {
+  for (const key of Object.keys(options)) {
+    if (key === "confirm") {
+      continue;
+    }
+    if (!allowedKeys.has(key)) {
+      stop(`${command} does not support --${key.replace(/_/g, "-")}`);
+    }
+  }
+}
+
+function requireOption(options, key, command) {
+  const value = options[key];
+  if (typeof value !== "string" || !value.trim()) {
+    stop(`${command} requires --${key.replace(/_/g, "-")}`);
+  }
+  return value.trim();
+}
+
+function validateStoreIdentifier(value, label) {
+  if (!/^[A-Za-z0-9._:-]{8,160}$/.test(value)) {
+    stop(`${label} must use only letters, numbers, dot, underscore, colon, or hyphen and be at least 8 characters`);
+  }
+  return value;
+}
+
+function baseSnapshotHash(tokens, components, orchestration) {
+  return sha256Text(JSON.stringify({
+    tokens,
+    components,
+    orchestration,
+  }));
+}
+
+function providerModeContract(orchestration, providerMode) {
+  const provider = (orchestration.providerModes || []).find((candidate) => candidate.id === providerMode);
+  if (!provider) {
+    stop(`unsupported provider mode: ${providerMode}`);
+  }
+  if (provider.directApplyAuthority !== false) {
+    stop(`provider mode must not have direct apply authority: ${providerMode}`);
+  }
+  return provider;
+}
+
+function targetAdapterContract(orchestration, targetRef) {
+  const target = (orchestration.targetAdapters || []).find((candidate) => candidate.id === targetRef);
+  if (!target) {
+    stop(`unsupported target ref: ${targetRef}`);
+  }
+  if (target.id === "external-product" && target.applyMode !== "plan-only") {
+    stop("external product targets must remain plan-only");
+  }
+  if (target.id === "dashboard-control-center" && target.applyMode !== "owner-tool") {
+    stop("dashboard-control-center target must remain owner-tool mediated");
+  }
+  return target;
+}
+
+function ensureRequestKind(value) {
+  const allowed = new Set(["design-intent", "mock", "template", "manual-proposal"]);
+  if (!allowed.has(value)) {
+    stop(`unsupported request kind: ${value}`);
+  }
+  return value;
+}
+
+function readEventRecords() {
+  if (!fs.existsSync(eventStorePath)) {
+    return [];
+  }
+  const lines = fs.readFileSync(eventStorePath, "utf8").split(/\r?\n/).filter(Boolean);
+  return lines.map((line, index) => {
+    try {
+      return JSON.parse(line);
+    } catch (error) {
+      stop(`invalid Design Studio event store JSON at line ${index + 1}: ${error.message}`, 1);
+    }
+    return null;
+  });
+}
+
+function appendEventRecord(record) {
+  fs.mkdirSync(eventStoreDir, { recursive: true });
+  fs.appendFileSync(eventStorePath, `${JSON.stringify(record)}\n`, "utf8");
+}
+
+function latestEventRecords(records) {
+  const latestByEvent = new Map();
+  for (const record of records) {
+    if (!record || record.sync_id !== eventStoreSyncId || !record.event_id) {
+      continue;
+    }
+    const previous = latestByEvent.get(record.event_id);
+    if (!previous || Number(record.event_order || 0) >= Number(previous.event_order || 0)) {
+      latestByEvent.set(record.event_id, record);
+    }
+  }
+  return [...latestByEvent.values()].sort((left, right) => {
+    const leftOrder = Number(left.event_order || 0);
+    const rightOrder = Number(right.event_order || 0);
+    if (leftOrder !== rightOrder) {
+      return leftOrder - rightOrder;
+    }
+    return String(left.event_id).localeCompare(String(right.event_id));
+  });
+}
+
+function eventPublicPayload(record) {
+  return {
+    event_id: record.event_id,
+    request_id: record.request_id,
+    idempotency_key: record.idempotency_key,
+    target_ref: record.target_ref,
+    target_apply_mode: record.target_apply_mode,
+    provider_mode: record.provider_mode,
+    provider_status: record.provider_status,
+    request_kind: record.request_kind,
+    lifecycle_state: record.lifecycle_state,
+    job_state: record.job_state,
+    proposal_state: record.proposal_state,
+    writes_allowed: record.writes_allowed,
+    direct_apply_authority: record.direct_apply_authority,
+    external_product_apply: record.external_product_apply,
+    base_snapshot_hash: record.base_snapshot_hash,
+    redaction_state: record.redaction_state,
+    intent_digest: record.intent_digest,
+    intent_preview: record.intent_preview,
+    intent_length: record.intent_length,
+    purpose_digest: record.purpose_digest,
+    purpose_preview: record.purpose_preview,
+    payload_policy: record.payload_policy,
+    retry_count: record.retry_count,
+    event_order: record.event_order,
+    created_at: record.created_at,
+    updated_at: record.updated_at,
+    audit_receipt: record.audit_receipt,
+    next_action: record.next_action,
+  };
+}
+
+function eventOutput(status, record, orchestration, extra = {}) {
+  return {
+    status,
+    sync_id: eventStoreSyncId,
+    store: {
+      format: "jsonl",
+      path: relativeStorePath(),
+      append_only: true,
+      retention_policy: "metadata_and_redacted_preview_only",
+    },
+    runner: {
+      required_capabilities: orchestration.eventRunner?.requiredCapabilities || [],
+      forbidden_capabilities: orchestration.eventRunner?.forbiddenCapabilities || [],
+    },
+    ...extra,
+    event: record ? eventPublicPayload(record) : null,
+  };
+}
+
+function attachAuditReceipt(record) {
+  const withoutReceipt = { ...record, audit_receipt: null };
+  return {
+    ...record,
+    audit_receipt: `sha256:${sha256Text(JSON.stringify(withoutReceipt))}`,
+  };
+}
+
+function buildQueuedEventRecord(options, tokens, components, orchestration, records) {
+  const targetRef = options.target_ref || "dashboard-control-center";
+  const providerMode = options.provider_mode || "manual";
+  const requestKind = ensureRequestKind(options.request_kind || "design-intent");
+  const intentText = requireOption(options, "intent_text", "queue-request");
+  const purpose = (options.purpose || "Design Studio proposal request").trim();
+  const provider = providerModeContract(orchestration, providerMode);
+  const target = targetAdapterContract(orchestration, targetRef);
+  const snapshotHash = options.base_snapshot_hash || baseSnapshotHash(tokens, components, orchestration);
+  if (!/^[a-f0-9]{64}$/.test(snapshotHash)) {
+    stop("base snapshot hash must be a sha256 hex digest");
+  }
+  if (intentText.length > 2000) {
+    stop("intent text must be 2000 characters or fewer");
+  }
+  if (purpose.length > 240) {
+    stop("purpose must be 240 characters or fewer");
+  }
+  if (providerMode === "api-key") {
+    stop("api-key provider mode is blocked until secret references, consent, cost, rate limit, and provider policy are implemented");
+  }
+  assertNoSecretLikePayload({ intent_text: intentText, purpose }, "Design Studio event request");
+
+  const idempotencyKey = validateStoreIdentifier(
+    options.idempotency_key || `idem:${sha256Text(JSON.stringify({ targetRef, providerMode, requestKind, intentText, purpose, snapshotHash })).slice(0, 32)}`,
+    "idempotency key",
+  );
+  const eventId = `dse:${sha256Text(`event:${idempotencyKey}`).slice(0, 24)}`;
+  const requestId = `dsr:${sha256Text(`request:${idempotencyKey}`).slice(0, 24)}`;
+  const now = isoNow();
+  const lifecycleState = provider.status === "ready" && target.id === "dashboard-control-center" ? "queued" : "manual_required";
+  const nextAction = lifecycleState === "queued"
+    ? "manual_proposal_or_subscription_agent_import_required"
+    : "manual_review_required_before_proposal";
+  const record = {
+    record_version: eventStoreRecordVersion,
+    sync_id: eventStoreSyncId,
+    record_type: "design_studio_event",
+    event_type: "request_queued",
+    record_id: `record:${sha256Text(`${eventId}:${records.length + 1}:${now}`).slice(0, 24)}`,
+    event_id: eventId,
+    request_id: requestId,
+    idempotency_key: idempotencyKey,
+    target_ref: target.id,
+    target_apply_mode: target.applyMode,
+    provider_mode: provider.id,
+    provider_status: provider.status,
+    request_kind: requestKind,
+    lifecycle_state: lifecycleState,
+    job_state: lifecycleState,
+    proposal_state: "proposal_only",
+    writes_allowed: false,
+    direct_apply_authority: false,
+    external_product_apply: false,
+    forbidden_capabilities_absent: true,
+    base_snapshot_hash: snapshotHash,
+    redaction_state: "checked_no_secret_like_payload",
+    intent_digest: `sha256:${sha256Text(intentText)}`,
+    intent_preview: compactPreview(intentText),
+    intent_length: intentText.length,
+    purpose_digest: `sha256:${sha256Text(purpose)}`,
+    purpose_preview: compactPreview(purpose, 96),
+    payload_policy: "metadata_and_redacted_preview_only",
+    retry_count: 0,
+    event_order: records.length + 1,
+    created_at: now,
+    updated_at: now,
+    next_action: nextAction,
+    source_command: "tools/dashboard-design-system queue-request",
+    audit_receipt: null,
+  };
+  return attachAuditReceipt(record);
+}
+
+function findLatestEvent(records, eventId) {
+  return latestEventRecords(records).find((record) => record.event_id === eventId);
+}
+
+function handleQueueRequest(tokens, components, orchestration) {
+  const options = parseOptionArgs(process.argv.slice(3));
+  rejectUnknownOptions(options, new Set([
+    "target_ref",
+    "provider_mode",
+    "request_kind",
+    "intent_text",
+    "purpose",
+    "idempotency_key",
+    "base_snapshot_hash",
+  ]), "queue-request");
+  const records = readEventRecords();
+  const record = buildQueuedEventRecord(options, tokens, components, orchestration, records);
+  const duplicate = latestEventRecords(records).find((candidate) => candidate.idempotency_key === record.idempotency_key);
+  if (duplicate) {
+    process.stdout.write(`${JSON.stringify(eventOutput("deduplicated", duplicate, orchestration, {
+      reason_code: "design_studio_event_idempotency_key_exists",
+      next_action: duplicate.next_action,
+    }), null, 2)}\n`);
+    return;
+  }
+  appendEventRecord(record);
+  process.stdout.write(`${JSON.stringify(eventOutput("queued", record, orchestration, {
+    reason_code: "design_studio_event_queued",
+    next_action: record.next_action,
+  }), null, 2)}\n`);
+}
+
+function handleListEvents(orchestration) {
+  const options = parseOptionArgs(process.argv.slice(3));
+  rejectUnknownOptions(options, new Set(["state"]), "list-events");
+  const stateFilter = options.state || "";
+  const events = latestEventRecords(readEventRecords()).filter((record) => !stateFilter || record.lifecycle_state === stateFilter);
+  process.stdout.write(`${JSON.stringify({
+    status: "passed",
+    sync_id: eventStoreSyncId,
+    count: events.length,
+    store: {
+      format: "jsonl",
+      path: relativeStorePath(),
+      append_only: true,
+    },
+    events: events.map(eventPublicPayload),
+    runner: {
+      required_capabilities: orchestration.eventRunner?.requiredCapabilities || [],
+      forbidden_capabilities: orchestration.eventRunner?.forbiddenCapabilities || [],
+    },
+  }, null, 2)}\n`);
+}
+
+function handleEventStatus(orchestration) {
+  const options = parseOptionArgs(process.argv.slice(3));
+  rejectUnknownOptions(options, new Set(["event_id"]), "event-status");
+  const eventId = requireOption(options, "event_id", "event-status");
+  const record = findLatestEvent(readEventRecords(), eventId);
+  if (!record) {
+    stop(`unknown Design Studio event: ${eventId}`, 1);
+  }
+  process.stdout.write(`${JSON.stringify(eventOutput("passed", record, orchestration), null, 2)}\n`);
+}
+
+function transitionEvent(command, orchestration) {
+  const options = parseOptionArgs(process.argv.slice(3));
+  const allowed = command === "dead-letter-event" ? new Set(["event_id", "reason"]) : new Set(["event_id"]);
+  rejectUnknownOptions(options, allowed, command);
+  if (options.confirm !== true) {
+    stop(`${command} requires --confirm`);
+  }
+  const eventId = requireOption(options, "event_id", command);
+  const records = readEventRecords();
+  const current = findLatestEvent(records, eventId);
+  if (!current) {
+    stop(`unknown Design Studio event: ${eventId}`, 1);
+  }
+  const terminalStates = new Set(["cancelled", "completed"]);
+  let nextState = "";
+  let eventType = "";
+  let nextAction = "";
+  let retryCount = Number(current.retry_count || 0);
+  if (command === "cancel-event") {
+    if (terminalStates.has(current.lifecycle_state) || current.lifecycle_state === "dead_letter") {
+      stop(`cannot cancel event in state: ${current.lifecycle_state}`);
+    }
+    nextState = "cancelled";
+    eventType = "request_cancelled";
+    nextAction = "no_follow_up_required";
+  } else if (command === "dead-letter-event") {
+    const reason = requireOption(options, "reason", command);
+    if (terminalStates.has(current.lifecycle_state) || current.lifecycle_state === "dead_letter") {
+      stop(`cannot dead-letter event in state: ${current.lifecycle_state}`);
+    }
+    assertNoSecretLikePayload({ reason }, "Design Studio dead-letter reason");
+    nextState = "dead_letter";
+    eventType = "request_dead_lettered";
+    nextAction = "inspect_dead_letter_reason_then_retry_or_cancel";
+  } else if (command === "retry-event") {
+    if (!new Set(["dead_letter", "blocked", "manual_required"]).has(current.lifecycle_state)) {
+      stop(`cannot retry event in state: ${current.lifecycle_state}`);
+    }
+    nextState = current.target_ref === "dashboard-control-center" && current.provider_status === "ready" ? "queued" : "manual_required";
+    eventType = "request_retried";
+    nextAction = nextState === "queued" ? "manual_proposal_or_subscription_agent_import_required" : "manual_review_required_before_proposal";
+    retryCount += 1;
+  } else {
+    usage();
+  }
+  const now = isoNow();
+  const transitionReason = command === "dead-letter-event" ? requireOption(options, "reason", command) : "";
+  const nextRecord = attachAuditReceipt({
+    ...current,
+    event_type: eventType,
+    record_id: `record:${sha256Text(`${eventId}:${records.length + 1}:${now}:${eventType}`).slice(0, 24)}`,
+    previous_lifecycle_state: current.lifecycle_state,
+    lifecycle_state: nextState,
+    job_state: nextState,
+    retry_count: retryCount,
+    event_order: records.length + 1,
+    updated_at: now,
+    next_action: nextAction,
+    transition_reason_digest: transitionReason ? `sha256:${sha256Text(transitionReason)}` : "",
+    transition_reason_preview: transitionReason ? compactPreview(transitionReason, 120) : "",
+    source_command: `tools/dashboard-design-system ${command}`,
+    audit_receipt: null,
+  });
+  appendEventRecord(nextRecord);
+  process.stdout.write(`${JSON.stringify(eventOutput("passed", nextRecord, orchestration, {
+    reason_code: `design_studio_event_${nextState}`,
+    next_action: nextAction,
+  }), null, 2)}\n`);
 }
 
 function interactionFromOptions(component, options) {
@@ -1563,6 +1991,14 @@ if (command === "emit-css") {
   console.log("Dashboard design-system check passed.");
 } else if (command === "plan-interaction" || command === "apply-interaction") {
   handleInteractionCommand(command, tokens, components);
+} else if (command === "queue-request") {
+  handleQueueRequest(tokens, components, orchestration);
+} else if (command === "list-events") {
+  handleListEvents(orchestration);
+} else if (command === "event-status") {
+  handleEventStatus(orchestration);
+} else if (command === "cancel-event" || command === "retry-event" || command === "dead-letter-event") {
+  transitionEvent(command, orchestration);
 } else {
   usage();
 }
