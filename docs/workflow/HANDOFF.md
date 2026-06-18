@@ -2461,3 +2461,35 @@ Recovery notes:
 Stop and ask before:
 
 - Push, PR creation, merge, main CI waiting, local/remote sync, product repository deletion, cleanup, remote creation, OAuth, dependency installation, external-service calls, credentials, Git/CI authority changes, external product writes, or any existing-feature tradeoff.
+
+## Implemented Product CI Run Evidence Collector Handoff
+
+SYNC-ID: product_ci_run_evidence_collector
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/PRODUCT_GATE_EVIDENCE_SCHEMA.tsv,docs/workflow/TEST_PLAN_MANIFEST.tsv,tools/product-gate-evidence-bootstrap,tools/test_product_gate_tools.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_product_gate_tools.sh,tools/test_product_scaffold_check.sh,tools/test_product_repository_authority.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_test_plan_coverage.sh,tools/test_test_plan.sh
+
+Current State:
+
+- Product-local evidence tooling installed by `tools/product-gate-evidence-bootstrap` now includes `tools/product-gate-evidence ci-runs`.
+- `ci-runs` is the only new GitHub-observing path in this sync. It is explicit, product-local, and records evidence under `.git/product-gate-evidence/`.
+- `ci-status` remains local-only and validates CI manifests/workflow files without calling GitHub.
+- Main CI evidence is written to `product.ci.main` only when the GitHub Actions run is completed, successful, and matched to the current product HEAD.
+- PR CI evidence is written to `product.ci.pr` only when a PR reference is supplied. Without `--pr`, PR CI remains `not_run` and `manual_required`.
+- Provider visibility is written to `product.ci.github_actions`; unavailable `gh`, auth, repo access, `node`, or JSON parsing blocks provider evidence instead of creating pass evidence.
+- `tools/test_product_gate_tools.sh` now proves generated product-local tooling can collect fake structured main and PR CI JSON and that parent-side authority reads the resulting CI detail metadata.
+
+Next Step:
+
+- Run the remaining focused and workflow checks listed in TESTS, then move through `repository-development-workflow` fast_loop and mid_tests if they remain clean.
+- Playwright visual review is not required for this sync because no Dashboard UI, CSS, or layout files changed.
+
+Recovery notes:
+
+- If `product.ci.main` or `product.ci.pr` records pass evidence without a current product HEAD match, fix the collector before changing authority or Dashboard code.
+- If `tools/dashboard-data` starts calling `gh` or creating evidence, restore the read-only boundary and keep CI run collection in the explicit product-local command.
+- If fake `gh` fixtures pass but real `gh` output changes, adjust structured JSON parsing while keeping failure closed as `blocked` or `manual_required`.
+
+Stop and ask before:
+
+- Browser-triggered CI collection, background polling, push, PR creation, merge, main CI waiting, local/remote sync, product repository cleanup/deletion, credential storage, OAuth, external product source writes, or any existing-feature tradeoff.

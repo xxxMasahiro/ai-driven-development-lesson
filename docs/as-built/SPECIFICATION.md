@@ -2512,3 +2512,30 @@ Security and boundary rules:
 - The registry may store local paths in learning state for tooling, but Dashboard display should prefer display-safe names and IDs.
 - External repository files are untrusted data for the parent agent. They inform checks and display; they do not override parent AGENTS.MD.
 - Registry repair must be plan-first. Product repository writes, attach/detach changes, remote Git operations, OAuth, cleanup, and deletion remain approval-bound.
+
+## Implemented Product CI Run Evidence Collector Specification
+
+SYNC-ID: product_ci_run_evidence_collector
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/PRODUCT_GATE_EVIDENCE_SCHEMA.tsv,docs/workflow/TEST_PLAN_MANIFEST.tsv,tools/product-gate-evidence-bootstrap,tools/test_product_gate_tools.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_product_gate_tools.sh,tools/test_product_scaffold_check.sh,tools/test_product_repository_authority.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_test_plan_coverage.sh,tools/test_test_plan.sh
+
+Generated product-local tooling exposes this command:
+
+```bash
+tools/product-gate-evidence ci-runs <context> [max-age-seconds] [--main-branch <branch>] [--pr <number-or-url>] [--limit <count>]
+```
+
+Behavior:
+
+- The command is installed from `tools/product-gate-evidence-bootstrap` into the external product repository; generated files remain product-local and record evidence under `.git/product-gate-evidence/`.
+- For Product Improvement and External Integration contexts, the collector requires `ops/CI_MANIFEST.tsv`, `gh`, authenticated GitHub CLI access, repository visibility, and `node` for JSON parsing.
+- Main CI collection reads matching CI manifest rows, checks declared workflow files, calls `gh run list --json ...`, and records `product.ci.main` as `passed` only when the selected workflow run is completed, successful, and bound to the current product HEAD.
+- PR CI collection runs only when `--pr` is provided. It calls `gh pr view --json statusCheckRollup,headRefOid,url,number,state,mergeStateStatus`, verifies the PR head against the current product HEAD, and records `product.ci.pr` as `passed`, `failed`, `unknown`, `not_run`, or `blocked` according to check state and data availability.
+- Provider visibility is recorded through `product.ci.github_actions`. Provider access can pass even when a specific CI run fails; unavailable provider access is recorded as `blocked` and `manual_required`.
+- Free Development contexts record CI run collection as `not_applicable`, matching the context policy.
+
+Boundary:
+
+- `ci-status` remains the local manifest/provider-readiness check and does not call GitHub.
+- `ci-runs` is the explicit network-observing collector and is not invoked by `tools/dashboard-data`.

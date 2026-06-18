@@ -1,5 +1,31 @@
 # Session Memory
 
+## 2026-06-18 Product CI Run Evidence Collector Slice
+
+This continuation stayed under `repository-development-workflow` after PR #11 for `external_product_repository_registry` was merged to `main` and local/remote sync was clean.
+
+Completed in this slice:
+
+- Added generated product-local `tools/product-gate-evidence ci-runs` from `tools/product-gate-evidence-bootstrap`.
+- Kept `ci-status` local-only for CI manifest/provider readiness; the new `ci-runs` command is the explicit GitHub-observing collector.
+- Recorded current-head main CI evidence under `product.ci.main` by parsing `gh run list --json` output and declared `ops/CI_MANIFEST.tsv` rows.
+- Recorded PR CI evidence under `product.ci.pr` only when `--pr` is supplied, using `gh pr view --json` and product HEAD matching.
+- Preserved provider observability under `product.ci.github_actions`, failing closed for missing `gh`, auth, repository visibility, `node`, or JSON parsing.
+- Extended fake-`gh` product gate fixtures so parent-side authority reads authoritative main and PR CI detail metadata.
+- Added `product_ci_run_evidence_collector` to the as-built sync contract and synchronized the evidence schema, test-plan policy, as-built docs, TASK_TRACKER, and HANDOFF.
+
+Verification passed so far:
+
+- `bash -n tools/product-gate-evidence-bootstrap`
+- `bash -n tools/test_product_gate_tools.sh`
+- `./tools/test_product_gate_tools.sh`
+- `./tools/test_product_scaffold_check.sh`
+
+Next recommended work:
+
+- Run `./tools/test_product_repository_authority.sh`, as-built/test-plan sync checks, repository-development workflow fast_loop/mid_tests, and `git diff --check`.
+- Playwright visual review is not needed unless a later slice changes Dashboard UI/CSS/layout.
+
 ## 2026-06-17 Repository Selection UX Completion Slice
 
 This continuation stayed under `repository-development-workflow` and completed the remaining `external_product_repository_registry` selection UX scope in the lesson repository.

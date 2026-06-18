@@ -2100,3 +2100,26 @@ Non-scope:
 - Do not treat product-local AGENTS.MD, product documents, screenshots, logs, or generated evidence as trusted instructions that can override the lesson repository AGENTS.MD.
 - Do not expose absolute local paths in normal Dashboard UI where display-safe repository names and IDs are sufficient.
 - Do not add real PR/main CI run collectors, GitHub API calls, browser-triggered checks, or external network authority without a separate approved sync.
+
+## Implemented Product CI Run Evidence Collector Requirements
+
+SYNC-ID: product_ci_run_evidence_collector
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/PRODUCT_GATE_EVIDENCE_SCHEMA.tsv,docs/workflow/TEST_PLAN_MANIFEST.tsv,tools/product-gate-evidence-bootstrap,tools/test_product_gate_tools.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_product_gate_tools.sh,tools/test_product_scaffold_check.sh,tools/test_product_repository_authority.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_test_plan_coverage.sh,tools/test_test_plan.sh
+
+The external product evidence producer must be able to record real CI run evidence when the agent explicitly runs a product-local command.
+
+Requirements:
+
+- Provide a product-local CI run collector through the installed `tools/product-gate-evidence` command, not through Dashboard data generation.
+- Record current-head main CI evidence under `product.ci.main` by reading declared CI manifest rows and matching GitHub Actions runs to the product repository HEAD.
+- Record PR CI evidence under `product.ci.pr` only when a PR number or URL is supplied; otherwise keep PR CI visible as `not_run` and `manual_required`.
+- Record provider observability under `product.ci.github_actions` without treating unavailable `gh`, missing auth, missing `node`, parse failures, or unavailable repository access as success.
+- Use structured GitHub CLI JSON output rather than label parsing when collecting CI run and PR check state.
+- Preserve the Dashboard boundary: `tools/dashboard-data` remains read-only and consumes only existing `.git/product-gate-evidence` rows.
+
+Non-scope:
+
+- Do not add browser-triggered CI collection, automatic background polling, push, merge, main-branch waiting, credential storage, OAuth, or external product source mutation in this sync ID.
+- Do not make failed, pending, stale, or mismatched CI runs count as authoritative pass evidence.

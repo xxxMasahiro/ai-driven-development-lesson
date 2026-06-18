@@ -2276,3 +2276,25 @@ Next Step:
 - `external_product_repository_registry` is implemented for parent-side registry, guarded register/select mutation, Dashboard read-only repository selection UX, and focused evidence fixtures.
 - Future real PR/main CI run collectors remain a separate approval-bound scope; do not add GitHub/network authority through this implemented sync.
 - Before editing future runtime code, read `AGENTS.MD`, `skills/repository-development-workflow/SKILL.md`, and this handoff block, then run the relevant focused checks for the changed owner layer.
+
+## Implemented Product CI Run Evidence Collector Work
+
+SYNC-ID: product_ci_run_evidence_collector
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/PRODUCT_GATE_EVIDENCE_SCHEMA.tsv,docs/workflow/TEST_PLAN_MANIFEST.tsv,tools/product-gate-evidence-bootstrap,tools/test_product_gate_tools.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_product_gate_tools.sh,tools/test_product_scaffold_check.sh,tools/test_product_repository_authority.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_test_plan_coverage.sh,tools/test_test_plan.sh
+
+Current Status:
+
+- [x] Added generated product-local `tools/product-gate-evidence ci-runs` for explicit CI run evidence collection.
+- [x] Kept `ci-status` local-only and non-networked.
+- [x] Recorded current-head main CI run evidence under `product.ci.main` using `gh run list --json` and declared CI manifest rows.
+- [x] Recorded PR CI evidence under `product.ci.pr` only when `--pr` is provided, using `gh pr view --json` and head/check-state validation.
+- [x] Preserved provider visibility and failure semantics under `product.ci.github_actions`.
+- [x] Added focused fake-`gh` coverage proving generated product-local tooling writes authoritative main and PR CI evidence and parent-side authority can read it.
+- [x] Updated the evidence schema and test-plan policy for the new explicit collector.
+
+Next Step:
+
+- Continue verification through focused product authority, as-built sync, test-plan, workflow-pair, fast-loop, and mid-test checks.
+- Do not move CI run collection into Dashboard data; Dashboard remains a read-only consumer of existing product evidence rows.
