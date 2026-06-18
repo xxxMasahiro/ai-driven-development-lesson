@@ -391,6 +391,7 @@ SYNC-ID: as_built_sync_contract
 STATUS: implemented
 ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv, tools/check_as_built_sync_contract.sh, tools/as-built-sync, tools/test_as_built_sync_contract.sh
 TESTS: tools/check_as_built_sync_contract.sh, tools/test_as_built_sync_contract.sh
+NOTE: `tools/as-built-sync status` caches repeated active-command and Git hook runner lookups so status reporting remains usable as the sync contract grows; output and pass/fail semantics stay unchanged.
 
 SYNC-ID: git_workflow_policy
 STATUS: implemented
@@ -4389,3 +4390,37 @@ git diff --check
 Boundary:
 
 - No Dashboard UI, Dashboard CSS, generated dashboard design-system output, browser mutation, push, merge, cleanup, or credential storage is part of this sync ID.
+
+## Implemented CI Final Gate Gap-Only Safety Implementation Plan
+
+SYNC-ID: ci_final_gate_gap_only_safety
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/FINAL_GATE_COVERAGE.tsv,docs/workflow/FINAL_GATE_GAP_COMMANDS.tsv,tools/ci-final-gate,tools/test_ci_final_gate.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md,docs/memory/SESSION_MEMORY.md
+TESTS: tools/test_ci_final_gate.sh,tools/check_ci_workflow_structure.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh
+
+Implementation order:
+
+1. Keep `repository-development-workflow` active and treat the existing final-gate optimization as the owner-layer contract to preserve.
+2. Add aggregate coverage validation to the `tools/ci-final-gate --gap-only` path before final-gap commands run.
+3. Keep the default final-gate path unchanged except for sharing the same coverage validation guarantee.
+4. Extend `tools/test_ci_final_gate.sh` with an uncovered aggregate fixture proving `--gap-only` fails closed.
+5. Extend the same regression test with a valid coverage fixture proving `--gap-only` succeeds only after validation.
+6. Synchronize the as-built contract, requirements, specification, implementation plan, TASK_TRACKER, HANDOFF, and session memory under `ci_final_gate_gap_only_safety`.
+
+Verification sequence:
+
+```bash
+bash -n tools/ci-final-gate
+bash -n tools/test_ci_final_gate.sh
+./tools/test_ci_final_gate.sh
+./tools/check_ci_workflow_structure.sh
+./tools/check_as_built_sync_contract.sh
+./tools/check_as_built_docs.sh
+./tools/check_workflow_pair_sync.sh
+git diff --check
+```
+
+Boundary:
+
+- Do not alter required CI workflow or job names, `tools/test_lesson_repository.sh`, full/no-cache hook semantics, same-run evidence identity checks, final-gap command contents, Dashboard UI, Playwright layout, or product repository behavior in this sync.
+- No existing-feature tradeoff is allowed. If a regression appears, repair this safety layer or its tests before advancing.

@@ -251,6 +251,7 @@ SYNC-ID: as_built_sync_contract
 STATUS: implemented
 ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv, tools/check_as_built_sync_contract.sh, tools/as-built-sync, tools/test_as_built_sync_contract.sh
 TESTS: tools/check_as_built_sync_contract.sh, tools/test_as_built_sync_contract.sh
+NOTE: `tools/as-built-sync status` caches repeated active-command and Git hook runner lookups so status reporting remains usable as the sync contract grows; output and pass/fail semantics stay unchanged.
 
 SYNC-ID: git_workflow_policy
 STATUS: implemented
@@ -2123,3 +2124,27 @@ Non-scope:
 
 - Do not add browser-triggered CI collection, automatic background polling, push, merge, main-branch waiting, credential storage, OAuth, or external product source mutation in this sync ID.
 - Do not make failed, pending, stale, or mismatched CI runs count as authoritative pass evidence.
+
+## Implemented CI Final Gate Gap-Only Safety Requirements
+
+SYNC-ID: ci_final_gate_gap_only_safety
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/FINAL_GATE_COVERAGE.tsv,docs/workflow/FINAL_GATE_GAP_COMMANDS.tsv,tools/ci-final-gate,tools/test_ci_final_gate.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md,docs/memory/SESSION_MEMORY.md
+TESTS: tools/test_ci_final_gate.sh,tools/check_ci_workflow_structure.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh
+
+The CI final gate gap-only mode must not become a shortcut that can skip aggregate coverage validation.
+It is a safety repair for the implemented final-gate optimization and preserves every existing full/no-cache, aggregate, hook, CI, and standalone verification contract.
+
+Requirements:
+
+- `tools/ci-final-gate --gap-only` must validate `docs/workflow/FINAL_GATE_COVERAGE.tsv` before it runs any `docs/workflow/FINAL_GATE_GAP_COMMANDS.tsv` command.
+- Gap-only mode must fail closed when an aggregate requirement is uncovered, stale, malformed, mapped to the final-gate hook itself, mapped to a missing hook, or mapped to a missing gap command.
+- Gap-only mode must remain standalone-callable for regression testing and callable from optimized full-hook or CI final-gate paths.
+- The default final-gate path must keep validating coverage before checking same-run Git hook evidence or falling back to the exhaustive aggregate command.
+- The exhaustive `tools/test_lesson_repository.sh`, full/no-cache hook behavior, required CI workflow names, same-run evidence identity checks, and fallback aggregate behavior must remain available.
+- No existing feature tradeoff is allowed. If this safety check conflicts with an existing valid behavior, the implementation must repair the safety check instead of weakening coverage, hiding a failure, or removing the existing behavior.
+
+Non-scope:
+
+- Do not change required CI check names, branch-protection contexts, full/no-cache meaning, final-gap command semantics, same-run evidence metadata, Dashboard behavior, Playwright coverage, or product repository behavior in this sync ID.
+- Do not make changed-only CI authoritative or introduce persistent verification-result caching.

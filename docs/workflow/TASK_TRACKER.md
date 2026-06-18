@@ -574,6 +574,7 @@ SYNC-ID: as_built_sync_contract
 STATUS: implemented
 ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv, tools/check_as_built_sync_contract.sh, tools/as-built-sync, tools/test_as_built_sync_contract.sh
 TESTS: tools/check_as_built_sync_contract.sh, tools/test_as_built_sync_contract.sh
+NOTE: `tools/as-built-sync status` caches repeated active-command and Git hook runner lookups so status reporting remains usable as the sync contract grows; output and pass/fail semantics stay unchanged.
 
 SYNC-ID: git_workflow_policy
 STATUS: implemented
@@ -2298,3 +2299,25 @@ Next Step:
 
 - Continue verification through focused product authority, as-built sync, test-plan, workflow-pair, fast-loop, and mid-test checks.
 - Do not move CI run collection into Dashboard data; Dashboard remains a read-only consumer of existing product evidence rows.
+
+## Implemented CI Final Gate Gap-Only Safety Work
+
+SYNC-ID: ci_final_gate_gap_only_safety
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/FINAL_GATE_COVERAGE.tsv,docs/workflow/FINAL_GATE_GAP_COMMANDS.tsv,tools/ci-final-gate,tools/test_ci_final_gate.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md,docs/memory/SESSION_MEMORY.md
+TESTS: tools/test_ci_final_gate.sh,tools/check_ci_workflow_structure.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh
+
+Current Status:
+
+- [x] Added aggregate coverage validation to `tools/ci-final-gate --gap-only`.
+- [x] Preserved the default final-gate evidence and aggregate fallback behavior.
+- [x] Added a focused uncovered aggregate fixture proving `--gap-only` fails closed.
+- [x] Added a focused valid fixture proving `--gap-only` reports coverage-and-command success only after validation.
+- [x] Added cached active-command and Git hook runner lookups to `tools/as-built-sync status` after release proof exposed repeated status scans.
+- [x] Synchronized the new sync ID across the as-built contract, as-built documents, TASK_TRACKER, HANDOFF, and session memory.
+- [x] Passed focused, fast-loop, mid-test, aggregate, full/no-cache hook, and pre-commit verification.
+
+Next Step:
+
+- Continue remaining approved implementation slices as separate sync IDs.
+- Do not accept any existing-feature tradeoff, CI-name change, full/no-cache reduction, Dashboard behavior change, or product repository behavior change in later slices.
