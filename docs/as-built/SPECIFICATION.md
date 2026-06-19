@@ -2797,3 +2797,23 @@ Display semantics:
 
 Design Studio drift detection remains a verification boundary for the Dashboard design-system source and generated runtime output.
 It does not make external products or arbitrary CSS browser-editable.
+
+## Dashboard Control Center Display Depth Settings Specification
+
+SYNC-ID: dashboard_control_center_display_depth_settings
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,learning/DASHBOARD_DISPLAY_DEPTH.tsv,tools/lib/dashboard_display_depth.sh,tools/dashboard-settings,tools/dashboard-data,docs/workflow/DASHBOARD_DATA_SCHEMA.tsv,docs/workflow/TEST_PLAN_MANIFEST.tsv,vite.config.mjs,dashboard-control-center/src/dashboardData.js,dashboard-control-center/src/App.jsx,dashboard-control-center/src/i18n.js,tests/fixtures/dashboard-control-center.json,tests/fixtures/dashboard-control-center-live-update.json,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_settings.sh,tools/test_dashboard_data.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_dashboard_settings.sh,tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/check_dashboard_design_system.sh,tools/check_test_plan_coverage.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+The display depth setting is stored in `learning/DASHBOARD_DISPLAY_DEPTH.tsv` and normalized by `tools/lib/dashboard_display_depth.sh`.
+`tools/dashboard-settings` exposes `dashboard_display_depth` as a dashboard-scoped editable Settings item with the same plan-token and owner-layer current-state checks used by other Settings changes.
+
+`tools/dashboard-data` publishes `summary.display_depth` and a synchronized Settings catalog item.
+The dashboard data schema and browser validation accept only `friendly`, `standard`, and `technical`.
+
+UI semantics:
+
+- `friendly` renders guide-level wording and keeps technical details collapsed by default.
+- `standard` preserves the current dashboard behavior as the baseline.
+- `technical` opens or prioritizes source, command, evidence, and internal-key details where those details already exist.
+- None of the modes may remove or soften approval, blocker, failed evidence, stale evidence, security, target-file, or command-preview signals.

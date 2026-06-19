@@ -20,6 +20,8 @@ source "$ROOT/tools/lib/product_repository_authority.sh"
 source "$ROOT/tools/lib/product_repository_registry.sh"
 # shellcheck source=tools/lib/product_workflow_git_usage.sh
 source "$ROOT/tools/lib/product_workflow_git_usage.sh"
+# shellcheck source=tools/lib/dashboard_display_depth.sh
+source "$ROOT/tools/lib/dashboard_display_depth.sh"
 # shellcheck source=tools/lib/document_paths.sh
 source "$ROOT/tools/lib/document_paths.sh"
 # shellcheck source=tools/lib/dashboard_data.sh
@@ -238,6 +240,7 @@ source_files=(
   "learning/context/WORKFLOW_CONTEXT_MAP.tsv"
   "learning/GIT_WORKFLOW_SETTINGS.tsv"
   "learning/PRODUCT_WORKFLOW_GIT_USAGE_SETTINGS.tsv"
+  "learning/DASHBOARD_DISPLAY_DEPTH.tsv"
   "learning/GIT_WORKFLOW_APPROVALS.tsv"
   "lesson/LESSON_CONFIG.tsv"
   "lesson/LESSON_CONFIG_14_DAYS.tsv"
@@ -1359,6 +1362,10 @@ dashboard_settings_config_for_menu() {
 dashboard_setting_file_for_menu() {
   local setting="$1"
   local config_file
+  if [[ "$setting" == "dashboard_display_depth" ]]; then
+    dashboard_display_depth_file
+    return 0
+  fi
   config_file="$(dashboard_settings_config_for_menu)"
   lesson_setting_file_from_config "$config_file" "$setting"
 }
@@ -1388,6 +1395,9 @@ dashboard_setting_current_value_for_menu() {
         printf '%s' "${normalized_language%%$'\t'*}"
       fi
       ;;
+    dashboard_display_depth)
+      dashboard_display_depth_current_value "$file"
+      ;;
     *)
       printf 'unknown'
       ;;
@@ -1398,7 +1408,11 @@ dashboard_setting_current_label_for_menu() {
   local setting="$1"
   local file
   file="$(dashboard_setting_file_for_menu "$setting")"
-  lesson_setting_value_from_file "$setting" "$file" 2>/dev/null || printf 'Not selected'
+  if [[ "$setting" == "dashboard_display_depth" ]]; then
+    dashboard_display_depth_current_label "$file"
+  else
+    lesson_setting_value_from_file "$setting" "$file" 2>/dev/null || printf 'Not selected'
+  fi
 }
 
 dashboard_setting_approval_source_for_menu() {
@@ -4695,9 +4709,16 @@ if [[ -z "$summary_workflow_language" || "$summary_workflow_language" == "unknow
 fi
 summary_ui_locale="$(dashboard_ui_locale_for_workflow_language "$summary_workflow_language")"
 summary_ui_direction="$(dashboard_ui_direction_for_locale "$summary_ui_locale")"
+summary_display_depth="$(dashboard_setting_current_value_for_menu dashboard_display_depth)"
 settings_learning_mode_status="$(dashboard_data_lesson_setting_state "$settings_lesson_config" learning_mode)"
 settings_workflow_language_status="$(dashboard_data_lesson_setting_state "$settings_lesson_config" workflow_language)"
 settings_product_language_status="$(dashboard_data_lesson_setting_state "$settings_lesson_config" product_language)"
+settings_dashboard_display_depth_file="$(dashboard_display_depth_file)"
+settings_dashboard_display_depth_file_rel="$(dashboard_data_relative_path "$settings_dashboard_display_depth_file")"
+settings_dashboard_display_depth_status="ready"
+if [[ ! -f "$settings_dashboard_display_depth_file" ]]; then
+  settings_dashboard_display_depth_status="missing"
+fi
 settings_target_repository_status="$(dashboard_path_state_status "$(dashboard_target_repository_path_state "$SELECTED_MENU_ID")")"
 settings_learner_approval_status="$(dashboard_setting_approval_status_for_menu)"
 settings_requires_product_repo="$(dashboard_context_product_repo_required "$SELECTED_MENU_ID")"
@@ -4736,16 +4757,18 @@ fi
 IFS='|' read -r -a settings_language_values <<<"$(lesson_supported_language_codes)"
 
 settings_context_group_status="$(dashboard_settings_status_rollup "ready" "$settings_target_repository_status" "$settings_product_summary_status" "$settings_product_type_status")"
+settings_dashboard_group_status="$(dashboard_settings_status_rollup "$settings_dashboard_display_depth_status")"
 settings_learning_group_status="$(dashboard_settings_status_rollup "$settings_learning_mode_status" "$settings_workflow_language_status" "$settings_product_language_status" "$settings_learner_approval_status")"
 settings_workflow_group_status="$(dashboard_settings_status_rollup "$settings_product_git_usage_status" "$git_policy_status" "$git_settings_status" "$git_gate_status" "$git_approval_status")"
 settings_security_group_status="$(dashboard_settings_status_rollup "$security_policy_status" "$security_gate_status" "$dangerous_action_approval_status")"
-settings_status="$(dashboard_settings_status_rollup "$settings_context_group_status" "$settings_learning_group_status" "$settings_workflow_group_status" "$settings_security_group_status")"
+settings_status="$(dashboard_settings_status_rollup "$settings_context_group_status" "$settings_dashboard_group_status" "$settings_learning_group_status" "$settings_workflow_group_status" "$settings_security_group_status")"
 
 settings_groups=(
   "$(dashboard_json_setting_group "context" "settingsPage.group.context" "settingsPage.groupDetail.context" "$settings_context_group_status" 1)"
-  "$(dashboard_json_setting_group "learning" "settingsPage.group.learning" "settingsPage.groupDetail.learning" "$settings_learning_group_status" 2)"
-  "$(dashboard_json_setting_group "workflow" "settingsPage.group.workflow" "settingsPage.groupDetail.workflow" "$settings_workflow_group_status" 3)"
-  "$(dashboard_json_setting_group "security" "settingsPage.group.security" "settingsPage.groupDetail.security" "$settings_security_group_status" 4)"
+  "$(dashboard_json_setting_group "dashboard" "settingsPage.group.dashboard" "settingsPage.groupDetail.dashboard" "$settings_dashboard_group_status" 2)"
+  "$(dashboard_json_setting_group "learning" "settingsPage.group.learning" "settingsPage.groupDetail.learning" "$settings_learning_group_status" 3)"
+  "$(dashboard_json_setting_group "workflow" "settingsPage.group.workflow" "settingsPage.groupDetail.workflow" "$settings_workflow_group_status" 4)"
+  "$(dashboard_json_setting_group "security" "settingsPage.group.security" "settingsPage.groupDetail.security" "$settings_security_group_status" 5)"
 )
 
 settings_items=(
@@ -4753,6 +4776,7 @@ settings_items=(
   "$(dashboard_json_setting_item "target_repository" "context" "repository" "settingsPage.item.targetRepository" "settingsPage.itemDetail.targetRepository" "$(dashboard_target_repository_name "$SELECTED_MENU_ID")" "$(dashboard_target_repository_name "$SELECTED_MENU_ID")" "$settings_target_repository_status" "$settings_lesson_config_rel" "false" "true" "low" "true" "settingsPage.disabled.previewOnly" "#repository-info" "selected_context.target_repository" "settingsPage.impact.targetRepository" "$settings_lesson_config_rel" "$settings_target_repository_status" "settingsPage.preview.targetRepository")"
   "$(dashboard_json_setting_item "product_name" "context" "repository" "settingsPage.item.productName" "settingsPage.itemDetail.productName" "$settings_product_name_value" "$settings_product_name_value" "$settings_product_summary_status" "product:ops/PRODUCT_PROFILE.json" "false" "true" "low" "true" "settingsPage.disabled.previewOnly" "#repository-info" "product_profile.display_name" "settingsPage.impact.productName" "product:ops/PRODUCT_PROFILE.json" "$settings_product_summary_status" "settingsPage.preview.productName")"
   "$(dashboard_json_setting_item "product_type" "context" "repository" "settingsPage.item.productType" "settingsPage.itemDetail.productType" "$settings_product_type_value" "$settings_product_type_value" "$settings_product_type_status" "product:ops/PRODUCT_MANIFEST.tsv" "false" "true" "low" "true" "settingsPage.disabled.previewOnly" "#repository-info" "product_manifest.product_type" "settingsPage.impact.productType" "product:ops/PRODUCT_MANIFEST.tsv" "$settings_product_type_status" "settingsPage.preview.productType" "all" "web" "api" "cli" "library" "integration" "custom")"
+  "$(dashboard_json_setting_item "dashboard_display_depth" "dashboard" "dashboard" "settingsPage.item.dashboardDisplayDepth" "settingsPage.itemDetail.dashboardDisplayDepth" "$(dashboard_setting_current_value_for_menu dashboard_display_depth)" "$(dashboard_setting_current_label_for_menu dashboard_display_depth)" "$settings_dashboard_display_depth_status" "$settings_dashboard_display_depth_file_rel" "true" "true" "low" "true" "settingsPage.disabled.available" "#settings" "dashboard.display_depth" "settingsPage.impact.dashboardDisplayDepth" "$settings_dashboard_display_depth_file_rel" "$settings_dashboard_display_depth_status" "settingsPage.preview.dashboardDisplayDepth" "friendly" "standard" "technical")"
   "$(dashboard_json_setting_item "learning_mode" "learning" "learning" "settingsPage.item.learningMode" "settingsPage.itemDetail.learningMode" "$(dashboard_setting_current_value_for_menu learning_mode)" "$(dashboard_setting_current_label_for_menu learning_mode)" "$settings_learning_mode_status" "$(dashboard_setting_source_for_menu learning_mode)" "true" "true" "low" "true" "settingsPage.disabled.available" "#lessons" "lesson.learning_mode" "settingsPage.impact.learningMode" "$(dashboard_setting_source_for_menu learning_mode)" "$settings_learning_mode_status" "settingsPage.preview.learningMode" "A" "B" "C")"
   "$(dashboard_json_setting_item "workflow_language" "learning" "learning" "settingsPage.item.workflowLanguage" "settingsPage.itemDetail.workflowLanguage" "$(dashboard_setting_current_value_for_menu workflow_language)" "$(dashboard_setting_current_label_for_menu workflow_language)" "$settings_workflow_language_status" "$(dashboard_setting_source_for_menu workflow_language)" "true" "true" "low" "true" "settingsPage.disabled.available" "#lessons" "lesson.workflow_language" "settingsPage.impact.workflowLanguage" "$(dashboard_setting_source_for_menu workflow_language)" "$settings_workflow_language_status" "settingsPage.preview.workflowLanguage" "${settings_language_values[@]}")"
   "$(dashboard_json_setting_item "product_language" "learning" "learning" "settingsPage.item.productLanguage" "settingsPage.itemDetail.productLanguage" "$(dashboard_setting_current_value_for_menu product_language)" "$(dashboard_setting_current_label_for_menu product_language)" "$settings_product_language_status" "$(dashboard_setting_source_for_menu product_language)" "true" "true" "low" "true" "settingsPage.disabled.available" "#lessons" "lesson.product_language" "settingsPage.impact.productLanguage" "$(dashboard_setting_source_for_menu product_language)" "$settings_product_language_status" "settingsPage.preview.productLanguage" "${settings_language_values[@]}")"
@@ -5099,6 +5123,7 @@ content_seed="$(
     "$summary_workflow_language" \
     "$summary_ui_locale" \
     "$summary_ui_direction" \
+    "$summary_display_depth" \
     "${dashboard_display_source_files[*]}" \
     "${dashboard_display_source_commands[*]}" \
     "${partial_failures[*]}" \
@@ -5228,6 +5253,9 @@ dashboard_json_string "$summary_ui_locale"
 printf ',\n'
 printf '    "ui_direction": '
 dashboard_json_string "$summary_ui_direction"
+printf ',\n'
+printf '    "display_depth": '
+dashboard_json_string "$summary_display_depth"
 printf ',\n'
 printf '    "next_safe_action": '
 dashboard_json_string "Review blocking_items and run the listed required commands manually before treating optional or gate status as authoritative."

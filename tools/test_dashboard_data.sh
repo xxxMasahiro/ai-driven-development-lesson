@@ -1212,7 +1212,7 @@ for (const item of settings.items) {
   }
   if (item.editable) {
     editableSettingIds.add(item.id);
-    if (!item.reviewable || !['learning', 'workflow'].includes(item.scope)) {
+    if (!item.reviewable || !['learning', 'workflow', 'dashboard'].includes(item.scope)) {
       fail(`editable settings item has invalid scope: ${item.id}`);
     }
     if (!item.allowed_values.length || item.requires_confirmation !== true) {
@@ -1223,10 +1223,20 @@ for (const item of settings.items) {
     }
   }
 }
-for (const expectedEditable of ['learning_mode', 'workflow_language', 'product_language', 'git_push_automation']) {
+for (const expectedEditable of ['dashboard_display_depth', 'learning_mode', 'workflow_language', 'product_language', 'git_push_automation']) {
   if (!editableSettingIds.has(expectedEditable)) {
     fail(`missing expected editable settings row: ${expectedEditable}`);
   }
+}
+const dashboardDisplayDepthItem = settings.items.find((item) => item.id === 'dashboard_display_depth');
+if (!dashboardDisplayDepthItem) {
+  fail('settings.items must include dashboard_display_depth');
+}
+if (!['friendly', 'standard', 'technical'].includes(data.summary.display_depth)) {
+  fail(`summary.display_depth is invalid: ${data.summary.display_depth}`);
+}
+if (data.summary.display_depth !== dashboardDisplayDepthItem.current_value) {
+  fail('summary.display_depth must match the Settings dashboard_display_depth current value');
 }
 const workflowLanguageItem = settings.items.find((item) => item.id === 'workflow_language');
 if (!workflowLanguageItem) {

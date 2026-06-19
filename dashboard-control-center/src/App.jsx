@@ -5693,10 +5693,16 @@ function settingsCatalogData(data) {
   return { settings, groups, items };
 }
 
+function dashboardDisplayDepth(data) {
+  const value = displayText(data?.summary?.display_depth, "standard");
+  return ["friendly", "standard", "technical"].includes(value) ? value : "standard";
+}
+
 function settingGroupIconFor(group) {
   const id = displayText(group.id, "");
   const map = {
     context: Compass,
+    dashboard: Settings,
     learning: GraduationCap,
     workflow: GitBranch,
     security: ShieldCheck,
@@ -5706,6 +5712,7 @@ function settingGroupIconFor(group) {
 
 function settingItemIconFor(item) {
   const id = displayText(item.id, "");
+  if (id === "dashboard_display_depth") return Eye;
   if (id.includes("language")) return Globe2;
   if (id.includes("approval")) return UserCheck;
   if (id.includes("security") || id.includes("dangerous")) return ShieldCheck;
@@ -5795,6 +5802,9 @@ function settingValueLabel(item, t) {
   if (id === "learning_mode") {
     return t(`settingsPage.value.learningMode.${value}`, displayText(item.current_label, value));
   }
+  if (id === "dashboard_display_depth") {
+    return t(`settingsPage.value.displayDepth.${value}`, displayText(item.current_label, value));
+  }
   const workflowActionLabel = settingWorkflowActionValueLabel(value, item, t);
   if (workflowActionLabel) {
     return workflowActionLabel;
@@ -5823,6 +5833,9 @@ function settingAllowedValueLabel(value, item, t) {
   }
   if (id === "learning_mode") {
     return t(`settingsPage.value.learningMode.${normalized}`, normalized);
+  }
+  if (id === "dashboard_display_depth") {
+    return t(`settingsPage.value.displayDepth.${normalized}`, normalized);
   }
   const workflowActionLabel = settingWorkflowActionValueLabel(normalized, item, t);
   if (workflowActionLabel) {
@@ -5884,6 +5897,9 @@ function settingsSnapshotReconciles(snapshotData, settingId, requestedValue, app
     return false;
   }
 
+  if (settingId === "dashboard_display_depth") {
+    return displayText(snapshotData?.summary?.display_depth, "") === expectedValue;
+  }
   if (settingId !== "workflow_language") {
     return true;
   }
@@ -7460,6 +7476,7 @@ function SettingsPage({ data, locale, t, onRefreshSnapshot }) {
   const context = selectedContextData(data);
   const authority = data.development?.product_authority || {};
   const { settings, groups, items } = settingsCatalogData(data);
+  const displayDepth = dashboardDisplayDepth(data);
   const hasSettingsCatalog = groups.length > 0 && items.length > 0;
   const reviewItems = items.filter((item) => isReviewState(item.status));
   const selectedRepository = repositoryDisplayName(context.target_repository?.name || authority.repository?.configured_name || authority.repository?.name, t);
@@ -7729,7 +7746,7 @@ function SettingsPage({ data, locale, t, onRefreshSnapshot }) {
   };
 
   return (
-    <section className="view-surface view-surface--settings sidebar-page" id="settings" aria-labelledby="settings-heading">
+    <section className="view-surface view-surface--settings sidebar-page" id="settings" aria-labelledby="settings-heading" data-dashboard-display-depth={displayDepth}>
       <DetailPageHeader tone="settings" Icon={Settings} title={t("settingsPage.title")} subtitle={t("settingsPage.description")} data={data} locale={locale} t={t} actionLabel={t("detail.refreshDisplayOnly")} headingId="settings-heading" />
       <ProducerDecisionSummary data={data} pageId="settings" tone="sidebar" t={t} />
       <DetailDecisionSummary
@@ -7938,7 +7955,7 @@ function SettingsPage({ data, locale, t, onRefreshSnapshot }) {
                         <p>{mutationState.status === "applied" ? t("settingsPage.modal.applyResult") : mutationState.status === "blocked" ? t(displayText(mutationState.result.reason_key, ""), t("settingsPage.modal.planBlocked")) : t("settingsPage.modal.planResult")}</p>
                         {mutationState.status === "blocked" ? <small>{t(displayText(mutationState.result.next_action_key, ""), t("settingsPage.consistency.next.none"))}</small> : null}
                         <small>{t("settingsPage.modal.targetFile")}: {displayText(mutationState.result.target_file)}</small>
-                        <details>
+                        <details open={displayDepth === "technical"}>
                           <summary>{t("settingsPage.modal.technicalDetails")}</summary>
                           <code>{displayText(mutationState.result.tool_command)}</code>
                         </details>
@@ -8400,6 +8417,7 @@ function HistoryPage({ data, locale, t }) {
 }
 
 function SourceBoundary({ data, t }) {
+  const displayDepth = dashboardDisplayDepth(data);
   const files = asArray(data.source_files);
   const commands = asArray(data.source_commands);
   const productFiles = files.filter((value) => displayText(value, "").startsWith("product:"));
@@ -8407,7 +8425,7 @@ function SourceBoundary({ data, t }) {
   const productCommands = commands.filter((value) => /(\[absolute-path\]|--context|check_git_sync|check_ci_status|product-security)/.test(displayText(value, "")));
   const rootCommands = commands.filter((value) => !productCommands.includes(value));
   return (
-    <details className="source-boundary" aria-label={t("aria.dataBoundary")}>
+    <details className="source-boundary" aria-label={t("aria.dataBoundary")} data-dashboard-display-depth={displayDepth} open={displayDepth === "technical"}>
       <summary className="source-boundary__head">
         <FileText aria-hidden="true" size={22} />
         <div>

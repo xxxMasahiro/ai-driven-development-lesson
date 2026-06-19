@@ -20,6 +20,7 @@ const riskLevels = new Set(["low", "medium", "high", "critical"]);
 const partialFailureStates = new Set(["failed", "blocked", "unknown"]);
 const manualFollowupStates = new Set(["optional", "cached", "unknown"]);
 const settingScopes = new Set(["selected_context", "learning", "workflow", "security", "repository", "dashboard"]);
+const dashboardDisplayDepths = new Set(["friendly", "standard", "technical"]);
 const settingsRelatedPages = new Set(["#overview", "#lessons", "#workflow", "#maintenance", "#safety", "#repository-info", "#documents", "#settings", "#history", "#help"]);
 const dashboardUiLocales = new Set(DASHBOARD_LOCALE_CODES);
 const dashboardUiDirections = new Set(["ltr", "rtl"]);
@@ -164,7 +165,7 @@ function validateSettingsCatalog(settings) {
       return validationFailure(`invalid_settings_item:${itemId}:review`);
     }
     if (item.editable) {
-      if (!item.reviewable || !["learning", "workflow"].includes(String(item.scope || "")) || item.allowed_values.length === 0 || item.requires_confirmation !== true || String(item.source_file || "").startsWith("product:")) {
+      if (!item.reviewable || !["learning", "workflow", "dashboard"].includes(String(item.scope || "")) || item.allowed_values.length === 0 || item.requires_confirmation !== true || String(item.source_file || "").startsWith("product:")) {
         return validationFailure(`invalid_settings_item:${itemId}:editable_contract`);
       }
     }
@@ -254,6 +255,9 @@ export function validateDashboardData(body) {
   }
   if (!["learning", "development", "maintenance", "unknown"].includes(String(data.summary.mode || ""))) {
     return validationFailure("invalid_summary_mode");
+  }
+  if (!dashboardDisplayDepths.has(String(data.summary.display_depth || "standard"))) {
+    return validationFailure("invalid_summary_display_depth");
   }
   if (!validateSummaryLocale(data.summary)) {
     return validationFailure("invalid_summary_locale");

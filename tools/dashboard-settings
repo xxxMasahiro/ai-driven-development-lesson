@@ -12,6 +12,8 @@ source "$ROOT/tools/lib/lesson_common.sh"
 source "$ROOT/tools/lib/git_workflow_policy.sh"
 # shellcheck source=tools/lib/product_workflow_git_usage.sh
 source "$ROOT/tools/lib/product_workflow_git_usage.sh"
+# shellcheck source=tools/lib/dashboard_display_depth.sh
+source "$ROOT/tools/lib/dashboard_display_depth.sh"
 # shellcheck source=tools/lib/dashboard_data.sh
 source "$ROOT/tools/lib/dashboard_data.sh"
 
@@ -26,7 +28,7 @@ Usage:
   tools/dashboard-settings plan <setting_id> <value> [--menu <menu_id>]
   tools/dashboard-settings apply <setting_id> <value> --confirm [--menu <menu_id>] [--snapshot <file>] [--expect-current-value <value>] [--expect-current-label <label>] [--expect-target-file <file>] [--expect-setting-kind <kind>]
 
-Settings writes are limited to allowlisted lesson settings, policy-backed Git workflow settings, and product workflow Git usage settings.
+Settings writes are limited to allowlisted lesson settings, policy-backed Git workflow settings, product workflow Git usage settings, and dashboard display settings.
 USAGE
 }
 
@@ -317,6 +319,32 @@ dashboard_settings_prepare_product_git_usage_setting() {
   PLAN_CURRENT_LABEL="$(product_workflow_git_usage_mode_label "$PLAN_CURRENT_VALUE")"
 }
 
+dashboard_settings_prepare_dashboard_setting() {
+  local setting_id="$1"
+  local raw_value="$2"
+  local normalized target_file
+
+  case "$setting_id" in
+    dashboard_display_depth)
+      normalized="$(dashboard_display_depth_normalize "$raw_value")"
+      target_file="$(dashboard_display_depth_file)"
+      dashboard_settings_allow_file "$target_file"
+      PLAN_KIND="dashboard"
+      PLAN_SETTING="display_depth"
+      PLAN_TARGET_FILE="$target_file"
+      PLAN_TARGET_DISPLAY="$(dashboard_settings_display_path "$target_file")"
+      PLAN_VALUE="${normalized%%$'\t'*}"
+      PLAN_LABEL="${normalized#*$'\t'}"
+      PLAN_CURRENT_VALUE="$(dashboard_display_depth_current_value "$target_file")"
+      PLAN_CURRENT_LABEL="$(dashboard_display_depth_current_label "$target_file")"
+      ;;
+    *)
+      printf 'Unsupported dashboard setting: %s\n' "$setting_id" >&2
+      return 1
+      ;;
+  esac
+}
+
 dashboard_settings_prepare_plan() {
   local setting_id="$1"
   local raw_value="$2"
@@ -344,6 +372,9 @@ dashboard_settings_prepare_plan() {
       ;;
     product_git_usage_mode)
       dashboard_settings_prepare_product_git_usage_setting "$raw_value" "$menu_id"
+      ;;
+    dashboard_display_depth)
+      dashboard_settings_prepare_dashboard_setting "$setting_id" "$raw_value"
       ;;
     *)
       printf 'Unsupported dashboard setting: %s\n' "$setting_id" >&2
@@ -483,6 +514,18 @@ dashboard_settings_apply_plan() {
       ;;
     product_workflow_git_usage)
       product_workflow_git_usage_write_setting "$PLAN_SETTING" "$PLAN_VALUE"
+      ;;
+    dashboard)
+      case "$PLAN_SETTING" in
+        display_depth)
+          dashboard_settings_allow_file "$PLAN_TARGET_FILE"
+          dashboard_display_depth_write_setting "$PLAN_TARGET_FILE" "$PLAN_VALUE" "$PLAN_LABEL"
+          ;;
+        *)
+          printf 'Unsupported dashboard settings plan: %s\n' "$PLAN_SETTING" >&2
+          return 1
+          ;;
+      esac
       ;;
     *)
       printf 'Unsupported settings plan kind: %s\n' "$PLAN_KIND" >&2

@@ -22,6 +22,7 @@ export const PARTIAL_FAILURE_STATES = new Set(["failed", "blocked", "unknown"]);
 export const PRODUCT_OPERATION_BLOCKER_STATES = new Set(["missing", "failed", "blocked", "unknown", "stale", "not_run"]);
 export const DASHBOARD_UI_LOCALES = new Set(DASHBOARD_LOCALE_CODES);
 export const DASHBOARD_UI_DIRECTIONS = new Set(["ltr", "rtl"]);
+export const DASHBOARD_DISPLAY_DEPTHS = new Set(["friendly", "standard", "technical"]);
 
 const SECRET_PATTERN =
   /(SECRET|TOKEN|API_KEY|PASSWORD|PRIVATE_KEY)\s*[:=]\s*[^\s#]{8,}|gh[pousr]_[A-Za-z0-9_]{20,}|sk-[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16}|BEGIN (RSA |OPENSSH |EC |DSA )?PRIVATE KEY/i;
@@ -1579,7 +1580,7 @@ function validateSettings(data) {
     }
     const itemScope = displayText(item.scope, "");
     if (item.editable === true) {
-      if (!item.reviewable || !["learning", "workflow"].includes(itemScope)) {
+      if (!item.reviewable || !["learning", "workflow", "dashboard"].includes(itemScope)) {
         throw new Error("dashboard settings item editable scope is invalid");
       }
       if (displayText(item.source_file, "").startsWith("product:")) {
@@ -1696,7 +1697,7 @@ function validateSettingsMutationResponse(value, label) {
       throw new Error(`${label} ${key} is missing`);
     }
   }
-  if (!["lesson", "git", "product_workflow_git_usage"].includes(displayText(result.setting_kind, ""))) {
+  if (!["lesson", "git", "product_workflow_git_usage", "dashboard"].includes(displayText(result.setting_kind, ""))) {
     throw new Error(`${label} setting_kind is invalid`);
   }
   if (!safeScopedRelativePath(result.target_file)) {
@@ -2127,6 +2128,9 @@ export function validateDashboardData(data) {
   }
   if (!["learning", "development", "maintenance", "unknown"].includes(displayText(data.summary.mode, "unknown"))) {
     throw new Error("dashboard mode is invalid");
+  }
+  if (!DASHBOARD_DISPLAY_DEPTHS.has(displayText(data.summary.display_depth, "standard"))) {
+    throw new Error("dashboard display depth is invalid");
   }
   validateSummaryLocale(data.summary);
   validatePrimaryAction(data.summary);

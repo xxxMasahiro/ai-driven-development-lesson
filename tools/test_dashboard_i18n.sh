@@ -98,6 +98,12 @@ if (!keys.includes("settingsPage.notice.title") || !keys.includes("settingsPage.
 const consistencyKeys = [
   "sidebar.readOnlyNotice",
   "designStudio.result.technicalDetails",
+  "settingsPage.group.dashboard",
+  "settingsPage.groupDetail.dashboard",
+  "settingsPage.item.dashboardDisplayDepth",
+  "settingsPage.itemDetail.dashboardDisplayDepth",
+  "settingsPage.impact.dashboardDisplayDepth",
+  "settingsPage.preview.dashboardDisplayDepth",
   "settingsPage.change.approvalRequired",
   "settingsPage.modal.afterApprovalMeansExternalApproval",
   "settingsPage.modal.gitSettingsBoundary",
@@ -124,6 +130,11 @@ const consistencyKeys = [
 for (const key of consistencyKeys) {
   if (!keys.includes(key)) {
     fail(`Dashboard dictionaries must include Settings consistency key ${key}`);
+  }
+}
+for (const key of ["settingsPage.value.displayDepth.friendly", "settingsPage.value.displayDepth.standard", "settingsPage.value.displayDepth.technical"]) {
+  if (!keys.includes(key)) {
+    fail(`Dashboard dictionaries must include Settings display-depth key ${key}`);
   }
 }
 

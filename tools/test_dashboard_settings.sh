@@ -12,6 +12,7 @@ lesson14_mode="$TMP_DIR/LESSON_MODE_14_DAYS.tsv"
 lesson14_workflow_language="$TMP_DIR/WORKFLOW_DISPLAY_LANGUAGE_14_DAYS.tsv"
 lesson14_product_language="$TMP_DIR/PRODUCT_DEVELOPMENT_LANGUAGE_14_DAYS.tsv"
 git_settings="$TMP_DIR/GIT_WORKFLOW_SETTINGS.tsv"
+dashboard_display_depth="$TMP_DIR/DASHBOARD_DISPLAY_DEPTH.tsv"
 lesson_config="$TMP_DIR/LESSON_CONFIG.tsv"
 lesson14_config="$TMP_DIR/LESSON_CONFIG_14_DAYS.tsv"
 
@@ -21,6 +22,7 @@ printf '# selected_at\tcode\tlabel\n2026-06-05 00:00:00\ten\tEnglish\n' >"$produ
 printf '# selected_at\tmode\tdescription\n2026-06-05 00:00:00\tA\tじっくり説明\n' >"$lesson14_mode"
 printf '# selected_at\tcode\tlabel\n2026-06-05 00:00:00\tja\t日本語\n' >"$lesson14_workflow_language"
 printf '# selected_at\tcode\tlabel\n2026-06-05 00:00:00\ten\tEnglish\n' >"$lesson14_product_language"
+printf '# selected_at\tdepth\tlabel\n2026-06-05 00:00:00\tstandard\tStandard\n' >"$dashboard_display_depth"
 cat >"$git_settings" <<'DOC'
 # key	value
 branch_allowed	true
@@ -59,6 +61,7 @@ run_settings() {
   LESSON_CONFIG="$lesson14_config" \
   GIT_WORKFLOW_SETTINGS_FILE="$git_settings" \
   GIT_WORKFLOW_POLICY_FILE="$ROOT/docs/workflow/GIT_WORKFLOW_POLICY.tsv" \
+  DASHBOARD_DISPLAY_DEPTH_FILE="$dashboard_display_depth" \
   "$ROOT/tools/dashboard-settings" "$@"
 }
 
@@ -114,6 +117,25 @@ awk -F '\t' '$1 !~ /^#/ && $2 == "en" && $3 == "English" { found = 1 } END { exi
 
 run_settings apply product_language zh-CN --menu step_1_14 --confirm >/dev/null
 awk -F '\t' '$1 !~ /^#/ && $2 == "zh-CN" && $3 != "" { found = 1 } END { exit found ? 0 : 1 }' "$lesson14_product_language"
+
+dashboard_depth_plan_json="$(run_settings plan dashboard_display_depth technical --menu step_1_14)"
+DASHBOARD_DEPTH_PLAN_JSON="$dashboard_depth_plan_json" node <<'NODE'
+const data = JSON.parse(process.env.DASHBOARD_DEPTH_PLAN_JSON);
+if (data.status !== "ready" || data.setting_kind !== "dashboard" || data.setting_id !== "dashboard_display_depth" || data.requested_value !== "technical") {
+  console.error("dashboard display depth plan must expose a dashboard-scoped safe plan");
+  process.exit(1);
+}
+if (data.current_value !== "standard" || data.target_file !== "settings-test-target") {
+  console.error("dashboard display depth plan must report the current value and target file");
+  process.exit(1);
+}
+NODE
+run_settings apply dashboard_display_depth technical --menu step_1_14 --expect-current-value standard --expect-setting-kind dashboard --confirm >/dev/null
+awk -F '\t' '$1 !~ /^#/ && $2 == "technical" && $3 == "Technical detail" { found = 1 } END { exit found ? 0 : 1 }' "$dashboard_display_depth"
+if run_settings plan dashboard_display_depth verbose --menu step_1_14 >/dev/null 2>&1; then
+  printf 'dashboard-settings must reject invalid dashboard display depth values\n' >&2
+  exit 1
+fi
 
 validate_catalog_allowed_values_for_menu() {
   local menu_id="$1"
@@ -256,6 +278,7 @@ if DASHBOARD_SETTINGS_TEST_MODE=1 \
   LESSON_CONFIG="$outside_config" \
   GIT_WORKFLOW_SETTINGS_FILE="$git_settings" \
   GIT_WORKFLOW_POLICY_FILE="$ROOT/docs/workflow/GIT_WORKFLOW_POLICY.tsv" \
+  DASHBOARD_DISPLAY_DEPTH_FILE="$dashboard_display_depth" \
   "$ROOT/tools/dashboard-settings" apply learning_mode A --menu step_1_14 --confirm >/dev/null 2>&1; then
   printf 'dashboard-settings must reject files outside the approved boundary\n' >&2
   exit 1

@@ -346,14 +346,18 @@ async function routeSettingsApi(page, calls = [], options = {}) {
     const settingId = String(payload.setting_id || "");
     const isWorkflowLanguage = settingId === "workflow_language";
     const isProductLanguage = settingId === "product_language";
-    const previousValue = isWorkflowLanguage ? (value === "ar" ? "en" : "ja") : settingId === "learning_mode" ? "A" : value;
+    const isDashboardDisplayDepth = settingId === "dashboard_display_depth";
+    const previousValue = isWorkflowLanguage ? (value === "ar" ? "en" : "ja") : settingId === "learning_mode" ? "A" : isDashboardDisplayDepth ? "standard" : value;
     const targetFile = isWorkflowLanguage
       ? "learning/WORKFLOW_DISPLAY_LANGUAGE_14_DAYS.tsv"
       : isProductLanguage
         ? "learning/PRODUCT_DEVELOPMENT_LANGUAGE_14_DAYS.tsv"
-        : settingId.startsWith("git_")
-          ? "learning/GIT_WORKFLOW_SETTINGS.tsv"
-          : "learning/LESSON_MODE_14_DAYS.tsv";
+        : isDashboardDisplayDepth
+          ? "learning/DASHBOARD_DISPLAY_DEPTH.tsv"
+          : settingId.startsWith("git_")
+            ? "learning/GIT_WORKFLOW_SETTINGS.tsv"
+            : "learning/LESSON_MODE_14_DAYS.tsv";
+    const settingKind = isDashboardDisplayDepth ? "dashboard" : settingId.startsWith("git_") ? "git" : "lesson";
     const localeMetadata = isWorkflowLanguage ? localeMap.get(value) || localeMap.get("en") : null;
     const blocked =
       (command === "plan" && options.blockedPlanSettingId === settingId) ||
@@ -369,7 +373,7 @@ async function routeSettingsApi(page, calls = [], options = {}) {
         affected_setting_ids: blocked ? ["branch_allowed", "main_direct_work_allowed"] : [],
         setting_id: settingId,
         menu_id: String(payload.menu_id || "step_1_14"),
-        setting_kind: settingId.startsWith("git_") ? "git" : "lesson",
+        setting_kind: settingKind,
         requested_value: value,
         requested_label: value,
         current_value: previousValue,
@@ -594,7 +598,13 @@ function dashboardSettingFixture(settingId, value, hashCharacter) {
     throw new Error(`fixture is missing ${settingId} setting`);
   }
   item.current_value = value;
-  item.current_label = settingId === "learning_mode" ? `${value}: Detailed guidance` : String(value);
+  if (settingId === "dashboard_display_depth") {
+    const labels = { friendly: "Guide", standard: "Standard", technical: "Technical detail" };
+    item.current_label = labels[value] || String(value);
+    data.summary.display_depth = value;
+  } else {
+    item.current_label = settingId === "learning_mode" ? `${value}: Detailed guidance` : String(value);
+  }
   return data;
 }
 
@@ -1324,6 +1334,7 @@ test.describe("English dashboard control center", () => {
     await repositoryNavigation.getByRole("link", { name: /Settings/ }).click();
     const settingsView = page.locator("#settings");
     await expect(settingsView).toBeVisible();
+    await expect(settingsView).toHaveAttribute("data-dashboard-display-depth", "standard");
     await expect(settingsView.locator(".settings-row")).toHaveCount(fixtureSettingsCount);
     await expect(settingsView.locator(".settings-change-chip")).toHaveCount(0);
     const learningModeRow = settingsView.locator(".settings-row", { hasText: "Learning mode" });
@@ -1334,6 +1345,17 @@ test.describe("English dashboard control center", () => {
     await expect(productNameRow.locator(".settings-row__open")).toContainText("Review");
     await expect(productNameRow.locator(".settings-row__meta")).not.toContainText("Review only");
     await expect(productNameRow).toContainText("Repository Info");
+    const displayDepthRow = settingsView.locator(".settings-row[data-settings-row-id='dashboard_display_depth']");
+    await expect(displayDepthRow).toContainText("Dashboard display depth");
+    await expect(displayDepthRow).toContainText("Standard");
+    await expect(displayDepthRow.locator(".settings-row__open")).toContainText("Editable here");
+    await displayDepthRow.click();
+    await expect(page.locator(".settings-modal__allowed")).toContainText("Guide");
+    await expect(page.locator(".settings-modal__allowed")).toContainText("Standard");
+    await expect(page.locator(".settings-modal__allowed")).toContainText("Technical detail");
+    await expect(page.locator(".settings-value-select select")).toContainText("Technical detail");
+    await page.locator(".settings-modal__close").click();
+    await expect(page.locator(".settings-modal")).toHaveCount(0);
     const branchAllowedRow = settingsView.locator(".settings-row[data-settings-row-id='git_branch_allowed']");
     await expect(branchAllowedRow).toContainText("Allowed");
     await branchAllowedRow.click();
@@ -1627,6 +1649,19 @@ test.describe("English dashboard control center", () => {
     await expect(page.locator(".insight-detail-modal")).toContainText("Why it matters");
     await page.keyboard.press("Escape");
     await expect(page.locator(".insight-detail-modal")).toHaveCount(0);
+  });
+
+  test("opens source details by default in technical display depth", async ({ page }) => {
+    const technicalFixture = dashboardSettingFixture("dashboard_display_depth", "technical", "c");
+    await page.unroute(dashboardDataRoutePattern);
+    await routeDashboardDataPayload(page, technicalFixture);
+    await page.goto("http://lesson.local/dashboard-control-center/index.html#repository-info");
+
+    const repositoryView = page.locator("#repository-info");
+    await expect(repositoryView).toBeVisible();
+    const sourceBoundary = repositoryView.locator(".source-boundary");
+    await expect(sourceBoundary).toHaveAttribute("data-dashboard-display-depth", "technical");
+    await expect(sourceBoundary).toHaveAttribute("open", "");
   });
 
   test("renders every dashboard page without losing selected context", async ({ page }) => {

@@ -2363,3 +2363,30 @@ Non-scope:
 
 - Do not add arbitrary command execution, a browser Git workflow runner, product repository writes, external product design writes, credential storage, OAuth, dependency changes, push, PR creation, merge, main CI waiting, local/remote sync, cleanup, or delete operations.
 - Do not weaken existing same-origin, JSON-only, POST-only, body-size, unknown-field, execFile, or generated design-system boundaries.
+
+## Dashboard Control Center Display Depth Settings Requirements
+
+SYNC-ID: dashboard_control_center_display_depth_settings
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,learning/DASHBOARD_DISPLAY_DEPTH.tsv,tools/lib/dashboard_display_depth.sh,tools/dashboard-settings,tools/dashboard-data,docs/workflow/DASHBOARD_DATA_SCHEMA.tsv,docs/workflow/TEST_PLAN_MANIFEST.tsv,vite.config.mjs,dashboard-control-center/src/dashboardData.js,dashboard-control-center/src/App.jsx,dashboard-control-center/src/i18n.js,tests/fixtures/dashboard-control-center.json,tests/fixtures/dashboard-control-center-live-update.json,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_settings.sh,tools/test_dashboard_data.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_dashboard_settings.sh,tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/check_dashboard_design_system.sh,tools/check_test_plan_coverage.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+Dashboard Control Center Settings must expose one dashboard-scoped display depth setting so non-engineers, AI beginners, and technical learners can choose guide, standard, or technical detail presentation without changing workflow authority.
+The display depth must affect explanation density and disclosure defaults only; it must not hide blockers, approvals, security state, stale evidence, command preview access, Settings boundaries, Design Studio boundaries, or owner-layer protections.
+
+Requirements:
+
+- The setting accepts exactly `friendly`, `standard`, and `technical`; `standard` remains the current baseline.
+- The setting is stored as dashboard state, not as a lesson progression mode or Design Studio density token.
+- Settings mutation remains owner-layer planned, token-bound, stale-current guarded, and target-file validated.
+- Technical mode makes source files, commands, evidence references, and technical keys easier to inspect.
+- Guide mode reduces technical clutter by default while preserving all safety, approval, blocker, and evidence signals.
+- All labels are localized through the dashboard i18n layer.
+
+Non-scope:
+
+- Do not change lesson step content, lesson settings semantics, Git workflow policy semantics, Design Studio source authority, dependency versions, or product repository authority.
+
+Implemented verification:
+
+- Dashboard Settings, schema, data, i18n, Control Center Playwright, design-system drift, and test-plan coverage checks passed before promotion.

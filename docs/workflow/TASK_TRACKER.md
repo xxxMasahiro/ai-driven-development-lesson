@@ -2623,3 +2623,26 @@ Current Status:
 Next Step:
 
 - No remaining implementation action for this sync ID. Continue to treat Settings as a guarded settings surface, not a browser command runner.
+
+## Dashboard Control Center Display Depth Settings Work
+
+SYNC-ID: dashboard_control_center_display_depth_settings
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,learning/DASHBOARD_DISPLAY_DEPTH.tsv,tools/lib/dashboard_display_depth.sh,tools/dashboard-settings,tools/dashboard-data,docs/workflow/DASHBOARD_DATA_SCHEMA.tsv,docs/workflow/TEST_PLAN_MANIFEST.tsv,vite.config.mjs,dashboard-control-center/src/dashboardData.js,dashboard-control-center/src/App.jsx,dashboard-control-center/src/i18n.js,tests/fixtures/dashboard-control-center.json,tests/fixtures/dashboard-control-center-live-update.json,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_settings.sh,tools/test_dashboard_data.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_dashboard_settings.sh,tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/check_dashboard_design_system.sh,tools/check_test_plan_coverage.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+Current Status:
+
+- [x] Developer approved implementation from the xhigh review-based plan.
+- [x] Started under `repository-development-workflow` with AGENTS invariants and sync-first discipline.
+- [x] Synchronize planned documents and pass implementation-plan sync checks.
+- [x] Add the display depth source and shared helper.
+- [x] Add owner-layer Settings plan/apply support.
+- [x] Publish dashboard data, schema, test-plan, and fixture coverage.
+- [x] Update Control Center rendering and localized labels.
+- [x] Run focused Settings, schema, data, i18n, Playwright, design-system, and test-plan coverage checks.
+- [x] Promote this sync ID to implemented.
+
+Next Step:
+
+- No remaining implementation action for this sync ID. Continue to keep display depth separate from lesson mode and Design Studio density.

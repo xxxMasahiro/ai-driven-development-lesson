@@ -4785,3 +4785,22 @@ git diff --check
 
 Use Playwright visual review for the Settings page and updated warning/technical-detail surfaces if focused Control Center tests do not already cover the rendered behavior.
 Stop and ask before arbitrary command execution, product repository writes, external product design writes, Git operations, CI waiting, OAuth, credentials, dependency changes, generated-file source edits, cleanup, delete, push, PR creation, merge, main sync, or any existing-feature tradeoff.
+
+## Dashboard Control Center Display Depth Settings Implementation Plan
+
+SYNC-ID: dashboard_control_center_display_depth_settings
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,learning/DASHBOARD_DISPLAY_DEPTH.tsv,tools/lib/dashboard_display_depth.sh,tools/dashboard-settings,tools/dashboard-data,docs/workflow/DASHBOARD_DATA_SCHEMA.tsv,docs/workflow/TEST_PLAN_MANIFEST.tsv,vite.config.mjs,dashboard-control-center/src/dashboardData.js,dashboard-control-center/src/App.jsx,dashboard-control-center/src/i18n.js,tests/fixtures/dashboard-control-center.json,tests/fixtures/dashboard-control-center-live-update.json,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_settings.sh,tools/test_dashboard_data.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_dashboard_settings.sh,tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/check_dashboard_design_system.sh,tools/check_test_plan_coverage.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+Implemented order:
+
+1. Synchronized this planned block across the as-built contract, requirements, specification, implementation plan, tracker, and handoff before runtime edits.
+2. Added `learning/DASHBOARD_DISPLAY_DEPTH.tsv` and `tools/lib/dashboard_display_depth.sh` for strict value normalization and atomic writes.
+3. Extended `tools/dashboard-settings` to plan and apply `dashboard_display_depth` through the existing token-bound Settings mutation contract.
+4. Extended `tools/dashboard-data`, `docs/workflow/DASHBOARD_DATA_SCHEMA.tsv`, and test-plan coverage for `summary.display_depth` and the Settings catalog item.
+5. Updated Dashboard Control Center validation, labels, rendered Settings rows, and technical disclosure defaults while preserving standard mode as the existing baseline.
+6. Updated fixtures and Playwright coverage for the display-depth Settings row and technical source-boundary disclosure.
+7. Ran focused settings, schema, data, i18n, Playwright control-center, design-system, and test-plan coverage checks before promotion.
+
+Stop and ask before changing lesson step behavior, lesson mode semantics, Git workflow policy authority, Design Studio source authority, dependencies, product repository writes, arbitrary browser command execution, push, PR creation, merge, cleanup, delete, or any existing-feature tradeoff.

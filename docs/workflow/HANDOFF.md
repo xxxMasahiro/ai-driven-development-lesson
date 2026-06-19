@@ -2779,3 +2779,23 @@ Next Step:
 - No remaining implementation action for this sync ID. Future changes must preserve the owner-layer Settings boundary and one-time plan-token apply contract.
 
 Stop and ask before arbitrary command execution, product repository writes, external product design writes, Git operations, CI waiting, OAuth, credentials, dependencies, generated-file source edits, cleanup, delete, push, PR creation, merge, main sync, or any existing-feature tradeoff.
+
+## Dashboard Control Center Display Depth Settings Handoff
+
+SYNC-ID: dashboard_control_center_display_depth_settings
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,learning/DASHBOARD_DISPLAY_DEPTH.tsv,tools/lib/dashboard_display_depth.sh,tools/dashboard-settings,tools/dashboard-data,docs/workflow/DASHBOARD_DATA_SCHEMA.tsv,docs/workflow/TEST_PLAN_MANIFEST.tsv,vite.config.mjs,dashboard-control-center/src/dashboardData.js,dashboard-control-center/src/App.jsx,dashboard-control-center/src/i18n.js,tests/fixtures/dashboard-control-center.json,tests/fixtures/dashboard-control-center-live-update.json,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_settings.sh,tools/test_dashboard_data.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_dashboard_settings.sh,tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/check_dashboard_design_system.sh,tools/check_test_plan_coverage.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+Restart context:
+
+- This sync added a dashboard-scoped display depth setting with guide, standard, and technical detail modes.
+- `standard` preserves the current Control Center disclosure baseline.
+- The setting affects disclosure and explanation density only; it does not change workflow authority, hide safety signals, or broaden Settings/Design Studio mutation scope.
+- Runtime targets now include the new dashboard display source/helper, settings owner layer, dashboard data/schema/test-plan contracts, browser validation, localized labels, fixtures, and Playwright coverage.
+
+Next Step:
+
+- No remaining implementation action for this sync ID. Future changes should keep display depth separate from lesson mode and Design Studio density.
+
+Stop and ask before changing lesson step behavior, lesson mode semantics, Git workflow policy authority, Design Studio source authority, dependencies, product repository writes, arbitrary browser command execution, push, PR creation, merge, cleanup, delete, or any existing-feature tradeoff.

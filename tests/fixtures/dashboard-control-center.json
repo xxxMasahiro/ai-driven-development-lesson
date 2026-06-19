@@ -5,7 +5,8 @@
   "content_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
   "source_files": [
     "docs/workflow/DASHBOARD_DATA_SCHEMA.tsv",
-    "learning/LESSON_STATE.tsv"
+    "learning/LESSON_STATE.tsv",
+    "learning/DASHBOARD_DISPLAY_DEPTH.tsv"
   ],
   "source_commands": [
     "tools/dashboard-data"
@@ -116,6 +117,7 @@
   ],
   "summary": {
     "mode": "maintenance",
+    "display_depth": "standard",
     "next_safe_action": "Review the listed blockers and previews before continuing.",
     "primary_action": {
       "title": "Review lessons and accept for workflow",
@@ -1248,25 +1250,32 @@
         "order": 1
       },
       {
+        "id": "dashboard",
+        "label_key": "settingsPage.group.dashboard",
+        "description_key": "settingsPage.groupDetail.dashboard",
+        "status": "ready",
+        "order": 2
+      },
+      {
         "id": "learning",
         "label_key": "settingsPage.group.learning",
         "description_key": "settingsPage.groupDetail.learning",
         "status": "approval_required",
-        "order": 2
+        "order": 3
       },
       {
         "id": "workflow",
         "label_key": "settingsPage.group.workflow",
         "description_key": "settingsPage.groupDetail.workflow",
         "status": "unknown",
-        "order": 3
+        "order": 4
       },
       {
         "id": "security",
         "label_key": "settingsPage.group.security",
         "description_key": "settingsPage.groupDetail.security",
         "status": "not_run",
-        "order": 4
+        "order": 5
       }
     ],
     "items": [
@@ -1419,6 +1428,44 @@
           "reason_key": "settingsPage.consistency.none",
           "next_action_key": "settingsPage.consistency.next.none",
           "effective_mode": "web",
+          "affected_setting_ids": []
+        }
+      },
+      {
+        "id": "dashboard_display_depth",
+        "group_id": "dashboard",
+        "scope": "dashboard",
+        "label_key": "settingsPage.item.dashboardDisplayDepth",
+        "description_key": "settingsPage.itemDetail.dashboardDisplayDepth",
+        "current_value": "standard",
+        "current_label": "Standard",
+        "status": "ready",
+        "source_file": "learning/DASHBOARD_DISPLAY_DEPTH.tsv",
+        "allowed_values": [
+          "friendly",
+          "standard",
+          "technical"
+        ],
+        "editable": true,
+        "reviewable": true,
+        "risk_level": "low",
+        "requires_confirmation": true,
+        "disabled_reason_key": "settingsPage.disabled.available",
+        "related_page": "#settings",
+        "update_action_id": "dashboard.display_depth",
+        "review": {
+          "impact_key": "settingsPage.impact.dashboardDisplayDepth",
+          "target_file": "learning/DASHBOARD_DISPLAY_DEPTH.tsv",
+          "validation_status": "ready",
+          "update_preview_key": "settingsPage.preview.dashboardDisplayDepth"
+        },
+        "consistency": {
+          "status": "ready",
+          "severity": "info",
+          "reason_code": "none",
+          "reason_key": "settingsPage.consistency.none",
+          "next_action_key": "settingsPage.consistency.next.none",
+          "effective_mode": "standard",
           "affected_setting_ids": []
         }
       },
