@@ -232,6 +232,7 @@ source_files=(
   "docs/workflow/PRODUCT_REPOSITORY_REGISTRY_SCHEMA.tsv"
   "learning/PRODUCT_REPOSITORY_REGISTRY.tsv"
   "learning/PRODUCT_REPOSITORY_SELECTION.tsv"
+  "tools/dashboard-browser-debug-manifest"
   "learning/context/WORKFLOW_CONTEXT_MAP.tsv"
   "learning/GIT_WORKFLOW_SETTINGS.tsv"
   "learning/PRODUCT_WORKFLOW_GIT_USAGE_SETTINGS.tsv"
@@ -275,6 +276,123 @@ add_partial_failure() {
 
 add_manual_followup() {
   dashboard_data_add_manual_followup manual_followups "$1" "$2" "$3" "$4"
+}
+
+dashboard_first_relative_artifact() {
+  local rel_dir="$1"
+  local name_filter="${2:-}"
+  local root_dir="$ROOT/$rel_dir"
+  [[ -d "$root_dir" ]] || return 1
+  while IFS= read -r -d '' artifact_path; do
+    artifact_path="${artifact_path#$ROOT/}"
+    case "$artifact_path" in
+      ""|/*|*..*|*[!A-Za-z0-9._/@%+=,-]*)
+        continue
+        ;;
+    esac
+    printf '%s' "$artifact_path"
+    return 0
+  done < <(
+    if [[ -n "$name_filter" ]]; then
+      find "$root_dir" -type f -name "$name_filter" -print0 2>/dev/null | sort -z
+    else
+      find "$root_dir" -type f -print0 2>/dev/null | sort -z
+    fi
+  )
+  return 1
+}
+
+dashboard_browser_debug_cli_root() {
+  local repo
+  repo="$(dashboard_target_repository_root "free-development" 2>/dev/null || true)"
+  [[ -n "$repo" && -f "$repo/bin/browser-debug.js" ]] || return 1
+  printf '%s' "$repo"
+}
+
+dashboard_artifact_status() {
+  local path="$1"
+  [[ -n "$path" ]] && printf 'passed' || printf 'not_run'
+}
+
+dashboard_browser_debug_status_json() {
+  local cli_root cli_status cli_repo manifest_status latest_review latest_package latest_result latest_report
+  local review_status package_status result_status report_status overall_status review_ref package_ref result_ref
+
+  cli_root="$(dashboard_browser_debug_cli_root 2>/dev/null || true)"
+  if [[ -n "$cli_root" ]]; then
+    cli_status="ready"
+    cli_repo="browser-debug-cli"
+  else
+    cli_status="manual_required"
+    cli_repo="not_selected"
+  fi
+
+  if [[ -f "$ROOT/tools/dashboard-browser-debug-manifest" ]]; then
+    manifest_status="ready"
+  else
+    manifest_status="missing"
+  fi
+
+  latest_review="$(dashboard_first_relative_artifact ".browser-debug/review-artifacts" "*.json" 2>/dev/null || true)"
+  latest_package="$(dashboard_first_relative_artifact ".browser-debug/agent-packages" "packet.json" 2>/dev/null || true)"
+  latest_result="$(dashboard_first_relative_artifact ".browser-debug/agent-results" "*.json" 2>/dev/null || true)"
+  latest_report="$(dashboard_first_relative_artifact ".browser-debug/reports" "*.md" 2>/dev/null || true)"
+  review_status="$(dashboard_artifact_status "$latest_review")"
+  package_status="$(dashboard_artifact_status "$latest_package")"
+  result_status="$(dashboard_artifact_status "$latest_result")"
+  report_status="$(dashboard_artifact_status "$latest_report")"
+
+  if [[ "$manifest_status" != "ready" ]]; then
+    overall_status="missing"
+  elif [[ "$cli_status" != "ready" ]]; then
+    overall_status="optional"
+  elif [[ "$review_status" != "passed" ]]; then
+    overall_status="not_run"
+  elif [[ "$package_status" == "passed" && "$result_status" == "passed" && "$report_status" == "passed" ]]; then
+    overall_status="passed"
+  else
+    overall_status="manual_required"
+  fi
+
+  review_ref="${latest_review:-.browser-debug/review-artifacts/review-index.json}"
+  package_ref="${latest_package:-.browser-debug/agent-packages/packet.json}"
+  result_ref="${latest_result:-.browser-debug/agent-results/agent-advisory-result.json}"
+
+  dashboard_json_raw_object \
+    "schema_version" "$(dashboard_json_string "0.1.0")" \
+    "status" "$(dashboard_json_string "$overall_status")" \
+    "target" "$(dashboard_json_string "Dashboard Control Center")" \
+    "selected_cli_repository" "$(dashboard_json_string "$cli_repo")" \
+    "tool" "$(dashboard_json_raw_object \
+      "status" "$(dashboard_json_string "$cli_status")" \
+      "command" "$(dashboard_json_string "node product:bin/browser-debug.js")" \
+      "source" "$(dashboard_json_string "selected_free_development_repository")")" \
+    "manifest" "$(dashboard_json_raw_object \
+      "status" "$(dashboard_json_string "$manifest_status")" \
+      "path" "$(dashboard_json_string "tools/dashboard-browser-debug-manifest")" \
+      "command" "$(dashboard_json_string "tools/dashboard-browser-debug-manifest --output .tmp/dashboard-browser-debug-target.json")")" \
+    "review" "$(dashboard_json_raw_object \
+      "status" "$(dashboard_json_string "$review_status")" \
+      "artifact_index_path" "$(dashboard_json_string "${latest_review:-not_collected}")" \
+      "command" "$(dashboard_json_string "node product:bin/browser-debug.js review --target .tmp/dashboard-browser-debug-target.json --json")")" \
+    "agent_package" "$(dashboard_json_raw_object \
+      "status" "$(dashboard_json_string "$package_status")" \
+      "path" "$(dashboard_json_string "${latest_package:-not_collected}")" \
+      "command" "$(dashboard_json_string "node product:bin/browser-debug.js agent package --review-index $review_ref --surface local-subscription-agent --json")")" \
+    "agent_result" "$(dashboard_json_raw_object \
+      "status" "$(dashboard_json_string "$result_status")" \
+      "path" "$(dashboard_json_string "${latest_result:-not_collected}")" \
+      "command" "$(dashboard_json_string "node product:bin/browser-debug.js agent ingest --package $package_ref --input $result_ref --json")")" \
+    "agent_report" "$(dashboard_json_raw_object \
+      "status" "$(dashboard_json_string "$report_status")" \
+      "path" "$(dashboard_json_string "${latest_report:-not_collected}")" \
+      "command" "$(dashboard_json_string "node product:bin/browser-debug.js agent report --review-index $review_ref --agent-result $result_ref --json")")" \
+    "boundary" "$(dashboard_json_raw_object \
+      "dashboard_executes_browser_debug" "$(dashboard_json_bool false)" \
+      "external_upload" "$(dashboard_json_bool false)" \
+      "provider_api" "$(dashboard_json_bool false)" \
+      "credential_storage" "$(dashboard_json_bool false)" \
+      "product_repository_mutated" "$(dashboard_json_bool false)")"
 }
 
 add_blocking_item() {
@@ -3996,6 +4114,9 @@ repository_scope_observed_at="$(dashboard_json_get_field "$repository_scope_json
 repository_scope_evidence_path="product:ops/PRODUCT_PROFILE.json;product:ops/REPOSITORY_INDEX.json"
 product_authority_evidence_path="docs/workflow/PRODUCT_GATE_EVIDENCE_SCHEMA.tsv;product:ops/TEST_PLAN_MANIFEST.tsv"
 product_security_evidence_path="product:ops/SECURITY_MANIFEST.tsv;product:docs/workflow/SECURITY.md"
+browser_debug_json="$(dashboard_browser_debug_status_json)"
+browser_debug_status="$(dashboard_json_get_field "$browser_debug_json" status 2>/dev/null || printf 'unknown')"
+dashboard_data_allowed_state "$browser_debug_status" || browser_debug_status="unknown"
 dashboard_display_source_files=("${source_files[@]}")
 dashboard_display_source_commands=("${source_commands[@]}")
 if [[ "$(dashboard_context_product_repo_required "$SELECTED_MENU_ID")" == "true" ]]; then
@@ -4362,6 +4483,7 @@ maintenance_evidence_rows=(
   "$(dashboard_json_evidence_row "security_policy" "Security policy" "required" "$security_policy_status" "docs/workflow/PRODUCT_SECURITY_POLICY.tsv;product:ops/SECURITY_MANIFEST.tsv;product:docs/workflow/SECURITY.md" "Security policy and guardrails" "Confirms command, approval, and dangerous-operation policy before risky work." "./tools/product-security status --context $PRODUCT_AUTHORITY_CONTEXT" "policy" "$generated_at" "" "" "high" "docs/workflow/PRODUCT_SECURITY_POLICY.tsv;product:ops/SECURITY_MANIFEST.tsv;product:docs/workflow/SECURITY.md" "0")"
   "$(dashboard_json_evidence_row "developer_memory" "Developer memory" "required" "$developer_memory_status" "docs/memory/DEVELOPER_MEMORY.md" "Development decision memory" "Confirms implementation decisions and unresolved UI concerns are recorded." "./tools/check_developer_memory_requirements.sh" "memory" "$generated_at" "" "" "medium" "docs/memory/DEVELOPER_MEMORY.md" "0")"
   "$(dashboard_json_evidence_row "workflow_pair" "Workflow pair" "required" "$workflow_pair_status" "docs/workflow/TASK_TRACKER.md;docs/workflow/HANDOFF.md" "Task tracker and handoff pair" "Confirms progress and restart notes stay synchronized for handoff." "./tools/check_workflow_pair_sync.sh" "workflow_pair" "$generated_at" "" "" "medium" "docs/workflow/TASK_TRACKER.md;docs/workflow/HANDOFF.md" "0")"
+  "$(dashboard_json_evidence_row "browser_debug_agent_handoff" "Browser Debug agent handoff" "optional" "$browser_debug_status" "tools/dashboard-browser-debug-manifest;.browser-debug/review-artifacts;.browser-debug/agent-packages;.browser-debug/agent-results;.browser-debug/reports" "Dashboard Control Center review handoff" "Confirms Browser Debug CLI review package, agent ingest, and report handoff state without executing provider APIs from the dashboard." "tools/dashboard-browser-debug-manifest --output .tmp/dashboard-browser-debug-target.json" "browser_debug" "$generated_at" "" "" "medium" "tools/dashboard-browser-debug-manifest;.browser-debug/review-artifacts;.browser-debug/agent-packages;.browser-debug/agent-results;.browser-debug/reports" "0")"
 )
 
 security_approvals=(
@@ -4406,6 +4528,7 @@ content_seed="$(
     "${available_contexts[*]}" \
     "$repository_selection_json" \
     "$repository_scope_json" \
+    "$browser_debug_json" \
     "$product_repository_status" \
     "$documents_status" \
     "$git_sync_status" \
@@ -4480,6 +4603,9 @@ printf '%s' "$repository_selection_json"
 printf ',\n'
 printf '  "repository_scope": '
 printf '%s' "$repository_scope_json"
+printf ',\n'
+printf '  "browser_debug": '
+printf '%s' "$browser_debug_json"
 printf ',\n'
 printf '  "partial_failures": '
 dashboard_json_raw_array "${partial_failures[@]}"

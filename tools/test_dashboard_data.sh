@@ -180,6 +180,7 @@ for (const seedToken of [
   '"$settings_status"',
   '"${settings_groups[*]}"',
   '"${settings_items[*]}"',
+  '"$browser_debug_json"',
 ]) {
   if (!producerRaw.includes(seedToken)) {
     fail(`content_hash seed must include document payload token: ${seedToken}`);
@@ -211,6 +212,9 @@ if (!data.source_files.includes('docs/workflow/MENU_PRODUCT_PROFILE_POLICY.tsv')
 }
 if (!data.source_files.includes('docs/workflow/PRODUCT_GATE_EVIDENCE_SCHEMA.tsv')) {
   fail('source_files does not include product gate evidence schema');
+}
+if (!data.source_files.includes('tools/dashboard-browser-debug-manifest')) {
+  fail('source_files does not include dashboard Browser Debug manifest generator');
 }
 if (!data.source_commands.includes('tools/dashboard-data')) {
   fail('source_commands does not include dashboard-data');
@@ -254,6 +258,13 @@ for (const path of [
   'security.policy_status',
   'security.gate_status',
   'security.dangerous_action_approval',
+  'browser_debug.status',
+  'browser_debug.tool.status',
+  'browser_debug.manifest.status',
+  'browser_debug.review.status',
+  'browser_debug.agent_package.status',
+  'browser_debug.agent_result.status',
+  'browser_debug.agent_report.status',
 ]) {
   const value = requireField(path);
   if (!allowedStates.has(value) && path !== 'summary.mode') {
@@ -578,6 +589,81 @@ for (const row of maintenanceEvidenceRows) {
   }
   if (!allowedStates.has(row.status)) {
     fail(`invalid maintenance evidence status: ${row.status}`);
+  }
+}
+if (!maintenanceEvidenceRows.some((row) => row.id === 'browser_debug_agent_handoff')) {
+  fail('maintenance evidence rows must include browser_debug_agent_handoff');
+}
+
+const browserDebug = requireField('browser_debug');
+if (!browserDebug || typeof browserDebug !== 'object' || Array.isArray(browserDebug)) {
+  fail('browser_debug must be an object');
+}
+if (!/^[0-9]+\.[0-9]+\.[0-9]+$/.test(String(browserDebug.schema_version || ''))) {
+  fail('browser_debug.schema_version must be semver-like');
+}
+if (!allowedStates.has(browserDebug.status)) {
+  fail(`invalid browser_debug.status: ${browserDebug.status}`);
+}
+if (browserDebug.target !== 'Dashboard Control Center') {
+  fail(`browser_debug target must be Dashboard Control Center, got ${browserDebug.target}`);
+}
+if (!['browser-debug-cli', 'not_selected'].includes(browserDebug.selected_cli_repository)) {
+  fail(`browser_debug selected CLI repository is invalid: ${browserDebug.selected_cli_repository}`);
+}
+function requireSafeDisplayCommand(command, label) {
+  if (typeof command !== 'string' || command.length === 0) {
+    fail(`${label} command is required`);
+  }
+  if (/(^|\s)\/|[A-Za-z]:[\\/]|https?:\/\//.test(command) || /[;&|`$<>\\]/.test(command)) {
+    fail(`${label} command must be display-only and safe: ${command}`);
+  }
+}
+function requireSafeRelativeArtifact(value, label) {
+  if (value === 'not_collected') {
+    return;
+  }
+  if (!isSafeScopedPath(value)) {
+    fail(`${label} must be a safe relative artifact path or not_collected: ${value}`);
+  }
+}
+const browserDebugStages = [
+  ['tool', ['status', 'command', 'source']],
+  ['manifest', ['status', 'path', 'command']],
+  ['review', ['status', 'artifact_index_path', 'command']],
+  ['agent_package', ['status', 'path', 'command']],
+  ['agent_result', ['status', 'path', 'command']],
+  ['agent_report', ['status', 'path', 'command']],
+];
+for (const [stageName, fields] of browserDebugStages) {
+  const stage = browserDebug[stageName];
+  if (!stage || typeof stage !== 'object' || Array.isArray(stage)) {
+    fail(`browser_debug.${stageName} must be an object`);
+  }
+  for (const field of fields) {
+    if (!(field in stage) || stage[field] === '') {
+      fail(`browser_debug.${stageName} missing ${field}`);
+    }
+  }
+  if (!allowedStates.has(stage.status)) {
+    fail(`invalid browser_debug.${stageName}.status: ${stage.status}`);
+  }
+  requireSafeDisplayCommand(stage.command, `browser_debug.${stageName}`);
+}
+if (browserDebug.manifest.path !== 'tools/dashboard-browser-debug-manifest') {
+  fail(`browser_debug manifest path must identify the lesson-owned generator: ${browserDebug.manifest.path}`);
+}
+requireSafeRelativeArtifact(browserDebug.review.artifact_index_path, 'browser_debug.review.artifact_index_path');
+for (const stageName of ['agent_package', 'agent_result', 'agent_report']) {
+  requireSafeRelativeArtifact(browserDebug[stageName].path, `browser_debug.${stageName}.path`);
+}
+const browserBoundary = browserDebug.boundary;
+if (!browserBoundary || typeof browserBoundary !== 'object' || Array.isArray(browserBoundary)) {
+  fail('browser_debug.boundary must be an object');
+}
+for (const key of ['dashboard_executes_browser_debug', 'external_upload', 'provider_api', 'credential_storage', 'product_repository_mutated']) {
+  if (browserBoundary[key] !== false) {
+    fail(`browser_debug boundary must keep ${key} false`);
   }
 }
 

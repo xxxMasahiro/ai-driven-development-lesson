@@ -2632,3 +2632,25 @@ It reads either the maintained `tools/dashboard-data json` output or a test fixt
 
 The generated rubric intentionally keeps lesson-specific categories such as workflow-state clarity and next-action clarity in the target manifest.
 Browser Debug CLI consumes those as manifest data; it does not need Dashboard-specific runtime branches or external source loaders.
+
+## Implemented Dashboard Browser Debug Agent Handoff Specification
+
+SYNC-ID: dashboard_browser_debug_agent_handoff
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/DASHBOARD_DATA_SCHEMA.tsv,tools/dashboard-data,dashboard-control-center/src/dashboardData.js,dashboard-control-center/src/App.jsx,dashboard-control-center/src/i18n.js,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+`tools/dashboard-data` now emits a top-level `browser_debug` object with these stage groups:
+
+- `tool`, `manifest`, `review`, `agent_package`, `agent_result`, and `agent_report`.
+- Each stage exposes a structured status and display-only command preview.
+- Review/package/result/report stages expose safe relative artifact paths or `not_collected`.
+- `boundary` records `dashboard_executes_browser_debug`, `external_upload`, `provider_api`, `credential_storage`, and `product_repository_mutated` as `false`.
+
+The Maintenance Sync page renders this state in a Browser Debug agent handoff panel using existing status pills, command chips, mini cards, and confirmation rows.
+`dashboard-control-center/src/dashboardData.js` validates the new section when present, and producer tests require it in generated dashboard data.
+
+Boundary:
+
+- Dashboard Control Center remains a read-only observer.
+- Browser Debug CLI remains the generic review engine and receives Dashboard-specific meaning through the lesson-owned manifest and handoff artifacts.

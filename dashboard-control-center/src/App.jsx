@@ -2057,6 +2057,7 @@ function maintenanceEvidenceIcon(id) {
     security_policy: ShieldCheck,
     developer_memory: Brain,
     workflow_pair: Waypoints,
+    browser_debug_agent_handoff: TerminalSquare,
   };
   return map[displayText(id, "")] || FileCheck2;
 }
@@ -4625,6 +4626,93 @@ function MaintenanceStatusCards({ maintenance, data, t }) {
   );
 }
 
+function BrowserDebugHandoffPanel({ browserDebug, t }) {
+  if (!browserDebug || typeof browserDebug !== "object") {
+    return null;
+  }
+  const stages = [
+    { id: "manifest", Icon: FileJson, title: t("browserDebug.stage.manifest"), pathKey: "path" },
+    { id: "review", Icon: Eye, title: t("browserDebug.stage.review"), pathKey: "artifact_index_path" },
+    { id: "agent_package", Icon: FileSearch, title: t("browserDebug.stage.package"), pathKey: "path" },
+    { id: "agent_result", Icon: TerminalSquare, title: t("browserDebug.stage.result"), pathKey: "path" },
+    { id: "agent_report", Icon: FileText, title: t("browserDebug.stage.report"), pathKey: "path" },
+  ].map((stage) => ({
+    ...stage,
+    data: browserDebug[stage.id] && typeof browserDebug[stage.id] === "object" ? browserDebug[stage.id] : {},
+  }));
+  const tool = browserDebug.tool && typeof browserDebug.tool === "object" ? browserDebug.tool : {};
+  const boundary = browserDebug.boundary && typeof browserDebug.boundary === "object" ? browserDebug.boundary : {};
+  const boundarySafe = ["dashboard_executes_browser_debug", "external_upload", "provider_api", "credential_storage", "product_repository_mutated"].every((key) => boundary[key] === false);
+  const displayHandoffValue = (value, fallback) => {
+    const text = displayText(value, "");
+    if (text === "not_collected") {
+      return t("browserDebug.notCollected");
+    }
+    if (text === "not_selected") {
+      return t("browserDebug.notSelected");
+    }
+    return text || fallback;
+  };
+  const stagePath = (stage) => displayHandoffValue(stage.data[stage.pathKey], t("browserDebug.notCollected"));
+  return (
+    <section className="evidence-table-section" aria-labelledby="browser-debug-handoff-heading" data-browser-debug-handoff="true">
+      <h3 id="browser-debug-handoff-heading">{t("browserDebug.title")}</h3>
+      <p className="section-help-text">{t("browserDebug.detail")}</p>
+      <section className="maintenance-card-grid" aria-label={t("browserDebug.stageCards")}>
+        <article className="maintenance-mini-card">
+          <span className="maintenance-mini-card__icon">
+            <TerminalSquare aria-hidden="true" size={24} />
+          </span>
+          <h3>{t("browserDebug.stage.tool")}</h3>
+          <StatusPill value={tool.status || "unknown"} t={t} label={statusLabelForChip(tool.status, t)} />
+          <p>{displayHandoffValue(browserDebug.selected_cli_repository, t("browserDebug.notSelected"))}</p>
+          <CommandChip command={tool.command} />
+        </article>
+        {stages.map(({ id, Icon, title, data }) => (
+          <article className="maintenance-mini-card" key={id}>
+            <span className="maintenance-mini-card__icon">
+              <Icon aria-hidden="true" size={24} />
+            </span>
+            <h3>{title}</h3>
+            <StatusPill value={data.status || "unknown"} t={t} label={statusLabelForChip(data.status, t)} />
+            <p>{stagePath({ data, pathKey: id === "review" ? "artifact_index_path" : "path" })}</p>
+          </article>
+        ))}
+      </section>
+      <div className="confirmation-table">
+        <div className="confirmation-table__head">
+          <span>{t("detail.confirm.what")}</span>
+          <span>{t("detail.confirm.why")}</span>
+          <span>{t("detail.confirm.status")}</span>
+          <span>{t("browserDebug.commandPreview")}</span>
+        </div>
+        {stages.map(({ id, Icon, title, data }) => (
+          <article className={`confirmation-row confirmation-row--${normalizeState(data.status)}`} key={`browser-debug-${id}`}>
+            <div className="confirmation-row__name">
+              <Icon aria-hidden="true" size={21} />
+              <div>
+                <strong>{title}</strong>
+                <span>{stagePath({ data, pathKey: id === "review" ? "artifact_index_path" : "path" })}</span>
+              </div>
+              <span className="small-badge">{t("app.readOnly")}</span>
+            </div>
+            <p>{t(`browserDebug.stageDetail.${id}`)}</p>
+            <div>
+              <StatusPill value={data.status || "unknown"} t={t} />
+            </div>
+            <div>
+              <CommandChip command={data.command} />
+            </div>
+          </article>
+        ))}
+      </div>
+      <p className="section-help-text">
+        <StatusPill value={boundarySafe ? "ready" : "blocked"} t={t} label={boundarySafe ? t("browserDebug.boundarySafe") : t("browserDebug.boundaryUnsafe")} /> {t("browserDebug.boundary")}
+      </p>
+    </section>
+  );
+}
+
 function MaintenanceSection({ maintenance, data, locale, t, liveStatus }) {
   const context = selectedContextData(data);
   const activeLiveStatus = liveStatusForContext(liveStatus, context);
@@ -4662,6 +4750,7 @@ function MaintenanceSection({ maintenance, data, locale, t, liveStatus }) {
       />
       <MaintenanceStatusCards maintenance={maintenance} data={data} t={t} />
       <LiveEvidenceTable liveStatus={liveStatus} context={context} keys={["local_tests", "git_sync", "ci", "security"]} title={t("detail.liveEvidence.maintenanceTitle")} headingId="maintenance-live-evidence-heading" t={t} tone="maintenance" />
+      <BrowserDebugHandoffPanel browserDebug={data.browser_debug} t={t} />
       <section className="maintenance-confirmation-section evidence-table-section" aria-labelledby="maintenance-confirmation-heading">
         <h3 id="maintenance-confirmation-heading">{t("maintenance.confirmationFlow")}</h3>
         <p className="section-help-text">{t("maintenance.confirmationFlowDetail")}</p>

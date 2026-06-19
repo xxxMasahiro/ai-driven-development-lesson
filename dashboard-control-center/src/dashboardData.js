@@ -127,6 +127,21 @@ function safeDisplayCommand(value) {
   return /^tools\/[A-Za-z0-9._-]+(?: [A-Za-z0-9._:@/%+=,-]+)*$/.test(normalized) ? normalized : "";
 }
 
+function safeBrowserDebugCommand(value) {
+  if (typeof value !== "string") {
+    return "";
+  }
+  const normalized = value.replace(/[\u0000-\u001f]/g, "").replace(/\s+/g, " ").trim();
+  if (
+    !normalized ||
+    /[;&|`$<>\\]/.test(normalized) ||
+    /(^|\s)\/|[A-Za-z]:[\\/]|https?:\/\//.test(normalized)
+  ) {
+    return "";
+  }
+  return normalized;
+}
+
 export function displayText(value, fallback = "unknown") {
   if (value === null || value === undefined || value === "") {
     return fallback;
@@ -1656,6 +1671,58 @@ function validateMaintenanceEvidence(maintenance) {
   }
 }
 
+function validateBrowserDebugStage(stage, label, pathKey = "path") {
+  if (!stage || typeof stage !== "object" || Array.isArray(stage)) {
+    throw new Error(`${label} must be an object`);
+  }
+  if (!ALLOWED_STATES.has(displayText(stage.status, ""))) {
+    throw new Error(`${label} status is invalid`);
+  }
+  if (!safeBrowserDebugCommand(stage.command)) {
+    throw new Error(`${label} command is invalid`);
+  }
+  if (pathKey && stage[pathKey] !== undefined && displayText(stage[pathKey], "") !== "not_collected" && !safeScopedRelativePath(stage[pathKey])) {
+    throw new Error(`${label} path is invalid`);
+  }
+}
+
+function validateBrowserDebug(data) {
+  if (data.browser_debug === undefined || data.browser_debug === null) {
+    return;
+  }
+  const browserDebug = asObject(data.browser_debug, "dashboard browser_debug");
+  if (!/^[0-9]+\.[0-9]+\.[0-9]+$/.test(displayText(browserDebug.schema_version, ""))) {
+    throw new Error("dashboard browser_debug schema version is invalid");
+  }
+  if (!ALLOWED_STATES.has(displayText(browserDebug.status, ""))) {
+    throw new Error("dashboard browser_debug status is invalid");
+  }
+  if (!displayText(browserDebug.target, "")) {
+    throw new Error("dashboard browser_debug target is missing");
+  }
+  if (!displayText(browserDebug.selected_cli_repository, "")) {
+    throw new Error("dashboard browser_debug selected_cli_repository is missing");
+  }
+  validateBrowserDebugStage(browserDebug.tool, "dashboard browser_debug tool", "");
+  if (!displayText(browserDebug.tool.source, "")) {
+    throw new Error("dashboard browser_debug tool source is missing");
+  }
+  validateBrowserDebugStage(browserDebug.manifest, "dashboard browser_debug manifest");
+  if (safeRelativePath(browserDebug.manifest.path) !== "tools/dashboard-browser-debug-manifest") {
+    throw new Error("dashboard browser_debug manifest path is invalid");
+  }
+  validateBrowserDebugStage(browserDebug.review, "dashboard browser_debug review", "artifact_index_path");
+  validateBrowserDebugStage(browserDebug.agent_package, "dashboard browser_debug agent_package");
+  validateBrowserDebugStage(browserDebug.agent_result, "dashboard browser_debug agent_result");
+  validateBrowserDebugStage(browserDebug.agent_report, "dashboard browser_debug agent_report");
+  const boundary = asObject(browserDebug.boundary, "dashboard browser_debug boundary");
+  for (const key of ["dashboard_executes_browser_debug", "external_upload", "provider_api", "credential_storage", "product_repository_mutated"]) {
+    if (boundary[key] !== false) {
+      throw new Error(`dashboard browser_debug boundary ${key} must be false`);
+    }
+  }
+}
+
 function validateSecurityRows(security) {
   for (const collectionName of ["approvals", "dangerous_operations"]) {
     for (const row of asArray(security[collectionName])) {
@@ -1728,6 +1795,7 @@ export function validateDashboardData(data) {
   validateRepositoryScope(data);
   validateDocuments(data);
   validateSettings(data);
+  validateBrowserDebug(data);
   validateMaintenanceEvidence(data.maintenance);
   validateSecurityRows(data.security);
   validateCommandPreviews(data.actions);

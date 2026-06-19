@@ -2198,3 +2198,20 @@ Dashboard Control Center Browser Debug review must keep lesson-specific workflow
 
 The manifest generator must project `tools/dashboard-data` into bounded inline `sourceData` for Browser Debug CLI target review.
 It must not add arbitrary external loaders to Browser Debug CLI, expose secrets or raw warnings, execute browser-side commands, mutate product repositories, or require Vite/Playwright startup to validate the manifest contract.
+
+## Implemented Dashboard Browser Debug Agent Handoff Requirements
+
+SYNC-ID: dashboard_browser_debug_agent_handoff
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/DASHBOARD_DATA_SCHEMA.tsv,tools/dashboard-data,dashboard-control-center/src/dashboardData.js,dashboard-control-center/src/App.jsx,dashboard-control-center/src/i18n.js,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+Dashboard Control Center must show whether its Browser Debug CLI review handoff has local evidence for target manifest generation, review artifacts, agent package creation, agent result ingest, and advisory report creation.
+
+Requirements:
+
+- The handoff state must be produced by `tools/dashboard-data` as structured `browser_debug` JSON, not inferred from React copy or screenshots.
+- The Dashboard must keep this panel read-only and must not launch Browser Debug CLI, call provider APIs, upload artifacts, store credentials, or mutate any product repository.
+- The state must support both subscription-agent and API-agent workflows by showing local evidence packet and ingest/report stages without depending on a single provider.
+- The handoff evidence must remain additive; it must not change Git, CI, product authority, release readiness, existing maintenance status, Browser Debug findings, or existing dashboard routes.
+- The implementation must keep lesson-specific Dashboard Control Center semantics in this repository and leave Browser Debug CLI generic.
