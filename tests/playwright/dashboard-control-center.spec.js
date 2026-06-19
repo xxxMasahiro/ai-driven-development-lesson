@@ -1651,17 +1651,65 @@ test.describe("English dashboard control center", () => {
     await expect(page.locator(".insight-detail-modal")).toHaveCount(0);
   });
 
-  test("opens source details by default in technical display depth", async ({ page }) => {
+  test("collapses technical references in friendly display depth while preserving safety actions", async ({ page }) => {
+    const friendlyFixture = dashboardSettingFixture("dashboard_display_depth", "friendly", "f");
+    addProducerDecisionPages(friendlyFixture);
+    await page.unroute(dashboardDataRoutePattern);
+    await routeDashboardDataPayload(page, friendlyFixture);
+    await page.goto("http://lesson.local/dashboard-control-center/index.html#safety");
+
+    const safetyView = page.locator("#safety");
+    await expect(safetyView).toBeVisible();
+    await expect(safetyView.locator(".decision-summary__technical").first()).toHaveAttribute("data-dashboard-display-depth", "friendly");
+    await expect(safetyView.locator(".decision-summary__technical").first()).not.toHaveAttribute("open", "");
+    await expect(page.getByRole("heading", { name: "Command Previews (display only)" })).toBeVisible();
+    await expect(safetyView.locator(".command-preview__technical").first()).toHaveAttribute("data-dashboard-display-depth", "friendly");
+    await expect(safetyView.locator(".command-preview__technical").first()).not.toHaveAttribute("open", "");
+    await expect(safetyView.locator(".display-only-badge").first()).toContainText("Display only");
+    await expect(safetyView.locator("[data-state='approval_required']").first()).toBeVisible();
+    await expect(page.getByRole("button", { name: /^(Run|Execute|Apply|Merge|Push|Check)$/i })).toHaveCount(0);
+  });
+
+  test("keeps standard display depth as the current disclosure baseline", async ({ page }) => {
+    const standardFixture = dashboardSettingFixture("dashboard_display_depth", "standard", "d");
+    addProducerDecisionPages(standardFixture);
+    await page.unroute(dashboardDataRoutePattern);
+    await routeDashboardDataPayload(page, standardFixture);
+    await page.goto("http://lesson.local/dashboard-control-center/index.html#safety");
+
+    const safetyView = page.locator("#safety");
+    await expect(safetyView).toBeVisible();
+    await expect(safetyView.locator(".decision-summary__technical")).toHaveCount(0);
+    await expect(safetyView.locator(".command-preview__technical")).toHaveCount(0);
+    await expect(safetyView.locator(".command-preview .command-chip")).toHaveCount(4);
+
+    await page.goto("http://lesson.local/dashboard-control-center/index.html#repository-info");
+    const sourceBoundary = page.locator("#repository-info .source-boundary");
+    await expect(sourceBoundary).toHaveAttribute("data-dashboard-display-depth", "standard");
+    await expect(sourceBoundary).not.toHaveAttribute("open", "");
+  });
+
+  test("opens source and technical details by default in technical display depth", async ({ page }) => {
     const technicalFixture = dashboardSettingFixture("dashboard_display_depth", "technical", "c");
+    addProducerDecisionPages(technicalFixture);
     await page.unroute(dashboardDataRoutePattern);
     await routeDashboardDataPayload(page, technicalFixture);
     await page.goto("http://lesson.local/dashboard-control-center/index.html#repository-info");
 
     const repositoryView = page.locator("#repository-info");
     await expect(repositoryView).toBeVisible();
+    await expect(repositoryView.locator(".decision-summary__technical").first()).toHaveAttribute("data-dashboard-display-depth", "technical");
+    await expect(repositoryView.locator(".decision-summary__technical").first()).toHaveAttribute("open", "");
+    await expect(repositoryView.locator(".decision-summary__technical").first()).toContainText("producer.repository-info");
     const sourceBoundary = repositoryView.locator(".source-boundary");
     await expect(sourceBoundary).toHaveAttribute("data-dashboard-display-depth", "technical");
     await expect(sourceBoundary).toHaveAttribute("open", "");
+
+    await page.goto("http://lesson.local/dashboard-control-center/index.html#safety");
+    const safetyView = page.locator("#safety");
+    await expect(safetyView.locator(".command-preview__technical").first()).toHaveAttribute("data-dashboard-display-depth", "technical");
+    await expect(safetyView.locator(".command-preview__technical").first()).toHaveAttribute("open", "");
+    await expect(safetyView.locator(".command-preview .command-chip")).toHaveCount(4);
   });
 
   test("renders every dashboard page without losing selected context", async ({ page }) => {

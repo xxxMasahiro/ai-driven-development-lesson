@@ -78,6 +78,7 @@ import {
 } from "./dashboardData.js";
 import { DetailDecisionSummary, ProducerDecisionSummary } from "./DecisionSummary.jsx";
 import { dashboardControlCenterDesignSystem } from "./design-system.generated.js";
+import { displayDepthPolicyForData } from "./displayDepth.js";
 import { createTranslator, formatDateTime, formatRelativeAge, getDashboardIntlLocale, getDashboardLocaleDirection, resolveLocale } from "./i18n.js";
 
 const stateIcons = {
@@ -1988,7 +1989,7 @@ function workflowRunInsight(row, context, t) {
   };
 }
 
-function EvidenceRowsTable({ rows, t }) {
+function EvidenceRowsTable({ rows, t, displayPolicy = null }) {
   const items = asArray(rows);
   if (!items.length) {
     return null;
@@ -2006,6 +2007,15 @@ function EvidenceRowsTable({ rows, t }) {
         {items.map((row) => {
           const unresolvedCount = maintenanceUnresolvedCount(row);
           const observedAt = maintenanceObservedAt(row);
+          const referenceValues = maintenanceReferenceValues(row);
+          const referenceChips = referenceValues.map((reference) => (
+            <span className="evidence-row__reference-chip" key={reference} aria-label={`${maintenanceEvidenceLabel(row, t)}: ${reference}`}>
+              {technicalTooltipValue(reference, referenceTooltip(reference, t, t("maintenance.evidenceReferenceTooltip")), "evidence-row__reference-value")}
+              <button className="evidence-row__reference-copy" type="button" aria-label={`${t("maintenance.copyReference")}: ${reference}`} data-copy-tooltip={reference} onClick={() => copyTextToClipboard(reference)}>
+                <Copy aria-hidden="true" size={14} />
+              </button>
+            </span>
+          ));
           return (
             <article className="evidence-row" key={displayText(row.id)}>
               <div className="evidence-row__title">
@@ -2033,14 +2043,12 @@ function EvidenceRowsTable({ rows, t }) {
                   t={t}
                   tone="maintenance"
                 />
-                {maintenanceReferenceValues(row).map((reference) => (
-                  <span className="evidence-row__reference-chip" key={reference} aria-label={`${maintenanceEvidenceLabel(row, t)}: ${reference}`}>
-                    {technicalTooltipValue(reference, referenceTooltip(reference, t, t("maintenance.evidenceReferenceTooltip")), "evidence-row__reference-value")}
-                    <button className="evidence-row__reference-copy" type="button" aria-label={`${t("maintenance.copyReference")}: ${reference}`} data-copy-tooltip={reference} onClick={() => copyTextToClipboard(reference)}>
-                      <Copy aria-hidden="true" size={14} />
-                    </button>
-                  </span>
-                ))}
+                {displayPolicy?.collapseTechnicalDetails && referenceChips.length ? (
+                  <details className="evidence-row__technical" data-dashboard-display-depth={displayPolicy.depth} open={displayPolicy.openTechnicalDetails}>
+                    <summary>{t("settingsPage.modal.technicalDetails")}</summary>
+                    {referenceChips}
+                  </details>
+                ) : referenceChips}
               </div>
             </article>
           );
@@ -4680,6 +4688,7 @@ function BrowserDebugHandoffPanel({ browserDebug, t }) {
 function MaintenanceSection({ maintenance, data, locale, t, liveStatus }) {
   const context = selectedContextData(data);
   const activeLiveStatus = liveStatusForContext(liveStatus, context);
+  const displayPolicy = displayDepthPolicyForData(data);
   const manualFollowups = asArray(data.summary?.manual_followups);
   const warnings = asArray(data.warnings).map((warning, index) => ({
     source: `${t("summary.warningItem")} ${index + 1}`,
@@ -4721,7 +4730,7 @@ function MaintenanceSection({ maintenance, data, locale, t, liveStatus }) {
         <p className="section-help-text">{t("maintenance.confirmationFlowDetail")}</p>
         <MaintenanceConfirmationTable manualFollowups={manualFollowups} warnings={warnings} data={data} t={t} />
       </section>
-      {activeLiveStatus ? null : <EvidenceRowsTable rows={maintenance.evidence_rows} t={t} />}
+      {activeLiveStatus ? null : <EvidenceRowsTable rows={maintenance.evidence_rows} t={t} displayPolicy={displayPolicy} />}
       <SourceBoundary data={data} t={t} />
       <MockNotice
         tone="maintenance-warning"
@@ -4912,7 +4921,16 @@ function SecuritySection({ security, partialFailures, data, locale, t, liveStatu
   );
 }
 
-function CommandPreviews({ actions, t }) {
+function commandPreviewTechnicalRows(preview, t) {
+  return [
+    [t("field.target"), preview.target],
+    [t("field.risk"), normalizeRisk(preview.risk_level)],
+    [t("field.approval"), preview.approval_gate_id],
+    [t("field.executionMode"), preview.execution_mode],
+  ].filter(([, value]) => displayText(value, ""));
+}
+
+function CommandPreviews({ actions, t, displayPolicy = null }) {
   const previews = asArray(actions?.command_previews);
   if (!previews.length) {
     return null;
@@ -4927,23 +4945,43 @@ function CommandPreviews({ actions, t }) {
         <p>{t("actions.description")}</p>
       </div>
       <div className="preview-list">
-        {previews.map((preview, index) => (
-          <article className={`command-preview command-preview--${normalizeRisk(preview.risk_level)}`} key={`${displayText(preview.intent)}-${index}`}>
-            <div className="command-preview__head">
-              <span className="command-preview__icon">
-                <ShieldCheck aria-hidden="true" size={18} />
-              </span>
-              <div>
-                <h3>{commandIntentLabel(preview.intent, t)}</h3>
+        {previews.map((preview, index) => {
+          const technicalRows = commandPreviewTechnicalRows(preview, t);
+          const command = <CommandPreviewCommand command={preview.command_text} t={t} />;
+          return (
+            <article className={`command-preview command-preview--${normalizeRisk(preview.risk_level)}`} key={`${displayText(preview.intent)}-${index}`}>
+              <div className="command-preview__head">
+                <span className="command-preview__icon">
+                  <ShieldCheck aria-hidden="true" size={18} />
+                </span>
+                <div>
+                  <h3>{commandIntentLabel(preview.intent, t)}</h3>
+                </div>
               </div>
-            </div>
-            <CommandPreviewCommand command={preview.command_text} t={t} />
-            <div className="command-preview__badges">
-              <span className="display-only-badge">{t("actions.displayOnly")}</span>
-              <span className="display-only-badge">{preview.non_executable === true ? t("actions.notExecutable") : t("field.unknown")}</span>
-            </div>
-          </article>
-        ))}
+              {displayPolicy?.collapseTechnicalDetails ? null : command}
+              <div className="command-preview__badges">
+                <span className="display-only-badge">{t("actions.displayOnly")}</span>
+                <span className="display-only-badge">{preview.non_executable === true ? t("actions.notExecutable") : t("field.unknown")}</span>
+              </div>
+              {displayPolicy?.commandPreviewTechnicalDetails ? (
+                <details className="command-preview__technical" data-dashboard-display-depth={displayPolicy.depth} open={displayPolicy.openTechnicalDetails}>
+                  <summary>{t("settingsPage.modal.technicalDetails")}</summary>
+                  {displayPolicy.collapseTechnicalDetails ? command : null}
+                  {technicalRows.length ? (
+                    <dl>
+                      {technicalRows.map(([label, value]) => (
+                        <div key={label}>
+                          <dt>{label}</dt>
+                          <dd>{displayText(value)}</dd>
+                        </div>
+                      ))}
+                    </dl>
+                  ) : null}
+                </details>
+              ) : null}
+            </article>
+          );
+        })}
       </div>
     </section>
   );
@@ -4995,11 +5033,12 @@ function SecurityPolicyPanel({ security, data, t }) {
 }
 
 function SafetySection({ security, actions, partialFailures, data, locale, t, liveStatus }) {
+  const displayPolicy = displayDepthPolicyForData(data);
   return (
     <section className="view-surface view-surface--safety" id="safety" aria-labelledby="security-heading">
       <SecuritySection security={security} partialFailures={partialFailures} data={data} locale={locale} t={t} liveStatus={liveStatus} />
       <div className="safety-lower-grid">
-        <CommandPreviews actions={actions} t={t} />
+        <CommandPreviews actions={actions} t={t} displayPolicy={displayPolicy} />
         <SecurityPolicyPanel security={security} data={data} t={t} />
       </div>
       <MockNotice
@@ -5691,11 +5730,6 @@ function settingsCatalogData(data) {
   const groups = asArray(settings.groups).slice().sort((left, right) => (Number(left.order) || 0) - (Number(right.order) || 0));
   const items = asArray(settings.items);
   return { settings, groups, items };
-}
-
-function dashboardDisplayDepth(data) {
-  const value = displayText(data?.summary?.display_depth, "standard");
-  return ["friendly", "standard", "technical"].includes(value) ? value : "standard";
 }
 
 function settingGroupIconFor(group) {
@@ -7476,7 +7510,8 @@ function SettingsPage({ data, locale, t, onRefreshSnapshot }) {
   const context = selectedContextData(data);
   const authority = data.development?.product_authority || {};
   const { settings, groups, items } = settingsCatalogData(data);
-  const displayDepth = dashboardDisplayDepth(data);
+  const displayPolicy = displayDepthPolicyForData(data);
+  const displayDepth = displayPolicy.depth;
   const hasSettingsCatalog = groups.length > 0 && items.length > 0;
   const reviewItems = items.filter((item) => isReviewState(item.status));
   const selectedRepository = repositoryDisplayName(context.target_repository?.name || authority.repository?.configured_name || authority.repository?.name, t);
@@ -7955,7 +7990,7 @@ function SettingsPage({ data, locale, t, onRefreshSnapshot }) {
                         <p>{mutationState.status === "applied" ? t("settingsPage.modal.applyResult") : mutationState.status === "blocked" ? t(displayText(mutationState.result.reason_key, ""), t("settingsPage.modal.planBlocked")) : t("settingsPage.modal.planResult")}</p>
                         {mutationState.status === "blocked" ? <small>{t(displayText(mutationState.result.next_action_key, ""), t("settingsPage.consistency.next.none"))}</small> : null}
                         <small>{t("settingsPage.modal.targetFile")}: {displayText(mutationState.result.target_file)}</small>
-                        <details open={displayDepth === "technical"}>
+                        <details data-dashboard-display-depth={displayDepth} open={displayPolicy.settingsTechnicalDetailsDefaultOpen}>
                           <summary>{t("settingsPage.modal.technicalDetails")}</summary>
                           <code>{displayText(mutationState.result.tool_command)}</code>
                         </details>
@@ -8417,7 +8452,8 @@ function HistoryPage({ data, locale, t }) {
 }
 
 function SourceBoundary({ data, t }) {
-  const displayDepth = dashboardDisplayDepth(data);
+  const displayPolicy = displayDepthPolicyForData(data);
+  const displayDepth = displayPolicy.depth;
   const files = asArray(data.source_files);
   const commands = asArray(data.source_commands);
   const productFiles = files.filter((value) => displayText(value, "").startsWith("product:"));
@@ -8425,7 +8461,7 @@ function SourceBoundary({ data, t }) {
   const productCommands = commands.filter((value) => /(\[absolute-path\]|--context|check_git_sync|check_ci_status|product-security)/.test(displayText(value, "")));
   const rootCommands = commands.filter((value) => !productCommands.includes(value));
   return (
-    <details className="source-boundary" aria-label={t("aria.dataBoundary")} data-dashboard-display-depth={displayDepth} open={displayDepth === "technical"}>
+    <details className="source-boundary" aria-label={t("aria.dataBoundary")} data-dashboard-display-depth={displayDepth} open={displayPolicy.sourceBoundaryDefaultOpen}>
       <summary className="source-boundary__head">
         <FileText aria-hidden="true" size={22} />
         <div>

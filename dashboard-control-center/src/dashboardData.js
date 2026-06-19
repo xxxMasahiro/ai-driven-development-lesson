@@ -1,4 +1,5 @@
 import { DASHBOARD_LOCALE_CODES } from "./i18n.js";
+import { DASHBOARD_DISPLAY_DEPTHS } from "./displayDepth.js";
 
 export const ALLOWED_STATES = new Set([
   "missing",
@@ -22,7 +23,6 @@ export const PARTIAL_FAILURE_STATES = new Set(["failed", "blocked", "unknown"]);
 export const PRODUCT_OPERATION_BLOCKER_STATES = new Set(["missing", "failed", "blocked", "unknown", "stale", "not_run"]);
 export const DASHBOARD_UI_LOCALES = new Set(DASHBOARD_LOCALE_CODES);
 export const DASHBOARD_UI_DIRECTIONS = new Set(["ltr", "rtl"]);
-export const DASHBOARD_DISPLAY_DEPTHS = new Set(["friendly", "standard", "technical"]);
 
 const SECRET_PATTERN =
   /(SECRET|TOKEN|API_KEY|PASSWORD|PRIVATE_KEY)\s*[:=]\s*[^\s#]{8,}|gh[pousr]_[A-Za-z0-9_]{20,}|sk-[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16}|BEGIN (RSA |OPENSSH |EC |DSA )?PRIVATE KEY/i;

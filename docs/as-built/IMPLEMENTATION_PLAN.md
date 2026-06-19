@@ -4804,3 +4804,37 @@ Implemented order:
 7. Ran focused settings, schema, data, i18n, Playwright control-center, design-system, and test-plan coverage checks before promotion.
 
 Stop and ask before changing lesson step behavior, lesson mode semantics, Git workflow policy authority, Design Studio source authority, dependencies, product repository writes, arbitrary browser command execution, push, PR creation, merge, cleanup, delete, or any existing-feature tradeoff.
+
+## Dashboard Control Center Display Depth Phase 2 Implementation Plan
+
+SYNC-ID: dashboard_control_center_display_depth_phase_2
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,tools/lib/dashboard_data.sh,tools/dashboard-data,dashboard-control-center/src/displayDepth.js,dashboard-control-center/src/App.jsx,dashboard-control-center/src/DecisionSummary.jsx,dashboard-control-center/src/dashboardData.js,dashboard-control-center/src/i18n.js,tests/fixtures/dashboard-control-center.json,tests/fixtures/dashboard-control-center-live-update.json,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+Implemented order:
+
+1. Synchronized this block before runtime edits and kept the scope limited to display policy, producer-owned decision text, and shared rendering surfaces.
+2. Added `dashboard-control-center/src/displayDepth.js` as the shared Dashboard display-depth policy module.
+3. Replaced direct display-depth comparisons in shared surfaces with reusable policy flags while preserving `standard` as the current baseline.
+4. Improved producer-owned decision-page questions through existing `decision_pages[]` fields without adding schema fields.
+5. Applied the policy to `ProducerDecisionSummary`, `SourceBoundary`, Settings technical result details, evidence reference chips, and command previews without hiding safety state or adding browser execution authority.
+6. Extended Playwright coverage for `friendly`, `standard`, and `technical` behavior, including safety-signal visibility and disclosure defaults.
+7. Promoted this sync ID to implemented after focused dashboard, data/schema, i18n, sync, and repository-development checks passed.
+
+Verification sequence:
+
+```bash
+./tools/test_dashboard_schema.sh
+./tools/test_dashboard_data.sh
+./tools/test_dashboard_i18n.sh
+./tools/test_dashboard_control_center.sh
+./tools/check_as_built_sync_contract.sh
+./tools/check_as_built_docs.sh
+./tools/check_workflow_pair_sync.sh
+./tools/check_repository_development_workflow.sh
+./tools/test_repository_development_workflow.sh
+git diff --check
+```
+
+Stop and ask before dependency changes, Settings authority expansion, arbitrary command execution, Git/CI operations, product repository writes, Design Studio authority changes, generated-file source edits, cleanup, push, PR creation, merge, or any existing-feature tradeoff.

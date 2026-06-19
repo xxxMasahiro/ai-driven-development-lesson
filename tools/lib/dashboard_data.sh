@@ -466,9 +466,43 @@ dashboard_json_decision_page() {
   local risk_level="${14}"
   local must_review_one="${15}"
   local must_review_two="${16}"
+  local decision_question
 
   dashboard_data_validate_state "$status"
   dashboard_data_validate_risk_level "$risk_level"
+
+  case "$id" in
+    overview)
+      decision_question="Can the current dashboard snapshot be used as the next development decision summary?"
+      ;;
+    lessons)
+      decision_question="Which lesson path or approval state needs attention before learning continues?"
+      ;;
+    workflow)
+      decision_question="Can the selected development workflow safely continue?"
+      ;;
+    maintenance)
+      decision_question="Are synchronized documents and evidence current enough to rely on?"
+      ;;
+    safety)
+      decision_question="Are blockers, approvals, and dangerous-operation boundaries clear enough to proceed?"
+      ;;
+    repository-info)
+      decision_question="Is the selected repository context clear enough for the next operation?"
+      ;;
+    documents)
+      decision_question="Which document should be reviewed for the current decision?"
+      ;;
+    settings)
+      decision_question="Which guarded setting can be reviewed without changing workflow authority?"
+      ;;
+    history)
+      decision_question="Is the recorded evidence recent enough for this decision?"
+      ;;
+    *)
+      decision_question="Can this page be used for the current development decision?"
+      ;;
+  esac
 
   printf '{"id":'
   dashboard_json_string "$id"
@@ -481,7 +515,7 @@ dashboard_json_decision_page() {
   printf ',"status":'
   dashboard_json_string "$status"
   printf ',"decision_question":'
-  dashboard_json_string "Can this page be used for the current development decision?"
+  dashboard_json_string "$decision_question"
   printf ',"current_judgment":'
   dashboard_json_string "$current_judgment"
   printf ',"top_reason":'

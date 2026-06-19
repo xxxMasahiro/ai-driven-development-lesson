@@ -2817,3 +2817,21 @@ UI semantics:
 - `standard` preserves the current dashboard behavior as the baseline.
 - `technical` opens or prioritizes source, command, evidence, and internal-key details where those details already exist.
 - None of the modes may remove or soften approval, blocker, failed evidence, stale evidence, security, target-file, or command-preview signals.
+
+## Dashboard Control Center Display Depth Phase 2 Specification
+
+SYNC-ID: dashboard_control_center_display_depth_phase_2
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,tools/lib/dashboard_data.sh,tools/dashboard-data,dashboard-control-center/src/displayDepth.js,dashboard-control-center/src/App.jsx,dashboard-control-center/src/DecisionSummary.jsx,dashboard-control-center/src/dashboardData.js,dashboard-control-center/src/i18n.js,tests/fixtures/dashboard-control-center.json,tests/fixtures/dashboard-control-center-live-update.json,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+The dashboard display-depth value remains `friendly`, `standard`, or `technical` and continues to come from `summary.display_depth`.
+Phase 2 adds a UI presentation policy over existing producer-owned fields.
+
+Specified behavior:
+
+- A shared display-depth policy normalizes invalid or missing values to `standard` for rendering.
+- Shared decision summaries render technical references as secondary disclosure in `friendly`, as the current baseline in `standard`, and as expanded or inline technical detail in `technical`.
+- Source boundary and Settings technical details use the same policy for default open state.
+- Producer decision pages may use page-specific decision questions, but React must not compute readiness or authority from labels, routes, or display depth.
+- Commands remain display-only and copyable; no mode executes them.

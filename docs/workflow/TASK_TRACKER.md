@@ -2646,3 +2646,25 @@ Current Status:
 Next Step:
 
 - No remaining implementation action for this sync ID. Continue to keep display depth separate from lesson mode and Design Studio density.
+
+## Dashboard Control Center Display Depth Phase 2 Work
+
+SYNC-ID: dashboard_control_center_display_depth_phase_2
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,tools/lib/dashboard_data.sh,tools/dashboard-data,dashboard-control-center/src/displayDepth.js,dashboard-control-center/src/App.jsx,dashboard-control-center/src/DecisionSummary.jsx,dashboard-control-center/src/dashboardData.js,dashboard-control-center/src/i18n.js,tests/fixtures/dashboard-control-center.json,tests/fixtures/dashboard-control-center-live-update.json,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+Current Status:
+
+- [x] Developer approved implementation from the xhigh review-based plan.
+- [x] Started under `repository-development-workflow` with AGENTS invariants and sync-first discipline.
+- [x] Add this planned sync ID across the as-built contract and synchronized documents before runtime implementation.
+- [x] Add a shared display-depth policy and preserve `standard` as the current baseline.
+- [x] Apply display-depth behavior to shared decision, source, evidence, command-preview, and Settings technical-detail surfaces.
+- [x] Improve producer-owned page decision questions through existing `decision_pages[]` fields.
+- [x] Add focused Playwright coverage for all three depths and safety-signal preservation.
+- [x] Promote this sync ID to implemented after runtime implementation and required verification.
+
+Next Step:
+
+- No remaining implementation action for this sync ID. Continue to keep display depth as presentation policy only.
