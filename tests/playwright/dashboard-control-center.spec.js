@@ -926,6 +926,58 @@ function selectedMenuProducerFixture(baseFixture, menuId, hashCharacter) {
   return data;
 }
 
+function addProducerDecisionPages(data) {
+  const titles = {
+    overview: "Dashboard",
+    lessons: "Lessons",
+    workflow: "Development Workflow",
+    maintenance: "Maintenance Sync",
+    safety: "Safety Actions",
+    "repository-info": "Repository Info",
+    documents: "Documents",
+    settings: "Settings",
+    history: "Update History",
+  };
+  data.operational_decision = {
+    status: "stale",
+    decision_question: "Can the current development workflow safely continue?",
+    primary_blocker_source_id: "producer.overview",
+    why_blocked: "Producer decision evidence is stale in this fixture.",
+    next_safe_action: "Review producer-owned evidence.",
+    done_condition: "Current judgment and evidence source are visible.",
+    approval_boundary: "Dashboard remains read-only.",
+    risk_level: "medium",
+    freshness_state: "stale",
+    authority: "manual_required",
+    source_id: "producer.overview",
+    audience_briefs: {
+      non_engineer: "The producer says this state needs review.",
+      junior_engineer: "Check source_id and detail_page before treating this as complete.",
+    },
+    command_execution_mode: "preview_only",
+  };
+  data.decision_pages = Object.entries(titles).map(([id, title]) => ({
+    id,
+    title,
+    scope: `${title} producer decision scope`,
+    audiences: ["non_engineer", "junior_engineer"],
+    status: id === "workflow" ? "stale" : "manual_required",
+    decision_question: `What should ${title} decide now?`,
+    current_judgment: `${title} needs producer-owned review`,
+    top_reason: `${title} is using producer decision data.`,
+    evidence_confidence: "manual review required",
+    must_review: [`producer.${id}`, "command_preview_boundary"],
+    next_safe_action: `Review ${title} evidence`,
+    detail_page: `#${id}`,
+    owner_source: "dashboard-data",
+    source_id: `producer.${id}`,
+    authority: "manual_required",
+    freshness_state: "stale",
+    risk_level: "medium",
+    command_execution_mode: "preview_only",
+  }));
+}
+
 async function expectCenteredSvg(locator, tolerance = 1) {
   const deltas = await locator.evaluateAll((elements) =>
     elements.map((element) => {
@@ -976,6 +1028,7 @@ test.describe("English dashboard control center", () => {
       "tools/product-repository-authority status --json",
     ]));
     addDesignSystemRepositoryScope(sourceBoundaryFixture);
+    addProducerDecisionPages(sourceBoundaryFixture);
     await page.unroute(dashboardDataRoutePattern);
     await routeDashboardData(page, sourceBoundaryFixture);
     await page.goto("http://lesson.local/dashboard-control-center/index.html?refresh_ms=60000");
@@ -1012,6 +1065,10 @@ test.describe("English dashboard control center", () => {
     await expect(page.locator("[data-overview-status-card='ci']")).toContainText("CI run status checked");
     await expect(page.locator("[data-overview-status-card='security']")).toContainText("Blockers: 1");
     await expect(page.locator("[data-overview-status-card='security']")).toContainText("Risky operations, approvals, and blockers checked");
+    const overviewProducerDecision = page.locator("#overview .decision-summary--sidebar").first();
+    await expect(overviewProducerDecision).toContainText("producer.overview");
+    await expect(overviewProducerDecision).toContainText("#overview");
+    await expect(overviewProducerDecision).toContainText("dashboard-data");
     await expect(page.locator(".common-status-card--git .common-status-op")).toHaveCount(4);
     await expect(page.locator(".common-status-card--git .common-status-op", { hasText: "Merge" })).toContainText("Allowed");
     await expectCenteredSvg(page.locator(".common-status-card--git .common-status-op__label"));
@@ -1061,16 +1118,16 @@ test.describe("English dashboard control center", () => {
 
     await navigation.getByRole("link", { name: /Lessons/ }).click();
     await expect(page.getByRole("heading", { name: "Lessons" })).toBeVisible();
-    await expect(page.getByLabel("Detail page decision summary")).toBeVisible();
+    await expect(page.locator("#lessons").getByLabel("Detail page decision summary").first()).toBeVisible();
     await expectCenteredSvg(page.locator(".page-title__icon"));
     await expectCenteredSvg(page.locator(".decision-summary__icon"));
     await expect(page.locator(".context-strip")).toContainText(/Step\s*12\s*\/\s*14/);
     await expect(page.locator(".context-strip--lessons .mini-progress-ring--icon")).toHaveCount(1);
-    await expect(page.getByText("What this page checks")).toBeVisible();
-    await expect(page.getByText("Current judgment")).toBeVisible();
-    await expect(page.getByText("Must review")).toBeVisible();
-    await expect(page.getByText("Next safe check")).toBeVisible();
-    await expect(page.locator(".decision-summary--lessons")).toContainText(/Check\s*Git\/CI status on the workflow page/);
+    await expect(page.locator("#lessons").getByText("What this page checks").first()).toBeVisible();
+    await expect(page.locator("#lessons").getByText("Current judgment").first()).toBeVisible();
+    await expect(page.locator("#lessons").getByText("Must review").first()).toBeVisible();
+    await expect(page.locator("#lessons").getByText("Next safe check").first()).toBeVisible();
+    await expect(page.locator("#lessons .decision-summary--lessons").filter({ hasText: /Check\s*Git\/CI status on the workflow page/ })).toBeVisible();
     await expect(page.getByRole("heading", { name: "STEP 1-7 Basic Lesson" })).toBeVisible();
     await expect(page.locator(".lesson-progress-card")).toHaveCount(3);
     await expect(page.getByRole("heading", { name: "Applied Lesson" })).toBeVisible();
@@ -1093,6 +1150,9 @@ test.describe("English dashboard control center", () => {
     await expect(page.locator(".operation-chip", { hasText: "Merge" })).toContainText("Allowed");
     await expect(page.locator(".workflow-mini-card")).toHaveCount(5);
     await expectCenteredSvg(page.locator(".workflow-mini-card__icon"));
+    const workflowProducerDecision = page.locator("#workflow .decision-summary--workflow").first();
+    await expect(workflowProducerDecision).toContainText("producer.workflow");
+    await expect(workflowProducerDecision).toContainText("#workflow");
     await expect(page.getByRole("heading", { name: "Git Sync" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Product Evidence" })).toBeVisible();
     await page.locator(".workflow-mini-card", { hasText: "Git Sync" }).getByRole("button", { name: /View details/ }).click();

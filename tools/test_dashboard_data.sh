@@ -593,6 +593,15 @@ for (const audience of decisionAudiences) {
     fail(`operational_decision audience brief missing ${audience}`);
   }
 }
+if (Array.isArray(selectedContext.blockers) && selectedContext.blockers.length > 0) {
+  const topLevelBlockers = Array.isArray(data.blocking_items) ? data.blocking_items : [];
+  if (topLevelBlockers.length === 0) {
+    const selectedBlockerSource = selectedContext.blockers[0].source;
+    if (operationalDecision.primary_blocker_source_id !== selectedBlockerSource || operationalDecision.source_id !== selectedBlockerSource) {
+      fail(`operational_decision must identify the selected context blocker source: ${selectedBlockerSource}`);
+    }
+  }
+}
 
 const decisionPages = requireField('decision_pages');
 if (!Array.isArray(decisionPages) || decisionPages.length < decisionIds.size) {
@@ -730,6 +739,9 @@ for (const event of workflowEvidenceEvents) {
   }
   workflowEventIds.add(event.event_id);
   requireEvidenceState(event, `workflow evidence event ${event.event_id}`);
+  if (event.detail_artifact_path.includes(';')) {
+    fail(`workflow evidence event detail_artifact_path must be a single artifact reference: ${event.detail_artifact_path}`);
+  }
   if (event.detail_artifact_path !== 'not_collected' && !isSafeScopedPath(event.detail_artifact_path)) {
     fail(`workflow evidence event detail_artifact_path must be safe: ${event.detail_artifact_path}`);
   }
@@ -759,6 +771,12 @@ for (const row of ciEvidence) {
   requireEvidenceState(row, `CI evidence role ${row.role}`);
   if (!ciHeadMatchStates.has(row.head_match_status)) {
     fail(`invalid CI evidence head_match_status: ${row.head_match_status}`);
+  }
+  if (
+    row.status === 'passed' &&
+    (row.head_match_status !== 'matched' || row.freshness_state !== 'current' || row.authority !== 'authoritative')
+  ) {
+    fail(`passed CI evidence must be current authoritative matching HEAD proof: ${row.role}`);
   }
   for (const field of ['source_id', 'summary', 'observed_at']) {
     requireTextObjectField(row, field, `development.ci_evidence.${row.role}`);
@@ -1563,10 +1581,25 @@ assert_contains "$output" '"contexts_by_menu"'
 assert_contains "$output" '"evidence_rows"'
 
 LIVE_STATUS_FILE="$TMP_DIR/dashboard-live-status.json"
+FAKE_GH_CALLED="$TMP_DIR/fake-gh-called"
+FAKE_BIN="$TMP_DIR/fake-bin"
+mkdir -p "$FAKE_BIN"
+cat >"$FAKE_BIN/gh" <<'SH'
+#!/usr/bin/env bash
+: >"${FAKE_GH_CALLED:?}"
+exit 99
+SH
+chmod +x "$FAKE_BIN/gh"
 DASHBOARD_DATA_GENERATED_AT="2026-06-05T00:00:00Z" \
   DASHBOARD_SELECTED_MENU_ID="free-development" \
   DASHBOARD_LIVE_STATUS_TIMEOUT_SECONDS="1" \
+  FAKE_GH_CALLED="$FAKE_GH_CALLED" \
+  PATH="$FAKE_BIN:$PATH" \
   "$ROOT/tools/dashboard-data" live-status >"$LIVE_STATUS_FILE"
+if [[ -e "$FAKE_GH_CALLED" ]]; then
+  printf 'dashboard live-status must not call gh unless DASHBOARD_LIVE_STATUS_CI_NETWORK is enabled\n' >&2
+  exit 1
+fi
 node - "$LIVE_STATUS_FILE" <<'NODE'
 const fs = require('fs');
 const data = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
@@ -1650,6 +1683,12 @@ for (const key of ['local_tests', 'git_sync', 'ci', 'security']) {
     }
     if (!headMatchStates.has(check.head_match_status)) {
       fail(`live check ci has invalid head_match_status: ${check.head_match_status}`);
+    }
+    if (
+      check.status === 'passed' &&
+      (check.head_match_status !== 'matched' || check.freshness_state !== 'current' || check.authority !== 'authoritative')
+    ) {
+      fail('passed live CI check must be current authoritative matching HEAD proof');
     }
   }
   for (const item of check.items) {

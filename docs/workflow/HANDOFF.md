@@ -2641,121 +2641,120 @@ Stop and ask before:
 
 - Push, PR creation, merge, main CI waiting, local/remote sync, cleanup/delete, credentials, OAuth, dependency changes, browser command execution authority, external product writes, or any existing-feature tradeoff.
 
-## Planned Product Authority Evidence Source Completion Handoff
+## Implemented Product Authority Evidence Source Completion Handoff
 
 SYNC-ID: product_authority_evidence_source_completion
-STATUS: planned
+STATUS: implemented
 ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/DASHBOARD_DATA_SCHEMA.tsv,docs/workflow/PRODUCT_GATE_EVIDENCE_SCHEMA.tsv,tools/lib/product_repository_authority.sh,tools/product-repository-authority,tools/product-gate-evidence-bootstrap,tools/test_product_repository_authority.sh,tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
 TESTS: tools/test_product_repository_authority.sh,tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
 
 Restart context:
 
-- This is the first planned follow-up for the Control Center decision-quality review.
-- The owner layer is product authority and product-local evidence contracts, not React.
-- Complete source IDs, freshness, authority, product HEAD, blocker, risk, artifact, and next-action fields before Dashboard data projects decisions.
-- Remove or split-generate any secret-like fixture literals before promotion.
+- This P0 follow-up is implemented for the Control Center decision-quality review.
+- Dashboard data now consumes source-owned product authority status, freshness, authority, product HEAD, blocker, risk, artifact, and next-action fields instead of inferring them in React.
+- Workflow evidence events and CI evidence roles must continue to inherit source-owned evidence fields.
+- No new secret-like fixture literals were added during this slice.
 
 Next Step:
 
-- Implement this P0 slice first, then run the focused product authority/schema/data checks and sync checks.
+- No remaining action for this sync ID.
 
 Stop and ask before external service calls, credentials, external product writes, push, PR creation, merge, cleanup, dependency changes, or any existing-feature tradeoff.
 
-## Planned Dashboard Control Center Decision Projection Handoff
+## Implemented Dashboard Control Center Decision Projection Handoff
 
 SYNC-ID: dashboard_control_center_decision_projection
-STATUS: planned
+STATUS: implemented
 ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/DASHBOARD_DATA_SCHEMA.tsv,tools/lib/dashboard_data.sh,tools/dashboard-data,dashboard-control-center/src/dashboardData.js,tests/fixtures/dashboard-control-center.json,tests/fixtures/dashboard-control-center-live-update.json,tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
 TESTS: tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
 
 Restart context:
 
 - This P0 slice makes `tools/dashboard-data` the authority for the Control Center decision model.
-- Project product authority, repository-development phase, Git/worktree state, repository changes, workflow evidence, tests, and CI into producer-owned decision fields.
-- Keep live/advisory data separate from stored authoritative evidence.
-- React must remain a renderer; it must not compute readiness from labels or route names.
+- Product authority, repository-development phase, Git/worktree state, repository changes, workflow evidence, tests, and CI are projected into producer-owned decision fields.
+- Live/advisory data stays separate from stored authoritative evidence; live CI network lookup remains opt-in.
+- React remains a renderer and must not compute readiness from labels or route names.
 
 Next Step:
 
-- Start after product authority evidence source completion, or after confirming no authority gap blocks projection.
+- No remaining action for this sync ID.
 
 Stop and ask before GitHub polling, browser-triggered evidence collection, repository mutation, approval writes, push, PR creation, merge, cleanup, credentials, or any existing-feature tradeoff.
 
-## Planned Dashboard Control Center Decision Page Rendering Handoff
+## Implemented Dashboard Control Center Decision Page Rendering Handoff
 
 SYNC-ID: dashboard_control_center_decision_page_rendering
-STATUS: planned
-ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/DASHBOARD_DATA_SCHEMA.tsv,dashboard-control-center/src/App.jsx,dashboard-control-center/src/dashboardData.js,dashboard-control-center/src/i18n.js,tests/fixtures/dashboard-control-center.json,tests/fixtures/dashboard-control-center-live-update.json,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/DASHBOARD_DATA_SCHEMA.tsv,dashboard-control-center/src/App.jsx,dashboard-control-center/src/DecisionSummary.jsx,dashboard-control-center/src/dashboardData.js,dashboard-control-center/src/i18n.js,tests/fixtures/dashboard-control-center.json,tests/fixtures/dashboard-control-center-live-update.json,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
 TESTS: tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
 
 Restart context:
 
 - This P1 slice renders the producer-owned decision model across primary Control Center pages.
 - The target user split is non-engineer overview clarity plus junior/intermediate engineer evidence drilldown.
-- Reuse the existing generic renderer and UI primitives where possible.
-- Keep command previews display-only and keep source identity consistent from summary to detail.
+- `DecisionSummary.jsx` owns the reusable summary renderer for producer decision pages and static detail summaries.
+- Command previews remain display-only, and source identity/detail targets are visible without exposing raw execution-mode internals.
 
 Next Step:
 
-- Start only after the decision projection schema/data exists.
-- Use Playwright visual review if layout or responsive behavior changes.
+- No remaining action for this sync ID.
 
 Stop and ask before command execution authority, Git/CI operations, repository writes, credentials, dependency changes, cleanup, or any existing-feature tradeoff.
 
-## Planned Dashboard Control Center Density And Mobile CSS Refinement Handoff
+## Implemented Dashboard Control Center Density And Mobile CSS Refinement Handoff
 
 SYNC-ID: dashboard_control_center_density_mobile_css_refinement
-STATUS: planned
+STATUS: implemented
 ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/design-system/dashboard-control-center/DESIGN_SYSTEM.md,docs/design-system/dashboard-control-center/tokens.json,docs/design-system/dashboard-control-center/components.json,dashboard-control-center/src/design-system.generated.css,dashboard-control-center/src/design-system.generated.js,dashboard-control-center/src/App.jsx,dashboard-control-center/src/styles.css,tests/playwright/dashboard-control-center.spec.js,tools/check_dashboard_design_system.sh,tools/test_dashboard_control_center.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
 TESTS: tools/check_dashboard_design_system.sh,tools/test_dashboard_control_center.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
 
 Restart context:
 
-- This conditional P1 slice is for actual density/mobile issues found after decision rendering.
+- This conditional P1 slice found no required runtime CSS or design-system change after decision rendering and Playwright verification.
 - Shared visual changes belong in the Dashboard design-system source and generated runtime path.
 - `styles.css` is limited to page-specific layout, responsive wrapping, and overflow prevention.
 - Generated design-system files are artifacts, not hand-edited source.
 
 Next Step:
 
-- Inspect rendered decision pages first. Implement this only if visual fit is not acceptable.
+- No remaining action for this sync ID.
 
 Stop and ask before bypassing the design-system source, adding dependencies, editing generated files as source, external product design writes, or any existing-feature tradeoff.
 
-## Planned Dashboard Control Center Package And CI Verification Wiring Handoff
+## Implemented Dashboard Control Center Package And CI Verification Wiring Handoff
 
 SYNC-ID: dashboard_control_center_package_ci_verification_wiring
-STATUS: planned
+STATUS: implemented
 ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/TEST_PLAN_MANIFEST.tsv,docs/workflow/GIT_HOOK_CHECKS.tsv,docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv,docs/workflow/FINAL_GATE_COVERAGE.tsv,package.json,package-lock.json,.github/workflows/ci.yml,.github/workflows/lesson14-ci.yml,tools/check_ci_workflow_structure.sh,tools/check_test_plan_coverage.sh,tools/test_dashboard_control_center.sh,tools/test_lesson_repository.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
-TESTS: tools/check_ci_workflow_structure.sh,tools/check_test_plan_coverage.sh,tools/test_test_plan.sh,tools/test_git_hooks.sh,tools/test_git_hooks_parallel.sh,tools/test_ci_final_gate.sh,tools/test_dashboard_control_center.sh,tools/test_lesson_repository.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+TESTS: tools/check_ci_workflow_structure.sh,tools/check_test_plan_coverage.sh,tools/test_test_plan.sh,tools/test_git_hooks.sh,tools/test_git_hooks_parallel.sh,tools/test_ci_final_gate.sh,tools/test_dashboard_control_center.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
 
 Restart context:
 
-- This P2 slice is conditional verification wiring, not a default runtime change.
-- Do not edit package or CI files unless P0/P1 implementation creates a real verification gap.
+- This P2 slice is implemented as a no-op verification wiring decision.
+- Package and CI files were not edited because P0/P1 implementation did not create a real verification gap.
 - Preserve required CI names, full/no-cache meaning, final-gate coverage, aggregate fallback, Lesson14 compatibility, and existing standalone tests.
 
 Next Step:
 
-- Keep pending until existing checks prove insufficient.
+- No remaining action for this sync ID.
 
 Stop and ask before dependency installation, required CI check renames, CI authority changes, push, PR creation, merge, main CI waiting, cleanup, credentials, or any existing-feature tradeoff.
 
-## Planned Dashboard Control Center Component Module Extraction Handoff
+## Implemented Dashboard Control Center Component Module Extraction Handoff
 
 SYNC-ID: dashboard_control_center_component_module_extraction
-STATUS: planned
-ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,dashboard-control-center/src/App.jsx,dashboard-control-center/src/dashboardData.js,dashboard-control-center/src/i18n.js,dashboard-control-center/src/styles.css,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,dashboard-control-center/src/App.jsx,dashboard-control-center/src/DecisionSummary.jsx,dashboard-control-center/src/dashboardData.js,dashboard-control-center/src/i18n.js,dashboard-control-center/src/styles.css,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
 TESTS: tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
 
 Restart context:
 
-- This optional P2 refactor should wait until the decision behavior is stable.
-- Extraction must be behavior-preserving and reduce maintenance cost.
+- This optional P2 refactor is implemented for the decision summary surface.
+- `dashboard-control-center/src/DecisionSummary.jsx` extracts reusable decision summary rendering while keeping behavior stable.
 - Preserve routes, data ownership, i18n, status semantics, command-preview boundaries, design-system authority, and tests.
 
 Next Step:
 
-- Keep pending until P0/P1 implementation and visual fit are stable.
+- No remaining action for this sync ID.
 
 Stop and ask before changing runtime behavior, data production, dependencies, Git/CI behavior, external product writes, cleanup, or any existing-feature tradeoff.

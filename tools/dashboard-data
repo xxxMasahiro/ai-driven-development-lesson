@@ -24,6 +24,8 @@ source "$ROOT/tools/lib/product_workflow_git_usage.sh"
 source "$ROOT/tools/lib/document_paths.sh"
 # shellcheck source=tools/lib/dashboard_data.sh
 source "$ROOT/tools/lib/dashboard_data.sh"
+# shellcheck source=tools/lib/repository_development_runner.sh
+source "$ROOT/tools/lib/repository_development_runner.sh"
 
 usage() {
   cat <<'USAGE'
@@ -469,6 +471,13 @@ dashboard_live_status_timeout_seconds() {
   fi
 }
 
+dashboard_live_status_ci_network_enabled() {
+  case "${DASHBOARD_LIVE_STATUS_CI_NETWORK:-0}" in
+    1|true|TRUE|yes|YES) return 0 ;;
+  esac
+  return 1
+}
+
 dashboard_product_git_check_command() {
   local mode="$1"
   local menu_id="${2:-$SELECTED_MENU_ID}"
@@ -621,6 +630,7 @@ dashboard_live_product_ci_status() {
   git_state="$(dashboard_target_repository_git_state "$menu_id")"
   [[ "$git_state" == "configured" ]] || { printf '%s' "$git_state"; return; }
   dashboard_live_status_enabled || { printf '%s' "$fallback"; return; }
+  dashboard_live_status_ci_network_enabled || { printf '%s' "$fallback"; return; }
   repo="$(dashboard_target_repository_root "$menu_id" 2>/dev/null || true)"
   [[ -n "$repo" ]] || { printf 'missing'; return; }
   dashboard_live_command_status ci passed "$ROOT/tools/check_ci_status.sh" --repo "$repo" --required
@@ -1972,6 +1982,176 @@ process.stdout.write(statuses[0]);
 NODE
 }
 
+dashboard_authority_evidence_field() {
+  local authority_json="$1"
+  local source_id="$2"
+  local field="$3"
+  local fallback="${4:-}"
+  DASHBOARD_AUTHORITY_JSON="$authority_json" \
+  DASHBOARD_AUTHORITY_SOURCE_ID="$source_id" \
+  DASHBOARD_AUTHORITY_FIELD="$field" \
+  DASHBOARD_AUTHORITY_FALLBACK="$fallback" node <<'NODE'
+function safeText(value, fallback = "") {
+  const text = String(value ?? fallback)
+    .replace(/[\u0000-\u001f]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return text || fallback;
+}
+let data = {};
+try {
+  data = JSON.parse(process.env.DASHBOARD_AUTHORITY_JSON || "{}");
+} catch (_error) {
+  data = {};
+}
+const sourceId = safeText(process.env.DASHBOARD_AUTHORITY_SOURCE_ID);
+const field = safeText(process.env.DASHBOARD_AUTHORITY_FIELD);
+const fallback = safeText(process.env.DASHBOARD_AUTHORITY_FALLBACK);
+const items = Array.isArray(data.evidence_summary?.items) ? data.evidence_summary.items : [];
+const exact = items.find((item) => safeText(item?.source_id) === sourceId);
+if (exact && Object.prototype.hasOwnProperty.call(exact, field)) {
+  process.stdout.write(safeText(exact[field], fallback));
+  process.exit(0);
+}
+const blockers = Array.isArray(data.product_operation_blockers) ? data.product_operation_blockers : [];
+const blocker = blockers.find((item) => safeText(item?.source) === sourceId);
+if (blocker && Object.prototype.hasOwnProperty.call(blocker, field)) {
+  process.stdout.write(safeText(blocker[field], fallback));
+  process.exit(0);
+}
+process.stdout.write(fallback);
+NODE
+}
+
+dashboard_authority_axis_primary_source() {
+  local authority_json="$1"
+  local axis_prefix="$2"
+  local fallback="$3"
+  DASHBOARD_AUTHORITY_JSON="$authority_json" DASHBOARD_AXIS_PREFIX="$axis_prefix" DASHBOARD_AXIS_FALLBACK="$fallback" node <<'NODE'
+function safeText(value, fallback = "") {
+  const text = String(value ?? fallback)
+    .replace(/[\u0000-\u001f]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return text || fallback;
+}
+const priority = {
+  failed: 0,
+  blocked: 1,
+  stale: 2,
+  not_run: 3,
+  missing: 4,
+  unknown: 5,
+  manual_required: 6,
+  approval_required: 7,
+  optional: 8,
+  cached: 9,
+  ready: 10,
+  passed: 11,
+};
+function rank(value) {
+  return priority[safeText(value, "unknown")] ?? 99;
+}
+function matches(source, prefix) {
+  return source === prefix || source.startsWith(`${prefix}.`);
+}
+let data = {};
+try {
+  data = JSON.parse(process.env.DASHBOARD_AUTHORITY_JSON || "{}");
+} catch (_error) {
+  data = {};
+}
+const prefix = safeText(process.env.DASHBOARD_AXIS_PREFIX);
+const fallback = safeText(process.env.DASHBOARD_AXIS_FALLBACK);
+const candidates = [];
+for (const blocker of Array.isArray(data.product_operation_blockers) ? data.product_operation_blockers : []) {
+  const source = safeText(blocker?.source);
+  if (matches(source, prefix)) candidates.push({ source, rank: rank(blocker?.status) - 0.5 });
+}
+for (const item of Array.isArray(data.evidence_summary?.items) ? data.evidence_summary.items : []) {
+  const source = safeText(item?.source_id);
+  if (matches(source, prefix)) candidates.push({ source, rank: rank(item?.status) });
+}
+candidates.sort((left, right) => left.rank - right.rank || left.source.localeCompare(right.source));
+process.stdout.write(candidates[0]?.source || fallback);
+NODE
+}
+
+dashboard_head_match_status() {
+  local evidence_head="$1"
+  local repository_head="$2"
+  case "$evidence_head" in
+    ""|none|not_collected|unknown)
+      printf 'unknown'
+      return
+      ;;
+  esac
+  case "$repository_head" in
+    ""|none|not_collected|unknown)
+      printf 'unknown'
+      return
+      ;;
+  esac
+  if [[ "$repository_head" == "$evidence_head"* || "$evidence_head" == "$repository_head"* ]]; then
+    printf 'matched'
+  else
+    printf 'different'
+  fi
+}
+
+dashboard_source_status() {
+  local source_id="$1"
+  local fallback="$2"
+  dashboard_authority_evidence_field "$product_authority_json" "$source_id" status "$fallback"
+}
+
+dashboard_source_freshness_state() {
+  local source_id="$1"
+  local fallback_status="$2"
+  dashboard_authority_evidence_field "$product_authority_json" "$source_id" freshness_state "$(dashboard_status_freshness_state "$fallback_status")"
+}
+
+dashboard_source_authority() {
+  local source_id="$1"
+  local fallback_status="$2"
+  dashboard_authority_evidence_field "$product_authority_json" "$source_id" authority "$(dashboard_status_authority "$fallback_status")"
+}
+
+dashboard_source_observed_at() {
+  local source_id="$1"
+  local fallback="$2"
+  dashboard_authority_evidence_field "$product_authority_json" "$source_id" observed_at "$fallback"
+}
+
+dashboard_source_product_head() {
+  local source_id="$1"
+  dashboard_authority_evidence_field "$product_authority_json" "$source_id" product_head ""
+}
+
+dashboard_source_detail_artifact_path() {
+  local source_id="$1"
+  local fallback="$2"
+  dashboard_first_scoped_reference "$(dashboard_authority_evidence_field "$product_authority_json" "$source_id" detail_artifact_path "$fallback")" "$fallback"
+}
+
+dashboard_first_scoped_reference() {
+  local value="$1"
+  local fallback="${2:-not_collected}"
+  local part
+  local -a parts
+  IFS=';' read -r -a parts <<<"$value"
+  for part in "${parts[@]}"; do
+    part="$(printf '%s' "$part" | sed -E 's/^[[:space:]]+//;s/[[:space:]]+$//')"
+    [[ -n "$part" ]] || continue
+    case "$part" in
+      /*|../*|*/../*|*\\*) continue ;;
+    esac
+    printf '%s' "$part"
+    return
+  done
+  printf '%s' "$fallback"
+}
+
 dashboard_json_available_context() {
   local menu_id="$1"
   local workflow_context="$2"
@@ -3291,6 +3471,10 @@ dashboard_live_ci_summary_json() {
     printf '{"status":"missing","detail_code":"ci_git_missing","workflow_name":"","run_status":"","conclusion":"","run_id":"","run_url":"","run_head_sha":"","run_head_branch":"","head_match_status":"unknown","observed_at":"not_collected"}'
     return
   fi
+  if ! dashboard_live_status_ci_network_enabled; then
+    printf '{"status":"manual_required","detail_code":"ci_network_opt_in_required","workflow_name":"","run_status":"","conclusion":"","run_id":"","run_url":"","run_head_sha":"","run_head_branch":"","head_match_status":"unknown","observed_at":"not_collected"}'
+    return
+  fi
   if ! command -v gh >/dev/null 2>&1; then
     printf '{"status":"blocked","detail_code":"ci_gh_missing","workflow_name":"","run_status":"","conclusion":"","run_id":"","run_url":"","run_head_sha":"","run_head_branch":"","head_match_status":"unknown","observed_at":"not_collected"}'
     return
@@ -4221,14 +4405,14 @@ dashboard_operational_status_from_states() {
       unknown) saw_unknown=1 ;;
     esac
   done
-  if [[ "$saw_approval" -eq 1 ]]; then
-    printf 'approval_required'
-  elif [[ "$saw_missing" -eq 1 ]]; then
+  if [[ "$saw_missing" -eq 1 ]]; then
     printf 'missing'
   elif [[ "$saw_stale" -eq 1 ]]; then
     printf 'stale'
   elif [[ "$saw_manual" -eq 1 ]]; then
     printf 'manual_required'
+  elif [[ "$saw_approval" -eq 1 ]]; then
+    printf 'approval_required'
   elif [[ "$saw_unknown" -eq 1 ]]; then
     printf 'unknown'
   else
@@ -4284,9 +4468,28 @@ dashboard_first_blocker_field() {
   dashboard_json_get_field "${blocking_items[0]}" "$field" 2>/dev/null || return 1
 }
 
+dashboard_selected_context_first_blocker_field() {
+  local field="$1"
+  DASHBOARD_SELECTED_CONTEXT_JSON="${selected_context_json:-}" DASHBOARD_SELECTED_CONTEXT_BLOCKER_FIELD="$field" node <<'NODE'
+let data = {};
+try {
+  data = JSON.parse(process.env.DASHBOARD_SELECTED_CONTEXT_JSON || "{}");
+} catch (_error) {
+  data = {};
+}
+const field = String(process.env.DASHBOARD_SELECTED_CONTEXT_BLOCKER_FIELD || "");
+const blockers = Array.isArray(data.blockers) ? data.blockers : [];
+const blocker = blockers.find((item) => item && typeof item === "object" && !Array.isArray(item));
+if (!blocker || !(field in blocker)) process.exit(2);
+process.stdout.write(String(blocker[field] ?? "").replace(/[\u0000-\u001f]+/g, " ").trim());
+NODE
+}
+
 dashboard_operational_primary_source() {
   local source
   source="$(dashboard_first_blocker_field source 2>/dev/null || true)"
+  if [[ -n "$source" ]]; then printf '%s' "$source"; return; fi
+  source="$(dashboard_selected_context_first_blocker_field source 2>/dev/null || true)"
   if [[ -n "$source" ]]; then printf '%s' "$source"; return; fi
   if dashboard_attention_state "$product_repository_status"; then printf 'development.product_repository'; return; fi
   if dashboard_attention_state "$product_authority_status"; then printf 'development.product_authority'; return; fi
@@ -4300,6 +4503,8 @@ dashboard_operational_primary_source() {
 dashboard_operational_reason() {
   local reason
   reason="$(dashboard_first_blocker_field reason 2>/dev/null || true)"
+  if [[ -n "$reason" ]]; then printf '%s' "$reason"; return; fi
+  reason="$(dashboard_selected_context_first_blocker_field reason 2>/dev/null || true)"
   if [[ -n "$reason" ]]; then printf '%s' "$reason"; return; fi
   case "$1" in
     ready|passed) printf 'No blocking item is currently reported by the dashboard producer.' ;;
@@ -4316,6 +4521,8 @@ dashboard_operational_next_action() {
   local command
   command="$(dashboard_first_blocker_field required_command 2>/dev/null || true)"
   if [[ -n "$command" ]]; then printf '%s' "$command"; return; fi
+  command="$(dashboard_selected_context_first_blocker_field required_command 2>/dev/null || true)"
+  if [[ -n "$command" ]]; then printf '%s' "$command"; return; fi
   case "$1" in
     ready|passed) printf 'Open the relevant detail page only if you need supporting evidence.' ;;
     approval_required) printf 'Review approval boundaries before running any Git, CI, merge, or cleanup operation.' ;;
@@ -4329,7 +4536,7 @@ dashboard_operational_next_action() {
 
 dashboard_repository_development_json() {
   local changed_paths non_plan_changed_paths phase reason row order purpose required_inputs allowed_writes recommended_checks required_checks git_ci_expectations approval_requirements cleanup_behavior stop_conditions
-  local records_file current_head runner_records_status
+  local records_file current_head current_policy_fingerprint current_input_fingerprint runner_records_status
   changed_paths="$(git -C "$ROOT" status --short --untracked-files=normal 2>/dev/null | awk '{ print $2 }')"
   non_plan_changed_paths="$(printf '%s\n' "$changed_paths" | grep -Ev '^(docs/as-built/|docs/workflow/(AS_BUILT_SYNC_CONTRACT|TASK_TRACKER|HANDOFF)\.)' 2>/dev/null || true)"
   if [[ -z "$changed_paths" ]]; then
@@ -4362,9 +4569,16 @@ dashboard_repository_development_json() {
   fi
   records_file="$ROOT/.repository-development-runs/records.tsv"
   current_head="$(git -C "$ROOT" rev-parse HEAD 2>/dev/null || true)"
+  current_policy_fingerprint="$(repository_development_runner_policy_fingerprint 2>/dev/null || true)"
+  current_input_fingerprint="$(repository_development_runner_input_fingerprint 2>/dev/null || true)"
   if [[ ! -f "$records_file" ]]; then
     runner_records_status="missing"
-  elif [[ -n "$current_head" ]] && awk -F '\t' -v head="$current_head" 'NR > 1 && $8 == head && $7 == "pass" { found = 1; exit } END { exit found ? 0 : 1 }' "$records_file"; then
+  elif [[ -n "$current_head" && -n "$current_policy_fingerprint" && -n "$current_input_fingerprint" ]] \
+    && awk -F '\t' \
+      -v head="$current_head" \
+      -v policy_fingerprint="$current_policy_fingerprint" \
+      -v input_fingerprint="$current_input_fingerprint" \
+      'NR > 1 && $8 == head && $9 == policy_fingerprint && $10 == input_fingerprint && $7 == "pass" { found = 1; exit } END { exit found ? 0 : 1 }' "$records_file"; then
     runner_records_status="current"
   else
     runner_records_status="stale"
@@ -4787,6 +5001,8 @@ operational_decision_status="$(
 operational_decision_source="$(dashboard_operational_primary_source)"
 operational_decision_reason="$(dashboard_operational_reason "$operational_decision_status")"
 operational_decision_next_action="$(dashboard_operational_next_action "$operational_decision_status")"
+operational_decision_freshness="$(dashboard_source_freshness_state "$operational_decision_source" "$operational_decision_status")"
+operational_decision_authority="$(dashboard_source_authority "$operational_decision_source" "$operational_decision_status")"
 operational_decision_json="$(
   dashboard_json_operational_decision \
     "$operational_decision_status" \
@@ -4797,19 +5013,34 @@ operational_decision_json="$(
     "Current judgment, evidence confidence, and next safe action are visible before any operation." \
     "Dashboard remains read-only; Git, CI, merge, cleanup, and product writes stay outside browser execution." \
     "$(dashboard_status_risk_level "$operational_decision_status")" \
-    "$(dashboard_status_freshness_state "$operational_decision_status")" \
-    "$(dashboard_status_authority "$operational_decision_status")" \
+    "$operational_decision_freshness" \
+    "$operational_decision_authority" \
     "$operational_decision_source" \
     "$operational_decision_reason" \
     "Inspect the source ID, freshness, authority, and required command before treating this state as complete."
 )"
 
+repository_scope_event_path="$(dashboard_first_scoped_reference "$repository_scope_evidence_path" "not_collected")"
+product_authority_event_path="$(dashboard_first_scoped_reference "$product_authority_evidence_path" "not_collected")"
+product_security_event_path="$(dashboard_first_scoped_reference "$product_security_evidence_path" "not_collected")"
+git_event_source="$(dashboard_authority_axis_primary_source "$product_authority_json" "product.git" "product.git.sync")"
+ci_event_source="$(dashboard_authority_axis_primary_source "$product_authority_json" "product.ci" "product.ci.main")"
+security_event_source="$(dashboard_authority_axis_primary_source "$product_authority_json" "product.security" "product.security.blockers")"
+git_event_status="$(dashboard_source_status "$git_event_source" "$git_sync_status")"
+ci_event_status="$(dashboard_source_status "$ci_event_source" "$ci_status")"
+security_event_status="$(dashboard_source_status "$security_event_source" "$security_gate_status")"
+git_event_head="$(dashboard_source_product_head "$git_event_source")"
+ci_event_head="$(dashboard_source_product_head "$ci_event_source")"
+security_event_head="$(dashboard_source_product_head "$security_event_source")"
+[[ -n "$git_event_head" ]] || git_event_head="$repository_changes_head"
+[[ -n "$ci_event_head" ]] || ci_event_head="$repository_changes_head"
+[[ -n "$security_event_head" ]] || security_event_head="$repository_changes_head"
 workflow_evidence_events=(
-  "$(dashboard_json_workflow_evidence_event "repository-observation" "repository_scope" "$repository_scope_observed_at" "$repository_changes_head" "$repository_scope_inventory_status" "$(dashboard_status_freshness_state "$repository_scope_inventory_status")" "$(dashboard_status_authority "$repository_scope_inventory_status")" "$repository_scope_evidence_path" "Observed selected repository inventory and required paths.")"
-  "$(dashboard_json_workflow_evidence_event "repository-index-drift" "repository_inventory" "$repository_scope_observed_at" "$repository_changes_head" "$repository_scope_drift_status" "$(dashboard_status_freshness_state "$repository_scope_drift_status")" "$(dashboard_status_authority "$repository_scope_drift_status")" "$repository_scope_evidence_path" "Compared worktree files with repository index.")"
-  "$(dashboard_json_workflow_evidence_event "git-sync" "git_sync" "$generated_at" "$repository_changes_head" "$git_sync_status" "$(dashboard_status_freshness_state "$git_sync_status")" "$(dashboard_status_authority "$git_sync_status")" "$product_authority_evidence_path" "Selected context Git synchronization evidence.")"
-  "$(dashboard_json_workflow_evidence_event "ci-main" "ci" "$generated_at" "$repository_changes_head" "$ci_status" "$(dashboard_status_freshness_state "$ci_status")" "$(dashboard_status_authority "$ci_status")" "$product_authority_evidence_path" "Selected context CI evidence.")"
-  "$(dashboard_json_workflow_evidence_event "security-gate" "security_gate" "$generated_at" "$repository_changes_head" "$security_gate_status" "$(dashboard_status_freshness_state "$security_gate_status")" "$(dashboard_status_authority "$security_gate_status")" "$product_security_evidence_path" "Selected context security gate snapshot.")"
+  "$(dashboard_json_workflow_evidence_event "repository-observation" "repository_scope" "$repository_scope_observed_at" "$repository_changes_head" "$repository_scope_inventory_status" "$(dashboard_status_freshness_state "$repository_scope_inventory_status")" "$(dashboard_status_authority "$repository_scope_inventory_status")" "$repository_scope_event_path" "Observed selected repository inventory and required paths.")"
+  "$(dashboard_json_workflow_evidence_event "repository-index-drift" "repository_inventory" "$repository_scope_observed_at" "$repository_changes_head" "$repository_scope_drift_status" "$(dashboard_status_freshness_state "$repository_scope_drift_status")" "$(dashboard_status_authority "$repository_scope_drift_status")" "$repository_scope_event_path" "Compared worktree files with repository index.")"
+  "$(dashboard_json_workflow_evidence_event "git-sync" "$git_event_source" "$(dashboard_source_observed_at "$git_event_source" "$generated_at")" "$git_event_head" "$git_event_status" "$(dashboard_source_freshness_state "$git_event_source" "$git_event_status")" "$(dashboard_source_authority "$git_event_source" "$git_event_status")" "$(dashboard_source_detail_artifact_path "$git_event_source" "$product_authority_event_path")" "Selected context Git synchronization evidence.")"
+  "$(dashboard_json_workflow_evidence_event "ci-main" "$ci_event_source" "$(dashboard_source_observed_at "$ci_event_source" "$generated_at")" "$ci_event_head" "$ci_event_status" "$(dashboard_source_freshness_state "$ci_event_source" "$ci_event_status")" "$(dashboard_source_authority "$ci_event_source" "$ci_event_status")" "$(dashboard_source_detail_artifact_path "$ci_event_source" "$product_authority_event_path")" "Selected context CI evidence.")"
+  "$(dashboard_json_workflow_evidence_event "security-gate" "$security_event_source" "$(dashboard_source_observed_at "$security_event_source" "$generated_at")" "$security_event_head" "$security_event_status" "$(dashboard_source_freshness_state "$security_event_source" "$security_event_status")" "$(dashboard_source_authority "$security_event_source" "$security_event_status")" "$(dashboard_source_detail_artifact_path "$security_event_source" "$product_security_event_path")" "Selected context security gate snapshot.")"
 )
 
 local_tests_status="$(dashboard_authority_axis_status "$product_authority_json" "product.tests" "not_run")"
@@ -4817,15 +5048,15 @@ dashboard_data_allowed_state "$local_tests_status" || local_tests_status="unknow
 provider_visibility_status="$(dashboard_authority_axis_status "$product_authority_json" "product.ci.github_actions" "$ci_status")"
 dashboard_data_allowed_state "$provider_visibility_status" || provider_visibility_status="$ci_status"
 ci_evidence_roles=(
-  "$(dashboard_json_ci_evidence_role "branch_ci" "$ci_status" "product.ci.branch" "unknown" "$(dashboard_status_authority "$ci_status")" "$(dashboard_status_freshness_state "$ci_status")" "Selected branch CI evidence or manual review state." "$generated_at")"
-  "$(dashboard_json_ci_evidence_role "pr_ci" "$(dashboard_git_operation_status pr_ci "$git_operation_pr_ci_mode" "$ci_status")" "product.ci.pr" "unknown" "$(dashboard_status_authority "$(dashboard_git_operation_status pr_ci "$git_operation_pr_ci_mode" "$ci_status")")" "$(dashboard_status_freshness_state "$(dashboard_git_operation_status pr_ci "$git_operation_pr_ci_mode" "$ci_status")")" "Pull request CI evidence is separate from branch and main CI." "$generated_at")"
-  "$(dashboard_json_ci_evidence_role "main_ci" "$(dashboard_git_operation_status main_ci "$git_operation_main_ci_mode" "$ci_status")" "product.ci.main" "unknown" "$(dashboard_status_authority "$(dashboard_git_operation_status main_ci "$git_operation_main_ci_mode" "$ci_status")")" "$(dashboard_status_freshness_state "$(dashboard_git_operation_status main_ci "$git_operation_main_ci_mode" "$ci_status")")" "Main CI evidence is separate from PR and branch CI." "$generated_at")"
+  "$(dashboard_json_ci_evidence_role "branch_ci" "$(dashboard_source_status "product.ci.github_actions" "$ci_status")" "product.ci.github_actions" "$(dashboard_head_match_status "$(dashboard_source_product_head "product.ci.github_actions")" "$repository_changes_head")" "$(dashboard_source_authority "product.ci.github_actions" "$ci_status")" "$(dashboard_source_freshness_state "product.ci.github_actions" "$ci_status")" "Selected branch/provider CI evidence or manual review state." "$(dashboard_source_observed_at "product.ci.github_actions" "$generated_at")")"
+  "$(dashboard_json_ci_evidence_role "pr_ci" "$(dashboard_source_status "product.ci.pr" "$(dashboard_git_operation_status pr_ci "$git_operation_pr_ci_mode" "$ci_status")")" "product.ci.pr" "$(dashboard_head_match_status "$(dashboard_source_product_head "product.ci.pr")" "$repository_changes_head")" "$(dashboard_source_authority "product.ci.pr" "$(dashboard_git_operation_status pr_ci "$git_operation_pr_ci_mode" "$ci_status")")" "$(dashboard_source_freshness_state "product.ci.pr" "$(dashboard_git_operation_status pr_ci "$git_operation_pr_ci_mode" "$ci_status")")" "Pull request CI evidence is separate from branch and main CI." "$(dashboard_source_observed_at "product.ci.pr" "$generated_at")")"
+  "$(dashboard_json_ci_evidence_role "main_ci" "$(dashboard_source_status "product.ci.main" "$(dashboard_git_operation_status main_ci "$git_operation_main_ci_mode" "$ci_status")")" "product.ci.main" "$(dashboard_head_match_status "$(dashboard_source_product_head "product.ci.main")" "$repository_changes_head")" "$(dashboard_source_authority "product.ci.main" "$(dashboard_git_operation_status main_ci "$git_operation_main_ci_mode" "$ci_status")")" "$(dashboard_source_freshness_state "product.ci.main" "$(dashboard_git_operation_status main_ci "$git_operation_main_ci_mode" "$ci_status")")" "Main CI evidence is separate from PR and branch CI." "$(dashboard_source_observed_at "product.ci.main" "$generated_at")")"
   "$(dashboard_json_ci_evidence_role "local_tests" "$local_tests_status" "product.tests" "unknown" "$(dashboard_status_authority "$local_tests_status")" "$(dashboard_status_freshness_state "$local_tests_status")" "Local test evidence is shown separately from remote CI." "$generated_at")"
-  "$(dashboard_json_ci_evidence_role "provider_visibility" "$provider_visibility_status" "product.ci.github_actions" "unknown" "$(dashboard_status_authority "$provider_visibility_status")" "$(dashboard_status_freshness_state "$provider_visibility_status")" "Provider visibility is not the same as a passing CI run." "$generated_at")"
+  "$(dashboard_json_ci_evidence_role "provider_visibility" "$(dashboard_source_status "product.ci.github_actions" "$provider_visibility_status")" "product.ci.github_actions" "$(dashboard_head_match_status "$(dashboard_source_product_head "product.ci.github_actions")" "$repository_changes_head")" "$(dashboard_source_authority "product.ci.github_actions" "$provider_visibility_status")" "$(dashboard_source_freshness_state "product.ci.github_actions" "$provider_visibility_status")" "Provider visibility is not the same as a passing CI run." "$(dashboard_source_observed_at "product.ci.github_actions" "$generated_at")")"
 )
 
 decision_page_rows=(
-  "$(dashboard_json_decision_page "overview" "Overview" "$selected_target_repository_name" "$operational_decision_status" "$(dashboard_status_judgment_text "$operational_decision_status")" "$operational_decision_reason" "$(dashboard_status_authority "$operational_decision_status") / $(dashboard_status_freshness_state "$operational_decision_status")" "$operational_decision_next_action" "#overview" "dashboard-data" "$operational_decision_source" "$(dashboard_status_authority "$operational_decision_status")" "$(dashboard_status_freshness_state "$operational_decision_status")" "$(dashboard_status_risk_level "$operational_decision_status")" "Top blocker" "Evidence confidence")"
+  "$(dashboard_json_decision_page "overview" "Overview" "$selected_target_repository_name" "$operational_decision_status" "$(dashboard_status_judgment_text "$operational_decision_status")" "$operational_decision_reason" "$operational_decision_authority / $operational_decision_freshness" "$operational_decision_next_action" "#overview" "dashboard-data" "$operational_decision_source" "$operational_decision_authority" "$operational_decision_freshness" "$(dashboard_status_risk_level "$operational_decision_status")" "Top blocker" "Evidence confidence")"
   "$(dashboard_json_decision_page "lessons" "Lessons" "$SELECTED_MENU_ID" "$(dashboard_operational_status_from_states "$lesson_7_status" "$lesson_14_status" "$advanced_status")" "$(dashboard_status_judgment_text "$(dashboard_operational_status_from_states "$lesson_7_status" "$lesson_14_status" "$advanced_status")")" "Lesson progress and approval state are producer-owned." "lesson-runtime / current" "Review the current lesson step and required approval before moving forward." "#lessons" "dashboard-data" "lessons" "authoritative" "current" "$(dashboard_status_risk_level "$(dashboard_operational_status_from_states "$lesson_7_status" "$lesson_14_status" "$advanced_status")")" "Current step" "Next learning action")"
   "$(dashboard_json_decision_page "workflow" "Development Workflow" "$SELECTED_WORKFLOW_CONTEXT" "$category_metric_workflow_status" "$(dashboard_status_judgment_text "$category_metric_workflow_status")" "Workflow state combines repository, Git, CI, evidence, and approval sources." "$(dashboard_status_authority "$category_metric_workflow_status") / $(dashboard_status_freshness_state "$category_metric_workflow_status")" "Repair the first non-ready workflow item before treating the workflow as complete." "#workflow" "dashboard-data" "development.workflow" "$(dashboard_status_authority "$category_metric_workflow_status")" "$(dashboard_status_freshness_state "$category_metric_workflow_status")" "$(dashboard_status_risk_level "$category_metric_workflow_status")" "Git and CI state" "Approval gates")"
   "$(dashboard_json_decision_page "maintenance" "Maintenance" "$latest_sync_id" "$category_metric_maintenance_status" "$(dashboard_status_judgment_text "$category_metric_maintenance_status")" "Maintenance compares synchronized documents and evidence freshness." "$(dashboard_status_authority "$category_metric_maintenance_status") / $(dashboard_status_freshness_state "$category_metric_maintenance_status")" "Refresh or repair stale maintenance evidence before relying on the snapshot." "#maintenance" "dashboard-data" "maintenance.evidence_rows" "$(dashboard_status_authority "$category_metric_maintenance_status")" "$(dashboard_status_freshness_state "$category_metric_maintenance_status")" "$(dashboard_status_risk_level "$category_metric_maintenance_status")" "Synchronized docs" "Evidence rows")"

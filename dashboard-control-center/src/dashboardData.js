@@ -1273,6 +1273,9 @@ function validateWorkflowEvidenceEvents(development) {
     seen.add(eventId);
     validateEvidenceSourceFields(event, `dashboard workflow evidence event ${eventId}`);
     const artifactPath = displayText(event.detail_artifact_path, "");
+    if (artifactPath.includes(";")) {
+      throw new Error(`dashboard workflow evidence event ${eventId} detail_artifact_path must be a single artifact reference`);
+    }
     if (artifactPath !== "not_collected" && !safeScopedRelativePath(artifactPath)) {
       throw new Error(`dashboard workflow evidence event ${eventId} detail_artifact_path is unsafe`);
     }
@@ -1299,8 +1302,17 @@ function validateCiEvidence(development) {
     }
     seen.add(role);
     validateEvidenceSourceFields(row, `dashboard CI evidence row ${role}`);
-    if (!CI_HEAD_MATCH_STATES.has(displayText(row.head_match_status, ""))) {
+    const headMatchStatus = displayText(row.head_match_status, "");
+    if (!CI_HEAD_MATCH_STATES.has(headMatchStatus)) {
       throw new Error(`dashboard CI evidence row ${role} head_match_status is invalid`);
+    }
+    if (
+      displayText(row.status, "") === "passed" &&
+      (headMatchStatus !== "matched" ||
+        displayText(row.freshness_state, "") !== "current" ||
+        displayText(row.authority, "") !== "authoritative")
+    ) {
+      throw new Error(`dashboard CI evidence row ${role} passed status requires current authoritative matching HEAD evidence`);
     }
     for (const key of ["source_id", "summary", "observed_at"]) {
       if (!displayText(row[key], "")) {
@@ -2202,8 +2214,17 @@ function validateDashboardLiveCheck(check, key) {
     validateNonNegativeInteger(Number(check.blocker_count), `dashboard live check ${key} blocker_count`);
   }
   if (key === "ci") {
-    if (!CI_HEAD_MATCH_STATES.has(displayText(check.head_match_status, "unknown"))) {
+    const headMatchStatus = displayText(check.head_match_status, "unknown");
+    if (!CI_HEAD_MATCH_STATES.has(headMatchStatus)) {
       throw new Error("dashboard live check ci head_match_status is invalid");
+    }
+    if (
+      displayText(check.status, "") === "passed" &&
+      (headMatchStatus !== "matched" ||
+        displayText(check.freshness_state, "") !== "current" ||
+        displayText(check.authority, "") !== "authoritative")
+    ) {
+      throw new Error("dashboard live check ci passed status requires current authoritative matching HEAD evidence");
     }
     for (const field of ["workflow_name", "run_status", "conclusion", "run_id", "run_url", "repository_head", "run_head_sha", "run_head_branch"]) {
       if (check[field] !== undefined && typeof check[field] !== "string") {

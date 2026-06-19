@@ -76,6 +76,7 @@ import {
   planDashboardSettingChange,
   planDashboardDesignSystemChange,
 } from "./dashboardData.js";
+import { DetailDecisionSummary, ProducerDecisionSummary } from "./DecisionSummary.jsx";
 import { dashboardControlCenterDesignSystem } from "./design-system.generated.js";
 import { createTranslator, formatDateTime, formatRelativeAge, getDashboardIntlLocale, getDashboardLocaleDirection, resolveLocale } from "./i18n.js";
 
@@ -3425,87 +3426,6 @@ function lessonSummaryLines(text) {
     return value.replace(" and what ", "\nand what ").split("\n");
   }
   return [value];
-}
-
-function DetailDecisionSummary({ tone, items, t }) {
-  return (
-    <section className={`decision-summary decision-summary--${tone}`} aria-label={t("detail.summaryAria")}>
-      {items.map(({ Icon, label, value, valueLines, detail, points = [], badge, cta, tone: itemTone }) => (
-        <article className={itemTone ? `decision-summary__item decision-summary__item--${itemTone}` : "decision-summary__item"} key={label}>
-          <span className="decision-summary__icon">
-            <Icon aria-hidden="true" size={24} />
-          </span>
-          <div>
-            <span>{label}</span>
-            {valueLines?.length ? (
-              <p className="decision-summary__value-lines">
-                {valueLines.map((line, index) => (
-                  <span key={`${displayText(line)}-${index}`}>{line}</span>
-                ))}
-              </p>
-            ) : displayText(value, "") ? (
-              <strong>{value}</strong>
-            ) : null}
-            {badge ? <em>{badge}</em> : null}
-            {detail ? <p>{detail}</p> : null}
-            {points.length ? (
-              <ul className="decision-summary__points">
-                {points.map((point, index) => (
-                  <li key={`${displayText(point)}-${index}`}>{displayText(point)}</li>
-                ))}
-              </ul>
-            ) : null}
-            {cta ? (
-              <a className="decision-summary__cta" href={cta.href}>
-                {cta.label}
-                <ArrowRightCircle aria-hidden="true" size={16} />
-              </a>
-            ) : null}
-          </div>
-        </article>
-      ))}
-    </section>
-  );
-}
-
-function decisionPageFor(data, pageId) {
-  return asArray(data?.decision_pages).find((page) => displayText(page?.id, "") === pageId) || null;
-}
-
-function decisionToneForStatus(status) {
-  const state = normalizeState(status);
-  if (state === "ready" || state === "passed" || state === "not_applicable") {
-    return "ready";
-  }
-  if (state === "blocked" || state === "failed") {
-    return "danger";
-  }
-  return "warning";
-}
-
-function ProducerDecisionSummary({ data, pageId, tone = "sidebar", t }) {
-  const decision = decisionPageFor(data, pageId);
-  if (!decision) {
-    return null;
-  }
-  const state = normalizeState(decision.status);
-  const StateIcon = stateIcons[state] || CircleHelp;
-  const mustReview = asArray(decision.must_review).map((item) => displayText(item, "")).filter(Boolean);
-  const evidenceConfidence = displayText(decision.evidence_confidence, "");
-  const ownerSource = displayText(decision.owner_source, "");
-  const commandMode = displayText(decision.command_execution_mode, "");
-  return (
-    <DetailDecisionSummary
-      tone={tone}
-      t={t}
-      items={[
-        { Icon: Target, label: t("detail.checks"), value: displayText(decision.decision_question), detail: displayText(decision.scope, "") },
-        { Icon: StateIcon, label: t("detail.currentJudgment"), value: displayText(decision.current_judgment), detail: displayText(decision.top_reason), badge: statusLabelForChip(state, t), tone: decisionToneForStatus(state) },
-        { Icon: Eye, label: t("detail.mustReview"), points: mustReview.length ? mustReview : [t("detail.noRequiredReview")], detail: evidenceConfidence },
-        { Icon: ArrowRightCircle, label: t("detail.nextSafeCheck"), value: displayText(decision.next_safe_action), detail: [ownerSource, commandMode].filter(Boolean).join(" / ") },
-      ]}
-    />
-  );
 }
 
 function SummaryBullets({ items }) {
