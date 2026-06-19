@@ -2466,3 +2466,138 @@ SYNC-ID: dashboard_browser_debug_agent_handoff
 STATUS: implemented
 ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/DASHBOARD_DATA_SCHEMA.tsv,tools/dashboard-data,dashboard-control-center/src/dashboardData.js,dashboard-control-center/src/App.jsx,dashboard-control-center/src/i18n.js,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
 TESTS: tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+## Dashboard Control Center Operational Decision Evidence Work
+
+Sync ID: `dashboard_control_center_operational_decision_evidence`.
+Current status: `implemented`.
+Priority: 2.
+
+Task state:
+
+- [x] Consolidate xhigh sub-agent audits into one owner-layer-first implementation plan.
+- [x] Define and synchronize the sync ID metadata.
+- [x] Extend Dashboard data schema with operational decision, page decision, repository change, workflow event, repository-development, and role-separated CI/test evidence contracts.
+- [x] Extend dashboard-data owner-layer producers for operational decisions, page decisions, selected-repository change summaries, repository-development workflow phase context, workflow evidence events, and CI evidence roles.
+- [x] Strengthen Dashboard runtime validation for current producer snapshots while preserving legacy snapshot compatibility.
+- [x] Extend existing schema/data/control-center tests for the new contracts.
+- [x] Update Control Center pages to render the six-part page contract from producer data.
+- [x] Promote this sync ID to implemented after focused checks and targeted Playwright review.
+
+SYNC-ID: dashboard_control_center_operational_decision_evidence
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/DASHBOARD_DATA_SCHEMA.tsv,tools/lib/dashboard_data.sh,tools/dashboard-data,dashboard-control-center/src/dashboardData.js,dashboard-control-center/src/App.jsx,tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/test_dashboard_control_center.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/test_dashboard_control_center.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+## Planned Product Authority Evidence Source Completion Work
+
+SYNC-ID: product_authority_evidence_source_completion
+STATUS: planned
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/DASHBOARD_DATA_SCHEMA.tsv,docs/workflow/PRODUCT_GATE_EVIDENCE_SCHEMA.tsv,tools/lib/product_repository_authority.sh,tools/product-repository-authority,tools/product-gate-evidence-bootstrap,tools/test_product_repository_authority.sh,tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_product_repository_authority.sh,tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+Current Status:
+
+- [x] Approved as a planned follow-up from the App.jsx/CSS/package/CI/product-authority review.
+- [ ] Audit product authority emitted fields for source ID, authority, freshness, product HEAD, blockers, risk, detail artifact references, and next action.
+- [ ] Repair owner-layer evidence gaps without adding Dashboard UI-side readiness inference.
+- [ ] Remove or split-generate any secret-like test literals before promotion.
+- [ ] Run the focused product authority, schema, data, repository-development, and sync checks.
+
+Next Step:
+
+- Implement this before Dashboard decision projection so the data producer can cite complete product authority evidence.
+
+## Planned Dashboard Control Center Decision Projection Work
+
+SYNC-ID: dashboard_control_center_decision_projection
+STATUS: planned
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/DASHBOARD_DATA_SCHEMA.tsv,tools/lib/dashboard_data.sh,tools/dashboard-data,dashboard-control-center/src/dashboardData.js,tests/fixtures/dashboard-control-center.json,tests/fixtures/dashboard-control-center-live-update.json,tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+Current Status:
+
+- [x] Approved as P0 data-producer work.
+- [ ] Refine the decision schema for blocker, Git/worktree, repository changes, repository-development phase, test/CI, and workflow evidence.
+- [ ] Move cause selection into `tools/dashboard-data` and shared helpers.
+- [ ] Keep ordinary Dashboard data generation read-only, non-networked, and non-mutating.
+- [ ] Update fixtures and data/schema tests so current producer output is strict while legacy optional snapshots still render.
+
+Next Step:
+
+- Start after `product_authority_evidence_source_completion` or after confirming no authority field gap blocks the projection.
+
+## Planned Dashboard Control Center Decision Page Rendering Work
+
+SYNC-ID: dashboard_control_center_decision_page_rendering
+STATUS: planned
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/DASHBOARD_DATA_SCHEMA.tsv,dashboard-control-center/src/App.jsx,dashboard-control-center/src/dashboardData.js,dashboard-control-center/src/i18n.js,tests/fixtures/dashboard-control-center.json,tests/fixtures/dashboard-control-center-live-update.json,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+Current Status:
+
+- [x] Approved as P1 UI rendering work.
+- [ ] Render the six-part page decision contract on primary Control Center pages.
+- [ ] Keep command previews display-only and preserve existing Dashboard routes and Settings behavior.
+- [ ] Extend i18n and Playwright coverage for decision visibility, source identity, no-overlap, and no-clipping states.
+- [ ] Use producer data for readiness; do not infer readiness in React.
+
+Next Step:
+
+- Start after decision projection produces the complete data contract.
+
+## Planned Dashboard Control Center Density And Mobile CSS Refinement Work
+
+SYNC-ID: dashboard_control_center_density_mobile_css_refinement
+STATUS: planned
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/design-system/dashboard-control-center/DESIGN_SYSTEM.md,docs/design-system/dashboard-control-center/tokens.json,docs/design-system/dashboard-control-center/components.json,dashboard-control-center/src/design-system.generated.css,dashboard-control-center/src/design-system.generated.js,dashboard-control-center/src/App.jsx,dashboard-control-center/src/styles.css,tests/playwright/dashboard-control-center.spec.js,tools/check_dashboard_design_system.sh,tools/test_dashboard_control_center.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/check_dashboard_design_system.sh,tools/test_dashboard_control_center.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+Current Status:
+
+- [x] Approved as conditional P1 visual/layout work.
+- [ ] Inspect whether decision rendering fits existing design-system tokens and responsive constraints.
+- [ ] Change shared visual behavior through design-system source and generated runtime path when needed.
+- [ ] Use handwritten CSS only for page-specific layout glue, wrapping, and overflow prevention.
+- [ ] Run design-system drift checks and targeted Playwright visual checks when layout changes.
+
+Next Step:
+
+- Start only after decision rendering exposes actual density/mobile issues.
+
+## Planned Dashboard Control Center Package And CI Verification Wiring Work
+
+SYNC-ID: dashboard_control_center_package_ci_verification_wiring
+STATUS: planned
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/TEST_PLAN_MANIFEST.tsv,docs/workflow/GIT_HOOK_CHECKS.tsv,docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv,docs/workflow/FINAL_GATE_COVERAGE.tsv,package.json,package-lock.json,.github/workflows/ci.yml,.github/workflows/lesson14-ci.yml,tools/check_ci_workflow_structure.sh,tools/check_test_plan_coverage.sh,tools/test_dashboard_control_center.sh,tools/test_lesson_repository.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/check_ci_workflow_structure.sh,tools/check_test_plan_coverage.sh,tools/test_test_plan.sh,tools/test_git_hooks.sh,tools/test_git_hooks_parallel.sh,tools/test_ci_final_gate.sh,tools/test_dashboard_control_center.sh,tools/test_lesson_repository.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+Current Status:
+
+- [x] Approved as conditional P2 verification-wiring work.
+- [ ] Leave package and CI files unchanged unless P0/P1 work creates a real verification gap.
+- [ ] Prefer existing standalone and aggregate tests before adding scripts or CI jobs.
+- [ ] Preserve required CI names, full/no-cache semantics, final-gate coverage, and Lesson14 compatibility.
+- [ ] Run structure, test-plan, hook, final-gate, dashboard, aggregate, and sync checks if this scope becomes necessary.
+
+Next Step:
+
+- Keep pending until implementation proves existing verification wiring is insufficient.
+
+## Planned Dashboard Control Center Component Module Extraction Work
+
+SYNC-ID: dashboard_control_center_component_module_extraction
+STATUS: planned
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,dashboard-control-center/src/App.jsx,dashboard-control-center/src/dashboardData.js,dashboard-control-center/src/i18n.js,dashboard-control-center/src/styles.css,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+Current Status:
+
+- [x] Approved as optional P2 refactoring work.
+- [ ] Defer until decision projection, rendering, and visual fit are stable.
+- [ ] Extract reusable components only when behavior-preserving and test-covered.
+- [ ] Preserve routes, data ownership, i18n, design-system authority, and test expectations.
+
+Next Step:
+
+- Keep pending until feature behavior is stable enough that extraction reduces maintenance risk instead of adding churn.

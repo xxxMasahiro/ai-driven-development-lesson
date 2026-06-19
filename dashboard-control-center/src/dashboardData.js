@@ -58,6 +58,14 @@ const PRODUCT_HEAD_PATTERN = /^(none|[a-f0-9]{40}|[a-f0-9]{64})$/;
 const LIVE_CHECK_KEYS = ["local_tests", "git_sync", "ci", "security"];
 const LIVE_DETAIL_PAGES = new Set(["#workflow", "#maintenance", "#safety", "#repository-info", "#documents", "#history", "#help"]);
 const CI_HEAD_MATCH_STATES = new Set(["matched", "different", "unknown"]);
+const DECISION_PAGE_IDS = new Set(["overview", "lessons", "workflow", "maintenance", "safety", "repository-info", "documents", "settings", "history"]);
+const DECISION_PAGE_TARGETS = new Set(["#overview", "#lessons", "#workflow", "#maintenance", "#safety", "#repository-info", "#documents", "#settings", "#history"]);
+const DECISION_AUDIENCES = new Set(["non_engineer", "junior_engineer"]);
+const DECISION_OWNER_SOURCES = new Set(["dashboard-data", "product-authority", "git-workflow", "repository-development-workflow"]);
+const DECISION_COMMAND_EXECUTION_MODES = new Set(["preview_only"]);
+const REPOSITORY_DEVELOPMENT_PHASES = new Set(["context_triage", "proposal", "implementation_plan", "fast_loop", "mid_tests", "release_gate", "main_sync_cleanup"]);
+const REPOSITORY_DEVELOPMENT_RUNNER_RECORD_STATUSES = new Set(["missing", "current", "stale"]);
+const CI_EVIDENCE_ROLES = new Set(["branch_ci", "pr_ci", "main_ci", "local_tests", "provider_visibility"]);
 const DOCUMENT_AUDIENCES = new Set(["non_engineer", "engineer", "all"]);
 const DOCUMENT_RELATED_PAGES = new Set(["#documents", "#maintenance", "#workflow", "#safety", "#repository-info", "#history"]);
 const SETTING_SCOPES = new Set(["selected_context", "learning", "workflow", "security", "repository", "dashboard"]);
@@ -987,6 +995,326 @@ function validateWorkflowEvidenceRows(development) {
   }
 }
 
+function validateEvidenceSourceFields(row, label) {
+  if (!ALLOWED_STATES.has(displayText(row.status, ""))) {
+    throw new Error(`${label} status is invalid`);
+  }
+  if (!EVIDENCE_AUTHORITIES.has(displayText(row.authority, ""))) {
+    throw new Error(`${label} authority is invalid`);
+  }
+  if (!EVIDENCE_FRESHNESS_STATES.has(displayText(row.freshness_state, ""))) {
+    throw new Error(`${label} freshness_state is invalid`);
+  }
+}
+
+function validateOperationalDecision(data) {
+  if (data.operational_decision === undefined || data.operational_decision === null) {
+    return;
+  }
+  const decision = asObject(data.operational_decision, "dashboard operational decision");
+  assertAllowedKeys(
+    decision,
+    new Set([
+      "status",
+      "decision_question",
+      "primary_blocker_source_id",
+      "why_blocked",
+      "next_safe_action",
+      "done_condition",
+      "approval_boundary",
+      "risk_level",
+      "freshness_state",
+      "authority",
+      "source_id",
+      "audience_briefs",
+      "command_execution_mode",
+    ]),
+    "dashboard operational decision",
+  );
+  validateEvidenceSourceFields(decision, "dashboard operational decision");
+  if (!RISK_LEVELS.has(displayText(decision.risk_level, ""))) {
+    throw new Error("dashboard operational decision risk_level is invalid");
+  }
+  if (!DECISION_COMMAND_EXECUTION_MODES.has(displayText(decision.command_execution_mode, ""))) {
+    throw new Error("dashboard operational decision command execution mode must be preview_only");
+  }
+  for (const key of ["decision_question", "primary_blocker_source_id", "why_blocked", "next_safe_action", "done_condition", "approval_boundary", "source_id"]) {
+    if (!displayText(decision[key], "")) {
+      throw new Error(`dashboard operational decision ${key} is missing`);
+    }
+  }
+  const audienceBriefs = asObject(decision.audience_briefs, "dashboard operational decision audience briefs");
+  assertAllowedKeys(audienceBriefs, DECISION_AUDIENCES, "dashboard operational decision audience briefs");
+  for (const audience of DECISION_AUDIENCES) {
+    if (!displayText(audienceBriefs[audience], "")) {
+      throw new Error(`dashboard operational decision audience brief is missing: ${audience}`);
+    }
+  }
+}
+
+function validateDecisionPages(data) {
+  if (data.decision_pages === undefined || data.decision_pages === null) {
+    return;
+  }
+  const pages = asArray(data.decision_pages);
+  if (pages.length < DECISION_PAGE_IDS.size) {
+    throw new Error("dashboard decision pages must cover all primary pages");
+  }
+  const seen = new Set();
+  for (const page of pages) {
+    if (!page || typeof page !== "object" || Array.isArray(page)) {
+      throw new Error("dashboard decision page must be an object");
+    }
+    assertAllowedKeys(
+      page,
+      new Set([
+        "id",
+        "title",
+        "scope",
+        "audiences",
+        "status",
+        "decision_question",
+        "current_judgment",
+        "top_reason",
+        "evidence_confidence",
+        "must_review",
+        "next_safe_action",
+        "detail_page",
+        "owner_source",
+        "source_id",
+        "authority",
+        "freshness_state",
+        "risk_level",
+        "command_execution_mode",
+      ]),
+      "dashboard decision page",
+    );
+    const pageId = displayText(page.id, "");
+    if (!DECISION_PAGE_IDS.has(pageId)) {
+      throw new Error(`dashboard decision page id is invalid: ${pageId}`);
+    }
+    if (seen.has(pageId)) {
+      throw new Error(`dashboard decision page id is duplicated: ${pageId}`);
+    }
+    seen.add(pageId);
+    for (const key of ["title", "scope", "decision_question", "current_judgment", "top_reason", "evidence_confidence", "next_safe_action", "source_id"]) {
+      if (!displayText(page[key], "")) {
+        throw new Error(`dashboard decision page ${pageId}.${key} is missing`);
+      }
+    }
+    validateEvidenceSourceFields(page, `dashboard decision page ${pageId}`);
+    if (!RISK_LEVELS.has(displayText(page.risk_level, ""))) {
+      throw new Error(`dashboard decision page ${pageId} risk_level is invalid`);
+    }
+    if (!DECISION_COMMAND_EXECUTION_MODES.has(displayText(page.command_execution_mode, ""))) {
+      throw new Error(`dashboard decision page ${pageId} command execution mode must be preview_only`);
+    }
+    const ownerSource = displayText(page.owner_source, "");
+    if (ownerSource === "ui" || !DECISION_OWNER_SOURCES.has(ownerSource)) {
+      throw new Error(`dashboard decision page ${pageId} owner_source is invalid`);
+    }
+    const detailPage = displayText(page.detail_page, "");
+    if (!DECISION_PAGE_TARGETS.has(detailPage) || detailPage !== `#${pageId}`) {
+      throw new Error(`dashboard decision page ${pageId} detail_page is invalid`);
+    }
+    const audiences = new Set(asArray(page.audiences).map((audience) => displayText(audience, "")));
+    for (const audience of audiences) {
+      if (!DECISION_AUDIENCES.has(audience)) {
+        throw new Error(`dashboard decision page ${pageId} audience is invalid: ${audience}`);
+      }
+    }
+    for (const requiredAudience of DECISION_AUDIENCES) {
+      if (!audiences.has(requiredAudience)) {
+        throw new Error(`dashboard decision page ${pageId} is missing audience: ${requiredAudience}`);
+      }
+    }
+    const mustReview = asArray(page.must_review);
+    if (!mustReview.length || mustReview.some((item) => !displayText(item, ""))) {
+      throw new Error(`dashboard decision page ${pageId} must_review is invalid`);
+    }
+  }
+  for (const pageId of DECISION_PAGE_IDS) {
+    if (!seen.has(pageId)) {
+      throw new Error(`dashboard decision pages are missing ${pageId}`);
+    }
+  }
+}
+
+function validateRepositoryChanges(development) {
+  if (development.repository_changes === undefined || development.repository_changes === null) {
+    return;
+  }
+  const changes = asObject(development.repository_changes, "dashboard repository changes");
+  assertAllowedKeys(
+    changes,
+    new Set([
+      "status",
+      "observed_at",
+      "path_state",
+      "git_state",
+      "branch",
+      "head",
+      "upstream",
+      "main_target",
+      "detached",
+      "staged_count",
+      "unstaged_count",
+      "untracked_count",
+      "ahead",
+      "behind",
+      "worktree_count",
+      "changed_role_counts",
+      "safe_changed_file_samples",
+      "stale_reason",
+    ]),
+    "dashboard repository changes",
+  );
+  if (!ALLOWED_STATES.has(displayText(changes.status, ""))) {
+    throw new Error("dashboard repository changes status is invalid");
+  }
+  if (!REPOSITORY_PATH_STATES.has(displayText(changes.path_state, "")) || !REPOSITORY_PATH_STATES.has(displayText(changes.git_state, ""))) {
+    throw new Error("dashboard repository changes path or Git state is invalid");
+  }
+  if (!displayText(changes.observed_at, "") || !displayText(changes.stale_reason, "")) {
+    throw new Error("dashboard repository changes observation fields are missing");
+  }
+  if (typeof changes.detached !== "boolean") {
+    throw new Error("dashboard repository changes detached must be boolean");
+  }
+  for (const key of ["staged_count", "unstaged_count", "untracked_count", "ahead", "behind", "worktree_count"]) {
+    validateNonNegativeInteger(changes[key], `dashboard repository changes ${key}`);
+  }
+  const roleCounts = asObject(changes.changed_role_counts, "dashboard repository changes role counts");
+  assertAllowedKeys(roleCounts, new Set(["staged", "unstaged", "untracked"]), "dashboard repository changes role counts");
+  for (const key of ["staged", "unstaged", "untracked"]) {
+    validateNonNegativeInteger(roleCounts[key], `dashboard repository changes role count ${key}`);
+  }
+  if (roleCounts.staged !== changes.staged_count || roleCounts.unstaged !== changes.unstaged_count || roleCounts.untracked !== changes.untracked_count) {
+    throw new Error("dashboard repository changes role counts must match top-level counts");
+  }
+  for (const sample of asArray(changes.safe_changed_file_samples)) {
+    if (!safeRelativePath(sample)) {
+      throw new Error(`dashboard repository changes sample path is unsafe: ${displayText(sample, "")}`);
+    }
+  }
+}
+
+function validateRepositoryDevelopment(development) {
+  if (development.repository_development === undefined || development.repository_development === null) {
+    return;
+  }
+  const repositoryDevelopment = asObject(development.repository_development, "dashboard repository development workflow");
+  assertAllowedKeys(
+    repositoryDevelopment,
+    new Set([
+      "current_phase",
+      "phase_order",
+      "inference_reason",
+      "purpose",
+      "required_inputs",
+      "allowed_writes",
+      "recommended_checks",
+      "required_checks",
+      "git_ci_expectations",
+      "required_approvals",
+      "cleanup_behavior",
+      "stop_conditions",
+      "runner_records_status",
+      "source_files",
+    ]),
+    "dashboard repository development workflow",
+  );
+  if (!REPOSITORY_DEVELOPMENT_PHASES.has(displayText(repositoryDevelopment.current_phase, ""))) {
+    throw new Error("dashboard repository development phase is invalid");
+  }
+  validateNonNegativeInteger(repositoryDevelopment.phase_order, "dashboard repository development phase_order");
+  if (!REPOSITORY_DEVELOPMENT_RUNNER_RECORD_STATUSES.has(displayText(repositoryDevelopment.runner_records_status, ""))) {
+    throw new Error("dashboard repository development runner_records_status is invalid");
+  }
+  for (const key of ["inference_reason", "purpose", "required_inputs", "allowed_writes", "recommended_checks", "required_checks", "git_ci_expectations", "required_approvals", "cleanup_behavior", "stop_conditions"]) {
+    if (!displayText(repositoryDevelopment[key], "")) {
+      throw new Error(`dashboard repository development ${key} is missing`);
+    }
+  }
+  const sourceFiles = asArray(repositoryDevelopment.source_files);
+  if (!sourceFiles.length) {
+    throw new Error("dashboard repository development source_files is missing");
+  }
+  for (const sourceFile of sourceFiles) {
+    if (!safeRelativePath(sourceFile)) {
+      throw new Error(`dashboard repository development source file is unsafe: ${displayText(sourceFile, "")}`);
+    }
+  }
+}
+
+function validateWorkflowEvidenceEvents(development) {
+  if (development.workflow_evidence_events === undefined || development.workflow_evidence_events === null) {
+    return;
+  }
+  const events = asArray(development.workflow_evidence_events);
+  if (events.length < 5) {
+    throw new Error("dashboard workflow evidence events must include core evidence roles");
+  }
+  const seen = new Set();
+  for (const event of events) {
+    if (!event || typeof event !== "object" || Array.isArray(event)) {
+      throw new Error("dashboard workflow evidence event must be an object");
+    }
+    assertAllowedKeys(event, new Set(["event_id", "source_id", "observed_at", "repository_head", "status", "freshness_state", "authority", "detail_artifact_path", "summary"]), "dashboard workflow evidence event");
+    for (const key of ["event_id", "source_id", "observed_at", "repository_head", "detail_artifact_path", "summary"]) {
+      if (!displayText(event[key], "")) {
+        throw new Error(`dashboard workflow evidence event ${key} is missing`);
+      }
+    }
+    const eventId = displayText(event.event_id, "");
+    if (seen.has(eventId)) {
+      throw new Error(`dashboard workflow evidence event is duplicated: ${eventId}`);
+    }
+    seen.add(eventId);
+    validateEvidenceSourceFields(event, `dashboard workflow evidence event ${eventId}`);
+    const artifactPath = displayText(event.detail_artifact_path, "");
+    if (artifactPath !== "not_collected" && !safeScopedRelativePath(artifactPath)) {
+      throw new Error(`dashboard workflow evidence event ${eventId} detail_artifact_path is unsafe`);
+    }
+  }
+}
+
+function validateCiEvidence(development) {
+  if (development.ci_evidence === undefined || development.ci_evidence === null) {
+    return;
+  }
+  const evidenceRows = asArray(development.ci_evidence);
+  const seen = new Set();
+  for (const row of evidenceRows) {
+    if (!row || typeof row !== "object" || Array.isArray(row)) {
+      throw new Error("dashboard CI evidence row must be an object");
+    }
+    assertAllowedKeys(row, new Set(["role", "status", "source_id", "head_match_status", "authority", "freshness_state", "summary", "observed_at"]), "dashboard CI evidence row");
+    const role = displayText(row.role, "");
+    if (!CI_EVIDENCE_ROLES.has(role)) {
+      throw new Error(`dashboard CI evidence role is invalid: ${role}`);
+    }
+    if (seen.has(role)) {
+      throw new Error(`dashboard CI evidence role is duplicated: ${role}`);
+    }
+    seen.add(role);
+    validateEvidenceSourceFields(row, `dashboard CI evidence row ${role}`);
+    if (!CI_HEAD_MATCH_STATES.has(displayText(row.head_match_status, ""))) {
+      throw new Error(`dashboard CI evidence row ${role} head_match_status is invalid`);
+    }
+    for (const key of ["source_id", "summary", "observed_at"]) {
+      if (!displayText(row[key], "")) {
+        throw new Error(`dashboard CI evidence row ${role}.${key} is missing`);
+      }
+    }
+  }
+  for (const role of CI_EVIDENCE_ROLES) {
+    if (!seen.has(role)) {
+      throw new Error(`dashboard CI evidence is missing role: ${role}`);
+    }
+  }
+}
+
 function validateDocuments(data) {
   if (data.documents === undefined || data.documents === null) {
     return;
@@ -1788,8 +2116,14 @@ export function validateDashboardData(data) {
   validateSelectedContext(data);
   validateRepositorySelection(data);
   validatePartialFailureScope(data);
+  validateOperationalDecision(data);
+  validateDecisionPages(data);
   validateOperationRows(data.development);
   validateWorkflowEvidenceRows(data.development);
+  validateRepositoryChanges(data.development);
+  validateRepositoryDevelopment(data.development);
+  validateWorkflowEvidenceEvents(data.development);
+  validateCiEvidence(data.development);
   validateProductRepository(data.development);
   validateProductAuthority(data.development);
   validateRepositoryScope(data);

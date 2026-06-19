@@ -3468,6 +3468,46 @@ function DetailDecisionSummary({ tone, items, t }) {
   );
 }
 
+function decisionPageFor(data, pageId) {
+  return asArray(data?.decision_pages).find((page) => displayText(page?.id, "") === pageId) || null;
+}
+
+function decisionToneForStatus(status) {
+  const state = normalizeState(status);
+  if (state === "ready" || state === "passed" || state === "not_applicable") {
+    return "ready";
+  }
+  if (state === "blocked" || state === "failed") {
+    return "danger";
+  }
+  return "warning";
+}
+
+function ProducerDecisionSummary({ data, pageId, tone = "sidebar", t }) {
+  const decision = decisionPageFor(data, pageId);
+  if (!decision) {
+    return null;
+  }
+  const state = normalizeState(decision.status);
+  const StateIcon = stateIcons[state] || CircleHelp;
+  const mustReview = asArray(decision.must_review).map((item) => displayText(item, "")).filter(Boolean);
+  const evidenceConfidence = displayText(decision.evidence_confidence, "");
+  const ownerSource = displayText(decision.owner_source, "");
+  const commandMode = displayText(decision.command_execution_mode, "");
+  return (
+    <DetailDecisionSummary
+      tone={tone}
+      t={t}
+      items={[
+        { Icon: Target, label: t("detail.checks"), value: displayText(decision.decision_question), detail: displayText(decision.scope, "") },
+        { Icon: StateIcon, label: t("detail.currentJudgment"), value: displayText(decision.current_judgment), detail: displayText(decision.top_reason), badge: statusLabelForChip(state, t), tone: decisionToneForStatus(state) },
+        { Icon: Eye, label: t("detail.mustReview"), points: mustReview.length ? mustReview : [t("detail.noRequiredReview")], detail: evidenceConfidence },
+        { Icon: ArrowRightCircle, label: t("detail.nextSafeCheck"), value: displayText(decision.next_safe_action), detail: [ownerSource, commandMode].filter(Boolean).join(" / ") },
+      ]}
+    />
+  );
+}
+
 function SummaryBullets({ items }) {
   const visibleItems = asArray(items).filter((item) => displayText(item, ""));
   if (!visibleItems.length) {
@@ -3877,6 +3917,7 @@ function OverviewSection({ data, t, locale, activeMenuId, pendingMenuId, onActiv
       <PageTitleHeader viewId="overview" Icon={Home} title={t("nav.overview")} subtitle={t("overview.subtitle")} data={data} locale={locale} t={t} actionLabel={t("detail.refreshDisplayOnly")} headingId="overview-heading" />
       <MenuTileStrip data={data} t={t} activeMenuId={activeMenuId} pendingMenuId={pendingMenuId} onActiveMenuChange={onActiveMenuChange} />
       <ContextSnapshotStrip data={data} t={t} locale={locale} />
+      <ProducerDecisionSummary data={data} pageId="overview" tone="sidebar" t={t} />
       <RepositorySelectionPanel selection={repositorySelection} t={t} />
       <section className="overview-status-grid" aria-label={t("overview.currentStatus")}>
         <OverviewStatusCard
@@ -4365,6 +4406,7 @@ function LessonSection({ lessons, data, locale, t }) {
       <section className="view-surface view-surface--lessons" id="lessons" aria-labelledby="lesson-heading">
         <PageTitleHeader viewId="lessons" Icon={BookOpen} title={t("lessons.title")} subtitle={t("lessons.description")} data={data} locale={locale} t={t} actionLabel={t("lesson.snapshotButton")} headingId="lesson-heading" />
         <ContextSnapshotStrip data={data} t={t} locale={locale} variant="workflow" />
+        <ProducerDecisionSummary data={data} pageId="lessons" tone="lessons" t={t} />
         <SidebarPageCard
           Icon={WorkflowCategoryIcon}
           title={t("lessons.notLessonTitle")}
@@ -4383,6 +4425,7 @@ function LessonSection({ lessons, data, locale, t }) {
     <section className="view-surface view-surface--lessons" id="lessons" aria-labelledby="lesson-heading">
       <PageTitleHeader viewId="lessons" Icon={BookOpen} title={t("lessons.title")} subtitle={t("lessons.description")} data={data} locale={locale} t={t} actionLabel={t("lesson.snapshotButton")} headingId="lesson-heading" />
       <ContextSnapshotStrip data={data} t={t} locale={locale} variant="lessons" />
+      <ProducerDecisionSummary data={data} pageId="lessons" tone="lessons" t={t} />
       <DetailDecisionSummary
         tone="lessons"
         t={t}
@@ -4432,6 +4475,7 @@ function WorkflowSection({ development, gitWorkflow, data, locale, t, liveStatus
     <section className="view-surface view-surface--workflow" id="workflow" aria-labelledby="workflow-heading">
       <PageTitleHeader viewId="workflow" Icon={WorkflowCategoryIcon} title={t("workflow.title")} subtitle={t("workflow.description")} data={data} locale={locale} t={t} actionLabel={t("detail.refreshDisplayOnly")} headingId="workflow-heading" />
       <ContextSnapshotStrip data={data} t={t} locale={locale} variant="workflow" />
+      <ProducerDecisionSummary data={data} pageId="workflow" tone="workflow" t={t} />
       <DetailDecisionSummary
         tone="workflow"
         t={t}
@@ -4738,6 +4782,7 @@ function MaintenanceSection({ maintenance, data, locale, t, liveStatus }) {
     <section className="view-surface view-surface--maintenance" id="maintenance" aria-labelledby="maintenance-heading">
       <PageTitleHeader viewId="maintenance" Icon={RefreshCw} title={t("maintenance.title")} subtitle={t("maintenance.description")} data={data} locale={locale} t={t} actionLabel={t("detail.refreshMaintenance")} headingId="maintenance-heading" />
       <ContextSnapshotStrip data={data} t={t} locale={locale} variant="maintenance" />
+      <ProducerDecisionSummary data={data} pageId="maintenance" tone="maintenance" t={t} />
       <DetailDecisionSummary
         tone="maintenance"
         t={t}
@@ -4927,6 +4972,7 @@ function SecuritySection({ security, partialFailures, data, locale, t, liveStatu
     <div className="safety-primary">
       <PageTitleHeader viewId="safety" Icon={ShieldCheck} title={t("security.title")} subtitle={t("security.description")} data={data} locale={locale} t={t} actionLabel={t("detail.refreshDisplayOnly")} headingId="security-heading" />
       <ContextSnapshotStrip data={data} t={t} locale={locale} variant="safety" />
+      <ProducerDecisionSummary data={data} pageId="safety" tone="safety" t={t} />
       <DetailDecisionSummary
         tone="safety"
         t={t}
@@ -6094,6 +6140,7 @@ function RepositoryInfoPage({ data, locale, t, liveStatus }) {
   return (
     <section className="view-surface view-surface--repository-info sidebar-page" id="repository-info" aria-labelledby="repository-info-heading">
       <DetailPageHeader tone="repository-info" Icon={Info} title={t("repositoryInfo.title")} subtitle={t("repositoryInfo.description")} data={data} locale={locale} t={t} actionLabel={t("detail.refreshDisplayOnly")} headingId="repository-info-heading" />
+      <ProducerDecisionSummary data={data} pageId="repository-info" tone="sidebar" t={t} />
       <DetailDecisionSummary
         tone="sidebar"
         t={t}
@@ -6149,6 +6196,7 @@ function DocumentsPage({ data, locale, t }) {
   return (
     <section className="view-surface view-surface--documents sidebar-page" id="documents" aria-labelledby="documents-heading">
       <DetailPageHeader tone="documents" Icon={FileText} title={t("documentsPage.title")} subtitle={t("documentsPage.description")} data={data} locale={locale} t={t} actionLabel={t("detail.refreshDisplayOnly")} headingId="documents-heading" />
+      <ProducerDecisionSummary data={data} pageId="documents" tone="sidebar" t={t} />
       <DetailDecisionSummary
         tone="sidebar"
         t={t}
@@ -7702,6 +7750,7 @@ function SettingsPage({ data, locale, t, onRefreshSnapshot }) {
   return (
     <section className="view-surface view-surface--settings sidebar-page" id="settings" aria-labelledby="settings-heading">
       <DetailPageHeader tone="settings" Icon={Settings} title={t("settingsPage.title")} subtitle={t("settingsPage.description")} data={data} locale={locale} t={t} actionLabel={t("detail.refreshDisplayOnly")} headingId="settings-heading" />
+      <ProducerDecisionSummary data={data} pageId="settings" tone="sidebar" t={t} />
       <DetailDecisionSummary
         tone="sidebar"
         t={t}
@@ -8307,6 +8356,7 @@ function HistoryPage({ data, locale, t }) {
   return (
     <section className="view-surface view-surface--history sidebar-page" id="history" aria-labelledby="history-heading">
       <DetailPageHeader tone="history" Icon={Clock} title={t("historyPage.title")} subtitle={t("historyPage.description")} data={data} locale={locale} t={t} actionLabel={t("detail.refreshDisplayOnly")} headingId="history-heading" />
+      <ProducerDecisionSummary data={data} pageId="history" tone="sidebar" t={t} />
       <DetailDecisionSummary
         tone="sidebar"
         t={t}

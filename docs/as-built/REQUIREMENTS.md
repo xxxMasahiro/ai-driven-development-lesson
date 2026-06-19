@@ -2215,3 +2215,126 @@ Requirements:
 - The state must support both subscription-agent and API-agent workflows by showing local evidence packet and ingest/report stages without depending on a single provider.
 - The handoff evidence must remain additive; it must not change Git, CI, product authority, release readiness, existing maintenance status, Browser Debug findings, or existing dashboard routes.
 - The implementation must keep lesson-specific Dashboard Control Center semantics in this repository and leave Browser Debug CLI generic.
+
+## Dashboard Control Center Operational Decision Evidence Requirements
+
+SYNC-ID: dashboard_control_center_operational_decision_evidence
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/DASHBOARD_DATA_SCHEMA.tsv,tools/lib/dashboard_data.sh,tools/dashboard-data,dashboard-control-center/src/dashboardData.js,dashboard-control-center/src/App.jsx,tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/test_dashboard_control_center.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/test_dashboard_control_center.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+Dashboard Control Center publishes an operational decision layer that answers the user's immediate development question without requiring them to interpret raw CLI output.
+`tools/dashboard-data` produces the current decision, reason, evidence confidence, blocker, and next safe action; React renders those facts and does not invent operational truth from labels or copy.
+
+Requirements:
+
+- Publish producer-owned `operational_decision` data for the selected context and repository, including status, primary blocker source, why it matters, next safe action, done condition, approval boundary, and audience briefs for non-engineers and junior engineers.
+- Publish typed Git, worktree, repository change, workflow phase, runner-record freshness, and CI/test evidence as structured data with source IDs, authority, freshness, and safe display text.
+- Separate authoritative stored evidence from advisory live lookup so the UI never presents policy readiness, stale records, or network availability as proof of completion.
+- Give every primary Control Center page the same decision contract: scope, current judgment, top reason, evidence confidence, next safe action, and technical drilldown.
+- Keep command previews display-only and keep push, PR creation, merge, main CI waiting, cleanup, external product writes, OAuth, credentials, and browser-side command execution outside this sync.
+- Preserve STEP 1-7, STEP 1-14, existing CI, existing checks, existing document routes, existing Dashboard routes, and all product authority semantics.
+
+Non-scope:
+
+- Do not run or wait for GitHub Actions from ordinary Dashboard data generation.
+- Do not add browser-triggered repository mutation, product evidence collection, approval writes, cleanup, push, PR creation, merge, or main-sync execution.
+- Do not encode FrameCue, Browser Debug CLI, task-tracker, or any single product repository as a permanent implementation requirement.
+
+## Planned Product Authority Evidence Source Completion Requirements
+
+SYNC-ID: product_authority_evidence_source_completion
+STATUS: planned
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/DASHBOARD_DATA_SCHEMA.tsv,docs/workflow/PRODUCT_GATE_EVIDENCE_SCHEMA.tsv,tools/lib/product_repository_authority.sh,tools/product-repository-authority,tools/product-gate-evidence-bootstrap,tools/test_product_repository_authority.sh,tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_product_repository_authority.sh,tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+Product authority evidence must be complete enough for Dashboard decisions to cite source-owned facts instead of UI inference.
+The product authority layer must publish source IDs, freshness, authority, product HEAD, detail artifact references, blockers, risk, and next safe action consistently for product documents, Git, tests, CI, Security, and repository structure evidence.
+It must not grant Dashboard data generation new external network authority, product mutation authority, or browser-triggered evidence collection.
+
+Non-scope:
+
+- Do not change existing product operation semantics, scaffold rules, Git usage mode rules, evidence source vocabulary compatibility, or product-local AGENTS.MD boundaries.
+- Do not treat stale, missing, advisory, or head-mismatched evidence as release proof.
+- Do not store secret-like values, raw credentials, private messages, or unsafe absolute paths in fixtures, logs, browser data, or product authority output.
+
+## Planned Dashboard Control Center Decision Projection Requirements
+
+SYNC-ID: dashboard_control_center_decision_projection
+STATUS: planned
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/DASHBOARD_DATA_SCHEMA.tsv,tools/lib/dashboard_data.sh,tools/dashboard-data,dashboard-control-center/src/dashboardData.js,tests/fixtures/dashboard-control-center.json,tests/fixtures/dashboard-control-center-live-update.json,tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+Dashboard data must project product authority, repository-development workflow, Git/worktree state, diff state, local test state, CI evidence, and blocker state into one producer-owned decision model.
+The model must tell non-engineers what is happening now and tell junior/intermediate engineers which evidence supports the next development decision.
+React may render this model but must not compute readiness from labels, route names, local UI state, or copied CLI wording.
+
+Non-scope:
+
+- Do not run GitHub Actions, poll GitHub, mutate repositories, write approvals, or collect product evidence from ordinary Dashboard data generation.
+- Do not remove existing Dashboard schema compatibility for older snapshots.
+- Do not hard-code FrameCue, Browser Debug CLI, task-tracker, branch names, or product stacks as permanent behavior.
+
+## Planned Dashboard Control Center Decision Page Rendering Requirements
+
+SYNC-ID: dashboard_control_center_decision_page_rendering
+STATUS: planned
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/DASHBOARD_DATA_SCHEMA.tsv,dashboard-control-center/src/App.jsx,dashboard-control-center/src/dashboardData.js,dashboard-control-center/src/i18n.js,tests/fixtures/dashboard-control-center.json,tests/fixtures/dashboard-control-center-live-update.json,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+Every primary Control Center page must render the producer-owned decision model in a way that answers: current judgment, top blocker or reason, supporting evidence, next safe action, and technical drilldown target.
+The overview must serve non-engineers, while detail pages must preserve enough evidence identity and context for junior/intermediate engineers to decide whether implementation, repair, test, Git sync, CI, or approval work is next.
+Command previews must remain display/copy references only.
+
+Non-scope:
+
+- Do not add browser command execution, repository writes, Git operations, CI waiting, approval mutation, cleanup, provider API calls, or credential handling.
+- Do not make React the authority for readiness, freshness, risk, or blocker semantics.
+- Do not trade off existing Dashboard routes, i18n, Settings behavior, Browser Debug handoff, repository selection, or existing Playwright coverage.
+
+## Planned Dashboard Control Center Density And Mobile CSS Refinement Requirements
+
+SYNC-ID: dashboard_control_center_density_mobile_css_refinement
+STATUS: planned
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/design-system/dashboard-control-center/DESIGN_SYSTEM.md,docs/design-system/dashboard-control-center/tokens.json,docs/design-system/dashboard-control-center/components.json,dashboard-control-center/src/design-system.generated.css,dashboard-control-center/src/design-system.generated.js,dashboard-control-center/src/App.jsx,dashboard-control-center/src/styles.css,tests/playwright/dashboard-control-center.spec.js,tools/check_dashboard_design_system.sh,tools/test_dashboard_control_center.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/check_dashboard_design_system.sh,tools/test_dashboard_control_center.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+Decision-heavy Dashboard pages must remain scannable on desktop and mobile without overlapping text, clipped controls, nested-card clutter, or one-off CSS exceptions.
+Shared visual behavior must be changed through the Dashboard design-system source and generated runtime path; handwritten CSS may cover only page-specific layout glue that respects the source tokens and components.
+
+Non-scope:
+
+- Do not directly edit generated design-system CSS/JS as source.
+- Do not introduce a new visual theme, new dependency, marketing-style landing page, or page-specific styling that bypasses the design-system contract.
+- Do not reduce existing page density, route coverage, accessibility, i18n, or mobile behavior to make the new decision surfaces fit.
+
+## Planned Dashboard Control Center Package And CI Verification Wiring Requirements
+
+SYNC-ID: dashboard_control_center_package_ci_verification_wiring
+STATUS: planned
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/TEST_PLAN_MANIFEST.tsv,docs/workflow/GIT_HOOK_CHECKS.tsv,docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv,docs/workflow/FINAL_GATE_COVERAGE.tsv,package.json,package-lock.json,.github/workflows/ci.yml,.github/workflows/lesson14-ci.yml,tools/check_ci_workflow_structure.sh,tools/check_test_plan_coverage.sh,tools/test_dashboard_control_center.sh,tools/test_lesson_repository.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/check_ci_workflow_structure.sh,tools/check_test_plan_coverage.sh,tools/test_test_plan.sh,tools/test_git_hooks.sh,tools/test_git_hooks_parallel.sh,tools/test_ci_final_gate.sh,tools/test_dashboard_control_center.sh,tools/test_lesson_repository.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+Package scripts and CI workflow wiring must change only if the decision projection or page rendering work creates a real verification gap that existing standalone and aggregate checks cannot cover.
+If needed, the wiring must keep Dashboard checks standalone-callable, aggregate-callable, hook-callable, and CI-callable without weakening final gates, required CI names, Lesson14 compatibility, or release proof boundaries.
+
+Non-scope:
+
+- Do not add dependencies, change package scripts, or edit CI workflows unless an implemented owner-layer change requires it.
+- Do not make changed-only, cached, runner-record, or advisory evidence authoritative release proof.
+- Do not rename required CI checks, remove existing tests, reduce full/no-cache coverage, or introduce one-off CI behavior for a single product repository.
+
+## Planned Dashboard Control Center Component Module Extraction Requirements
+
+SYNC-ID: dashboard_control_center_component_module_extraction
+STATUS: planned
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,dashboard-control-center/src/App.jsx,dashboard-control-center/src/dashboardData.js,dashboard-control-center/src/i18n.js,dashboard-control-center/src/styles.css,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+App.jsx may be split into reusable Dashboard page and evidence components only after the decision rendering behavior is stable enough that extraction is behavior-preserving.
+The extraction must reduce future maintenance cost without changing routes, text meaning, readiness decisions, data validation, styling authority, or test expectations.
+
+Non-scope:
+
+- Do not perform cosmetic churn, rename-only churn, route rewrites, dependency changes, or design-system bypasses under the extraction sync.
+- Do not use module extraction to change product authority, Dashboard data production, Git/CI behavior, Settings authority, or Browser Debug handoff semantics.

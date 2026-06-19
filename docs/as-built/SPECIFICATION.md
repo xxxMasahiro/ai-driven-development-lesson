@@ -2654,3 +2654,118 @@ Boundary:
 
 - Dashboard Control Center remains a read-only observer.
 - Browser Debug CLI remains the generic review engine and receives Dashboard-specific meaning through the lesson-owned manifest and handoff artifacts.
+
+## Dashboard Control Center Operational Decision Evidence Specification
+
+SYNC-ID: dashboard_control_center_operational_decision_evidence
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/DASHBOARD_DATA_SCHEMA.tsv,tools/lib/dashboard_data.sh,tools/dashboard-data,dashboard-control-center/src/dashboardData.js,dashboard-control-center/src/App.jsx,tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/test_dashboard_control_center.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/test_dashboard_control_center.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+The data model adds a producer-owned decision layer above the existing Dashboard data model.
+It is additive: existing status vocabulary, product authority evidence rows, repository selection data, Browser Debug handoff data, and dashboard routes remain valid.
+
+Implemented data surfaces:
+
+- `operational_decision`: status, decision question, primary blocker source ID, reason, next safe action, done condition, approval boundary, risk level, freshness state, authority, and audience briefs.
+- `decision_pages[]`: one normalized page contract per primary Control Center page, with scope, current judgment, top reason, evidence confidence, next safe action, detail target, owner source, and command execution mode set to preview-only.
+- `repository_changes`: branch, head, upstream, main target, staged/unstaged/untracked counts, safe changed-file role counts, ahead/behind, detached state, worktree count, and stale reason.
+- `workflow_evidence_events[]`: normalized event view sourced from evidence ledgers or detail artifacts, including observed time, repository head, source ID, status, authority, freshness, and safe detail artifact path.
+- `repository_development`: current or inferred phase, inference reason, allowed writes, required approvals, Git/CI expectations, cleanup behavior, stop conditions, and runner-record freshness.
+- `ci_evidence`: separate branch CI, PR CI, main CI, provider visibility, local test, and head-match states.
+
+Rendering contract:
+
+- Overview must answer whether work can continue, what blocks it, what evidence supports that judgment, and the next safe action.
+- Workflow must order repair steps across local changes, tests, Git sync, PR/merge readiness, CI, product evidence, and approval state.
+- Maintenance must show both collected snapshot evidence and live status, including stale or missing evidence.
+- Safety must resolve approvals, dangerous operations, partial failures, and policy into one active stop condition with a source.
+- Repository Info must show selected repository readiness before file or structure detail.
+- Documents must render audience and status source metadata so decision makers, implementers, and operators can find the right document.
+- History must show evidence confidence over time and identify pages that depend on stale evidence.
+
+Boundary:
+
+- Dashboard remains a read-only consumer and command-preview surface.
+- New checks must be standalone-callable and aggregate-callable.
+- Any design or layout change must go through the Dashboard design-system source and generated runtime path.
+
+## Planned Product Authority Evidence Source Completion Specification
+
+SYNC-ID: product_authority_evidence_source_completion
+STATUS: planned
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/DASHBOARD_DATA_SCHEMA.tsv,docs/workflow/PRODUCT_GATE_EVIDENCE_SCHEMA.tsv,tools/lib/product_repository_authority.sh,tools/product-repository-authority,tools/product-gate-evidence-bootstrap,tools/test_product_repository_authority.sh,tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_product_repository_authority.sh,tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+The product authority source-completion layer is an additive producer contract.
+It will normalize evidence rows into source-owned fields for source ID, status, authority, freshness, product HEAD, observed time, max age, detail artifact references, blockers, risk, next action, and safe display text.
+The layer will fail closed for missing, stale, advisory, head-mismatched, or malformed evidence and will expose those states as decision inputs rather than pass evidence.
+
+The source layer remains product-authority-owned.
+Dashboard data may consume it, but React and browser fixtures must not become authority sources.
+
+## Planned Dashboard Control Center Decision Projection Specification
+
+SYNC-ID: dashboard_control_center_decision_projection
+STATUS: planned
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/DASHBOARD_DATA_SCHEMA.tsv,tools/lib/dashboard_data.sh,tools/dashboard-data,dashboard-control-center/src/dashboardData.js,tests/fixtures/dashboard-control-center.json,tests/fixtures/dashboard-control-center-live-update.json,tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+`tools/dashboard-data` will own a normalized decision projection for Control Center pages.
+The projection will derive from product authority, repository-development workflow policy, Git/worktree inspection, changed-file summaries, local test evidence, CI evidence, and workflow evidence events.
+The schema will keep authority and freshness fields separate from status so stale, advisory, unknown, and unobserved states are not shown as proof.
+
+The browser data validator will accept legacy snapshots when optional decision fields are absent, but current producer snapshots and fixtures must satisfy the stricter decision contract.
+
+## Planned Dashboard Control Center Decision Page Rendering Specification
+
+SYNC-ID: dashboard_control_center_decision_page_rendering
+STATUS: planned
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/DASHBOARD_DATA_SCHEMA.tsv,dashboard-control-center/src/App.jsx,dashboard-control-center/src/dashboardData.js,dashboard-control-center/src/i18n.js,tests/fixtures/dashboard-control-center.json,tests/fixtures/dashboard-control-center-live-update.json,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+Primary pages will render a common decision surface from `decision_pages[]` and related producer evidence.
+The page contract is: scope, current judgment, top reason, evidence confidence, next safe action, and technical drilldown.
+Overview, Workflow, Maintenance, Safety, Repository Info, Documents, and History must preserve source IDs/current item IDs so a user can move from summary to evidence without losing context.
+
+Command chips remain previews.
+No page component may run commands, collect evidence, mutate approvals, call external services, or reinterpret source statuses.
+
+## Planned Dashboard Control Center Density And Mobile CSS Refinement Specification
+
+SYNC-ID: dashboard_control_center_density_mobile_css_refinement
+STATUS: planned
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/design-system/dashboard-control-center/DESIGN_SYSTEM.md,docs/design-system/dashboard-control-center/tokens.json,docs/design-system/dashboard-control-center/components.json,dashboard-control-center/src/design-system.generated.css,dashboard-control-center/src/design-system.generated.js,dashboard-control-center/src/App.jsx,dashboard-control-center/src/styles.css,tests/playwright/dashboard-control-center.spec.js,tools/check_dashboard_design_system.sh,tools/test_dashboard_control_center.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/check_dashboard_design_system.sh,tools/test_dashboard_control_center.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+The density/mobile refinement layer will use the Dashboard design-system source for shared tokens and component behavior.
+Generated design-system files remain artifacts generated from the source.
+Handwritten `styles.css` changes are limited to page-specific layout composition, responsive constraints, wrapping, and overflow prevention that cannot be expressed as shared source tokens.
+
+Playwright coverage will check the dashboard pages that carry the new decision surfaces on desktop and mobile when layout behavior changes.
+
+## Planned Dashboard Control Center Package And CI Verification Wiring Specification
+
+SYNC-ID: dashboard_control_center_package_ci_verification_wiring
+STATUS: planned
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/TEST_PLAN_MANIFEST.tsv,docs/workflow/GIT_HOOK_CHECKS.tsv,docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv,docs/workflow/FINAL_GATE_COVERAGE.tsv,package.json,package-lock.json,.github/workflows/ci.yml,.github/workflows/lesson14-ci.yml,tools/check_ci_workflow_structure.sh,tools/check_test_plan_coverage.sh,tools/test_dashboard_control_center.sh,tools/test_lesson_repository.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/check_ci_workflow_structure.sh,tools/check_test_plan_coverage.sh,tools/test_test_plan.sh,tools/test_git_hooks.sh,tools/test_git_hooks_parallel.sh,tools/test_ci_final_gate.sh,tools/test_dashboard_control_center.sh,tools/test_lesson_repository.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+Package and CI verification wiring is conditional.
+It will be used only when current standalone scripts, aggregate tests, hook rows, or CI workflow structure cannot prove the implemented Dashboard decision behavior.
+Any change must preserve existing package scripts, dependency lock integrity, required CI workflow names, final-gate coverage, Lesson14 compatibility, and full/no-cache semantics.
+
+The intended outcome is verification coverage, not a new runtime feature.
+
+## Planned Dashboard Control Center Component Module Extraction Specification
+
+SYNC-ID: dashboard_control_center_component_module_extraction
+STATUS: planned
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,dashboard-control-center/src/App.jsx,dashboard-control-center/src/dashboardData.js,dashboard-control-center/src/i18n.js,dashboard-control-center/src/styles.css,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+Component extraction is a behavior-preserving follow-up for `App.jsx`.
+Extraction may introduce reusable local modules only after the rendered decision behavior is stable and covered.
+The extracted components must keep the same props/data ownership, i18n keys, routes, status rendering, and visual contract.
+
+This sync must not become a feature change, route rewrite, CSS redesign, dependency change, or product authority rewrite.

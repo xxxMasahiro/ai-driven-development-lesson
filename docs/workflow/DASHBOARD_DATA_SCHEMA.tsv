@@ -258,6 +258,93 @@ settings	settings.items[].review.update_preview_key	implemented	string	i18n-key	
 development	development.git_sync_status	implemented	enum	missing|ready|passed|failed|blocked|unknown|approval_required|optional|cached|not_run|stale|manual_required|not_applicable	git-workflow	Product Git sync state must remain separate from Git policy readiness and may be not_applicable when the selected product workflow does not use Git.
 development	development.ci_status	implemented	enum	missing|ready|passed|failed|blocked|unknown|approval_required|optional|cached|not_run|stale|manual_required|not_applicable	ci-evidence	Product CI state must be optional, evidence-backed, missing, not_run, or not_applicable unless a required check is requested.
 development	development.git_operations[]	implemented	array	operation-row-list	dashboard-data	Git operation rows must describe Push, PR, CI, sync, and Merge settings from producer-owned workflow data.
+operational	operational_decision	implemented	object	operational-decision	dashboard-data	Top-level operational decision must be producer-owned so the overview and detail pages do not infer readiness from labels.
+operational	operational_decision.status	implemented	enum	missing|ready|passed|failed|blocked|unknown|approval_required|optional|cached|not_run|stale|manual_required|not_applicable	dashboard-data	Operational decision status must use the shared state vocabulary.
+operational	operational_decision.decision_question	implemented	string	safe-text	dashboard-data	Operational decision question must state the user-facing decision being answered.
+operational	operational_decision.primary_blocker_source_id	implemented	string	source-id	dashboard-data	Primary blocker source must point to the owner source that most directly controls the decision.
+operational	operational_decision.why_blocked	implemented	string	safe-text	dashboard-data	Operational decision reason must explain the top blocker or current readiness condition in plain language.
+operational	operational_decision.next_safe_action	implemented	string	safe-text	dashboard-data	Operational decision next safe action must be display-only and must not execute commands.
+operational	operational_decision.done_condition	implemented	string	safe-text	dashboard-data	Operational decision done condition must say when the user can treat the state as complete.
+operational	operational_decision.approval_boundary	implemented	string	safe-text	dashboard-data	Operational decision approval boundary must preserve Git, CI, merge, cleanup, credential, and product-write safety limits.
+operational	operational_decision.risk_level	implemented	enum	low|medium|high|critical	dashboard-data	Operational decision risk level must classify the current judgment for non-engineer and junior-engineer review.
+operational	operational_decision.freshness_state	implemented	enum	current|stale|not_collected|unknown	dashboard-data	Operational decision freshness must show whether the decision is current enough for use.
+operational	operational_decision.authority	implemented	enum	authoritative|manual_required|advisory|not_collected	dashboard-data	Operational decision authority must separate stored proof, manual review, advisory lookup, and missing collection.
+operational	operational_decision.source_id	implemented	string	source-id	dashboard-data	Operational decision source id must be stable for tests and detail navigation.
+operational	operational_decision.audience_briefs.non_engineer	implemented	string	safe-text	dashboard-data	Operational decision must include plain-language non-engineer guidance.
+operational	operational_decision.audience_briefs.junior_engineer	implemented	string	safe-text	dashboard-data	Operational decision must include junior-engineer guidance without replacing non-engineer guidance.
+operational	operational_decision.command_execution_mode	implemented	enum	preview_only	dashboard-data	Operational decision actions must remain display-only.
+operational	decision_pages[]	implemented	array	decision-page-list	dashboard-data	Each primary Control Center page must have a producer-owned decision contract.
+operational	decision_pages[].id	implemented	enum	overview|lessons|workflow|maintenance|safety|repository-info|documents|settings|history	dashboard-data	Decision page id must identify an existing primary page.
+operational	decision_pages[].title	implemented	string	safe-text	dashboard-data	Decision page title must be safe display text.
+operational	decision_pages[].scope	implemented	string	safe-text	dashboard-data	Decision page scope must identify selected repository, context, lesson, or workflow scope.
+operational	decision_pages[].audiences[]	implemented	array	non_engineer|junior_engineer	dashboard-data	Decision pages must serve non-engineers and junior engineers.
+operational	decision_pages[].status	implemented	enum	missing|ready|passed|failed|blocked|unknown|approval_required|optional|cached|not_run|stale|manual_required|not_applicable	dashboard-data	Decision page status must use the shared state vocabulary.
+operational	decision_pages[].decision_question	implemented	string	safe-text	dashboard-data	Decision page must state the question answered by the page.
+operational	decision_pages[].current_judgment	implemented	string	safe-text	dashboard-data	Decision page current judgment must explain if work can continue, needs review, is blocked, or requires approval.
+operational	decision_pages[].top_reason	implemented	string	safe-text	dashboard-data	Decision page top reason must give the most important evidence gap or blocker.
+operational	decision_pages[].evidence_confidence	implemented	string	safe-text	dashboard-data	Decision page evidence confidence must expose authority and freshness without UI inference.
+operational	decision_pages[].must_review[]	implemented	array	safe-text-list	dashboard-data	Decision page must-review points must identify the first evidence users should inspect.
+operational	decision_pages[].next_safe_action	implemented	string	safe-text	dashboard-data	Decision page next action must be display-only and scoped to an existing page or manual command.
+operational	decision_pages[].detail_page	implemented	enum	#overview|#lessons|#workflow|#maintenance|#safety|#repository-info|#documents|#settings|#history	dashboard-data	Decision page detail target must route to an existing Control Center page.
+operational	decision_pages[].owner_source	implemented	enum	dashboard-data|product-authority|git-workflow|repository-development-workflow	dashboard-data	Decision page owner source must not be ui.
+operational	decision_pages[].source_id	implemented	string	source-id	dashboard-data	Decision page source id must link back to the producer source.
+operational	decision_pages[].authority	implemented	enum	authoritative|manual_required|advisory|not_collected	dashboard-data	Decision page authority must use the evidence authority vocabulary.
+operational	decision_pages[].freshness_state	implemented	enum	current|stale|not_collected|unknown	dashboard-data	Decision page freshness must use the evidence freshness vocabulary.
+operational	decision_pages[].risk_level	implemented	enum	low|medium|high|critical	dashboard-data	Decision page risk level must classify the user-facing decision.
+operational	decision_pages[].command_execution_mode	implemented	enum	preview_only	dashboard-data	Decision page actions must remain display-only.
+development	development.repository_changes	implemented	object	repository-change-summary	dashboard-data	Repository changes must summarize branch, worktree, and sync state without leaking absolute paths.
+development	development.repository_changes.status	implemented	enum	missing|ready|passed|failed|blocked|unknown|approval_required|optional|cached|not_run|stale|manual_required|not_applicable	dashboard-data	Repository change status must use the shared state vocabulary.
+development	development.repository_changes.observed_at	implemented	string	iso8601	dashboard-data	Repository change observation time must identify when Git state was read.
+development	development.repository_changes.path_state	implemented	enum	configured|missing|not_applicable|unknown	dashboard-data	Repository change path state must come from the selected repository resolver.
+development	development.repository_changes.git_state	implemented	enum	configured|missing|not_applicable|unknown	dashboard-data	Repository change Git state must show whether Git metadata is available.
+development	development.repository_changes.branch	implemented	string	safe-text	dashboard-data	Repository change branch must be safe display text and may be empty for detached HEAD.
+development	development.repository_changes.head	implemented	string	safe-text	dashboard-data	Repository change head must be a short display-safe revision.
+development	development.repository_changes.upstream	implemented	string	safe-text	dashboard-data	Repository change upstream must be display-safe and may be empty when not configured.
+development	development.repository_changes.main_target	implemented	string	safe-text	dashboard-data	Repository change main target must identify main or origin/main when available.
+development	development.repository_changes.detached	implemented	boolean	true|false	dashboard-data	Repository change detached flag must show detached HEAD without parsing branch labels.
+development	development.repository_changes.staged_count	implemented	integer	non-negative	dashboard-data	Repository change staged count must be non-negative.
+development	development.repository_changes.unstaged_count	implemented	integer	non-negative	dashboard-data	Repository change unstaged count must be non-negative.
+development	development.repository_changes.untracked_count	implemented	integer	non-negative	dashboard-data	Repository change untracked count must be non-negative.
+development	development.repository_changes.ahead	implemented	integer	non-negative	dashboard-data	Repository change ahead count must be non-negative.
+development	development.repository_changes.behind	implemented	integer	non-negative	dashboard-data	Repository change behind count must be non-negative.
+development	development.repository_changes.worktree_count	implemented	integer	non-negative	dashboard-data	Repository change worktree count must be non-negative.
+development	development.repository_changes.changed_role_counts	implemented	object	repository-change-counts	dashboard-data	Repository change role counts must separate staged, unstaged, and untracked counts.
+development	development.repository_changes.safe_changed_file_samples[]	implemented	array	relative-path-list	dashboard-data	Repository change samples must stay display-safe and bounded.
+development	development.repository_changes.stale_reason	implemented	string	source-id	dashboard-data	Repository change stale reason must explain why the state is not current.
+development	development.repository_development	implemented	object	repository-development-state	repository-development-workflow	Repository development workflow state must expose phase and runner-record freshness as advisory owner data.
+development	development.repository_development.current_phase	implemented	enum	context_triage|proposal|implementation_plan|fast_loop|mid_tests|release_gate|main_sync_cleanup	repository-development-workflow	Repository development current phase must use the workflow phase vocabulary.
+development	development.repository_development.phase_order	implemented	integer	non-negative	repository-development-workflow	Repository development phase order must match the workflow policy order.
+development	development.repository_development.inference_reason	implemented	string	safe-text	repository-development-workflow	Repository development inference reason must explain why the phase was selected.
+development	development.repository_development.purpose	implemented	string	safe-text	repository-development-workflow	Repository development purpose must come from the workflow policy.
+development	development.repository_development.required_inputs	implemented	string	safe-text	repository-development-workflow	Repository development required inputs must come from the workflow policy.
+development	development.repository_development.allowed_writes	implemented	string	safe-text	repository-development-workflow	Repository development allowed writes must come from the workflow policy.
+development	development.repository_development.recommended_checks	implemented	string	safe-text	repository-development-workflow	Repository development recommended checks must come from the workflow policy.
+development	development.repository_development.required_checks	implemented	string	safe-text	repository-development-workflow	Repository development required checks must come from the workflow policy.
+development	development.repository_development.git_ci_expectations	implemented	string	safe-text	repository-development-workflow	Repository development Git and CI expectations must come from the workflow policy.
+development	development.repository_development.required_approvals	implemented	string	safe-text	repository-development-workflow	Repository development approval boundary must come from the workflow policy.
+development	development.repository_development.cleanup_behavior	implemented	string	safe-text	repository-development-workflow	Repository development cleanup behavior must preserve plan-only boundaries.
+development	development.repository_development.stop_conditions	implemented	string	safe-text	repository-development-workflow	Repository development stop conditions must be visible without running the workflow.
+development	development.repository_development.runner_records_status	implemented	enum	missing|current|stale	repository-development-workflow	Repository development runner records must be advisory and must not count as release proof.
+development	development.repository_development.source_files[]	implemented	array	relative-path-list	repository-development-workflow	Repository development source files must identify the policy sources.
+development	development.workflow_evidence_events[]	implemented	array	workflow-evidence-event-list	dashboard-data	Workflow evidence events must normalize recent workflow evidence for timeline and history views.
+development	development.workflow_evidence_events[].event_id	implemented	string	source-id	dashboard-data	Workflow event id must be stable.
+development	development.workflow_evidence_events[].source_id	implemented	string	source-id	dashboard-data	Workflow event source id must link to the owner evidence.
+development	development.workflow_evidence_events[].observed_at	implemented	string	iso8601-or-not_collected	dashboard-data	Workflow event observation time must be explicit.
+development	development.workflow_evidence_events[].repository_head	implemented	string	safe-text	dashboard-data	Workflow event repository head must identify the observed repository revision when available.
+development	development.workflow_evidence_events[].status	implemented	enum	missing|ready|passed|failed|blocked|unknown|approval_required|optional|cached|not_run|stale|manual_required|not_applicable	dashboard-data	Workflow event status must use the shared state vocabulary.
+development	development.workflow_evidence_events[].freshness_state	implemented	enum	current|stale|not_collected|unknown	dashboard-data	Workflow event freshness must use the evidence freshness vocabulary.
+development	development.workflow_evidence_events[].authority	implemented	enum	authoritative|manual_required|advisory|not_collected	dashboard-data	Workflow event authority must use the evidence authority vocabulary.
+development	development.workflow_evidence_events[].detail_artifact_path	implemented	string	scoped-relative-path	dashboard-data	Workflow event artifact path must be safe and may be product-scoped.
+development	development.workflow_evidence_events[].summary	implemented	string	safe-text	dashboard-data	Workflow event summary must be non-empty display text.
+development	development.ci_evidence[]	implemented	array	ci-evidence-role-list	dashboard-data	CI evidence roles must separate branch, PR, main, local tests, and provider visibility.
+development	development.ci_evidence[].role	implemented	enum	branch_ci|pr_ci|main_ci|local_tests|provider_visibility	dashboard-data	CI evidence role must identify which confidence signal is represented.
+development	development.ci_evidence[].status	implemented	enum	missing|ready|passed|failed|blocked|unknown|approval_required|optional|cached|not_run|stale|manual_required|not_applicable	dashboard-data	CI evidence role status must use the shared state vocabulary.
+development	development.ci_evidence[].source_id	implemented	string	source-id	dashboard-data	CI evidence role source id must link back to product evidence.
+development	development.ci_evidence[].head_match_status	implemented	enum	matched|different|unknown	dashboard-data	CI evidence role head match must show whether evidence is for the current head when known.
+development	development.ci_evidence[].authority	implemented	enum	authoritative|manual_required|advisory|not_collected	dashboard-data	CI evidence role authority must separate proof from availability.
+development	development.ci_evidence[].freshness_state	implemented	enum	current|stale|not_collected|unknown	dashboard-data	CI evidence role freshness must show if the evidence is usable for the current decision.
+development	development.ci_evidence[].summary	implemented	string	safe-text	dashboard-data	CI evidence role summary must be plain-language display text.
+development	development.ci_evidence[].observed_at	implemented	string	iso8601-or-not_collected	dashboard-data	CI evidence role observation time must be explicit.
 development	development.git_operations[].id	implemented	string	source-id	dashboard-data	Each Git operation row must expose a stable id for reusable rendering.
 development	development.git_operations[].label	implemented	string	safe-text	dashboard-data	Each Git operation row must expose a display label without relying on one screenshot language.
 development	development.git_operations[].status	implemented	enum	missing|ready|passed|failed|blocked|unknown|approval_required|optional|cached|not_run|stale|manual_required|not_applicable	dashboard-data	Each Git operation row must expose structured status.

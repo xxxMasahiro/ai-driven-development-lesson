@@ -402,6 +402,176 @@ dashboard_json_primary_action() {
   printf '}'
 }
 
+dashboard_json_operational_decision() {
+  local status="$1"
+  local decision_question="$2"
+  local primary_blocker_source_id="$3"
+  local why_blocked="$4"
+  local next_safe_action="$5"
+  local done_condition="$6"
+  local approval_boundary="$7"
+  local risk_level="$8"
+  local freshness_state="$9"
+  local authority="${10}"
+  local source_id="${11}"
+  local non_engineer_brief="${12}"
+  local junior_engineer_brief="${13}"
+
+  dashboard_data_validate_state "$status"
+  dashboard_data_validate_risk_level "$risk_level"
+
+  printf '{"status":'
+  dashboard_json_string "$status"
+  printf ',"decision_question":'
+  dashboard_json_string "$decision_question"
+  printf ',"primary_blocker_source_id":'
+  dashboard_json_string "$primary_blocker_source_id"
+  printf ',"why_blocked":'
+  dashboard_json_string "$why_blocked"
+  printf ',"next_safe_action":'
+  dashboard_json_string "$next_safe_action"
+  printf ',"done_condition":'
+  dashboard_json_string "$done_condition"
+  printf ',"approval_boundary":'
+  dashboard_json_string "$approval_boundary"
+  printf ',"risk_level":'
+  dashboard_json_string "$risk_level"
+  printf ',"freshness_state":'
+  dashboard_json_string "$freshness_state"
+  printf ',"authority":'
+  dashboard_json_string "$authority"
+  printf ',"source_id":'
+  dashboard_json_string "$source_id"
+  printf ',"audience_briefs":{"non_engineer":'
+  dashboard_json_string "$non_engineer_brief"
+  printf ',"junior_engineer":'
+  dashboard_json_string "$junior_engineer_brief"
+  printf '},"command_execution_mode":"preview_only"}'
+}
+
+dashboard_json_decision_page() {
+  local id="$1"
+  local title="$2"
+  local scope="$3"
+  local status="$4"
+  local current_judgment="$5"
+  local top_reason="$6"
+  local evidence_confidence="$7"
+  local next_safe_action="$8"
+  local detail_page="$9"
+  local owner_source="${10}"
+  local source_id="${11}"
+  local authority="${12}"
+  local freshness_state="${13}"
+  local risk_level="${14}"
+  local must_review_one="${15}"
+  local must_review_two="${16}"
+
+  dashboard_data_validate_state "$status"
+  dashboard_data_validate_risk_level "$risk_level"
+
+  printf '{"id":'
+  dashboard_json_string "$id"
+  printf ',"title":'
+  dashboard_json_string "$title"
+  printf ',"scope":'
+  dashboard_json_string "$scope"
+  printf ',"audiences":'
+  dashboard_json_string_array "non_engineer" "junior_engineer"
+  printf ',"status":'
+  dashboard_json_string "$status"
+  printf ',"decision_question":'
+  dashboard_json_string "Can this page be used for the current development decision?"
+  printf ',"current_judgment":'
+  dashboard_json_string "$current_judgment"
+  printf ',"top_reason":'
+  dashboard_json_string "$top_reason"
+  printf ',"evidence_confidence":'
+  dashboard_json_string "$evidence_confidence"
+  printf ',"must_review":'
+  dashboard_json_string_array "$must_review_one" "$must_review_two"
+  printf ',"next_safe_action":'
+  dashboard_json_string "$next_safe_action"
+  printf ',"detail_page":'
+  dashboard_json_string "$detail_page"
+  printf ',"owner_source":'
+  dashboard_json_string "$owner_source"
+  printf ',"source_id":'
+  dashboard_json_string "$source_id"
+  printf ',"authority":'
+  dashboard_json_string "$authority"
+  printf ',"freshness_state":'
+  dashboard_json_string "$freshness_state"
+  printf ',"risk_level":'
+  dashboard_json_string "$risk_level"
+  printf ',"command_execution_mode":"preview_only"}'
+}
+
+dashboard_json_workflow_evidence_event() {
+  local event_id="$1"
+  local source_id="$2"
+  local observed_at="$3"
+  local repository_head="$4"
+  local status="$5"
+  local freshness_state="$6"
+  local authority="$7"
+  local detail_artifact_path="$8"
+  local summary="$9"
+
+  dashboard_data_validate_state "$status"
+
+  printf '{"event_id":'
+  dashboard_json_string "$event_id"
+  printf ',"source_id":'
+  dashboard_json_string "$source_id"
+  printf ',"observed_at":'
+  dashboard_json_string "$observed_at"
+  printf ',"repository_head":'
+  dashboard_json_string "$repository_head"
+  printf ',"status":'
+  dashboard_json_string "$status"
+  printf ',"freshness_state":'
+  dashboard_json_string "$freshness_state"
+  printf ',"authority":'
+  dashboard_json_string "$authority"
+  printf ',"detail_artifact_path":'
+  dashboard_json_string "$detail_artifact_path"
+  printf ',"summary":'
+  dashboard_json_string "$summary"
+  printf '}'
+}
+
+dashboard_json_ci_evidence_role() {
+  local role="$1"
+  local status="$2"
+  local source_id="$3"
+  local head_match_status="$4"
+  local authority="$5"
+  local freshness_state="$6"
+  local summary="$7"
+  local observed_at="$8"
+
+  dashboard_data_validate_state "$status"
+
+  printf '{"role":'
+  dashboard_json_string "$role"
+  printf ',"status":'
+  dashboard_json_string "$status"
+  printf ',"source_id":'
+  dashboard_json_string "$source_id"
+  printf ',"head_match_status":'
+  dashboard_json_string "$head_match_status"
+  printf ',"authority":'
+  dashboard_json_string "$authority"
+  printf ',"freshness_state":'
+  dashboard_json_string "$freshness_state"
+  printf ',"summary":'
+  dashboard_json_string "$summary"
+  printf ',"observed_at":'
+  dashboard_json_string "$observed_at"
+  printf '}'
+}
+
 dashboard_data_metric_bucket() {
   case "$1" in
     ready|passed)
