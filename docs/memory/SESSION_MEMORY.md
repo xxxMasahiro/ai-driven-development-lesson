@@ -440,3 +440,18 @@ Latest focused verification passed:
 - `./tools/check_repository_development_workflow.sh`
 - `./tools/test_repository_development_workflow.sh`
 - `git diff --check` for the touched document-root files
+
+## 2026-06-19 Session Restart Note
+
+はい。次回は以下を見れば再開できます。
+
+- 最新コミット: `f29beec Add dashboard decision evidence planning`
+- 作業ツリー: クリーン
+- ブランチ: `main`, `origin/main` より 1 commit ahead
+- 次の実装順:
+  1. `product_authority_evidence_source_completion`
+  2. `dashboard_control_center_decision_projection`
+  3. `dashboard_control_center_decision_page_rendering`
+  4. 必要時のみ CSS refinement / package-CI wiring / component extraction
+
+再開時は `AGENTS.MD` と `repository-development-workflow` を読み、[HANDOFF.md](/home/masahiro/projects/ai-driven-development-lesson/docs/workflow/HANDOFF.md:2646) の planned handoff から始めればスムーズです。
