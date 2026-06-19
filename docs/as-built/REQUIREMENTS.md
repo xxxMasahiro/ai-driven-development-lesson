@@ -2338,3 +2338,28 @@ Non-scope:
 
 - Do not perform cosmetic churn, rename-only churn, route rewrites, dependency changes, or design-system bypasses under the extraction sync.
 - Do not use module extraction to change product authority, Dashboard data production, Git/CI behavior, Settings authority, or Browser Debug handoff semantics.
+
+## Dashboard Control Center Settings Control Policy Refinement Requirements
+
+SYNC-ID: dashboard_control_center_settings_control_policy_refinement
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,tools/dashboard-settings,vite.config.mjs,dashboard-control-center/src/dashboardData.js,dashboard-control-center/src/App.jsx,dashboard-control-center/src/i18n.js,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_settings.sh,tools/test_dashboard_control_center.sh,tools/test_dashboard_i18n.sh,tools/check_dashboard_design_system.sh,tools/test_dashboard_design_studio_events.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_dashboard_settings.sh,tools/test_dashboard_control_center.sh,tools/test_dashboard_i18n.sh,tools/check_dashboard_design_system.sh,tools/test_dashboard_design_studio_events.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+Dashboard Control Center Settings must remain a narrowly guarded settings surface, not a general browser command executor.
+Settings changes must be planned, token-bound, revalidated against the owner-layer current state, and applied only when the requested setting, menu context, target file, current value, and snapshot identity still match the approved plan.
+
+Requirements:
+
+- Settings plan success returns a one-time `plan_token`; blocked or invalid plans return no token.
+- Settings apply requires the current token and fails closed for missing, replayed, stale, mismatched, or owner-layer-replanned changes.
+- `tools/dashboard-settings` remains the owner layer for catalog, plan, apply, target-file, value, and current-state validation; React copy and middleware labels are not the security boundary.
+- Git workflow settings must be clearly described as saved policy settings only. The browser must not execute commit, push, PR creation, CI waiting, merge, main sync, cleanup, OAuth, external service calls, or credential handling.
+- Settings and Design Studio technical commands must be visible as technical details, not as the main non-engineer decision surface.
+- UI labels must distinguish manual, auto, approval-required, allowed, disallowed, and not-applicable states without presenting approval-required work as automatic.
+- Design Studio mutation scope remains limited to the Dashboard design-system source and generated runtime path; drift detection must not broaden the editable target set.
+
+Non-scope:
+
+- Do not add arbitrary command execution, a browser Git workflow runner, product repository writes, external product design writes, credential storage, OAuth, dependency changes, push, PR creation, merge, main CI waiting, local/remote sync, cleanup, or delete operations.
+- Do not weaken existing same-origin, JSON-only, POST-only, body-size, unknown-field, execFile, or generated design-system boundaries.

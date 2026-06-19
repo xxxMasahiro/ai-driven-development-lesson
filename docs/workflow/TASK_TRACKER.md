@@ -2601,3 +2601,25 @@ Current Status:
 Next Step:
 
 - No remaining action for this sync ID; future extraction should remain behavior-preserving and test-covered.
+
+## Dashboard Control Center Settings Control Policy Refinement Work
+
+SYNC-ID: dashboard_control_center_settings_control_policy_refinement
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,tools/dashboard-settings,vite.config.mjs,dashboard-control-center/src/dashboardData.js,dashboard-control-center/src/App.jsx,dashboard-control-center/src/i18n.js,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_settings.sh,tools/test_dashboard_control_center.sh,tools/test_dashboard_i18n.sh,tools/check_dashboard_design_system.sh,tools/test_dashboard_design_studio_events.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_dashboard_settings.sh,tools/test_dashboard_control_center.sh,tools/test_dashboard_i18n.sh,tools/check_dashboard_design_system.sh,tools/test_dashboard_design_studio_events.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+Current Status:
+
+- [x] Developer approved implementation from the xhigh review-based plan.
+- [x] Started under `repository-development-workflow` with AGENTS invariants and sync-first discipline.
+- [x] Synchronized planned documents and passed implementation-plan sync checks.
+- [x] Implemented owner-layer Settings current-state guards.
+- [x] Implemented Settings plan-token middleware and browser data contract.
+- [x] Updated Settings UI wording, token invalidation, Git warning, and technical details.
+- [x] Ran focused Settings, Control Center, i18n, Design Studio, repository-development, and sync checks.
+- [x] Promoted this sync ID to implemented after verification.
+
+Next Step:
+
+- No remaining implementation action for this sync ID. Continue to treat Settings as a guarded settings surface, not a browser command runner.

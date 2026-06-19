@@ -310,6 +310,7 @@ function repositorySelectionFixtureForContext(context, displayName = "") {
 }
 
 async function routeSettingsApi(page, calls = [], options = {}) {
+  const planToken = "22222222-2222-4222-8222-222222222222";
   const localeMap = new Map([
     ["ja", { uiLocale: "ja", direction: "ltr" }],
     ["en", { uiLocale: "en", direction: "ltr" }],
@@ -329,6 +330,14 @@ async function routeSettingsApi(page, calls = [], options = {}) {
   async function fulfill(route, command) {
     const payload = route.request().postDataJSON();
     calls.push({ command, payload });
+    if (command === "apply" && payload.plan_token !== planToken) {
+      await route.fulfill({
+        status: 409,
+        contentType: "application/json",
+        body: JSON.stringify({ error: "settings apply requires a matching current plan token" }),
+      });
+      return;
+    }
     const delayMs = command === "apply" ? Number(options.applyDelayMs || 0) : Number(options.planDelayMs || 0);
     if (delayMs > 0) {
       await new Promise((resolve) => setTimeout(resolve, delayMs));
@@ -371,6 +380,7 @@ async function routeSettingsApi(page, calls = [], options = {}) {
         snapshot_regenerated: command === "apply" && !blocked,
         snapshot_file: command === "apply" && !blocked ? ".dashboard-control-center/dashboard-data.json" : undefined,
         tool_command: `tools/dashboard-settings apply ${settingId} ${value} --menu ${payload.menu_id || "step_1_14"} --confirm`,
+        ...(command === "plan" && !blocked ? { plan_token: planToken } : {}),
         ...(localeMetadata
           ? {
               workflow_language: value,
@@ -1044,7 +1054,7 @@ test.describe("English dashboard control center", () => {
     await expect(repositoryNavigation.locator(".category-nav__link")).toHaveCount(4);
     await expect(repositoryNavigation.getByRole("link", { name: /Design Studio/ })).toBeVisible();
     await expect(page.getByRole("navigation", { name: "Other" }).locator(".category-nav__link")).toHaveCount(2);
-    await expect(page.getByText("Read-only outside Settings.")).toBeVisible();
+    await expect(page.getByText("Read-only except allowed Settings and Design Studio changes.")).toBeVisible();
 
     await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible();
     await expect(page.getByText("Category Health")).toHaveCount(0);
@@ -1345,14 +1355,15 @@ test.describe("English dashboard control center", () => {
     await expect(settingsView.locator(".settings-row[data-settings-row-id='git_push_automation']").locator(".settings-row__open")).toContainText("Editable here");
     const mergeExecutionRow = settingsView.locator(".settings-row[data-settings-row-id='git_merge_execution']");
     await expect(mergeExecutionRow.locator(".settings-row__open")).toContainText("Editable here");
-    await expect(mergeExecutionRow).toContainText("Auto");
+    await expect(mergeExecutionRow).toContainText("After approval");
     await mergeExecutionRow.click();
     await expect(page.locator(".settings-modal__allowed")).toContainText("Ask each time");
-    await expect(page.locator(".settings-modal__allowed")).toContainText("Auto");
+    await expect(page.locator(".settings-modal__allowed")).toContainText("After approval");
     await expect(page.locator(".settings-value-select select")).toContainText("Ask each time");
-    await expect(page.locator(".settings-value-select select")).toContainText("Auto");
+    await expect(page.locator(".settings-value-select select")).toContainText("After approval");
     await expect(page.locator(".settings-modal__automation-note")).toHaveCount(1);
-    await expect(page.locator(".settings-modal__automation-note")).toContainText("prior approval");
+    await expect(page.locator(".settings-modal__automation-note")).toContainText("requires an approval");
+    await expect(page.locator(".settings-modal__git-note")).toContainText("are not executed from this screen");
     await page.locator(".settings-modal__close").click();
     await expect(page.locator(".settings-modal")).toHaveCount(0);
     await learningModeRow.click();
@@ -1375,15 +1386,25 @@ test.describe("English dashboard control center", () => {
     await page.locator(".settings-value-select select").selectOption("B");
     await page.getByRole("button", { name: /Review change/ }).click();
     await expect(page.locator(".settings-result")).toContainText("Plan ready");
+    await expect(page.locator(".settings-result")).toContainText("Technical details");
     await page.getByLabel("I confirm this settings update.").check();
     await page.unroute(dashboardDataRoutePattern);
-    await routeDashboardDataPayload(page, addDesignSystemRepositoryScope(dashboardSettingFixture("learning_mode", "B", "6")));
+    const updatedSettingsFixture = addDesignSystemRepositoryScope(dashboardSettingFixture("learning_mode", "B", "6"));
+    await routeDashboardDataPayload(page, updatedSettingsFixture);
     await page.getByRole("button", { name: /Apply setting/ }).click();
     await expect(page.locator(".settings-modal")).toHaveCount(0);
     await expect(page.locator(".settings-apply-feedback")).toHaveCount(0);
     await expect(learningModeRow).toContainText("B: Short guidance");
     expect(settingsCalls.map((call) => call.command)).toEqual(["plan", "apply"]);
-    expect(settingsCalls[1].payload).toMatchObject({ setting_id: "learning_mode", value: "B", menu_id: "step_1_14", confirm: true });
+    expect(settingsCalls[1].payload).toMatchObject({
+      setting_id: "learning_mode",
+      value: "B",
+      menu_id: "step_1_14",
+      plan_token: "22222222-2222-4222-8222-222222222222",
+      snapshot_id: sourceBoundaryFixture.snapshot_id,
+      content_hash: sourceBoundaryFixture.content_hash,
+      confirm: true,
+    });
 
     const designSystemCalls = [];
     await routeDesignSystemApi(page, designSystemCalls);
@@ -2685,7 +2706,7 @@ test.describe("Japanese dashboard control center", () => {
     await expect(navigation.getByRole("link", { name: /開発ワークフロー/ })).toBeVisible();
     await expect(navigation.getByRole("link", { name: /保守・同期/ })).toBeVisible();
     await expect(navigation.getByRole("link", { name: /安全確認/ })).toBeVisible();
-    await expect(page.getByText("設定以外は読み取り専用です。")).toBeVisible();
+    await expect(page.getByText("Settings と Design Studio の許可済み操作以外は読み取り専用です。")).toBeVisible();
     await expect(page.getByText("カテゴリ別の状態")).toHaveCount(0);
     await expect(page.locator(".menu-tile.is-selected")).toContainText(/STEP 1-14\s*実践レッスン/);
     await expect(page.locator("[data-overview-status-card='lessons']")).toContainText(/11\s*\/\s*14/);

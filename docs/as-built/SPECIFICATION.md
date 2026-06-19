@@ -2769,3 +2769,31 @@ Extraction may introduce reusable local modules only after the rendered decision
 The extracted components must keep the same props/data ownership, i18n keys, routes, status rendering, and visual contract.
 
 This sync must not become a feature change, route rewrite, CSS redesign, dependency change, or product authority rewrite.
+
+## Dashboard Control Center Settings Control Policy Refinement Specification
+
+SYNC-ID: dashboard_control_center_settings_control_policy_refinement
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,tools/dashboard-settings,vite.config.mjs,dashboard-control-center/src/dashboardData.js,dashboard-control-center/src/App.jsx,dashboard-control-center/src/i18n.js,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_settings.sh,tools/test_dashboard_control_center.sh,tools/test_dashboard_i18n.sh,tools/check_dashboard_design_system.sh,tools/test_dashboard_design_studio_events.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_dashboard_settings.sh,tools/test_dashboard_control_center.sh,tools/test_dashboard_i18n.sh,tools/check_dashboard_design_system.sh,tools/test_dashboard_design_studio_events.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+The Settings middleware mirrors the Design Studio mutation pattern: `plan` creates a short-lived server-memory one-time token bound to the owner-layer plan fingerprint, and `apply` consumes that token only after rerunning a non-destructive owner-layer plan and comparing the fingerprint.
+The fingerprint covers the setting ID, requested value, menu ID, setting kind, current value, current label, target file, plan status, reason code, snapshot ID, and content hash.
+
+`tools/dashboard-settings` accepts expected current-state inputs for guarded apply.
+It rejects stale or mismatched writes before touching settings files and keeps atomic owner-side writes for confirmed settings changes.
+
+The browser data layer validates Settings mutation responses with `plan_token` on successful plans and sends the matching token on apply.
+React discards tokens when the draft value, selected menu, selected setting, or snapshot identity changes and disables apply when the visible draft is no longer backed by the current plan.
+
+Display semantics:
+
+- `manual` means per-operation confirmation.
+- `auto` means automatic execution only where the existing policy already allows it.
+- `after_approval` means approval is required before execution and must not be rendered as automatic.
+- Boolean settings render as allowed or disallowed in context.
+- `not_applicable` renders as not applicable.
+- Non-editable rows show whether they are confirm-only, read-only here, or approval-required.
+
+Design Studio drift detection remains a verification boundary for the Dashboard design-system source and generated runtime output.
+It does not make external products or arbitrary CSS browser-editable.

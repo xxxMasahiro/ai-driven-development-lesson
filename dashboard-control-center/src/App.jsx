@@ -5756,7 +5756,10 @@ function settingWorkflowActionValueLabel(value, item, t) {
   if (normalized === "manual") {
     return t("settingsPage.value.workflow.confirmEachTime");
   }
-  if (normalized === "auto" || normalized === "after_approval" || normalized === "true") {
+  if (normalized === "after_approval") {
+    return t("settingsPage.value.workflow.afterApproval");
+  }
+  if (normalized === "auto" || normalized === "true") {
     return t("settingsPage.value.workflow.auto");
   }
   return "";
@@ -5766,7 +5769,18 @@ function settingShowsAutomationNote(item) {
   if (!settingIsWorkflowAction(item)) {
     return false;
   }
-  return settingEditableOptions(item).some((value) => ["auto", "after_approval", "true"].includes(value));
+  return settingEditableOptions(item).some((value) => ["auto", "true"].includes(value));
+}
+
+function settingShowsApprovalNote(item) {
+  if (!settingIsWorkflowAction(item)) {
+    return false;
+  }
+  return settingEditableOptions(item).some((value) => value === "after_approval");
+}
+
+function settingIsGitWorkflowSetting(item) {
+  return displayText(item?.id, "").startsWith("git_");
 }
 
 function settingValueLabel(item, t) {
@@ -5824,6 +5838,9 @@ function settingChangeabilityLabel(item, t) {
   if (item.editable) {
     return t("settingsPage.change.editable");
   }
+  if (["approval_required", "manual_required"].includes(normalizeState(item.status))) {
+    return t("settingsPage.change.approvalRequired");
+  }
   if (item.reviewable) {
     return t("settingsPage.change.previewOnly");
   }
@@ -5856,7 +5873,7 @@ function settingConsistencyNextAction(item, t) {
 }
 
 function settingRowActionLabel(item, t) {
-  return item.editable && settingEditableOptions(item).length ? t("settingsPage.change.editable") : t("settingsPage.modal.open");
+  return settingChangeabilityLabel(item, t);
 }
 
 function settingsSnapshotReconciles(snapshotData, settingId, requestedValue, applyResult = {}) {
@@ -7178,7 +7195,10 @@ function DesignStudioPage({ data, locale, t }) {
                 <StatusPill value={mutationState.status === "applied" ? "passed" : "ready"} t={t} label={mutationState.status === "applied" ? t("designStudio.result.appliedShort") : t("designStudio.result.plannedShort")} />
                 <p>{t(displayText(mutationState.result.reason_key, ""), t("designStudio.result.planned"))}</p>
                 <small>{t("designStudio.result.target")}: {displayText(mutationState.result.target_file)}</small>
-                <code>{displayText(mutationState.result.tool_command)}</code>
+                <details>
+                  <summary>{t("designStudio.result.technicalDetails")}</summary>
+                  <code>{displayText(mutationState.result.tool_command)}</code>
+                </details>
               </div>
             ) : null}
             {mutationState.error ? (
@@ -7428,6 +7448,8 @@ function SettingsPage({ data, locale, t, onRefreshSnapshot }) {
   const [draftValue, setDraftValue] = useState("");
   const [confirmed, setConfirmed] = useState(false);
   const [mutationState, setMutationState] = useState({ status: "idle", result: null, error: null });
+  const [planToken, setPlanToken] = useState("");
+  const [planIdentity, setPlanIdentity] = useState(null);
   const [applyFeedback, setApplyFeedback] = useState({ status: "idle", visible: false });
   const rowRefs = useRef({});
   const modalRef = useRef(null);
@@ -7443,6 +7465,10 @@ function SettingsPage({ data, locale, t, onRefreshSnapshot }) {
   const selectedRepository = repositoryDisplayName(context.target_repository?.name || authority.repository?.configured_name || authority.repository?.name, t);
   const selectedSetting = items.find((item) => displayText(item.id, "") === selectedSettingId) || null;
   const selectedMenuId = displayText(context.menu_id, "step_1_14");
+  const snapshotIdentity = useMemo(() => ({
+    snapshotId: displayText(data.snapshot_id, ""),
+    contentHash: displayText(data.content_hash, ""),
+  }), [data.snapshot_id, data.content_hash]);
   const editableOptions = selectedSetting ? settingEditableOptions(selectedSetting) : [];
   const selectedSettingEditable = Boolean(selectedSetting?.editable && editableOptions.length);
   const clearApplyFeedbackTimers = () => {
@@ -7507,6 +7533,8 @@ function SettingsPage({ data, locale, t, onRefreshSnapshot }) {
   const resetMutationState = () => {
     setConfirmed(false);
     setMutationState({ status: "idle", result: null, error: null });
+    setPlanToken("");
+    setPlanIdentity(null);
   };
 
   useEffect(() => {
@@ -7524,7 +7552,7 @@ function SettingsPage({ data, locale, t, onRefreshSnapshot }) {
       resetMutationState();
     }
     return undefined;
-  }, [selectedSettingId, selectedSetting?.current_value]);
+  }, [selectedSettingId, selectedSetting?.current_value, selectedMenuId, snapshotIdentity.snapshotId, snapshotIdentity.contentHash]);
 
   useEffect(() => {
     if (!selectedSetting) {
@@ -7590,17 +7618,46 @@ function SettingsPage({ data, locale, t, onRefreshSnapshot }) {
       return;
     }
     setConfirmed(false);
+    setPlanToken("");
+    setPlanIdentity(null);
     setMutationState({ status: "planning", result: null, error: null });
     try {
       const result = await planDashboardSettingChange(displayText(selectedSetting.id), draftValue, selectedMenuId);
+      if (result.status !== "blocked" && !result.plan_token) {
+        throw new Error(t("settingsPage.modal.planTokenMissing"));
+      }
+      setPlanToken(result.plan_token || "");
+      setPlanIdentity({
+        settingId: displayText(selectedSetting.id),
+        requestedValue: draftValue,
+        menuId: selectedMenuId,
+        snapshotId: snapshotIdentity.snapshotId,
+        contentHash: snapshotIdentity.contentHash,
+      });
       setMutationState({ status: result.status === "blocked" ? "blocked" : "planned", result, error: null });
     } catch (error) {
+      setPlanToken("");
+      setPlanIdentity(null);
       setMutationState({ status: "error", result: null, error });
     }
   };
 
   const handleApplySetting = async () => {
-    if (!selectedSettingEditable || !draftValue || !selectedSetting || !confirmed || mutationState.status !== "planned") {
+    if (!selectedSettingEditable || !draftValue || !selectedSetting || !confirmed || mutationState.status !== "planned" || !planToken) {
+      return;
+    }
+    const currentPlanMatches =
+      planIdentity &&
+      planIdentity.settingId === displayText(selectedSetting.id) &&
+      planIdentity.requestedValue === draftValue &&
+      planIdentity.menuId === selectedMenuId &&
+      planIdentity.snapshotId === snapshotIdentity.snapshotId &&
+      planIdentity.contentHash === snapshotIdentity.contentHash;
+    if (!currentPlanMatches) {
+      setConfirmed(false);
+      setPlanToken("");
+      setPlanIdentity(null);
+      setMutationState({ status: "error", result: mutationState.result, error: new Error(t("settingsPage.modal.planTokenStale")) });
       return;
     }
     const settingId = displayText(selectedSetting.id);
@@ -7614,7 +7671,9 @@ function SettingsPage({ data, locale, t, onRefreshSnapshot }) {
       onRefreshSnapshot?.({ localeHint: { workflow_language: requestedValue }, immediateOnly: true });
     }
     try {
-      const result = await applyDashboardSettingChange(settingId, requestedValue, selectedMenuId);
+      const result = await applyDashboardSettingChange(settingId, requestedValue, selectedMenuId, planToken, snapshotIdentity);
+      setPlanToken("");
+      setPlanIdentity(null);
       if (!result.applied) {
         if (result.status === "blocked") {
           const reason = t(displayText(result.reason_key, ""), t("settingsPage.modal.applyFailed"));
@@ -7659,6 +7718,8 @@ function SettingsPage({ data, locale, t, onRefreshSnapshot }) {
         });
       }
     } catch (error) {
+      setPlanToken("");
+      setPlanIdentity(null);
       if (settingId === "workflow_language") {
         onRefreshSnapshot?.({ clearLocaleHint: true, immediateOnly: true });
       }
@@ -7839,6 +7900,12 @@ function SettingsPage({ data, locale, t, onRefreshSnapshot }) {
                     {settingShowsAutomationNote(selectedSetting) ? (
                       <small className="settings-modal__automation-note">{t("settingsPage.modal.autoMeansPriorApproval")}</small>
                     ) : null}
+                    {settingShowsApprovalNote(selectedSetting) ? (
+                      <small className="settings-modal__automation-note">{t("settingsPage.modal.afterApprovalMeansExternalApproval")}</small>
+                    ) : null}
+                    {settingIsGitWorkflowSetting(selectedSetting) ? (
+                      <small className="settings-modal__git-note">{t("settingsPage.modal.gitSettingsBoundary")}</small>
+                    ) : null}
                     <div className="settings-action-row">
                       <button type="button" onClick={handlePlanSetting} disabled={!draftValue || mutationState.status === "planning" || mutationState.status === "applying"}>
                         <Pencil aria-hidden="true" size={16} />
@@ -7859,7 +7926,7 @@ function SettingsPage({ data, locale, t, onRefreshSnapshot }) {
                         className="settings-action-button--primary"
                         type="button"
                         onClick={handleApplySetting}
-                        disabled={!confirmed || mutationState.status !== "planned" || mutationState.result?.requested_value !== draftValue}
+                        disabled={!confirmed || mutationState.status !== "planned" || mutationState.result?.requested_value !== draftValue || !planToken}
                       >
                         <Check aria-hidden="true" size={16} />
                         {mutationState.status === "applying" ? t("settingsPage.modal.applying") : t("settingsPage.modal.applyChange")}
@@ -7871,7 +7938,10 @@ function SettingsPage({ data, locale, t, onRefreshSnapshot }) {
                         <p>{mutationState.status === "applied" ? t("settingsPage.modal.applyResult") : mutationState.status === "blocked" ? t(displayText(mutationState.result.reason_key, ""), t("settingsPage.modal.planBlocked")) : t("settingsPage.modal.planResult")}</p>
                         {mutationState.status === "blocked" ? <small>{t(displayText(mutationState.result.next_action_key, ""), t("settingsPage.consistency.next.none"))}</small> : null}
                         <small>{t("settingsPage.modal.targetFile")}: {displayText(mutationState.result.target_file)}</small>
-                        <code>{displayText(mutationState.result.tool_command)}</code>
+                        <details>
+                          <summary>{t("settingsPage.modal.technicalDetails")}</summary>
+                          <code>{displayText(mutationState.result.tool_command)}</code>
+                        </details>
                       </div>
                     ) : null}
                     {mutationState.error ? (

@@ -2758,3 +2758,24 @@ Next Step:
 - No remaining action for this sync ID.
 
 Stop and ask before changing runtime behavior, data production, dependencies, Git/CI behavior, external product writes, cleanup, or any existing-feature tradeoff.
+
+## Dashboard Control Center Settings Control Policy Refinement Handoff
+
+SYNC-ID: dashboard_control_center_settings_control_policy_refinement
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,tools/dashboard-settings,vite.config.mjs,dashboard-control-center/src/dashboardData.js,dashboard-control-center/src/App.jsx,dashboard-control-center/src/i18n.js,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_settings.sh,tools/test_dashboard_control_center.sh,tools/test_dashboard_i18n.sh,tools/check_dashboard_design_system.sh,tools/test_dashboard_design_studio_events.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_dashboard_settings.sh,tools/test_dashboard_control_center.sh,tools/test_dashboard_i18n.sh,tools/check_dashboard_design_system.sh,tools/test_dashboard_design_studio_events.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+Restart context:
+
+- This sync refined Settings authority and Control Center wording after the xhigh sub-agent review.
+- Settings apply is plan-token-bound and owner-layer-revalidated, matching the Design Studio one-time token pattern without broadening browser command authority.
+- `tools/dashboard-settings` remains the settings authority; Vite middleware is a guarded transport and React is a renderer/controller for current plan state.
+- Git workflow rows explain saved settings only. The browser still cannot run commit, push, PR creation, CI waiting, merge, main sync, cleanup, OAuth, credentials, or external service calls.
+- Design Studio remains limited to the Dashboard design-system source and generated runtime path.
+
+Next Step:
+
+- No remaining implementation action for this sync ID. Future changes must preserve the owner-layer Settings boundary and one-time plan-token apply contract.
+
+Stop and ask before arbitrary command execution, product repository writes, external product design writes, Git operations, CI waiting, OAuth, credentials, dependencies, generated-file source edits, cleanup, delete, push, PR creation, merge, main sync, or any existing-feature tradeoff.

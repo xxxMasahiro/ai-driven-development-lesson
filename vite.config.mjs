@@ -32,7 +32,9 @@ const liveDetailPages = new Set(["#workflow", "#maintenance", "#safety", "#repos
 const ciHeadMatchStates = new Set(["matched", "different", "unknown"]);
 const languageCodePattern = /^[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8})?$|^custom$/;
 const designSystemPlanTokenTtlMs = 10 * 60 * 1000;
+const settingsPlanTokenTtlMs = designSystemPlanTokenTtlMs;
 const designSystemPlanTokens = new Map();
+const settingsPlanTokens = new Map();
 const dashboardDataGenerationByMenu = new Map();
 const dashboardLiveStatusGenerationByMenu = new Map();
 const dashboardDataGenerationTimeoutMs = Math.max(5000, Number(process.env.DASHBOARD_DATA_GENERATION_TIMEOUT_MS || 60000));
@@ -486,6 +488,107 @@ function safeSettingsToken(value) {
   return typeof value === "string" && /^[A-Za-z0-9_.:-]+$/.test(value) ? value : "";
 }
 
+function safeSettingsPlanToken(value) {
+  return typeof value === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value) ? value : "";
+}
+
+function purgeExpiredSettingsPlanTokens(now = Date.now()) {
+  for (const [token, record] of settingsPlanTokens.entries()) {
+    if (!record || record.expiresAt <= now) {
+      settingsPlanTokens.delete(token);
+    }
+  }
+}
+
+function createSettingsPlanToken(fingerprint) {
+  const now = Date.now();
+  purgeExpiredSettingsPlanTokens(now);
+  const token = crypto.randomUUID();
+  settingsPlanTokens.set(token, { fingerprint, expiresAt: now + settingsPlanTokenTtlMs });
+  return token;
+}
+
+function consumeSettingsPlanToken(token, fingerprint) {
+  purgeExpiredSettingsPlanTokens();
+  const safeToken = safeSettingsPlanToken(token);
+  if (!safeToken) {
+    return false;
+  }
+  const record = settingsPlanTokens.get(safeToken);
+  settingsPlanTokens.delete(safeToken);
+  return Boolean(record && record.fingerprint === fingerprint);
+}
+
+function settingsSnapshotIdentity(dataFile) {
+  try {
+    const body = fs.readFileSync(dataFile, "utf8");
+    if (!validateDashboardData(body)) {
+      return { snapshotId: "invalid", contentHash: "invalid" };
+    }
+    const data = JSON.parse(body);
+    return {
+      snapshotId: String(data.snapshot_id || ""),
+      contentHash: String(data.content_hash || ""),
+    };
+  } catch {
+    return { snapshotId: "missing", contentHash: "missing" };
+  }
+}
+
+function settingsPlanFingerprint(result, snapshotIdentity) {
+  return JSON.stringify([
+    result.setting_id,
+    result.requested_value,
+    result.menu_id,
+    result.setting_kind,
+    result.current_value,
+    result.current_label,
+    result.target_file,
+    result.status,
+    result.reason_code,
+    snapshotIdentity.snapshotId,
+    snapshotIdentity.contentHash,
+  ]);
+}
+
+function settingsPlanCanCreateToken(result) {
+  return Boolean(result && result.applied === false && result.status !== "blocked");
+}
+
+function runSettingsTool(args, menuId, dataFile) {
+  return new Promise((resolve) => {
+    execFile(
+      settingsToolPath,
+      args,
+      {
+        cwd: repoRoot,
+        env: {
+          ...process.env,
+          DASHBOARD_SELECTED_MENU_ID: menuId,
+          DASHBOARD_CONTROL_CENTER_DATA_FILE: dataFile,
+        },
+        maxBuffer: 1024 * 1024,
+        windowsHide: true,
+      },
+      (error, stdout = "", stderr = "") => {
+        if (error) {
+          resolve({ error, stdout, stderr });
+          return;
+        }
+        resolve({ stdout, stderr });
+      },
+    );
+  });
+}
+
+function parseSettingsToolResult(stdout) {
+  try {
+    return JSON.parse(stdout);
+  } catch {
+    return null;
+  }
+}
+
 function dashboardMenuIdFromRequest(request) {
   let raw = "";
   try {
@@ -770,7 +873,7 @@ function dashboardSettingsMutationMiddleware(command) {
       return;
     }
 
-    const allowedPayloadKeys = new Set(["setting_id", "value", "menu_id", "confirm"]);
+    const allowedPayloadKeys = new Set(["setting_id", "value", "menu_id", "confirm", "plan_token", "snapshot_id", "content_hash"]);
     if (!payload || typeof payload !== "object" || Array.isArray(payload) || Object.keys(payload).some((key) => !allowedPayloadKeys.has(key))) {
       sendJson(response, 400, { error: "settings request contains unsupported fields" });
       return;
@@ -779,7 +882,7 @@ function dashboardSettingsMutationMiddleware(command) {
     const settingId = safeSettingsToken(payload.setting_id);
     const value = safeSettingsToken(payload.value);
     const menuId = safeSettingsToken(payload.menu_id || "step_1_14");
-    if (!settingId || !value || !menuId) {
+    if (!settingId || !value || !menuId || !dashboardMenuIds.has(menuId)) {
       sendJson(response, 400, { error: "settings request contains an invalid setting id, value, or menu id" });
       return;
     }
@@ -789,36 +892,81 @@ function dashboardSettingsMutationMiddleware(command) {
     }
 
     const dataFile = dashboardDataFile() || path.join(runtimeRoot, "dashboard-data.json");
-    const args = [command, settingId, value, "--menu", menuId];
+    const planArgs = ["plan", settingId, value, "--menu", menuId];
+    const snapshotIdentity = settingsSnapshotIdentity(dataFile);
+
     if (command === "apply") {
-      args.push("--snapshot", dataFile, "--confirm");
+      const planToken = safeSettingsPlanToken(payload.plan_token);
+      if (!planToken) {
+        sendJson(response, 409, { error: "settings apply requires a matching current plan token" });
+        return;
+      }
+      if (payload.snapshot_id !== undefined && String(payload.snapshot_id || "") !== snapshotIdentity.snapshotId) {
+        sendJson(response, 409, { error: "settings apply requires the current dashboard snapshot" });
+        return;
+      }
+      if (payload.content_hash !== undefined && String(payload.content_hash || "") !== snapshotIdentity.contentHash) {
+        sendJson(response, 409, { error: "settings apply requires the current dashboard snapshot" });
+        return;
+      }
     }
 
-    execFile(
-      settingsToolPath,
-      args,
-      {
-        cwd: repoRoot,
-        env: {
-          ...process.env,
-          DASHBOARD_SELECTED_MENU_ID: menuId,
-          DASHBOARD_CONTROL_CENTER_DATA_FILE: dataFile,
-        },
-        maxBuffer: 1024 * 1024,
-      },
-      (error, stdout, stderr) => {
-        if (error) {
-          sendJson(response, 422, { error: String(stderr || error.message).trim() || "settings update failed" });
-          return;
-        }
-        try {
-          const parsed = JSON.parse(stdout);
-          sendJson(response, 200, parsed);
-        } catch {
-          sendJson(response, 502, { error: "settings tool returned invalid JSON" });
-        }
-      },
-    );
+    const planned = await runSettingsTool(planArgs, menuId, dataFile);
+    if (planned.error) {
+      sendJson(response, 422, { error: String(planned.stderr || planned.error.message).trim() || "settings update failed" });
+      return;
+    }
+    const parsedPlan = parseSettingsToolResult(planned.stdout);
+    if (!parsedPlan) {
+      sendJson(response, 502, { error: "settings tool returned invalid JSON" });
+      return;
+    }
+    const planFingerprint = settingsPlanFingerprint(parsedPlan, snapshotIdentity);
+
+    if (command === "plan") {
+      if (settingsPlanCanCreateToken(parsedPlan)) {
+        parsedPlan.plan_token = createSettingsPlanToken(planFingerprint);
+      } else {
+        delete parsedPlan.plan_token;
+      }
+      sendJson(response, 200, parsedPlan);
+      return;
+    }
+
+    if (!settingsPlanCanCreateToken(parsedPlan) || !consumeSettingsPlanToken(payload.plan_token, planFingerprint)) {
+      sendJson(response, 409, { error: "settings apply requires a matching current plan token" });
+      return;
+    }
+
+    const applyArgs = [
+      "apply",
+      settingId,
+      value,
+      "--menu",
+      menuId,
+      "--snapshot",
+      dataFile,
+      "--expect-current-value",
+      String(parsedPlan.current_value || ""),
+      "--expect-current-label",
+      String(parsedPlan.current_label || ""),
+      "--expect-target-file",
+      String(parsedPlan.target_file || ""),
+      "--expect-setting-kind",
+      String(parsedPlan.setting_kind || ""),
+      "--confirm",
+    ];
+    const applied = await runSettingsTool(applyArgs, menuId, dataFile);
+    if (applied.error) {
+      sendJson(response, 422, { error: String(applied.stderr || applied.error.message).trim() || "settings update failed" });
+      return;
+    }
+    const parsedApply = parseSettingsToolResult(applied.stdout);
+    if (!parsedApply) {
+      sendJson(response, 502, { error: "settings tool returned invalid JSON" });
+      return;
+    }
+    sendJson(response, 200, parsedApply);
   };
 }
 

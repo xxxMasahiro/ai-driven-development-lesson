@@ -71,13 +71,29 @@ if (data.status !== "ready" || data.setting_id !== "learning_mode" || data.reque
   console.error("lesson setting plan did not expose the expected safe plan");
   process.exit(1);
 }
+if (data.plan_token !== undefined) {
+  console.error("dashboard-settings CLI plan must not mint browser middleware plan tokens");
+  process.exit(1);
+}
 if (!data.requires_confirmation || data.snapshot_regenerated !== false) {
   console.error("settings plan must require confirmation without regenerating a snapshot");
   process.exit(1);
 }
 NODE
 
-run_settings apply learning_mode B --menu step_1_14 --confirm >/dev/null
+if run_settings apply learning_mode B --menu step_1_14 --expect-current-value C --confirm >/dev/null 2>&1; then
+  printf 'dashboard-settings must reject stale expected current values\n' >&2
+  exit 1
+fi
+awk -F '\t' '$1 !~ /^#/ && $2 == "A" { found = 1 } END { exit found ? 0 : 1 }' "$lesson14_mode"
+
+if run_settings apply learning_mode B --menu step_1_14 --expect-target-file learning/OTHER.tsv --confirm >/dev/null 2>&1; then
+  printf 'dashboard-settings must reject mismatched expected target files\n' >&2
+  exit 1
+fi
+awk -F '\t' '$1 !~ /^#/ && $2 == "A" { found = 1 } END { exit found ? 0 : 1 }' "$lesson14_mode"
+
+run_settings apply learning_mode B --menu step_1_14 --expect-current-value A --expect-setting-kind lesson --confirm >/dev/null
 awk -F '\t' '$1 !~ /^#/ && $2 == "B" { found = 1 } END { exit found ? 0 : 1 }' "$lesson14_mode"
 
 workflow_apply_json="$(run_settings apply workflow_language ar --menu step_1_14 --confirm)"

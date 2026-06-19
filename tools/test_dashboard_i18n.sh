@@ -96,8 +96,18 @@ if (!keys.includes("settingsPage.notice.title") || !keys.includes("settingsPage.
   fail("Dashboard dictionaries must include the Settings refresh notice keys");
 }
 const consistencyKeys = [
+  "sidebar.readOnlyNotice",
+  "designStudio.result.technicalDetails",
+  "settingsPage.change.approvalRequired",
+  "settingsPage.modal.afterApprovalMeansExternalApproval",
+  "settingsPage.modal.gitSettingsBoundary",
+  "settingsPage.modal.planTokenMissing",
+  "settingsPage.modal.planTokenStale",
+  "settingsPage.modal.technicalDetails",
   "settingsPage.modal.consistencyTitle",
   "settingsPage.modal.planBlocked",
+  "settingsPage.value.workflow.afterApproval",
+  "settingsPage.value.not_applicable",
   "settingsPage.consistency.noApprovedWritePath",
   "settingsPage.consistency.worktreeRequiresBranch",
   "settingsPage.consistency.prCreationRequiresBranch",

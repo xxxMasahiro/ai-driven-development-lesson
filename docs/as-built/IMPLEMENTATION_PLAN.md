@@ -4748,3 +4748,40 @@ git diff --check
 ```
 
 Stop and ask before changing runtime behavior, data production, design-system authority, dependencies, Git/CI behavior, external product writes, or any existing-feature tradeoff.
+
+## Dashboard Control Center Settings Control Policy Refinement Implementation Plan
+
+SYNC-ID: dashboard_control_center_settings_control_policy_refinement
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,tools/dashboard-settings,vite.config.mjs,dashboard-control-center/src/dashboardData.js,dashboard-control-center/src/App.jsx,dashboard-control-center/src/i18n.js,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_settings.sh,tools/test_dashboard_control_center.sh,tools/test_dashboard_i18n.sh,tools/check_dashboard_design_system.sh,tools/test_dashboard_design_studio_events.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_dashboard_settings.sh,tools/test_dashboard_control_center.sh,tools/test_dashboard_i18n.sh,tools/check_dashboard_design_system.sh,tools/test_dashboard_design_studio_events.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+Implemented order:
+
+1. Synchronized this sync ID across the contract, requirements, specification, implementation plan, tracker, and handoff before runtime edits.
+2. Extended `tools/dashboard-settings` so guarded apply can verify expected current value, current label, setting kind, and target file at the owner layer before writes.
+3. Added Settings plan-token creation and consumption to `vite.config.mjs`, matching the Design Studio one-time server-memory token pattern and preserving same-origin, JSON, POST, body-size, unknown-field, and `execFile` boundaries.
+4. Updated `dashboard-control-center/src/dashboardData.js` so Settings mutation responses and requests validate and carry `plan_token`, `snapshot_id`, and `content_hash`.
+5. Updated `dashboard-control-center/src/App.jsx` so planned Settings changes keep token state, invalidate stale plans on draft/menu/setting/snapshot changes, require a current token for apply, and present Git workflow settings as saved settings rather than browser-run operations.
+6. Updated `dashboard-control-center/src/i18n.js` for manual, automatic, approval-required, allowed, disallowed, not-applicable, technical-details, token error, and read-only boundary language across supported Dashboard locales.
+7. Kept Design Studio target scope unchanged and verified drift/event checks still pass.
+8. Promoted this sync ID after focused Settings, Control Center, i18n, Design Studio drift/event, repository-development, and sync checks passed.
+
+Verification sequence:
+
+```bash
+./tools/test_dashboard_settings.sh
+./tools/test_dashboard_control_center.sh
+./tools/test_dashboard_i18n.sh
+./tools/check_dashboard_design_system.sh
+./tools/test_dashboard_design_studio_events.sh
+./tools/check_as_built_sync_contract.sh
+./tools/check_as_built_docs.sh
+./tools/check_workflow_pair_sync.sh
+./tools/check_repository_development_workflow.sh
+./tools/test_repository_development_workflow.sh
+git diff --check
+```
+
+Use Playwright visual review for the Settings page and updated warning/technical-detail surfaces if focused Control Center tests do not already cover the rendered behavior.
+Stop and ask before arbitrary command execution, product repository writes, external product design writes, Git operations, CI waiting, OAuth, credentials, dependency changes, generated-file source edits, cleanup, delete, push, PR creation, merge, main sync, or any existing-feature tradeoff.

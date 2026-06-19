@@ -24,7 +24,7 @@ usage() {
 Usage:
   tools/dashboard-settings catalog [--menu <menu_id>]
   tools/dashboard-settings plan <setting_id> <value> [--menu <menu_id>]
-  tools/dashboard-settings apply <setting_id> <value> --confirm [--menu <menu_id>] [--snapshot <file>]
+  tools/dashboard-settings apply <setting_id> <value> --confirm [--menu <menu_id>] [--snapshot <file>] [--expect-current-value <value>] [--expect-current-label <label>] [--expect-target-file <file>] [--expect-setting-kind <kind>]
 
 Settings writes are limited to allowlisted lesson settings, policy-backed Git workflow settings, and product workflow Git usage settings.
 USAGE
@@ -352,6 +352,28 @@ dashboard_settings_prepare_plan() {
   esac
 }
 
+dashboard_settings_expectation_matches() {
+  local label="$1"
+  local expected="$2"
+  local actual="$3"
+  if [[ -n "$expected" && "$expected" != "$actual" ]]; then
+    printf 'Refusing to apply stale dashboard settings plan: %s changed.\n' "$label" >&2
+    return 1
+  fi
+}
+
+dashboard_settings_validate_expected_plan_state() {
+  local expected_current_value="$1"
+  local expected_current_label="$2"
+  local expected_target_file="$3"
+  local expected_setting_kind="$4"
+
+  dashboard_settings_expectation_matches "current value" "$expected_current_value" "$PLAN_CURRENT_VALUE"
+  dashboard_settings_expectation_matches "current label" "$expected_current_label" "$PLAN_CURRENT_LABEL"
+  dashboard_settings_expectation_matches "target file" "$expected_target_file" "$PLAN_TARGET_DISPLAY"
+  dashboard_settings_expectation_matches "setting kind" "$expected_setting_kind" "$PLAN_KIND"
+}
+
 dashboard_settings_json_result() {
   local result_status="$1"
   local applied="$2"
@@ -546,6 +568,10 @@ case "$cmd" in
     menu_id="$DEFAULT_MENU_ID"
     snapshot_file="$DEFAULT_SNAPSHOT_FILE"
     confirmed="false"
+    expected_current_value=""
+    expected_current_label=""
+    expected_target_file=""
+    expected_setting_kind=""
     while [[ $# -gt 0 ]]; do
       case "$1" in
         --menu)
@@ -562,6 +588,26 @@ case "$cmd" in
           confirmed="true"
           shift
           ;;
+        --expect-current-value)
+          [[ $# -ge 2 ]] || { printf '%s\n' '--expect-current-value requires a value.' >&2; exit 1; }
+          expected_current_value="$2"
+          shift 2
+          ;;
+        --expect-current-label)
+          [[ $# -ge 2 ]] || { printf '%s\n' '--expect-current-label requires a value.' >&2; exit 1; }
+          expected_current_label="$2"
+          shift 2
+          ;;
+        --expect-target-file)
+          [[ $# -ge 2 ]] || { printf '%s\n' '--expect-target-file requires a value.' >&2; exit 1; }
+          expected_target_file="$2"
+          shift 2
+          ;;
+        --expect-setting-kind)
+          [[ $# -ge 2 ]] || { printf '%s\n' '--expect-setting-kind requires a value.' >&2; exit 1; }
+          expected_setting_kind="$2"
+          shift 2
+          ;;
         *)
           usage >&2
           exit 1
@@ -573,6 +619,7 @@ case "$cmd" in
       exit 1
     }
     dashboard_settings_prepare_plan "$setting_id" "$raw_value" "$menu_id"
+    dashboard_settings_validate_expected_plan_state "$expected_current_value" "$expected_current_label" "$expected_target_file" "$expected_setting_kind"
     dashboard_settings_allow_snapshot_file "$snapshot_file"
     if [[ "${PLAN_POLICY_BLOCKED:-false}" == "true" ]]; then
       dashboard_settings_json_result blocked false

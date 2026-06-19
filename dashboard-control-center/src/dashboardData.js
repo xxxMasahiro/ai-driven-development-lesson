@@ -1667,6 +1667,7 @@ function validateSettingsMutationResponse(value, label) {
       "snapshot_regenerated",
       "snapshot_file",
       "tool_command",
+      "plan_token",
       "workflow_language",
       "display_locale",
       "ui_locale",
@@ -1712,6 +1713,12 @@ function validateSettingsMutationResponse(value, label) {
   }
   if (!safeDisplayCommand(result.tool_command)) {
     throw new Error(`${label} tool command is invalid`);
+  }
+  if (result.plan_token !== undefined && !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(displayText(result.plan_token, ""))) {
+    throw new Error(`${label} plan_token is invalid`);
+  }
+  if (result.applied === false && displayText(result.status, "") !== "blocked" && !result.plan_token) {
+    throw new Error(`${label} plan_token is required for unapplied non-blocked plans`);
   }
   if (result.setting_id === "workflow_language") {
     for (const key of ["workflow_language", "display_locale", "ui_locale", "direction"]) {
@@ -2382,13 +2389,16 @@ export async function planDashboardSettingChange(settingId, value, menuId) {
   );
 }
 
-export async function applyDashboardSettingChange(settingId, value, menuId) {
+export async function applyDashboardSettingChange(settingId, value, menuId, planToken, snapshotIdentity = {}) {
   return postDashboardSettingMutation(
     "/dashboard-settings/apply",
     {
       setting_id: settingId,
       value,
       menu_id: menuId,
+      plan_token: planToken,
+      snapshot_id: snapshotIdentity.snapshotId,
+      content_hash: snapshotIdentity.contentHash,
       confirm: true,
     },
     "dashboard settings apply",
