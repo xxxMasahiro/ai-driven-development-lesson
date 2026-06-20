@@ -2092,6 +2092,161 @@ function validateDesignStudioBoundary(boundary, label) {
   }
 }
 
+const DESIGN_STUDIO_BOUNDARY_KEYS = [
+  "proposal_only",
+  "writes_allowed",
+  "direct_apply_authority",
+  "external_product_apply",
+  "provider_dispatch",
+  "imagegen_executed",
+  "plan_token_created",
+  "apply_token_created",
+  "approval_receipt_created",
+];
+
+const DESIGN_STUDIO_PACKAGE_BOUNDARY_KEYS = [
+  ...DESIGN_STUDIO_BOUNDARY_KEYS,
+  "background_execution",
+  "credential_storage",
+  "browser_command_execution",
+  "raw_prompt_included",
+  "package_uploaded",
+];
+
+function validateDesignStudioPackageBoundary(boundary, label) {
+  validateDesignStudioBoundary(boundary, label);
+  const source = asObject(boundary, label);
+  for (const key of ["background_execution", "credential_storage", "browser_command_execution", "raw_prompt_included", "package_uploaded"]) {
+    if (source[key] !== false) {
+      throw new Error(`${label} ${key} must be false`);
+    }
+  }
+}
+
+function validateDesignStudioSha256Digest(value, label) {
+  if (!/^sha256:[a-f0-9]{64}$/i.test(displayText(value, ""))) {
+    throw new Error(`${label} must be a sha256 digest`);
+  }
+}
+
+function safeDesignStudioPackagePath(value) {
+  const normalized = safeRelativePath(displayText(value, ""));
+  if (!normalized) {
+    return "";
+  }
+  const allowedPrefixes = [
+    ".dashboard-design-studio-events/agent-packages/",
+    "external-test-store/agent-packages/",
+  ];
+  if (!allowedPrefixes.some((prefix) => normalized.startsWith(prefix)) || !normalized.endsWith("/package.json")) {
+    return "";
+  }
+  return normalized;
+}
+
+function validateDesignStudioResponseContracts(value, label) {
+  const contracts = asArray(value);
+  const schemaIds = new Set();
+  for (const contractValue of contracts) {
+    const contract = asObject(contractValue, `${label} response contract`);
+    assertAllowedKeys(contract, new Set(["schema_id", "required_fields", "forbidden_fields"]), `${label} response contract`);
+    const schemaId = displayText(contract.schema_id, "");
+    if (!["CandidateEnvelope", "DesignChangeProposal"].includes(schemaId)) {
+      throw new Error(`${label} response contract schema_id is invalid`);
+    }
+    schemaIds.add(schemaId);
+    for (const field of [...asArray(contract.required_fields), ...asArray(contract.forbidden_fields)]) {
+      if (!displayText(field, "")) {
+        throw new Error(`${label} response contract field is invalid`);
+      }
+    }
+  }
+  if (!schemaIds.has("CandidateEnvelope") || !schemaIds.has("DesignChangeProposal")) {
+    throw new Error(`${label} response contracts must include candidate and proposal schemas`);
+  }
+}
+
+function validateDesignStudioHandoffPackage(value, label, parent = {}) {
+  if (value === undefined || value === null) {
+    return;
+  }
+  const source = asObject(value, label);
+  assertAllowedKeys(source, new Set([
+    "package_id",
+    "package_version",
+    "package_status",
+    "package_path",
+    "package_digest",
+    "event_id",
+    "request_id",
+    "created_at",
+    "expires_at",
+    "next_action",
+    ...DESIGN_STUDIO_PACKAGE_BOUNDARY_KEYS,
+  ]), label);
+  for (const key of ["package_id", "package_version", "event_id", "request_id", "created_at", "expires_at", "next_action"]) {
+    if (!displayText(source[key], "")) {
+      throw new Error(`${label} ${key} is missing`);
+    }
+  }
+  if (displayText(source.package_status, "") !== "ready") {
+    throw new Error(`${label} package_status must be ready`);
+  }
+  if (!safeDesignStudioPackagePath(source.package_path)) {
+    throw new Error(`${label} package_path is invalid`);
+  }
+  if (parent.event_id && displayText(source.event_id, "") !== displayText(parent.event_id, "")) {
+    throw new Error(`${label} event_id must match the parent handoff`);
+  }
+  if (parent.request_id && displayText(source.request_id, "") !== displayText(parent.request_id, "")) {
+    throw new Error(`${label} request_id must match the parent handoff`);
+  }
+  validateDesignStudioSha256Digest(source.package_digest, `${label} package_digest`);
+  validateDesignStudioPackageBoundary(source, label);
+}
+
+function validateDesignStudioSubscriptionHandoff(value, label) {
+  const handoff = asObject(value, label);
+  assertAllowedKeys(handoff, new Set([
+    "handoff_id",
+    "event_id",
+    "request_id",
+    "target_ref",
+    "provider_mode",
+    "provider_status",
+    "request_kind",
+    "intent_digest",
+    "purpose_preview",
+    "base_snapshot_hash",
+    "response_contracts",
+    "import_commands",
+    "package_command",
+    "package",
+    "next_action",
+    ...DESIGN_STUDIO_PACKAGE_BOUNDARY_KEYS,
+  ]), label);
+  for (const key of ["handoff_id", "event_id", "request_id", "target_ref", "provider_status", "request_kind", "purpose_preview", "base_snapshot_hash", "next_action"]) {
+    if (!displayText(handoff[key], "")) {
+      throw new Error(`${label} ${key} is missing`);
+    }
+  }
+  if (displayText(handoff.provider_mode, "") !== "subscription-agent") {
+    throw new Error(`${label} provider_mode must be subscription-agent`);
+  }
+  validateDesignStudioSha256Digest(handoff.intent_digest, `${label} intent_digest`);
+  validateDesignStudioResponseContracts(handoff.response_contracts, label);
+  for (const command of asArray(handoff.import_commands)) {
+    if (!safeDisplayCommand(command)) {
+      throw new Error(`${label} import command is invalid`);
+    }
+  }
+  if (!safeDisplayCommand(handoff.package_command)) {
+    throw new Error(`${label} package command is invalid`);
+  }
+  validateDesignStudioHandoffPackage(handoff.package, `${label} package`, handoff);
+  validateDesignStudioPackageBoundary(handoff, label);
+}
+
 function validateDesignStudioDecisionGate(value, label) {
   if (value === undefined || value === null) {
     return;
@@ -2213,16 +2368,10 @@ function validateDesignStudio(data) {
   validateDesignStudioCandidateReview(designStudio.latest_candidate_review, "dashboard design_studio latest_candidate_review");
   validateDesignStudioProposalPreview(designStudio.latest_proposal_preview, "dashboard design_studio latest_proposal_preview");
   if (designStudio.subscription_agent_handoff) {
-    const handoff = asObject(designStudio.subscription_agent_handoff, "dashboard design_studio subscription_agent_handoff");
-    if (handoff.raw_prompt_included !== false) {
-      throw new Error("dashboard design_studio subscription_agent_handoff must not include raw prompts");
-    }
-    validateDesignStudioBoundary(handoff, "dashboard design_studio subscription_agent_handoff");
-    for (const command of asArray(handoff.import_commands)) {
-      if (!safeDisplayCommand(command)) {
-        throw new Error("dashboard design_studio subscription_agent_handoff import command is invalid");
-      }
-    }
+    validateDesignStudioSubscriptionHandoff(
+      designStudio.subscription_agent_handoff,
+      "dashboard design_studio subscription_agent_handoff",
+    );
   }
   if (designStudio.external_product_export) {
     const exported = asObject(designStudio.external_product_export, "dashboard design_studio external_product_export");

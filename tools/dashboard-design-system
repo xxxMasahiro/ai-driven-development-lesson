@@ -24,7 +24,10 @@ const candidateImportSyncId = "dashboard_design_studio_candidate_import_foundati
 const candidateImportRecordVersion = "2026-06-20.design-studio-candidate-import";
 const proposalWorkflowSyncId = "dashboard_design_studio_proposal_workflow_foundation";
 const proposalWorkflowRecordVersion = "2026-06-21.design-studio-proposal-workflow";
-const secretLikePattern = /(SECRET|TOKEN|API_KEY|PASSWORD|PRIVATE_KEY)\s*[:=]\s*[^",\s]{8,}|sk-[A-Za-z0-9]{20,}|BEGIN (RSA |OPENSSH |EC |DSA )?PRIVATE KEY/i;
+const subscriptionHandoffPackageSyncId = "dashboard_design_studio_subscription_agent_handoff_package";
+const subscriptionHandoffPackageRecordVersion = "2026-06-21.subscription-agent-handoff-package";
+const agentPackageDir = path.join(eventStoreDir, "agent-packages");
+const secretLikePattern = /(SECRET|TOKEN|API_KEY|PASSWORD|PRIVATE_KEY)\s*[:=]\s*[^",\s]{8,}|sk-[A-Za-z0-9]{20,}|gh[pousr]_[A-Za-z0-9_]{20,}|AKIA[0-9A-Z]{16}|BEGIN (RSA |OPENSSH |EC |DSA )?PRIVATE KEY/i;
 const supportedInteractionValues = {
   component: new Set(["tooltip-copy"]),
   tooltip_trigger: new Set(["hover-only", "disabled"]),
@@ -1412,7 +1415,7 @@ function loadSources() {
 }
 
 function usage() {
-  console.error("Usage: ./tools/dashboard-design-system <check|write|emit-css|emit-js|emit-orchestration|plan-interaction|apply-interaction|queue-request|list-events|event-status|cancel-event|retry-event|dead-letter-event|import-candidate|import-proposal|list-imports|proposal-preview|candidate-review|agent-handoff|export-proposal|provider-policy|transaction-preview|proposal-status> [--component tooltip-copy] [--target-scope dashboard-control-center] [--theme-accent blue|teal|slate] [--density compact|balanced|comfortable] [--radius-scale compact|standard|soft] [--typography-scale standard|large] [--action-control-height 32px|34px|38px] [--action-control-padding '6px 10px'|'8px 11px'|'9px 13px'] [--compact-control-height 30px|32px|34px] [--compact-control-padding '4px 8px'|'5px 10px'|'6px 12px'] [--form-control-height 38px|40px|44px] [--form-control-padding '0 9px'|'0 10px'|'0 12px'] [--icon-button-size 34px|38px|42px] [--control-font-size 0.82rem|0.84rem|0.9rem] [--card-padding 12px|14px|16px] [--card-gap 8px|10px|12px] [--row-padding '9px 10px'|'10px 12px'|'12px 14px'] [--row-gap 8px|10px|12px] [--technical-affordance-gap 4px|6px|8px] [--technical-source-max-width 220px|260px|300px] [--technical-evidence-max-width 260px|292px|320px] [--technical-preview-chip-max-width 320px|360px|420px] [--page-header-padding '16px 18px'|'18px 20px'|'20px 22px'] [--metadata-gap 6px|8px|10px] [--page-icon-size 44px|52px|56px] [--badge-gap 4px|5px|6px] [--badge-height 24px|26px|28px] [--mode-badge-padding '3px 10px'|'4px 14px'|'5px 16px'] [--badge-font-size 0.72rem|0.76rem|0.8rem] [--mode-badge-font-size 0.74rem|0.78rem|0.82rem] [--tooltip-trigger hover-only|disabled] [--tooltip-hide-policy pointer-leave] [--tooltip-placement top] [--copy-feedback-trigger hover-only|disabled] [--copy-feedback-placement top] [--target-ref dashboard-control-center|external-product] [--provider-mode manual|subscription-agent|api-key] [--request-kind design-intent|mock|template|manual-proposal] [--intent-text text] [--event-id id] [--import-id id] [--reason text] [--input file.json] [--idempotency-key key] [--confirm]");
+  console.error("Usage: ./tools/dashboard-design-system <check|write|emit-css|emit-js|emit-orchestration|plan-interaction|apply-interaction|queue-request|list-events|event-status|cancel-event|retry-event|dead-letter-event|import-candidate|import-proposal|list-imports|proposal-preview|candidate-review|agent-handoff|agent-package|export-proposal|provider-policy|transaction-preview|proposal-status> [--component tooltip-copy] [--target-scope dashboard-control-center] [--theme-accent blue|teal|slate] [--density compact|balanced|comfortable] [--radius-scale compact|standard|soft] [--typography-scale standard|large] [--action-control-height 32px|34px|38px] [--action-control-padding '6px 10px'|'8px 11px'|'9px 13px'] [--compact-control-height 30px|32px|34px] [--compact-control-padding '4px 8px'|'5px 10px'|'6px 12px'] [--form-control-height 38px|40px|44px] [--form-control-padding '0 9px'|'0 10px'|'0 12px'] [--icon-button-size 34px|38px|42px] [--control-font-size 0.82rem|0.84rem|0.9rem] [--card-padding 12px|14px|16px] [--card-gap 8px|10px|12px] [--row-padding '9px 10px'|'10px 12px'|'12px 14px'] [--row-gap 8px|10px|12px] [--technical-affordance-gap 4px|6px|8px] [--technical-source-max-width 220px|260px|300px] [--technical-evidence-max-width 260px|292px|320px] [--technical-preview-chip-max-width 320px|360px|420px] [--page-header-padding '16px 18px'|'18px 20px'|'20px 22px'] [--metadata-gap 6px|8px|10px] [--page-icon-size 44px|52px|56px] [--badge-gap 4px|5px|6px] [--badge-height 24px|26px|28px] [--mode-badge-padding '3px 10px'|'4px 14px'|'5px 16px'] [--badge-font-size 0.72rem|0.76rem|0.8rem] [--mode-badge-font-size 0.74rem|0.78rem|0.82rem] [--tooltip-trigger hover-only|disabled] [--tooltip-hide-policy pointer-leave] [--tooltip-placement top] [--copy-feedback-trigger hover-only|disabled] [--copy-feedback-placement top] [--target-ref dashboard-control-center|external-product] [--provider-mode manual|subscription-agent|api-key] [--request-kind design-intent|mock|template|manual-proposal] [--intent-text text] [--event-id id] [--import-id id] [--reason text] [--input file.json] [--output file.json] [--idempotency-key key] [--confirm]");
   process.exit(2);
 }
 
@@ -1791,6 +1794,28 @@ function latestImportRecords(records) {
   return [...latestByImport.values()].sort((left, right) => Number(left.event_order || 0) - Number(right.event_order || 0));
 }
 
+function latestPackageRecords(records) {
+  const latestByPackage = new Map();
+  for (const record of records) {
+    if (!record || record.sync_id !== subscriptionHandoffPackageSyncId || !record.package_id) {
+      continue;
+    }
+    const previous = latestByPackage.get(record.package_id);
+    if (!previous || Number(record.event_order || 0) >= Number(previous.event_order || 0)) {
+      latestByPackage.set(record.package_id, record);
+    }
+  }
+  return [...latestByPackage.values()].sort((left, right) => Number(left.event_order || 0) - Number(right.event_order || 0));
+}
+
+function latestPackageForEvent(records, eventId) {
+  return [...latestPackageRecords(records)].reverse().find((record) => record.event_id === eventId) || null;
+}
+
+function latestSubscriptionEvent(records) {
+  return [...latestEventRecords(records)].reverse().find((record) => record.provider_mode === "subscription-agent") || null;
+}
+
 function boundedStringList(value, limit = 8) {
   if (!Array.isArray(value)) {
     return [];
@@ -1931,14 +1956,183 @@ function providerPolicyPublic(orchestration, providerMode = "api-key") {
   };
 }
 
-function agentHandoffPublic(record, orchestration) {
+function handoffIdForEvent(record) {
+  return `dsh:${sha256Text(`handoff:${record.event_id}:${record.updated_at || record.created_at}`).slice(0, 24)}`;
+}
+
+function responseContracts(orchestration) {
+  const proposalSchema = schemaContract(orchestration, "DesignChangeProposal");
+  const candidateSchema = schemaContract(orchestration, "CandidateEnvelope");
+  return [
+    {
+      schema_id: "CandidateEnvelope",
+      required_fields: candidateSchema.requiredFields || [],
+      forbidden_fields: candidateSchema.forbiddenFields || [],
+    },
+    {
+      schema_id: "DesignChangeProposal",
+      required_fields: proposalSchema.requiredFields || [],
+      forbidden_fields: proposalSchema.forbiddenFields || [],
+    },
+  ];
+}
+
+function packageBoundary() {
+  return {
+    ...proposalBoundary(),
+    background_execution: false,
+    credential_storage: false,
+    browser_command_execution: false,
+    raw_prompt_included: false,
+    package_uploaded: false,
+  };
+}
+
+function packageIdForEvent(record) {
+  return `dsp:${sha256Text(`agent-package:${record.event_id}:${record.request_id}`).slice(0, 24)}`;
+}
+
+function defaultPackageRelativePath(record) {
+  return `.dashboard-design-studio-events/agent-packages/${packageIdForEvent(record)}/package.json`;
+}
+
+function relativePackagePath(filePath) {
+  const rootRelative = path.relative(root, filePath);
+  if (!rootRelative.startsWith("..") && !path.isAbsolute(rootRelative)) {
+    return rootRelative;
+  }
+  const storeRelative = path.relative(eventStoreDir, filePath);
+  if (!storeRelative.startsWith("..") && !path.isAbsolute(storeRelative)) {
+    return `external-test-store/${storeRelative.replace(/\\/g, "/")}`;
+  }
+  return "external-test-store/agent-packages/package.json";
+}
+
+function safePackageOutputPath(value, record) {
+  const fallback = path.join(agentPackageDir, packageIdForEvent(record), "package.json");
+  const resolved = value ? path.resolve(root, value) : fallback;
+  fs.mkdirSync(agentPackageDir, { recursive: true });
+  const relative = path.relative(agentPackageDir, resolved);
+  if (relative.startsWith("..") || path.isAbsolute(relative)) {
+    stop("agent-package output must stay under .dashboard-design-studio-events/agent-packages");
+  }
+  if (path.basename(resolved) !== "package.json") {
+    stop("agent-package output file must be named package.json");
+  }
+  const outputStat = fs.existsSync(resolved) ? fs.lstatSync(resolved) : null;
+  if (outputStat?.isSymbolicLink()) {
+    stop("agent-package output must not use a symlinked package file");
+  }
+  const packageRootReal = fs.realpathSync.native(agentPackageDir);
+  let existingParent = path.dirname(resolved);
+  while (!fs.existsSync(existingParent)) {
+    const nextParent = path.dirname(existingParent);
+    if (nextParent === existingParent) {
+      stop("agent-package output parent could not be resolved safely");
+    }
+    existingParent = nextParent;
+  }
+  const parentReal = fs.realpathSync.native(existingParent);
+  const realRelative = path.relative(packageRootReal, parentReal);
+  if (realRelative.startsWith("..") || path.isAbsolute(realRelative)) {
+    stop("agent-package output must stay under the real agent package directory");
+  }
+  return resolved;
+}
+
+function packageExpiresAt(now) {
+  const value = new Date(Date.parse(now) + 7 * 24 * 60 * 60 * 1000);
+  return Number.isNaN(value.getTime()) ? "manual_expiry_required" : value.toISOString();
+}
+
+function buildAgentPackagePayload(record, orchestration, outputPath, now) {
+  const payload = {
+    package_id: packageIdForEvent(record),
+    package_version: subscriptionHandoffPackageRecordVersion,
+    sync_id: subscriptionHandoffPackageSyncId,
+    event_id: record.event_id,
+    request_id: record.request_id,
+    handoff_id: handoffIdForEvent(record),
+    target_ref: record.target_ref,
+    target_apply_mode: record.target_apply_mode,
+    provider_mode: "subscription-agent",
+    provider_status: record.provider_status,
+    request_kind: record.request_kind,
+    base_snapshot_hash: record.base_snapshot_hash,
+    purpose_digest: record.purpose_digest,
+    purpose_preview: record.purpose_preview,
+    intent_digest: record.intent_digest,
+    intent_length: record.intent_length,
+    response_contracts: responseContracts(orchestration),
+    import_commands: [
+      "tools/dashboard-design-system import-candidate --input candidate.json",
+      "tools/dashboard-design-system import-proposal --input proposal.json",
+    ],
+    return_policy: "return_candidate_or_proposal_json_for_manual_import",
+    package_path: relativePackagePath(outputPath),
+    created_at: now,
+    expires_at: packageExpiresAt(now),
+    next_action: "run_subscription_agent_outside_dashboard_and_return_structured_json",
+    ...packageBoundary(),
+  };
+  assertNoSecretLikePayload(payload, "agent package");
+  return {
+    ...payload,
+    package_digest: `sha256:${sha256Text(JSON.stringify(payload))}`,
+  };
+}
+
+function buildPackageRecord(packagePayload, outputPath, records, now) {
+  const record = {
+    record_version: subscriptionHandoffPackageRecordVersion,
+    sync_id: subscriptionHandoffPackageSyncId,
+    record_type: "design_studio_handoff_package",
+    record_id: `record:${sha256Text(`${packagePayload.package_id}:${records.length + 1}:${now}`).slice(0, 24)}`,
+    package_id: packagePayload.package_id,
+    package_version: packagePayload.package_version,
+    package_status: "ready",
+    package_path: relativePackagePath(outputPath),
+    package_digest: packagePayload.package_digest,
+    event_id: packagePayload.event_id,
+    request_id: packagePayload.request_id,
+    provider_mode: "subscription-agent",
+    target_ref: packagePayload.target_ref,
+    created_at: now,
+    updated_at: now,
+    expires_at: packagePayload.expires_at,
+    event_order: records.length + 1,
+    next_action: packagePayload.next_action,
+    audit_receipt: null,
+    ...packageBoundary(),
+  };
+  return attachAuditReceipt(record);
+}
+
+function packageRecordPublic(record) {
   if (!record) {
     return null;
   }
-  const proposalSchema = schemaContract(orchestration, "DesignChangeProposal");
-  const candidateSchema = schemaContract(orchestration, "CandidateEnvelope");
   return {
-    handoff_id: `dsh:${sha256Text(`handoff:${record.event_id}:${record.updated_at || record.created_at}`).slice(0, 24)}`,
+    package_id: record.package_id,
+    package_version: record.package_version,
+    package_status: record.package_status,
+    package_path: record.package_path,
+    package_digest: record.package_digest,
+    event_id: record.event_id,
+    request_id: record.request_id,
+    created_at: record.created_at,
+    expires_at: record.expires_at,
+    next_action: record.next_action,
+    ...packageBoundary(),
+  };
+}
+
+function agentHandoffPublic(record, orchestration, packageRecord = null) {
+  if (!record || record.provider_mode !== "subscription-agent") {
+    return null;
+  }
+  return {
+    handoff_id: handoffIdForEvent(record),
     event_id: record.event_id,
     request_id: record.request_id,
     target_ref: record.target_ref,
@@ -1946,28 +2140,17 @@ function agentHandoffPublic(record, orchestration) {
     provider_status: record.provider_status,
     request_kind: record.request_kind,
     intent_digest: record.intent_digest,
-    intent_preview: record.intent_preview,
     purpose_preview: record.purpose_preview,
     base_snapshot_hash: record.base_snapshot_hash,
-    response_contracts: [
-      {
-        schema_id: "CandidateEnvelope",
-        required_fields: candidateSchema.requiredFields || [],
-        forbidden_fields: candidateSchema.forbiddenFields || [],
-      },
-      {
-        schema_id: "DesignChangeProposal",
-        required_fields: proposalSchema.requiredFields || [],
-        forbidden_fields: proposalSchema.forbiddenFields || [],
-      },
-    ],
+    response_contracts: responseContracts(orchestration),
     import_commands: [
       "tools/dashboard-design-system import-candidate --input candidate.json",
       "tools/dashboard-design-system import-proposal --input proposal.json",
     ],
+    package_command: `tools/dashboard-design-system agent-package --event-id ${record.event_id}`,
+    package: packageRecordPublic(packageRecord),
     next_action: "return_structured_proposal_for_manual_import",
-    raw_prompt_included: false,
-    ...proposalBoundary(),
+    ...packageBoundary(),
   };
 }
 
@@ -2089,6 +2272,8 @@ function proposalWorkflowStatusPayload(orchestration) {
   const imports = latestImportRecords(records);
   const proposal = latestProposalImport(records);
   const candidate = latestCandidateImport(records);
+  const subscriptionEvent = latestSubscriptionEvent(records);
+  const subscriptionPackage = subscriptionEvent ? latestPackageForEvent(records, subscriptionEvent.event_id) : null;
   return {
     status: "passed",
     sync_id: proposalWorkflowSyncId,
@@ -2105,7 +2290,7 @@ function proposalWorkflowStatusPayload(orchestration) {
     history_rows: designStudioHistoryRows(events, imports),
     latest_candidate_review: candidateReviewPublic(candidate),
     latest_proposal_preview: proposalPreviewPublic(proposal),
-    subscription_agent_handoff: events.length ? agentHandoffPublic(events[events.length - 1], orchestration) : null,
+    subscription_agent_handoff: subscriptionEvent ? agentHandoffPublic(subscriptionEvent, orchestration, subscriptionPackage) : null,
     external_product_export: proposal ? externalProductExportPublic(proposal, orchestration, "external-product") : null,
     api_key_provider_policy: providerPolicyPublic(orchestration, "api-key"),
     owner_tool_transaction_preview: proposal ? transactionPreviewPublic(proposal, orchestration, "dashboard-control-center") : null,
@@ -2460,15 +2645,57 @@ function handleAgentHandoff(orchestration) {
   const options = parseOptionArgs(process.argv.slice(3));
   rejectUnknownOptions(options, new Set(["event_id"]), "agent-handoff");
   const eventId = requireOption(options, "event_id", "agent-handoff");
-  const record = findLatestEvent(readEventRecords(), eventId);
+  const records = readEventRecords();
+  const record = findLatestEvent(records, eventId);
   if (!record) {
     stop(`unknown Design Studio event: ${eventId}`, 1);
   }
+  if (record.provider_mode !== "subscription-agent") {
+    stop("agent-handoff requires a subscription-agent event", 1);
+  }
+  const packageRecord = latestPackageForEvent(records, eventId);
   process.stdout.write(`${JSON.stringify({
     status: "passed",
     sync_id: proposalWorkflowSyncId,
     store: proposalWorkflowStore(),
-    handoff: agentHandoffPublic(record, orchestration),
+    handoff: agentHandoffPublic(record, orchestration, packageRecord),
+  }, null, 2)}\n`);
+}
+
+function handleAgentPackage(orchestration) {
+  const options = parseOptionArgs(process.argv.slice(3));
+  rejectUnknownOptions(options, new Set(["event_id", "output"]), "agent-package");
+  const eventId = requireOption(options, "event_id", "agent-package");
+  const records = readEventRecords();
+  const record = findLatestEvent(records, eventId);
+  if (!record) {
+    stop(`unknown Design Studio event: ${eventId}`, 1);
+  }
+  if (record.provider_mode !== "subscription-agent") {
+    stop("agent-package requires a subscription-agent event", 1);
+  }
+  const outputPath = safePackageOutputPath(options.output, record);
+  const previous = latestPackageForEvent(records, eventId);
+  if (previous && previous.package_path === relativePackagePath(outputPath) && fs.existsSync(outputPath)) {
+    process.stdout.write(`${JSON.stringify({
+      status: "deduplicated",
+      sync_id: subscriptionHandoffPackageSyncId,
+      package: packageRecordPublic(previous),
+      handoff: agentHandoffPublic(record, orchestration, previous),
+    }, null, 2)}\n`);
+    return;
+  }
+  const now = isoNow();
+  const payload = buildAgentPackagePayload(record, orchestration, outputPath, now);
+  fs.mkdirSync(path.dirname(outputPath), { recursive: true });
+  fs.writeFileSync(outputPath, `${JSON.stringify(payload, null, 2)}\n`, "utf8");
+  const packageRecord = buildPackageRecord(payload, outputPath, records, now);
+  appendEventRecord(packageRecord);
+  process.stdout.write(`${JSON.stringify({
+    status: "passed",
+    sync_id: subscriptionHandoffPackageSyncId,
+    package: packageRecordPublic(packageRecord),
+    handoff: agentHandoffPublic(record, orchestration, packageRecord),
   }, null, 2)}\n`);
 }
 
@@ -2684,6 +2911,8 @@ if (command === "emit-css") {
   handleCandidateReview();
 } else if (command === "agent-handoff") {
   handleAgentHandoff(orchestration);
+} else if (command === "agent-package") {
+  handleAgentPackage(orchestration);
 } else if (command === "export-proposal") {
   handleExportProposal(orchestration);
 } else if (command === "provider-policy") {

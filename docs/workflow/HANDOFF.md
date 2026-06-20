@@ -2900,6 +2900,24 @@ Next safe action:
 
 - No remaining implementation action for this sync ID after focused verification.
 
+## Dashboard Design Studio Subscription-Agent Handoff Package Handoff
+
+SYNC-ID: dashboard_design_studio_subscription_agent_handoff_package
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/DASHBOARD_DATA_SCHEMA.tsv,tools/dashboard-design-system,tools/dashboard-data,dashboard-control-center/src/dashboardData.js,dashboard-control-center/src/App.jsx,dashboard-control-center/src/i18n.js,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_design_studio_events.sh,tools/test_dashboard_data.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_dashboard_design_studio_events.sh,tools/check_dashboard_design_system.sh,tools/test_dashboard_data.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+Restart context:
+
+- P2 added a CLI-only `agent-package` command and dashboard package metadata for subscription-agent events.
+- Package output stays under `.dashboard-design-studio-events/agent-packages/` or test-store equivalent, rejects symlink escapes, and does not execute, upload, or grant authority.
+- `proposal-status` only exposes subscription-agent handoff metadata for subscription-agent events and attaches package metadata after package generation.
+- Dashboard validation rejects unsupported handoff keys, unsafe package paths, mismatched event/request ids, raw prompt/payload/operation keys, secret-like data, and execution/write authority flags.
+
+Next safe action:
+
+- Proceed to P3 only after committing the implemented P2 slice; do not execute subscription agents, provider APIs, imagegen, external product writes, browser commands, Git/CI from the dashboard, or owner-tool apply from this handoff package.
+
 ## Dashboard Design Studio History Detail Handoff
 
 SYNC-ID: dashboard_design_studio_history_detail

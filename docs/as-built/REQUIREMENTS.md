@@ -2600,3 +2600,25 @@ Acceptance requirements:
 Non-scope:
 
 - Do not add provider dispatch, subscription-agent background execution, imagegen, OCR trust, mock editing, automatic apply, approval mutation, external product writes, Git/CI execution, credentials, dependencies, push, merge, or browser command execution.
+
+## Implemented Dashboard Design Studio Subscription-Agent Handoff Package Requirements
+
+SYNC-ID: dashboard_design_studio_subscription_agent_handoff_package
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/DASHBOARD_DATA_SCHEMA.tsv,tools/dashboard-design-system,tools/dashboard-data,dashboard-control-center/src/dashboardData.js,dashboard-control-center/src/App.jsx,dashboard-control-center/src/i18n.js,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_design_studio_events.sh,tools/test_dashboard_data.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_dashboard_design_studio_events.sh,tools/check_dashboard_design_system.sh,tools/test_dashboard_data.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+Design Studio creates a local, redacted, display-only package for handing a subscription-agent event to an external CLI agent without running that agent.
+The package makes return contracts clear and preserves proposal-only boundaries while the dashboard renders only safe package metadata.
+
+Acceptance requirements:
+
+- `tools/dashboard-design-system agent-package --event-id ... --output ...` writes only under `.dashboard-design-studio-events/agent-packages/` or the test event-store equivalent and records metadata without executing agents, providers, browsers, Git/CI, imagegen, or product writes.
+- Package metadata includes package id/version, event/request ids, target, provider mode, response contracts, import commands, digest, expiry, and explicit false execution/write boundary flags.
+- Package contents and dashboard projections exclude raw prompt text, raw payloads, proposal operations, secrets, credentials, plan tokens, apply tokens, approval receipts, absolute paths, and executable browser commands.
+- `proposal-status` exposes subscription-agent handoff metadata only for subscription-agent events, not arbitrary manual events.
+- Dashboard validation, tests, and UI show package readiness as read-only metadata.
+
+Non-scope:
+
+- Do not execute subscription agents, call provider APIs, upload packages, store credentials, create approval receipts, create plan/apply tokens, apply changes, mutate external products, run Git/CI, add dependencies, push, merge, or add browser command execution.

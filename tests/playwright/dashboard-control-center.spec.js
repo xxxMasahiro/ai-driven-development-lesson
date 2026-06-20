@@ -836,14 +836,52 @@ function addDesignStudioProposalWorkflowFixture(data) {
       provider_mode: "subscription-agent",
       provider_status: "manual_required",
       request_kind: "manual-proposal",
+      intent_digest: "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      purpose_preview: "Prepare a display-only Design Studio proposal for manual review.",
+      base_snapshot_hash: "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
       response_contracts: [
-        { schema_id: "CandidateEnvelope" },
-        { schema_id: "DesignChangeProposal" },
+        {
+          schema_id: "CandidateEnvelope",
+          required_fields: ["schema_id", "candidate_id", "source_kind", "payload"],
+          forbidden_fields: ["secrets", "credentials", "provider_dispatch"],
+        },
+        {
+          schema_id: "DesignChangeProposal",
+          required_fields: ["schema_id", "proposal_id", "operations"],
+          forbidden_fields: ["secrets", "credentials", "direct_apply_authority"],
+        },
       ],
       import_commands: [
         "tools/dashboard-design-system import-candidate --input candidate.json",
         "tools/dashboard-design-system import-proposal --input proposal.json",
       ],
+      package_command: "tools/dashboard-design-system agent-package --event-id dse:subscription-agent-plan-0001",
+      package: {
+        package_id: "dsp:subscription-agent-plan-0001",
+        package_version: "2026-06-21.subscription-agent-handoff-package",
+        package_status: "ready",
+        package_path: ".dashboard-design-studio-events/agent-packages/dsp:subscription-agent-plan-0001/package.json",
+        package_digest: "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        event_id: "dse:subscription-agent-plan-0001",
+        request_id: "dsr:subscription-agent-plan-0001",
+        created_at: "2026-06-21T00:00:00.000Z",
+        expires_at: "2026-06-28T00:00:00.000Z",
+        next_action: "run_subscription_agent_outside_dashboard_and_return_structured_json",
+        proposal_only: true,
+        writes_allowed: false,
+        direct_apply_authority: false,
+        external_product_apply: false,
+        provider_dispatch: false,
+        imagegen_executed: false,
+        plan_token_created: false,
+        apply_token_created: false,
+        approval_receipt_created: false,
+        background_execution: false,
+        credential_storage: false,
+        browser_command_execution: false,
+        raw_prompt_included: false,
+        package_uploaded: false,
+      },
       next_action: "return_structured_proposal_for_manual_import",
       raw_prompt_included: false,
       proposal_only: true,
@@ -855,6 +893,10 @@ function addDesignStudioProposalWorkflowFixture(data) {
       plan_token_created: false,
       apply_token_created: false,
       approval_receipt_created: false,
+      background_execution: false,
+      credential_storage: false,
+      browser_command_execution: false,
+      package_uploaded: false,
     },
     external_product_export: {
       export_id: "dse:proposal-alpha-0001",
@@ -1766,6 +1808,10 @@ test.describe("English dashboard control center", () => {
     await expect(designStudioView).toContainText("Latest candidate");
     await expect(designStudioView).toContainText("Latest proposal");
     await expect(designStudioView).toContainText("Operation count");
+    await expect(designStudioView).toContainText("Package status");
+    await expect(designStudioView).toContainText("ready");
+    await expect(designStudioView).toContainText(".dashboard-design-studio-events/agent-packages/dsp:subscription-agent-plan-0001/package.json");
+    await expect(designStudioView).toContainText("tools/dashboard-design-system agent-package --event-id dse:subscription-agent-plan-0001");
     await expect(designStudioView).toContainText("Plan only");
     await expect(designStudioView).toContainText("Dry run");
     await expect(designStudioView).toContainText("No provider dispatch");

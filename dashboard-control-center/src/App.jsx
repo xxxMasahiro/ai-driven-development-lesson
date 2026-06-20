@@ -7152,7 +7152,17 @@ function DesignStudioProposalWorkflowPanel({ data, t }) {
           </div>
           <StatusPill value={handoff.event_id ? "manual_required" : "unknown"} t={t} label={handoff.event_id ? t("designStudio.proposalWorkflow.manualImport") : statusLabelForChip("unknown", t)} />
           <p>{displayText(handoff.next_action, t("designStudio.proposalWorkflow.handoffDetail"))}</p>
+          {handoff.package ? (
+            <>
+              <small>{t("designStudio.proposalWorkflow.packageStatus")}: {displayText(handoff.package.package_status, t("summary.none"))}</small>
+              <small>{t("designStudio.proposalWorkflow.packagePath")}: {technicalChip(handoff.package.package_path)}</small>
+              <small>{t("designStudio.proposalWorkflow.packageDigest")}: {technicalChip(handoff.package.package_digest)}</small>
+            </>
+          ) : (
+            <small>{t("designStudio.proposalWorkflow.packageWaiting")}</small>
+          )}
           <small>{t("designStudio.proposalWorkflow.responseContracts")}: {asArray(handoff.response_contracts).map((contract) => displayText(contract.schema_id, "")).filter(Boolean).join(", ") || t("summary.none")}</small>
+          {handoff.package_command ? <SourceBoundaryChips values={[handoff.package_command]} t={t} limit={1} variant="commands" labelKey="maintenance.sourceCommandItem" tooltipKey="maintenance.sourceCommandTooltip" /> : null}
           {asArray(handoff.import_commands).length ? <SourceBoundaryChips values={handoff.import_commands} t={t} limit={2} variant="commands" labelKey="maintenance.sourceCommandItem" tooltipKey="maintenance.sourceCommandTooltip" /> : null}
         </article>
         <article className="design-studio-orchestration__card">

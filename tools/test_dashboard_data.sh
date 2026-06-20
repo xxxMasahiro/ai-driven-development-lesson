@@ -1034,6 +1034,55 @@ if (designStudio.latest_candidate_review) {
     fail('design_studio candidate review must not execute imagegen or product writes');
   }
 }
+if (designStudio.subscription_agent_handoff) {
+  const handoff = designStudio.subscription_agent_handoff;
+  if (handoff.provider_mode !== 'subscription-agent') {
+    fail(`design_studio subscription handoff provider_mode is invalid: ${handoff.provider_mode}`);
+  }
+  if (handoff.raw_prompt_included !== false || handoff.background_execution !== false || handoff.credential_storage !== false || handoff.browser_command_execution !== false || handoff.package_uploaded !== false) {
+    fail('design_studio subscription handoff must remain a display-only package boundary');
+  }
+  for (const key of ['proposal_only', 'writes_allowed', 'direct_apply_authority', 'external_product_apply', 'provider_dispatch', 'imagegen_executed', 'plan_token_created', 'apply_token_created', 'approval_receipt_created']) {
+    const expected = key === 'proposal_only';
+    if (handoff[key] !== expected) {
+      fail(`design_studio subscription handoff ${key} boundary is invalid`);
+    }
+  }
+  if (!/^sha256:[a-f0-9]{64}$/.test(handoff.intent_digest || '')) {
+    fail('design_studio subscription handoff must expose an intent digest');
+  }
+  requireSafeDisplayCommand(handoff.package_command, 'design_studio subscription handoff package');
+  const schemaIds = new Set((handoff.response_contracts || []).map((contract) => contract.schema_id));
+  if (!schemaIds.has('CandidateEnvelope') || !schemaIds.has('DesignChangeProposal')) {
+    fail('design_studio subscription handoff must expose candidate and proposal response contracts');
+  }
+  for (const command of handoff.import_commands || []) {
+    requireSafeDisplayCommand(command, 'design_studio subscription handoff import');
+  }
+  if (handoff.package) {
+    const pkg = handoff.package;
+    if (pkg.event_id !== handoff.event_id || pkg.request_id !== handoff.request_id) {
+      fail('design_studio subscription handoff package must match the parent handoff event and request');
+    }
+    if (pkg.package_status !== 'ready' || !isDesignStudioPackagePath(pkg.package_path)) {
+      fail('design_studio subscription handoff package must be ready and scoped to a safe path');
+    }
+    if (!/^sha256:[a-f0-9]{64}$/.test(pkg.package_digest || '')) {
+      fail('design_studio subscription handoff package must expose a sha256 digest');
+    }
+    for (const key of ['proposal_only', 'writes_allowed', 'direct_apply_authority', 'external_product_apply', 'provider_dispatch', 'imagegen_executed', 'plan_token_created', 'apply_token_created', 'approval_receipt_created']) {
+      const expected = key === 'proposal_only';
+      if (pkg[key] !== expected) {
+        fail(`design_studio subscription package ${key} boundary is invalid`);
+      }
+    }
+    for (const key of ['background_execution', 'credential_storage', 'browser_command_execution', 'raw_prompt_included', 'package_uploaded']) {
+      if (pkg[key] !== false) {
+        fail(`design_studio subscription package ${key} must be false`);
+      }
+    }
+  }
+}
 if (designStudio.external_product_export && designStudio.external_product_export.target_apply_mode !== 'plan-only') {
   fail('design_studio external product export must stay plan-only');
 }
@@ -1242,6 +1291,16 @@ function isSafeScopedPath(pathValue) {
   }
   const path = pathValue.startsWith('product:') ? pathValue.slice('product:'.length) : pathValue;
   return !path.startsWith('/') && !path.startsWith('\\') && !/^[A-Za-z]:[\\/]/.test(path) && !path.split(/[\\/]+/).includes('..');
+}
+function isDesignStudioPackagePath(pathValue) {
+  if (!isSafeScopedPath(pathValue)) {
+    return false;
+  }
+  return (
+    (pathValue.startsWith('.dashboard-design-studio-events/agent-packages/') ||
+      pathValue.startsWith('external-test-store/agent-packages/')) &&
+    pathValue.endsWith('/package.json')
+  );
 }
 const settingsGroupIds = new Set();
 for (const group of settings.groups) {

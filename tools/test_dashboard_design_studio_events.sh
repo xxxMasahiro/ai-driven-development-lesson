@@ -438,12 +438,149 @@ function fail(message) {
 if (handoff.event_id !== eventId || handoff.raw_prompt_included !== false) {
   fail("agent-handoff must expose metadata without raw prompt");
 }
+if (handoff.provider_mode !== "subscription-agent" || handoff.package !== null) {
+  fail("agent-handoff must target subscription-agent events and wait for an explicit package");
+}
 const schemaIds = new Set((handoff.response_contracts || []).map((contract) => contract.schema_id));
 if (!schemaIds.has("CandidateEnvelope") || !schemaIds.has("DesignChangeProposal")) {
   fail("agent-handoff must include import response contracts");
 }
-if (handoff.writes_allowed !== false || handoff.provider_dispatch !== false) {
+if (!handoff.package_command || !handoff.package_command.includes("agent-package --event-id")) {
+  fail("agent-handoff must expose a display-only package command");
+}
+if (handoff.writes_allowed !== false || handoff.provider_dispatch !== false || handoff.background_execution !== false) {
   fail("agent-handoff must not grant write or dispatch authority");
+}
+NODE
+
+package_out="$TMP_DIR/agent-package.json"
+"$ROOT/tools/dashboard-design-system" agent-package --event-id "$subscription_event_id" >"$package_out"
+node - "$package_out" "$subscription_event_id" <<'NODE'
+const fs = require("fs");
+const [file, eventId] = process.argv.slice(2);
+const payload = JSON.parse(fs.readFileSync(file, "utf8"));
+const pkg = payload.package || {};
+const handoff = payload.handoff || {};
+function fail(message) {
+  console.error(message);
+  process.exit(1);
+}
+if (payload.status !== "passed" || payload.sync_id !== "dashboard_design_studio_subscription_agent_handoff_package") {
+  fail("agent-package must expose the subscription handoff package sync id");
+}
+if (pkg.event_id !== eventId || pkg.package_status !== "ready") {
+  fail("agent-package must create a ready package for the requested subscription event");
+}
+if (!/^sha256:[a-f0-9]{64}$/.test(pkg.package_digest || "")) {
+  fail("agent-package must expose a sha256 package digest");
+}
+if (!pkg.package_path?.startsWith("external-test-store/agent-packages/")) {
+  fail(`agent-package test package path must stay under the test event store, got ${pkg.package_path}`);
+}
+for (const key of ["writes_allowed", "direct_apply_authority", "external_product_apply", "provider_dispatch", "imagegen_executed", "plan_token_created", "apply_token_created", "approval_receipt_created", "background_execution", "credential_storage", "browser_command_execution", "raw_prompt_included", "package_uploaded"]) {
+  if (pkg[key] !== false || handoff[key] !== false) {
+    fail(`agent-package boundary ${key} must be false`);
+  }
+}
+if (handoff.package?.package_id !== pkg.package_id) {
+  fail("agent-package must attach package metadata to the public handoff");
+}
+NODE
+
+node - "$package_out" <<'NODE'
+const fs = require("fs");
+const payload = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
+function fail(message) {
+  console.error(message);
+  process.exit(1);
+}
+const forbiddenKeys = new Set(["intent_text", "payload", "operations"]);
+function walk(value, path = []) {
+  if (!value || typeof value !== "object") {
+    return;
+  }
+  for (const [key, child] of Object.entries(value)) {
+    if (forbiddenKeys.has(key)) {
+      fail(`agent-package output exposed raw field key ${key}`);
+    }
+    walk(child, [...path, key]);
+  }
+}
+walk(payload);
+if (/PASSWORD=|gh[pousr]_|AKIA[0-9A-Z]{16}|sk-[A-Za-z0-9]{20}|BEGIN (RSA |OPENSSH |EC |DSA )?PRIVATE KEY/i.test(JSON.stringify(payload))) {
+  fail("agent-package output exposed secret-like data");
+}
+NODE
+package_path="$(node -e 'const fs = require("fs"); const payload = JSON.parse(fs.readFileSync(process.argv[1], "utf8")); const p = payload.package.package_path.replace(/^external-test-store\//, ""); console.log(process.env.DASHBOARD_DESIGN_STUDIO_EVENT_STORE_DIR + "/" + p);' "$package_out")"
+if [[ ! -f "$package_path" ]]; then
+  printf 'agent-package did not write the package.json artifact\n' >&2
+  exit 1
+fi
+node - "$package_path" <<'NODE'
+const fs = require("fs");
+const payload = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
+function fail(message) {
+  console.error(message);
+  process.exit(1);
+}
+const forbiddenKeys = new Set(["intent_text", "payload", "operations"]);
+function walk(value) {
+  if (!value || typeof value !== "object") {
+    return;
+  }
+  for (const [key, child] of Object.entries(value)) {
+    if (forbiddenKeys.has(key)) {
+      fail(`agent-package artifact exposed raw field key ${key}`);
+    }
+    walk(child);
+  }
+}
+walk(payload);
+if (/PASSWORD=|gh[pousr]_|AKIA[0-9A-Z]{16}|sk-[A-Za-z0-9]{20}|BEGIN (RSA |OPENSSH |EC |DSA )?PRIVATE KEY/i.test(JSON.stringify(payload))) {
+  fail("agent-package artifact exposed secret-like data");
+}
+NODE
+
+package_lines_before="$(wc -l <"$STORE_DIR/events.jsonl")"
+package_dedupe_out="$TMP_DIR/agent-package-dedupe.json"
+"$ROOT/tools/dashboard-design-system" agent-package --event-id "$subscription_event_id" >"$package_dedupe_out"
+node - "$package_dedupe_out" <<'NODE'
+const fs = require("fs");
+const payload = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
+if (payload.status !== "deduplicated" || payload.package?.package_status !== "ready") {
+  console.error("agent-package must deduplicate an existing package artifact");
+  process.exit(1);
+}
+NODE
+package_lines_after="$(wc -l <"$STORE_DIR/events.jsonl")"
+if [[ "$package_lines_after" != "$package_lines_before" ]]; then
+  printf 'duplicate agent-package appended a new record\n' >&2
+  exit 1
+fi
+
+manual_package_err="$TMP_DIR/manual-package.err"
+if "$ROOT/tools/dashboard-design-system" agent-package --event-id "$event_id" >"$TMP_DIR/manual-package.json" 2>"$manual_package_err"; then
+  printf 'agent-package accepted a non-subscription event unexpectedly\n' >&2
+  exit 1
+fi
+grep 'requires a subscription-agent event' "$manual_package_err" >/dev/null
+
+symlink_package_err="$TMP_DIR/symlink-package.err"
+ln -s "$TMP_DIR" "$STORE_DIR/agent-packages/symlink-escape"
+if "$ROOT/tools/dashboard-design-system" agent-package --event-id "$subscription_event_id" --output "$STORE_DIR/agent-packages/symlink-escape/package.json" >"$TMP_DIR/symlink-package.json" 2>"$symlink_package_err"; then
+  printf 'agent-package accepted a symlink escape output path unexpectedly\n' >&2
+  exit 1
+fi
+grep 'must stay under the real agent package directory' "$symlink_package_err" >/dev/null
+
+packaged_handoff_out="$TMP_DIR/agent-handoff-packaged.json"
+"$ROOT/tools/dashboard-design-system" agent-handoff --event-id "$subscription_event_id" >"$packaged_handoff_out"
+node - "$packaged_handoff_out" <<'NODE'
+const fs = require("fs");
+const payload = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
+if (payload.handoff?.package?.package_status !== "ready") {
+  console.error("agent-handoff must include package metadata after package generation");
+  process.exit(1);
 }
 NODE
 
@@ -522,6 +659,18 @@ if (!payload.latest_proposal_preview || !payload.latest_candidate_review) {
 }
 if (payload.api_key_provider_policy?.api_call_available !== false || payload.boundaries?.provider_dispatch !== false) {
   fail("proposal-status must expose blocked provider and dispatch boundaries");
+}
+const handoff = payload.subscription_agent_handoff || {};
+if (handoff.provider_mode !== "subscription-agent" || handoff.package?.package_status !== "ready") {
+  fail("proposal-status must expose the latest subscription-agent handoff package");
+}
+if (!handoff.package_command?.includes("agent-package --event-id")) {
+  fail("proposal-status must expose the display-only package command");
+}
+for (const key of ["writes_allowed", "direct_apply_authority", "external_product_apply", "provider_dispatch", "imagegen_executed", "plan_token_created", "apply_token_created", "approval_receipt_created", "background_execution", "credential_storage", "browser_command_execution", "raw_prompt_included", "package_uploaded"]) {
+  if (handoff[key] !== false || handoff.package[key] !== false) {
+    fail(`proposal-status handoff package boundary ${key} must be false`);
+  }
 }
 if (!Array.isArray(payload.history_rows) || payload.history_rows.length < 2) {
   fail("proposal-status must expose bounded Design Studio history rows");
