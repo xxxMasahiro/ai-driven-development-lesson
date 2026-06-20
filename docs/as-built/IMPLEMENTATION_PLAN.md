@@ -5014,3 +5014,22 @@ Implemented order:
 6. Promoted this sync ID to implemented after focused Design Studio, design-system, sync, and repository-development checks passed.
 
 Stop and ask before provider API dispatch, subscription-agent background execution, imagegen calls, mock image mutation, external product writes, browser mutation endpoints, dependencies, credentials, Git/CI execution, cleanup, push, PR creation, merge, or any existing-feature tradeoff.
+
+## Implemented Dashboard Design Studio Proposal Workflow Foundation Implementation Plan
+
+SYNC-ID: dashboard_design_studio_proposal_workflow_foundation
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/DASHBOARD_DATA_SCHEMA.tsv,docs/design-system/dashboard-control-center/orchestration.json,dashboard-control-center/src/design-system.generated.js,tools/dashboard-design-system,tools/dashboard-data,dashboard-control-center/src/App.jsx,dashboard-control-center/src/i18n.js,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_design_studio_events.sh,tools/test_dashboard_data.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_dashboard_design_studio_events.sh,tools/check_dashboard_design_system.sh,tools/test_dashboard_data.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+Implemented order:
+
+1. Synchronized this planned block before runtime edits.
+2. Extended the Design Studio owner tool with proposal-only commands: imported proposal preview, subscription-agent handoff metadata, external-product plan-only export, blocked API-key provider policy inspection, and owner-tool transaction dry run.
+3. Kept CandidateEnvelope mock/image/imagegen data as untrusted imported metadata and added review summaries without imagegen execution or image mutation.
+4. Added `design_studio` producer data to `tools/dashboard-data` and documented the schema contract.
+5. Rendered imported candidates, imported proposals, preview decisions, provider boundaries, external-product plan-only export, and dry-run transaction state in the Design Studio page.
+6. Extended event-store, dashboard-data, i18n, and Playwright tests for P0-P6 behavior and forbidden capabilities.
+7. Promoted this sync ID to implemented after focused Design Studio, dashboard-data, Dashboard, sync, and repository-development checks passed.
+
+Stop and ask before provider API dispatch, subscription-agent background execution, imagegen calls, mock image mutation, OCR trust, external product writes, browser mutation endpoints, dependency changes, credentials, Git/CI execution, push, PR creation, merge, main sync, cleanup, or any existing-feature tradeoff.

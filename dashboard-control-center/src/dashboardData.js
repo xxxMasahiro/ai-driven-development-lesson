@@ -2071,6 +2071,142 @@ function validateBrowserDebug(data) {
   }
 }
 
+function validateDesignStudioBoundary(boundary, label) {
+  const source = asObject(boundary, label);
+  if (source.proposal_only !== true) {
+    throw new Error(`${label} proposal_only must be true`);
+  }
+  for (const key of [
+    "writes_allowed",
+    "direct_apply_authority",
+    "external_product_apply",
+    "provider_dispatch",
+    "imagegen_executed",
+    "plan_token_created",
+    "apply_token_created",
+    "approval_receipt_created",
+  ]) {
+    if (source[key] !== false) {
+      throw new Error(`${label} ${key} must be false`);
+    }
+  }
+}
+
+function validateDesignStudioDecisionGate(value, label) {
+  if (value === undefined || value === null) {
+    return;
+  }
+  const gate = asObject(value, label);
+  if (displayText(gate.status, "") !== "manual_required") {
+    throw new Error(`${label} status must be manual_required`);
+  }
+}
+
+function validateDesignStudioProposalPreview(preview, label) {
+  if (preview === undefined || preview === null) {
+    return;
+  }
+  const source = asObject(preview, label);
+  validateNonNegativeInteger(Number(source.operation_count || 0), `${label} operation_count`);
+  for (const file of asArray(source.affected_source_files)) {
+    if (!safeRelativePath(file)) {
+      throw new Error(`${label} affected_source_files contains an unsafe path`);
+    }
+  }
+  for (const file of asArray(source.affected_generated_files)) {
+    if (!safeRelativePath(file)) {
+      throw new Error(`${label} affected_generated_files contains an unsafe path`);
+    }
+  }
+  for (const command of asArray(source.check_plan)) {
+    if (!safeDisplayCommand(command)) {
+      throw new Error(`${label} check_plan contains an unsafe command`);
+    }
+  }
+  validateDesignStudioDecisionGate(source.decision_gate, `${label} decision_gate`);
+  validateDesignStudioBoundary(source, label);
+}
+
+function validateDesignStudioCandidateReview(review, label) {
+  if (review === undefined || review === null) {
+    return;
+  }
+  const source = asObject(review, label);
+  for (const key of ["import_id", "candidate_id", "source_kind", "payload_digest"]) {
+    if (!displayText(source[key], "")) {
+      throw new Error(`${label} ${key} is missing`);
+    }
+  }
+  validateDesignStudioDecisionGate(source.decision_gate, `${label} decision_gate`);
+  validateDesignStudioBoundary(source, label);
+}
+
+function validateDesignStudio(data) {
+  if (data.design_studio === undefined || data.design_studio === null) {
+    return;
+  }
+  const designStudio = asObject(data.design_studio, "dashboard design_studio");
+  if (!ALLOWED_STATES.has(displayText(designStudio.status, ""))) {
+    throw new Error("dashboard design_studio status is invalid");
+  }
+  if (!displayText(designStudio.sync_id, "")) {
+    throw new Error("dashboard design_studio sync_id is missing");
+  }
+  const summary = asObject(designStudio.summary, "dashboard design_studio summary");
+  for (const key of ["event_count", "import_count", "candidate_count", "proposal_count"]) {
+    validateNonNegativeInteger(Number(summary[key] || 0), `dashboard design_studio summary ${key}`);
+  }
+  if (!displayText(summary.next_action, "")) {
+    throw new Error("dashboard design_studio next_action is missing");
+  }
+  for (const event of asArray(designStudio.events)) {
+    const source = asObject(event, "dashboard design_studio event");
+    if (!displayText(source.event_id, "") || "intent_text" in source) {
+      throw new Error("dashboard design_studio event must expose redacted metadata");
+    }
+  }
+  for (const imported of asArray(designStudio.imports)) {
+    const source = asObject(imported, "dashboard design_studio import");
+    if (!displayText(source.import_id, "") || "payload" in source || "operations" in source) {
+      throw new Error("dashboard design_studio import must expose redacted metadata");
+    }
+    validateDesignStudioBoundary(source, "dashboard design_studio import");
+  }
+  validateDesignStudioCandidateReview(designStudio.latest_candidate_review, "dashboard design_studio latest_candidate_review");
+  validateDesignStudioProposalPreview(designStudio.latest_proposal_preview, "dashboard design_studio latest_proposal_preview");
+  if (designStudio.subscription_agent_handoff) {
+    const handoff = asObject(designStudio.subscription_agent_handoff, "dashboard design_studio subscription_agent_handoff");
+    if (handoff.raw_prompt_included !== false) {
+      throw new Error("dashboard design_studio subscription_agent_handoff must not include raw prompts");
+    }
+    validateDesignStudioBoundary(handoff, "dashboard design_studio subscription_agent_handoff");
+    for (const command of asArray(handoff.import_commands)) {
+      if (!safeDisplayCommand(command)) {
+        throw new Error("dashboard design_studio subscription_agent_handoff import command is invalid");
+      }
+    }
+  }
+  if (designStudio.external_product_export) {
+    const exported = asObject(designStudio.external_product_export, "dashboard design_studio external_product_export");
+    if (displayText(exported.target_apply_mode, "") !== "plan-only") {
+      throw new Error("dashboard design_studio external_product_export must be plan-only");
+    }
+    validateDesignStudioBoundary(exported, "dashboard design_studio external_product_export");
+  }
+  const providerPolicy = asObject(designStudio.api_key_provider_policy, "dashboard design_studio api_key_provider_policy");
+  if (providerPolicy.api_call_available !== false) {
+    throw new Error("dashboard design_studio api_key_provider_policy api_call_available must be false");
+  }
+  if (designStudio.owner_tool_transaction_preview) {
+    const transaction = asObject(designStudio.owner_tool_transaction_preview, "dashboard design_studio owner_tool_transaction_preview");
+    if (transaction.dry_run !== true) {
+      throw new Error("dashboard design_studio owner_tool_transaction_preview must be dry-run");
+    }
+    validateDesignStudioBoundary(transaction, "dashboard design_studio owner_tool_transaction_preview");
+  }
+  validateDesignStudioBoundary(designStudio.boundaries, "dashboard design_studio boundaries");
+}
+
 function validateSecurityRows(security) {
   for (const collectionName of ["approvals", "dangerous_operations"]) {
     for (const row of asArray(security[collectionName])) {
@@ -2153,6 +2289,7 @@ export function validateDashboardData(data) {
   validateDocuments(data);
   validateSettings(data);
   validateBrowserDebug(data);
+  validateDesignStudio(data);
   validateMaintenanceEvidence(data.maintenance);
   validateSecurityRows(data.security);
   validateCommandPreviews(data.actions);

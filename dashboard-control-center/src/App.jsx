@@ -7026,6 +7026,174 @@ function DesignStudioOrchestrationPanel({ t }) {
   );
 }
 
+function designStudioWorkflowState(data) {
+  const source = data?.design_studio && typeof data.design_studio === "object" ? data.design_studio : {};
+  const summary = source.summary && typeof source.summary === "object" ? source.summary : {};
+  const boundaries = {
+    writes_allowed: false,
+    direct_apply_authority: false,
+    external_product_apply: false,
+    provider_dispatch: false,
+    imagegen_executed: false,
+    plan_token_created: false,
+    apply_token_created: false,
+    approval_receipt_created: false,
+    ...(source.boundaries && typeof source.boundaries === "object" ? source.boundaries : {}),
+  };
+  return {
+    status: normalizeState(source.status || "unknown"),
+    syncId: displayText(source.sync_id, "dashboard_design_studio_proposal_workflow_foundation"),
+    summary,
+    events: asArray(source.events),
+    imports: asArray(source.imports),
+    candidate: source.latest_candidate_review || null,
+    proposal: source.latest_proposal_preview || null,
+    handoff: source.subscription_agent_handoff || null,
+    exportPlan: source.external_product_export || null,
+    providerPolicy: {
+      provider_mode: "api-key",
+      status: "blocked",
+      api_call_available: false,
+      ...(source.api_key_provider_policy && typeof source.api_key_provider_policy === "object" ? source.api_key_provider_policy : {}),
+    },
+    transaction: source.owner_tool_transaction_preview || null,
+    boundaries,
+  };
+}
+
+function DesignStudioWorkflowMetric({ label, value }) {
+  return (
+    <article className="workflow-mini-card">
+      <strong>{displayText(value, "0")}</strong>
+      <p>{label}</p>
+    </article>
+  );
+}
+
+function DesignStudioProposalWorkflowPanel({ data, t }) {
+  const workflow = designStudioWorkflowState(data);
+  const summaryItems = [
+    [t("designStudio.proposalWorkflow.events"), workflow.summary.event_count ?? workflow.events.length],
+    [t("designStudio.proposalWorkflow.imports"), workflow.summary.import_count ?? workflow.imports.length],
+    [t("designStudio.proposalWorkflow.candidates"), workflow.summary.candidate_count ?? 0],
+    [t("designStudio.proposalWorkflow.proposals"), workflow.summary.proposal_count ?? 0],
+  ];
+  const candidate = workflow.candidate;
+  const proposal = workflow.proposal;
+  const providerPolicy = workflow.providerPolicy || {};
+  const exportPlan = workflow.exportPlan || {};
+  const transaction = workflow.transaction || {};
+  const handoff = workflow.handoff || {};
+  const boundaryRows = [
+    ["provider_dispatch", t("designStudio.proposalWorkflow.noProviderDispatch")],
+    ["imagegen_executed", t("designStudio.proposalWorkflow.noImagegenExecution")],
+    ["external_product_apply", t("designStudio.proposalWorkflow.noProductWrite")],
+    ["direct_apply_authority", t("designStudio.proposalWorkflow.noDirectApply")],
+    ["plan_token_created", t("designStudio.proposalWorkflow.noPlanToken")],
+    ["apply_token_created", t("designStudio.proposalWorkflow.noApplyToken")],
+    ["approval_receipt_created", t("designStudio.proposalWorkflow.noApprovalReceipt")],
+  ];
+
+  return (
+    <DetailSection id="design-studio-proposal-workflow" title={t("designStudio.proposalWorkflow.title")} Icon={ListChecks}>
+      <div className="design-studio-orchestration__intro">
+        <StatusPill value={workflow.status} t={t} label={statusLabelForChip(workflow.status, t)} />
+        <p>{displayText(workflow.summary.next_action, t("designStudio.proposalWorkflow.detail"))}</p>
+        <small>{t("designStudio.proposalWorkflow.syncId")}: {technicalChip(workflow.syncId)}</small>
+      </div>
+      <div className="design-studio-orchestration__cards">
+        {summaryItems.map(([label, value]) => (
+          <DesignStudioWorkflowMetric key={label} label={label} value={value} />
+        ))}
+      </div>
+      {!workflow.imports.length ? (
+        <p className="summary-empty-state">{t("designStudio.proposalWorkflow.noImports")}</p>
+      ) : null}
+      <div className="design-studio-orchestration__cards design-studio-orchestration__cards--compact">
+        <article className="design-studio-orchestration__card">
+          <div className="design-studio-orchestration__card-head">
+            <Eye aria-hidden="true" size={18} />
+            <h3>{t("designStudio.proposalWorkflow.latestCandidate")}</h3>
+          </div>
+          {candidate ? (
+            <>
+              <StatusPill value={candidate.decision_gate?.status || "manual_required"} t={t} label={t("designStudio.proposalWorkflow.manualDecision")} />
+              <p>{t("designStudio.proposalWorkflow.sourceKind")}: {displayText(candidate.source_kind)}</p>
+              <small>{t("designStudio.proposalWorkflow.confidence")}: {displayText(candidate.confidence)}</small>
+              <small>{t("designStudio.proposalWorkflow.instructionBoundary")}: {displayText(candidate.instruction_denial)}</small>
+            </>
+          ) : (
+            <p>{t("designStudio.proposalWorkflow.noCandidate")}</p>
+          )}
+        </article>
+        <article className="design-studio-orchestration__card">
+          <div className="design-studio-orchestration__card-head">
+            <FileCheck2 aria-hidden="true" size={18} />
+            <h3>{t("designStudio.proposalWorkflow.latestProposal")}</h3>
+          </div>
+          {proposal ? (
+            <>
+              <StatusPill value={proposal.decision_gate?.status || "manual_required"} t={t} label={t("designStudio.proposalWorkflow.manualDecision")} />
+              <p>{t("designStudio.proposalWorkflow.operationCount")}: {displayText(proposal.operation_count, "0")}</p>
+              <small>{t("designStudio.proposalWorkflow.risk")}: {displayText(proposal.risk_assessment)}</small>
+              <small>{t("designStudio.proposalWorkflow.confidence")}: {displayText(proposal.confidence)}</small>
+              <SourceBoundaryChips values={proposal.affected_source_files} t={t} limit={3} variant="files" labelKey="maintenance.sourceFileItem" tooltipKey="maintenance.sourceFileTooltip" />
+              <SourceBoundaryChips values={proposal.check_plan} t={t} limit={3} variant="commands" labelKey="maintenance.sourceCommandItem" tooltipKey="maintenance.sourceCommandTooltip" />
+            </>
+          ) : (
+            <p>{t("designStudio.proposalWorkflow.noProposal")}</p>
+          )}
+        </article>
+        <article className="design-studio-orchestration__card">
+          <div className="design-studio-orchestration__card-head">
+            <Brain aria-hidden="true" size={18} />
+            <h3>{t("designStudio.proposalWorkflow.handoffTitle")}</h3>
+          </div>
+          <StatusPill value={handoff.event_id ? "manual_required" : "unknown"} t={t} label={handoff.event_id ? t("designStudio.proposalWorkflow.manualImport") : statusLabelForChip("unknown", t)} />
+          <p>{displayText(handoff.next_action, t("designStudio.proposalWorkflow.handoffDetail"))}</p>
+          <small>{t("designStudio.proposalWorkflow.responseContracts")}: {asArray(handoff.response_contracts).map((contract) => displayText(contract.schema_id, "")).filter(Boolean).join(", ") || t("summary.none")}</small>
+          {asArray(handoff.import_commands).length ? <SourceBoundaryChips values={handoff.import_commands} t={t} limit={2} variant="commands" labelKey="maintenance.sourceCommandItem" tooltipKey="maintenance.sourceCommandTooltip" /> : null}
+        </article>
+        <article className="design-studio-orchestration__card">
+          <div className="design-studio-orchestration__card-head">
+            <KeyRound aria-hidden="true" size={18} />
+            <h3>{t("designStudio.proposalWorkflow.providerTitle")}</h3>
+          </div>
+          <StatusPill value={providerPolicy.status || "blocked"} t={t} label={statusLabelForChip(providerPolicy.status || "blocked", t)} />
+          <p>{t("designStudio.proposalWorkflow.providerDetail")}</p>
+          <small>{t("designStudio.proposalWorkflow.apiCallAvailable")}: {providerPolicy.api_call_available === true ? t("designStudio.orchestration.yes") : t("designStudio.orchestration.no")}</small>
+          <small>{asArray(providerPolicy.required_before_enablement).slice(0, 4).map((item) => displayKey(item)).join(", ") || t("designStudio.proposalWorkflow.blockedUntilPolicy")}</small>
+        </article>
+        <article className="design-studio-orchestration__card">
+          <div className="design-studio-orchestration__card-head">
+            <ExternalLink aria-hidden="true" size={18} />
+            <h3>{t("designStudio.proposalWorkflow.exportTitle")}</h3>
+          </div>
+          <StatusPill value={exportPlan.target_apply_mode === "plan-only" ? "manual_required" : "unknown"} t={t} label={t("designStudio.proposalWorkflow.planOnly")} />
+          <p>{displayText(exportPlan.next_action, t("designStudio.proposalWorkflow.exportDetail"))}</p>
+          <small>{t("designStudio.orchestration.applyMode")}: {displayText(exportPlan.target_apply_mode, "plan-only")}</small>
+        </article>
+        <article className="design-studio-orchestration__card">
+          <div className="design-studio-orchestration__card-head">
+            <ClipboardCheck aria-hidden="true" size={18} />
+            <h3>{t("designStudio.proposalWorkflow.transactionTitle")}</h3>
+          </div>
+          <StatusPill value={transaction.dry_run ? "manual_required" : "unknown"} t={t} label={transaction.dry_run ? t("designStudio.proposalWorkflow.dryRun") : statusLabelForChip("unknown", t)} />
+          <p>{displayText(transaction.next_action, t("designStudio.proposalWorkflow.transactionDetail"))}</p>
+          <small>{t("designStudio.proposalWorkflow.requiredBeforeApply")}: {asArray(transaction.required_before_apply).slice(0, 4).map((item) => displayKey(item)).join(", ") || t("summary.none")}</small>
+        </article>
+      </div>
+      <div className="design-studio-orchestration__flow" aria-label={t("designStudio.proposalWorkflow.boundaryTitle")}>
+        {boundaryRows.map(([key, label]) => (
+          <div className="design-studio-orchestration__flow-step" key={key}>
+            <StatusPill value={workflow.boundaries[key] === false ? "ready" : "blocked"} t={t} label={workflow.boundaries[key] === false ? label : statusLabelForChip("blocked", t)} />
+          </div>
+        ))}
+      </div>
+    </DetailSection>
+  );
+}
+
 function DesignStudioPage({ data, locale, t }) {
   const tooltipComponent = designStudioComponentById("tooltip-copy");
   const sourceInteraction = useMemo(() => designStudioInteraction(tooltipComponent), [tooltipComponent]);
@@ -7170,6 +7338,7 @@ function DesignStudioPage({ data, locale, t }) {
         </div>
       </DetailSection>
       <DesignStudioOrchestrationPanel t={t} />
+      <DesignStudioProposalWorkflowPanel data={data} t={t} />
       <DetailSection id="design-studio-interactions" title={t("designStudio.interactionsTitle")} Icon={Wrench}>
         <div className="design-studio-grid">
           <article className="design-studio-editor">

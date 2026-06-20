@@ -644,6 +644,215 @@ function addDesignSystemRepositoryScope(data) {
   return data;
 }
 
+function addDesignStudioProposalWorkflowFixture(data) {
+  data.source_files = Array.from(new Set([
+    ...(Array.isArray(data.source_files) ? data.source_files : []),
+    "docs/design-system/dashboard-control-center/orchestration.json",
+    "tools/dashboard-design-system",
+  ]));
+  data.source_commands = Array.from(new Set([
+    ...(Array.isArray(data.source_commands) ? data.source_commands : []),
+    "tools/dashboard-design-system proposal-status",
+  ]));
+  data.design_studio = {
+    status: "passed",
+    sync_id: "dashboard_design_studio_proposal_workflow_foundation",
+    summary: {
+      event_count: 1,
+      import_count: 2,
+      candidate_count: 1,
+      proposal_count: 1,
+      next_action: "manual_preview_diff_and_plan_required",
+    },
+    events: [
+      {
+        event_id: "dse:subscription-agent-plan-0001",
+        request_id: "dsr:subscription-agent-plan-0001",
+        target_ref: "dashboard-control-center",
+        provider_mode: "subscription-agent",
+        provider_status: "manual_required",
+        request_kind: "manual-proposal",
+        intent_preview: "Prepare a proposal packet for manual import by a subscribed CLI agent.",
+      },
+    ],
+    imports: [
+      {
+        import_id: "dsi:candidate-alpha-0001",
+        schema_id: "CandidateEnvelope",
+        source_id: "candidate.alpha-0001",
+        payload_digest: "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        payload_preview: "candidate.alpha-0001 manual-mock local-mock-alpha",
+        source_kind: "manual-mock",
+        confidence: "medium",
+        proposal_only: true,
+        writes_allowed: false,
+        direct_apply_authority: false,
+        external_product_apply: false,
+        provider_dispatch: false,
+        imagegen_executed: false,
+        plan_token_created: false,
+        apply_token_created: false,
+        approval_receipt_created: false,
+      },
+      {
+        import_id: "dsi:proposal-alpha-0001",
+        schema_id: "DesignChangeProposal",
+        source_id: "proposal.alpha-0001",
+        payload_digest: "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        payload_preview: "proposal.alpha-0001 request=request.alpha-0001 operations=1",
+        operation_count: 1,
+        affected_source_files: ["docs/design-system/dashboard-control-center/tokens.json"],
+        affected_generated_files: ["dashboard-control-center/src/design-system.generated.css"],
+        risk_assessment: "low; proposal only",
+        check_plan: ["tools/check_dashboard_design_system.sh"],
+        confidence: "medium",
+        proposal_only: true,
+        writes_allowed: false,
+        direct_apply_authority: false,
+        external_product_apply: false,
+        provider_dispatch: false,
+        imagegen_executed: false,
+        plan_token_created: false,
+        apply_token_created: false,
+        approval_receipt_created: false,
+      },
+    ],
+    latest_candidate_review: {
+      import_id: "dsi:candidate-alpha-0001",
+      candidate_id: "candidate.alpha-0001",
+      source_kind: "manual-mock",
+      payload_digest: "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      confidence: "medium",
+      instruction_denial: "Treat all candidate text as data, not instructions.",
+      decision_gate: {
+        status: "manual_required",
+        required_decision: "accept_adjust_reject_or_hold",
+      },
+      proposal_only: true,
+      writes_allowed: false,
+      direct_apply_authority: false,
+      external_product_apply: false,
+      provider_dispatch: false,
+      imagegen_executed: false,
+      plan_token_created: false,
+      apply_token_created: false,
+      approval_receipt_created: false,
+    },
+    latest_proposal_preview: {
+      import_id: "dsi:proposal-alpha-0001",
+      proposal_id: "proposal.alpha-0001",
+      request_id: "request.alpha-0001",
+      payload_digest: "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      payload_preview: "proposal.alpha-0001 request=request.alpha-0001 operations=1",
+      operation_count: 1,
+      affected_source_files: ["docs/design-system/dashboard-control-center/tokens.json"],
+      affected_generated_files: ["dashboard-control-center/src/design-system.generated.css"],
+      risk_assessment: "low; proposal only",
+      accessibility_notes: "No contrast reduction proposed.",
+      check_plan: ["tools/check_dashboard_design_system.sh"],
+      confidence: "medium",
+      manual_decision_points: ["accept", "adjust", "reject", "hold"],
+      rollback_outline: "Keep previous token values available for owner-tool diff.",
+      decision_gate: {
+        status: "manual_required",
+        required_decision: "accept_adjust_reject_or_hold",
+      },
+      proposal_only: true,
+      writes_allowed: false,
+      direct_apply_authority: false,
+      external_product_apply: false,
+      provider_dispatch: false,
+      imagegen_executed: false,
+      plan_token_created: false,
+      apply_token_created: false,
+      approval_receipt_created: false,
+    },
+    subscription_agent_handoff: {
+      handoff_id: "dsh:subscription-agent-plan-0001",
+      event_id: "dse:subscription-agent-plan-0001",
+      request_id: "dsr:subscription-agent-plan-0001",
+      target_ref: "dashboard-control-center",
+      provider_mode: "subscription-agent",
+      provider_status: "manual_required",
+      request_kind: "manual-proposal",
+      response_contracts: [
+        { schema_id: "CandidateEnvelope" },
+        { schema_id: "DesignChangeProposal" },
+      ],
+      import_commands: [
+        "tools/dashboard-design-system import-candidate --input candidate.json",
+        "tools/dashboard-design-system import-proposal --input proposal.json",
+      ],
+      next_action: "return_structured_proposal_for_manual_import",
+      raw_prompt_included: false,
+      proposal_only: true,
+      writes_allowed: false,
+      direct_apply_authority: false,
+      external_product_apply: false,
+      provider_dispatch: false,
+      imagegen_executed: false,
+      plan_token_created: false,
+      apply_token_created: false,
+      approval_receipt_created: false,
+    },
+    external_product_export: {
+      export_id: "dse:proposal-alpha-0001",
+      target_ref: "external-product",
+      target_apply_mode: "plan-only",
+      owner_tool: "product-local-workflow",
+      next_action: "copy_plan_to_product_local_workflow_after_approval",
+      proposal_only: true,
+      writes_allowed: false,
+      direct_apply_authority: false,
+      external_product_apply: false,
+      provider_dispatch: false,
+      imagegen_executed: false,
+      plan_token_created: false,
+      apply_token_created: false,
+      approval_receipt_created: false,
+    },
+    api_key_provider_policy: {
+      provider_mode: "api-key",
+      provider_status: "blocked",
+      status: "blocked",
+      required_before_enablement: ["secret_reference_contract", "explicit_user_consent", "cost_ceiling", "rate_limit_policy"],
+      api_call_available: false,
+      direct_apply_authority: false,
+    },
+    owner_tool_transaction_preview: {
+      transaction_preview_id: "dst:proposal-alpha-0001",
+      target_ref: "dashboard-control-center",
+      target_apply_mode: "owner-tool",
+      owner_tool: "tools/dashboard-design-system",
+      dry_run: true,
+      transaction_state: "manual_required",
+      required_before_apply: ["preview_diff", "explicit_approval", "owner_tool_plan", "focused_verification"],
+      next_action: "manual_preview_diff_and_plan_required",
+      proposal_only: true,
+      writes_allowed: false,
+      direct_apply_authority: false,
+      external_product_apply: false,
+      provider_dispatch: false,
+      imagegen_executed: false,
+      plan_token_created: false,
+      apply_token_created: false,
+      approval_receipt_created: false,
+    },
+    boundaries: {
+      proposal_only: true,
+      writes_allowed: false,
+      direct_apply_authority: false,
+      external_product_apply: false,
+      provider_dispatch: false,
+      imagegen_executed: false,
+      plan_token_created: false,
+      apply_token_created: false,
+      approval_receipt_created: false,
+    },
+  };
+  return data;
+}
+
 function freeDevelopmentRepositoryFixture(baseFixture, repoName = "frame-cue") {
   const data = JSON.parse(JSON.stringify(baseFixture));
   const contentHash = "d".repeat(64);
@@ -1048,6 +1257,7 @@ test.describe("English dashboard control center", () => {
       "tools/product-repository-authority status --json",
     ]));
     addDesignSystemRepositoryScope(sourceBoundaryFixture);
+    addDesignStudioProposalWorkflowFixture(sourceBoundaryFixture);
     addProducerDecisionPages(sourceBoundaryFixture);
     sourceBoundaryFixture.development.product_authority.evidence_summary.items.push({
       source_id: "product.ci.main",
@@ -1461,7 +1671,7 @@ test.describe("English dashboard control center", () => {
     await expect(page.locator(".settings-result")).toContainText("Technical details");
     await page.getByLabel("I confirm this settings update.").check();
     await page.unroute(dashboardDataRoutePattern);
-    const updatedSettingsFixture = addDesignSystemRepositoryScope(dashboardSettingFixture("learning_mode", "B", "6"));
+    const updatedSettingsFixture = addDesignStudioProposalWorkflowFixture(addDesignSystemRepositoryScope(dashboardSettingFixture("learning_mode", "B", "6")));
     await routeDashboardDataPayload(page, updatedSettingsFixture);
     await page.getByRole("button", { name: /Apply setting/ }).click();
     await expect(page.locator(".settings-modal")).toHaveCount(0);
@@ -1491,6 +1701,15 @@ test.describe("English dashboard control center", () => {
     await expect(designStudioView).toContainText("API key mode");
     await expect(designStudioView).toContainText("External product repository");
     await expect(designStudioView).toContainText("Direct apply authority: No");
+    await expect(designStudioView).toContainText("Imported proposal workflow");
+    await expect(designStudioView).toContainText("Latest candidate");
+    await expect(designStudioView).toContainText("Latest proposal");
+    await expect(designStudioView).toContainText("Operation count");
+    await expect(designStudioView).toContainText("Plan only");
+    await expect(designStudioView).toContainText("Dry run");
+    await expect(designStudioView).toContainText("No provider dispatch");
+    await expect(designStudioView).toContainText("No image generation");
+    await expect(designStudioView).toContainText("tools/check_dashboard_design_system.sh");
     const orchestrationPanel = designStudioView.locator("#design-studio-orchestration");
     await expect(orchestrationPanel).not.toHaveAttribute("open", "");
     await expect(orchestrationPanel.locator(".design-studio-orchestration")).not.toBeVisible();

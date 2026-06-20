@@ -13,6 +13,10 @@ event_id_from() {
   node -e 'const fs = require("fs"); console.log(JSON.parse(fs.readFileSync(process.argv[1], "utf8")).event.event_id);' "$1"
 }
 
+import_id_from() {
+  node -e 'const fs = require("fs"); console.log(JSON.parse(fs.readFileSync(process.argv[1], "utf8")).import.import_id);' "$1"
+}
+
 assert_event_json() {
   local file="$1"
   local expected_status="$2"
@@ -161,6 +165,7 @@ subscription_out="$TMP_DIR/subscription.json"
   --idempotency-key subscription-agent-plan-0001 \
   >"$subscription_out"
 assert_event_json "$subscription_out" queued manual_required
+subscription_event_id="$(event_id_from "$subscription_out")"
 
 dead_letter_seed="$TMP_DIR/dead-letter-seed.json"
 "$ROOT/tools/dashboard-design-system" queue-request \
@@ -285,6 +290,7 @@ JSON
 candidate_out="$TMP_DIR/candidate-import.json"
 "$ROOT/tools/dashboard-design-system" import-candidate --input "$candidate_json" --idempotency-key candidate-import-0001 >"$candidate_out"
 assert_import_json "$candidate_out" imported CandidateEnvelope
+candidate_import_id="$(import_id_from "$candidate_out")"
 if grep -F 'RAW_IMPORT_BODY_SHOULD_NOT_BE_STORED' "$STORE_DIR/events.jsonl" >/dev/null; then
   printf 'raw candidate payload reached the import store\n' >&2
   exit 1
@@ -326,6 +332,7 @@ JSON
 proposal_out="$TMP_DIR/proposal-import.json"
 "$ROOT/tools/dashboard-design-system" import-proposal --input "$proposal_json" --idempotency-key proposal-import-0001 >"$proposal_out"
 assert_import_json "$proposal_out" imported DesignChangeProposal
+proposal_import_id="$(import_id_from "$proposal_out")"
 if grep -F 'RAW_PROPOSAL_BODY_SHOULD_NOT_BE_STORED' "$STORE_DIR/events.jsonl" >/dev/null; then
   printf 'raw proposal payload reached the import store\n' >&2
   exit 1
@@ -334,6 +341,203 @@ if grep -F '"operations"' "$STORE_DIR/events.jsonl" >/dev/null; then
   printf 'raw proposal operations reached the import store\n' >&2
   exit 1
 fi
+
+list_imports_out="$TMP_DIR/list-imports.json"
+"$ROOT/tools/dashboard-design-system" list-imports --schema DesignChangeProposal >"$list_imports_out"
+node - "$list_imports_out" "$proposal_import_id" <<'NODE'
+const fs = require("fs");
+const [file, importId] = process.argv.slice(2);
+const payload = JSON.parse(fs.readFileSync(file, "utf8"));
+function fail(message) {
+  console.error(message);
+  process.exit(1);
+}
+if (payload.status !== "passed" || payload.sync_id !== "dashboard_design_studio_proposal_workflow_foundation") {
+  fail("list-imports must expose the proposal workflow sync id");
+}
+if (payload.count !== 1 || payload.imports[0]?.import_id !== importId) {
+  fail("list-imports did not return the imported proposal");
+}
+if ("payload" in payload.imports[0] || "operations" in payload.imports[0]) {
+  fail("list-imports must not expose raw payload or operations");
+}
+if (payload.imports[0].operation_count !== 1) {
+  fail("list-imports must expose safe operation metadata");
+}
+if (payload.boundaries?.writes_allowed !== false || payload.boundaries?.provider_dispatch !== false) {
+  fail("list-imports must expose proposal-only boundaries");
+}
+NODE
+
+proposal_preview_out="$TMP_DIR/proposal-preview.json"
+"$ROOT/tools/dashboard-design-system" proposal-preview --import-id "$proposal_import_id" >"$proposal_preview_out"
+node - "$proposal_preview_out" "$proposal_import_id" <<'NODE'
+const fs = require("fs");
+const [file, importId] = process.argv.slice(2);
+const payload = JSON.parse(fs.readFileSync(file, "utf8"));
+const preview = payload.preview || {};
+function fail(message) {
+  console.error(message);
+  process.exit(1);
+}
+if (payload.sync_id !== "dashboard_design_studio_proposal_workflow_foundation") {
+  fail("proposal-preview must use proposal workflow sync id");
+}
+if (preview.import_id !== importId || preview.operation_count !== 1) {
+  fail("proposal-preview must identify the selected proposal and operation count");
+}
+if (!preview.affected_source_files?.includes("docs/design-system/dashboard-control-center/tokens.json")) {
+  fail("proposal-preview must include affected source files");
+}
+if (preview.decision_gate?.status !== "manual_required") {
+  fail("proposal-preview must require a manual decision gate");
+}
+for (const key of ["writes_allowed", "direct_apply_authority", "external_product_apply", "provider_dispatch", "imagegen_executed", "plan_token_created", "apply_token_created", "approval_receipt_created"]) {
+  if (preview[key] !== false) {
+    fail(`proposal-preview boundary ${key} must be false`);
+  }
+}
+NODE
+
+candidate_review_out="$TMP_DIR/candidate-review.json"
+"$ROOT/tools/dashboard-design-system" candidate-review --import-id "$candidate_import_id" >"$candidate_review_out"
+node - "$candidate_review_out" "$candidate_import_id" <<'NODE'
+const fs = require("fs");
+const [file, importId] = process.argv.slice(2);
+const payload = JSON.parse(fs.readFileSync(file, "utf8"));
+const review = payload.review || {};
+function fail(message) {
+  console.error(message);
+  process.exit(1);
+}
+if (payload.sync_id !== "dashboard_design_studio_proposal_workflow_foundation") {
+  fail("candidate-review must use proposal workflow sync id");
+}
+if (review.import_id !== importId || review.source_kind !== "manual-mock") {
+  fail("candidate-review must expose candidate source metadata");
+}
+if (review.decision_gate?.status !== "manual_required") {
+  fail("candidate-review must require a manual decision gate");
+}
+if (review.imagegen_executed !== false || review.external_product_apply !== false) {
+  fail("candidate-review must not execute imagegen or product writes");
+}
+NODE
+
+agent_handoff_out="$TMP_DIR/agent-handoff.json"
+"$ROOT/tools/dashboard-design-system" agent-handoff --event-id "$subscription_event_id" >"$agent_handoff_out"
+node - "$agent_handoff_out" "$subscription_event_id" <<'NODE'
+const fs = require("fs");
+const [file, eventId] = process.argv.slice(2);
+const payload = JSON.parse(fs.readFileSync(file, "utf8"));
+const handoff = payload.handoff || {};
+function fail(message) {
+  console.error(message);
+  process.exit(1);
+}
+if (handoff.event_id !== eventId || handoff.raw_prompt_included !== false) {
+  fail("agent-handoff must expose metadata without raw prompt");
+}
+const schemaIds = new Set((handoff.response_contracts || []).map((contract) => contract.schema_id));
+if (!schemaIds.has("CandidateEnvelope") || !schemaIds.has("DesignChangeProposal")) {
+  fail("agent-handoff must include import response contracts");
+}
+if (handoff.writes_allowed !== false || handoff.provider_dispatch !== false) {
+  fail("agent-handoff must not grant write or dispatch authority");
+}
+NODE
+
+export_proposal_out="$TMP_DIR/export-proposal.json"
+"$ROOT/tools/dashboard-design-system" export-proposal --import-id "$proposal_import_id" --target-ref external-product >"$export_proposal_out"
+node - "$export_proposal_out" <<'NODE'
+const fs = require("fs");
+const payload = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
+const exported = payload.export || {};
+function fail(message) {
+  console.error(message);
+  process.exit(1);
+}
+if (exported.target_apply_mode !== "plan-only" || exported.external_product_apply !== false || exported.writes_allowed !== false) {
+  fail("export-proposal must remain plan-only for external products");
+}
+if (exported.proposal?.decision_gate?.status !== "manual_required") {
+  fail("export-proposal must include the manual proposal gate");
+}
+NODE
+
+provider_policy_out="$TMP_DIR/provider-policy.json"
+"$ROOT/tools/dashboard-design-system" provider-policy --provider-mode api-key >"$provider_policy_out"
+node - "$provider_policy_out" <<'NODE'
+const fs = require("fs");
+const payload = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
+const policy = payload.provider_policy || {};
+function fail(message) {
+  console.error(message);
+  process.exit(1);
+}
+if (policy.provider_mode !== "api-key" || policy.status !== "blocked" || policy.api_call_available !== false) {
+  fail("api-key provider policy must remain blocked and unavailable");
+}
+for (const required of ["secret_reference_contract", "explicit_user_consent", "cost_ceiling", "rate_limit_policy"]) {
+  if (!policy.required_before_enablement?.includes(required)) {
+    fail(`api-key provider policy missing prerequisite ${required}`);
+  }
+}
+NODE
+
+transaction_preview_out="$TMP_DIR/transaction-preview.json"
+"$ROOT/tools/dashboard-design-system" transaction-preview --import-id "$proposal_import_id" >"$transaction_preview_out"
+node - "$transaction_preview_out" <<'NODE'
+const fs = require("fs");
+const payload = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
+const preview = payload.transaction_preview || {};
+function fail(message) {
+  console.error(message);
+  process.exit(1);
+}
+if (preview.dry_run !== true || preview.transaction_state !== "manual_required") {
+  fail("transaction-preview must be a dry-run manual gate");
+}
+for (const key of ["plan_token_created", "apply_token_created", "approval_receipt_created"]) {
+  if (preview[key] !== false) {
+    fail(`transaction-preview ${key} must be false`);
+  }
+}
+NODE
+
+proposal_status_out="$TMP_DIR/proposal-status.json"
+"$ROOT/tools/dashboard-design-system" proposal-status >"$proposal_status_out"
+node - "$proposal_status_out" <<'NODE'
+const fs = require("fs");
+const payload = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
+function fail(message) {
+  console.error(message);
+  process.exit(1);
+}
+if (payload.status !== "passed" || payload.summary?.proposal_count !== 1 || payload.summary?.candidate_count !== 1) {
+  fail("proposal-status must summarize candidate and proposal imports");
+}
+if (!payload.latest_proposal_preview || !payload.latest_candidate_review) {
+  fail("proposal-status must include latest proposal and candidate review metadata");
+}
+if (payload.api_key_provider_policy?.api_call_available !== false || payload.boundaries?.provider_dispatch !== false) {
+  fail("proposal-status must expose blocked provider and dispatch boundaries");
+}
+NODE
+
+wrong_preview_err="$TMP_DIR/wrong-preview.err"
+if "$ROOT/tools/dashboard-design-system" proposal-preview --import-id "$candidate_import_id" >"$TMP_DIR/wrong-preview.json" 2>"$wrong_preview_err"; then
+  printf 'proposal-preview accepted a candidate import unexpectedly\n' >&2
+  exit 1
+fi
+grep 'requires a DesignChangeProposal import' "$wrong_preview_err" >/dev/null
+
+unknown_import_err="$TMP_DIR/unknown-import.err"
+if "$ROOT/tools/dashboard-design-system" candidate-review --import-id dsi:unknown-import >"$TMP_DIR/unknown-import.json" 2>"$unknown_import_err"; then
+  printf 'candidate-review accepted an unknown import unexpectedly\n' >&2
+  exit 1
+fi
+grep 'unknown Design Studio import' "$unknown_import_err" >/dev/null
 
 missing_candidate_json="$TMP_DIR/candidate-missing.json"
 cat >"$missing_candidate_json" <<'JSON'

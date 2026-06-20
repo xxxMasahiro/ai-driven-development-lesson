@@ -2900,6 +2900,23 @@ Next safe action:
 
 - No remaining implementation action for this sync ID after focused verification.
 
+## Dashboard Design Studio Proposal Workflow Foundation Handoff
+
+SYNC-ID: dashboard_design_studio_proposal_workflow_foundation
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/DASHBOARD_DATA_SCHEMA.tsv,docs/design-system/dashboard-control-center/orchestration.json,dashboard-control-center/src/design-system.generated.js,tools/dashboard-design-system,tools/dashboard-data,dashboard-control-center/src/App.jsx,dashboard-control-center/src/i18n.js,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_design_studio_events.sh,tools/test_dashboard_data.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_dashboard_design_studio_events.sh,tools/check_dashboard_design_system.sh,tools/test_dashboard_data.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+Restart context:
+
+- Design Studio supports queueing request metadata, importing CandidateEnvelope / DesignChangeProposal metadata, and exposing imported candidates/proposals as reviewable proposal-only dashboard state.
+- P0-P6 are implemented as one proposal-workflow foundation: imported viewer, preview decision gate, subscription-agent handoff metadata, mock/image candidate review, external-product plan-only export, blocked API-key provider policy, and owner-tool transaction dry-run.
+- The implementation grants no apply, provider, imagegen, Git/CI, browser-command, credential, or external product write authority.
+
+Next safe action:
+
+- No remaining implementation action for this sync ID after focused Design Studio, dashboard-data, Dashboard, sync, and repository-development checks passed.
+
 ## Dashboard Control Center Evidence Presentation Clarity Handoff
 
 SYNC-ID: dashboard_control_center_evidence_presentation_clarity

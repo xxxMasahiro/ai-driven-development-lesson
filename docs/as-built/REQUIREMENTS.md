@@ -2555,3 +2555,27 @@ Acceptance requirements:
 Non-scope:
 
 - Do not implement provider API dispatch, imagegen execution, mock image mutation, automatic apply, external product source writes, browser mutation endpoints, dependency changes, or credential handling.
+
+## Implemented Dashboard Design Studio Proposal Workflow Foundation Requirements
+
+SYNC-ID: dashboard_design_studio_proposal_workflow_foundation
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/DASHBOARD_DATA_SCHEMA.tsv,docs/design-system/dashboard-control-center/orchestration.json,dashboard-control-center/src/design-system.generated.js,tools/dashboard-design-system,tools/dashboard-data,dashboard-control-center/src/App.jsx,dashboard-control-center/src/i18n.js,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_design_studio_events.sh,tools/test_dashboard_data.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_dashboard_design_studio_events.sh,tools/check_dashboard_design_system.sh,tools/test_dashboard_data.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+Design Studio turns imported candidates and proposals into visible, reviewable proposal state before any broader provider, image, external-product, or apply work is considered.
+The workflow remains proposal-only and helps non-engineers understand what was imported while giving junior/intermediate engineers enough structured detail to judge risk, required decisions, affected files, and checks.
+
+Acceptance requirements:
+
+- Imported CandidateEnvelope and DesignChangeProposal records are visible in Dashboard data and the Control Center Design Studio page without exposing raw payloads or secrets.
+- DesignChangeProposal imports produce a read-only preview/decision gate that summarizes operation count, affected source and generated files, risk, confidence, manual decision points, rollback outline, and check plan.
+- Subscription-agent handoff is available as redacted local metadata only; no background agent dispatch, provider API call, command execution, or credential handling occurs.
+- Mock/image/imagegen-related input remains CandidateEnvelope data and can be reviewed as untrusted candidates; imagegen execution and mock image mutation are not implemented.
+- External-product proposals can be exported as plan-only metadata and do not write product files or claim product-local apply authority.
+- API-key provider policy is represented as blocked, secret-reference-only, consent/cost/rate-limit required metadata; API calls remain unavailable.
+- Owner-tool apply transaction design is represented as a dry-run, proposal-only transaction preview; no plan token, apply token, approval receipt, or direct apply authority is created.
+
+Non-scope:
+
+- Do not implement provider API dispatch, subscription-agent execution, imagegen execution, image editing, OCR trust, automatic apply, browser mutation endpoints, external product writes, dependency changes, Git/CI execution, push, merge, main sync, or credentials.

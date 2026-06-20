@@ -2951,3 +2951,17 @@ TESTS: tools/test_dashboard_design_studio_events.sh,tools/check_dashboard_design
 `tools/dashboard-design-system` must import CandidateEnvelope and DesignChangeProposal JSON as untrusted local metadata.
 Imported records are append-only, redacted, hashable, and proposal-only.
 The import path must validate orchestration-required fields, reject forbidden fields, avoid raw payload persistence, and never create plan/apply authority.
+
+## Implemented Dashboard Design Studio Proposal Workflow Foundation Specification
+
+SYNC-ID: dashboard_design_studio_proposal_workflow_foundation
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/DASHBOARD_DATA_SCHEMA.tsv,docs/design-system/dashboard-control-center/orchestration.json,dashboard-control-center/src/design-system.generated.js,tools/dashboard-design-system,tools/dashboard-data,dashboard-control-center/src/App.jsx,dashboard-control-center/src/i18n.js,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_design_studio_events.sh,tools/test_dashboard_data.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_dashboard_design_studio_events.sh,tools/check_dashboard_design_system.sh,tools/test_dashboard_data.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+`tools/dashboard-design-system` exposes proposal-only commands for previewing imported proposals, preparing subscription-agent handoff metadata, exporting external-product plan-only proposal metadata, inspecting blocked API-key provider policy, and dry-running owner-tool transaction design.
+The event/import store remains append-only JSONL metadata and no command persists raw prompt payloads, raw proposal payloads, secrets, credentials, plan tokens, apply tokens, or approval receipts.
+
+`tools/dashboard-data` projects the latest Design Studio event/import state into a `design_studio` object with queue, import, proposal, provider, external-product, and transaction summaries.
+The Control Center Design Studio page renders that producer-owned `design_studio` state as review cards and decision gates.
+The browser must not execute Design Studio owner-tool commands; command strings are display-only.

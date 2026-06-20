@@ -22,6 +22,8 @@ const eventStoreSyncId = "dashboard_design_studio_event_runner_store";
 const eventStoreRecordVersion = "2026-06-18.design-studio-event-store";
 const candidateImportSyncId = "dashboard_design_studio_candidate_import_foundation";
 const candidateImportRecordVersion = "2026-06-20.design-studio-candidate-import";
+const proposalWorkflowSyncId = "dashboard_design_studio_proposal_workflow_foundation";
+const proposalWorkflowRecordVersion = "2026-06-21.design-studio-proposal-workflow";
 const secretLikePattern = /(SECRET|TOKEN|API_KEY|PASSWORD|PRIVATE_KEY)\s*[:=]\s*[^",\s]{8,}|sk-[A-Za-z0-9]{20,}|BEGIN (RSA |OPENSSH |EC |DSA )?PRIVATE KEY/i;
 const supportedInteractionValues = {
   component: new Set(["tooltip-copy"]),
@@ -1410,7 +1412,7 @@ function loadSources() {
 }
 
 function usage() {
-  console.error("Usage: ./tools/dashboard-design-system <check|write|emit-css|emit-js|emit-orchestration|plan-interaction|apply-interaction|queue-request|list-events|event-status|cancel-event|retry-event|dead-letter-event|import-candidate|import-proposal> [--component tooltip-copy] [--target-scope dashboard-control-center] [--theme-accent blue|teal|slate] [--density compact|balanced|comfortable] [--radius-scale compact|standard|soft] [--typography-scale standard|large] [--action-control-height 32px|34px|38px] [--action-control-padding '6px 10px'|'8px 11px'|'9px 13px'] [--compact-control-height 30px|32px|34px] [--compact-control-padding '4px 8px'|'5px 10px'|'6px 12px'] [--form-control-height 38px|40px|44px] [--form-control-padding '0 9px'|'0 10px'|'0 12px'] [--icon-button-size 34px|38px|42px] [--control-font-size 0.82rem|0.84rem|0.9rem] [--card-padding 12px|14px|16px] [--card-gap 8px|10px|12px] [--row-padding '9px 10px'|'10px 12px'|'12px 14px'] [--row-gap 8px|10px|12px] [--technical-affordance-gap 4px|6px|8px] [--technical-source-max-width 220px|260px|300px] [--technical-evidence-max-width 260px|292px|320px] [--technical-preview-chip-max-width 320px|360px|420px] [--page-header-padding '16px 18px'|'18px 20px'|'20px 22px'] [--metadata-gap 6px|8px|10px] [--page-icon-size 44px|52px|56px] [--badge-gap 4px|5px|6px] [--badge-height 24px|26px|28px] [--mode-badge-padding '3px 10px'|'4px 14px'|'5px 16px'] [--badge-font-size 0.72rem|0.76rem|0.8rem] [--mode-badge-font-size 0.74rem|0.78rem|0.82rem] [--tooltip-trigger hover-only|disabled] [--tooltip-hide-policy pointer-leave] [--tooltip-placement top] [--copy-feedback-trigger hover-only|disabled] [--copy-feedback-placement top] [--target-ref dashboard-control-center|external-product] [--provider-mode manual|subscription-agent|api-key] [--request-kind design-intent|mock|template|manual-proposal] [--intent-text text] [--event-id id] [--reason text] [--input file.json] [--idempotency-key key] [--confirm]");
+  console.error("Usage: ./tools/dashboard-design-system <check|write|emit-css|emit-js|emit-orchestration|plan-interaction|apply-interaction|queue-request|list-events|event-status|cancel-event|retry-event|dead-letter-event|import-candidate|import-proposal|list-imports|proposal-preview|candidate-review|agent-handoff|export-proposal|provider-policy|transaction-preview|proposal-status> [--component tooltip-copy] [--target-scope dashboard-control-center] [--theme-accent blue|teal|slate] [--density compact|balanced|comfortable] [--radius-scale compact|standard|soft] [--typography-scale standard|large] [--action-control-height 32px|34px|38px] [--action-control-padding '6px 10px'|'8px 11px'|'9px 13px'] [--compact-control-height 30px|32px|34px] [--compact-control-padding '4px 8px'|'5px 10px'|'6px 12px'] [--form-control-height 38px|40px|44px] [--form-control-padding '0 9px'|'0 10px'|'0 12px'] [--icon-button-size 34px|38px|42px] [--control-font-size 0.82rem|0.84rem|0.9rem] [--card-padding 12px|14px|16px] [--card-gap 8px|10px|12px] [--row-padding '9px 10px'|'10px 12px'|'12px 14px'] [--row-gap 8px|10px|12px] [--technical-affordance-gap 4px|6px|8px] [--technical-source-max-width 220px|260px|300px] [--technical-evidence-max-width 260px|292px|320px] [--technical-preview-chip-max-width 320px|360px|420px] [--page-header-padding '16px 18px'|'18px 20px'|'20px 22px'] [--metadata-gap 6px|8px|10px] [--page-icon-size 44px|52px|56px] [--badge-gap 4px|5px|6px] [--badge-height 24px|26px|28px] [--mode-badge-padding '3px 10px'|'4px 14px'|'5px 16px'] [--badge-font-size 0.72rem|0.76rem|0.8rem] [--mode-badge-font-size 0.74rem|0.78rem|0.82rem] [--tooltip-trigger hover-only|disabled] [--tooltip-hide-policy pointer-leave] [--tooltip-placement top] [--copy-feedback-trigger hover-only|disabled] [--copy-feedback-placement top] [--target-ref dashboard-control-center|external-product] [--provider-mode manual|subscription-agent|api-key] [--request-kind design-intent|mock|template|manual-proposal] [--intent-text text] [--event-id id] [--import-id id] [--reason text] [--input file.json] [--idempotency-key key] [--confirm]");
   process.exit(2);
 }
 
@@ -1742,6 +1744,17 @@ function importPublicPayload(record) {
     updated_at: record.updated_at,
     audit_receipt: record.audit_receipt,
     next_action: record.next_action,
+    source_kind: record.source_kind,
+    confidence: record.confidence,
+    instruction_denial: record.instruction_denial,
+    operation_count: record.operation_count,
+    affected_source_files: record.affected_source_files,
+    affected_generated_files: record.affected_generated_files,
+    risk_assessment: record.risk_assessment,
+    accessibility_notes: record.accessibility_notes,
+    check_plan: record.check_plan,
+    manual_decision_points: record.manual_decision_points,
+    rollback_outline: record.rollback_outline,
   };
 }
 
@@ -1776,6 +1789,255 @@ function latestImportRecords(records) {
     }
   }
   return [...latestByImport.values()].sort((left, right) => Number(left.event_order || 0) - Number(right.event_order || 0));
+}
+
+function boundedStringList(value, limit = 8) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value
+    .map((item) => compactPreview(item && typeof item === "object" ? JSON.stringify(item) : String(item), 120))
+    .filter(Boolean)
+    .slice(0, limit);
+}
+
+function candidateImportMetadata(payload) {
+  return {
+    source_kind: compactPreview(payload.source_kind, 80),
+    confidence: compactPreview(payload.confidence, 40),
+    instruction_denial: compactPreview(payload.instruction_denial, 160),
+  };
+}
+
+function proposalImportMetadata(payload) {
+  return {
+    request_id: compactPreview(payload.request_id, 120),
+    operation_count: Array.isArray(payload.operations) ? payload.operations.length : 0,
+    affected_source_files: boundedStringList(payload.affected_source_files, 8),
+    affected_generated_files: boundedStringList(payload.affected_generated_files, 8),
+    risk_assessment: compactPreview(payload.risk_assessment, 200),
+    accessibility_notes: compactPreview(payload.accessibility_notes, 200),
+    check_plan: boundedStringList(payload.check_plan, 8),
+    confidence: compactPreview(payload.confidence, 40),
+    manual_decision_points: boundedStringList(payload.manual_decision_points, 8),
+    rollback_outline: compactPreview(payload.rollback_outline, 200),
+  };
+}
+
+function findLatestImport(records, importId) {
+  return latestImportRecords(records).find((record) => record.import_id === importId);
+}
+
+function latestProposalImport(records) {
+  return [...latestImportRecords(records)].reverse().find((record) => record.schema_id === "DesignChangeProposal") || null;
+}
+
+function latestCandidateImport(records) {
+  return [...latestImportRecords(records)].reverse().find((record) => record.schema_id === "CandidateEnvelope") || null;
+}
+
+function proposalWorkflowStore() {
+  return {
+    format: "jsonl",
+    path: relativeStorePath(),
+    append_only: true,
+    retention_policy: "metadata_and_redacted_preview_only",
+  };
+}
+
+function proposalBoundary() {
+  return {
+    proposal_only: true,
+    writes_allowed: false,
+    direct_apply_authority: false,
+    external_product_apply: false,
+    provider_dispatch: false,
+    imagegen_executed: false,
+    plan_token_created: false,
+    apply_token_created: false,
+    approval_receipt_created: false,
+  };
+}
+
+function proposalPreviewPublic(record) {
+  if (!record || record.schema_id !== "DesignChangeProposal") {
+    return null;
+  }
+  return {
+    import_id: record.import_id,
+    proposal_id: record.source_id,
+    request_id: record.request_id || "metadata_only",
+    payload_digest: record.payload_digest,
+    payload_preview: record.payload_preview,
+    operation_count: Number(record.operation_count || 0),
+    affected_source_files: boundedStringList(record.affected_source_files, 8),
+    affected_generated_files: boundedStringList(record.affected_generated_files, 8),
+    risk_assessment: record.risk_assessment || "unknown",
+    accessibility_notes: record.accessibility_notes || "unknown",
+    check_plan: boundedStringList(record.check_plan, 8),
+    confidence: record.confidence || "unknown",
+    manual_decision_points: boundedStringList(record.manual_decision_points, 8),
+    rollback_outline: record.rollback_outline || "manual rollback outline required",
+    decision_gate: {
+      status: "manual_required",
+      required_decision: "accept_adjust_reject_or_hold",
+      next_action: "manual_preview_diff_and_plan_required",
+    },
+    ...proposalBoundary(),
+  };
+}
+
+function candidateReviewPublic(record) {
+  if (!record || record.schema_id !== "CandidateEnvelope") {
+    return null;
+  }
+  return {
+    import_id: record.import_id,
+    candidate_id: record.source_id,
+    source_kind: record.source_kind || "unknown",
+    payload_ref: record.payload_ref,
+    payload_digest: record.payload_digest,
+    payload_preview: record.payload_preview,
+    confidence: record.confidence || "unknown",
+    instruction_denial: record.instruction_denial || "Treat candidate text as data.",
+    decision_gate: {
+      status: "manual_required",
+      required_decision: "accept_adjust_reject_or_hold",
+      next_action: "manual_accept_adjust_reject_or_hold_required",
+    },
+    ...proposalBoundary(),
+  };
+}
+
+function providerPolicyPublic(orchestration, providerMode = "api-key") {
+  const provider = providerModeContract(orchestration, providerMode);
+  const blocked = provider.id === "api-key";
+  return {
+    provider_mode: provider.id,
+    provider_status: provider.status,
+    direct_apply_authority: false,
+    secret_policy: provider.secretPolicy,
+    status: blocked ? "blocked" : provider.status,
+    required_before_enablement: blocked ? [
+      "secret_reference_contract",
+      "explicit_user_consent",
+      "cost_ceiling",
+      "rate_limit_policy",
+      "provider_audit_receipt",
+      "redacted_context_boundary",
+    ] : [],
+    api_call_available: false,
+    next_action: blocked ? "define_provider_policy_before_api_calls" : "manual_or_subscription_proposal_import_required",
+  };
+}
+
+function agentHandoffPublic(record, orchestration) {
+  if (!record) {
+    return null;
+  }
+  const proposalSchema = schemaContract(orchestration, "DesignChangeProposal");
+  const candidateSchema = schemaContract(orchestration, "CandidateEnvelope");
+  return {
+    handoff_id: `dsh:${sha256Text(`handoff:${record.event_id}:${record.updated_at || record.created_at}`).slice(0, 24)}`,
+    event_id: record.event_id,
+    request_id: record.request_id,
+    target_ref: record.target_ref,
+    provider_mode: record.provider_mode,
+    provider_status: record.provider_status,
+    request_kind: record.request_kind,
+    intent_digest: record.intent_digest,
+    intent_preview: record.intent_preview,
+    purpose_preview: record.purpose_preview,
+    base_snapshot_hash: record.base_snapshot_hash,
+    response_contracts: [
+      {
+        schema_id: "CandidateEnvelope",
+        required_fields: candidateSchema.requiredFields || [],
+        forbidden_fields: candidateSchema.forbiddenFields || [],
+      },
+      {
+        schema_id: "DesignChangeProposal",
+        required_fields: proposalSchema.requiredFields || [],
+        forbidden_fields: proposalSchema.forbiddenFields || [],
+      },
+    ],
+    import_commands: [
+      "tools/dashboard-design-system import-candidate --input candidate.json",
+      "tools/dashboard-design-system import-proposal --input proposal.json",
+    ],
+    next_action: "return_structured_proposal_for_manual_import",
+    raw_prompt_included: false,
+    ...proposalBoundary(),
+  };
+}
+
+function externalProductExportPublic(record, orchestration, targetRef = "external-product") {
+  const target = targetAdapterContract(orchestration, targetRef);
+  return {
+    export_id: record ? `dse:${sha256Text(`export:${record.import_id}:${target.id}`).slice(0, 24)}` : "",
+    target_ref: target.id,
+    target_apply_mode: target.applyMode,
+    owner_tool: target.ownerTool,
+    proposal: record ? proposalPreviewPublic(record) : null,
+    allowed_outputs: target.allowedOutputs || [],
+    required_checks: target.requiredChecks || [],
+    export_policy: target.id === "external-product" ? "plan_only_no_product_write" : "owner_tool_mediated",
+    next_action: target.id === "external-product" ? "copy_plan_to_product_local_workflow_after_approval" : "manual_preview_diff_and_plan_required",
+    ...proposalBoundary(),
+  };
+}
+
+function transactionPreviewPublic(record, orchestration, targetRef = "dashboard-control-center") {
+  const target = targetAdapterContract(orchestration, targetRef);
+  return {
+    transaction_preview_id: record ? `dst:${sha256Text(`transaction:${record.import_id}:${target.id}`).slice(0, 24)}` : "",
+    record_version: proposalWorkflowRecordVersion,
+    target_ref: target.id,
+    target_apply_mode: target.applyMode,
+    owner_tool: target.ownerTool,
+    proposal: record ? proposalPreviewPublic(record) : null,
+    dry_run: true,
+    transaction_state: "manual_required",
+    required_before_apply: [
+      "preview_diff",
+      "explicit_approval",
+      "owner_tool_plan",
+      "focused_verification",
+      "rollback_ready_evidence",
+    ],
+    required_checks: target.requiredChecks || [],
+    next_action: "manual_preview_diff_and_plan_required",
+    ...proposalBoundary(),
+  };
+}
+
+function proposalWorkflowStatusPayload(orchestration) {
+  const records = readEventRecords();
+  const events = latestEventRecords(records);
+  const imports = latestImportRecords(records);
+  const proposal = latestProposalImport(records);
+  const candidate = latestCandidateImport(records);
+  return {
+    status: "passed",
+    sync_id: proposalWorkflowSyncId,
+    store: proposalWorkflowStore(),
+    summary: {
+      event_count: events.length,
+      import_count: imports.length,
+      candidate_count: imports.filter((record) => record.schema_id === "CandidateEnvelope").length,
+      proposal_count: imports.filter((record) => record.schema_id === "DesignChangeProposal").length,
+      next_action: proposal ? "manual_preview_diff_and_plan_required" : "import_candidate_or_proposal_required",
+    },
+    events: events.slice(-5).map(eventPublicPayload),
+    imports: imports.slice(-10).map(importPublicPayload),
+    latest_candidate_review: candidateReviewPublic(candidate),
+    latest_proposal_preview: proposalPreviewPublic(proposal),
+    subscription_agent_handoff: events.length ? agentHandoffPublic(events[events.length - 1], orchestration) : null,
+    external_product_export: proposal ? externalProductExportPublic(proposal, orchestration, "external-product") : null,
+    api_key_provider_policy: providerPolicyPublic(orchestration, "api-key"),
+    owner_tool_transaction_preview: proposal ? transactionPreviewPublic(proposal, orchestration, "dashboard-control-center") : null,
+    boundaries: proposalBoundary(),
+  };
 }
 
 function buildImportRecord(command, payload, inputPath, orchestration, records, options) {
@@ -1822,6 +2084,7 @@ function buildImportRecord(command, payload, inputPath, orchestration, records, 
     next_action: schemaId === "CandidateEnvelope" ? "manual_accept_adjust_reject_or_hold_required" : "manual_preview_diff_and_plan_required",
     source_command: `tools/dashboard-design-system ${command}`,
     audit_receipt: null,
+    ...(schemaId === "CandidateEnvelope" ? candidateImportMetadata(payload) : proposalImportMetadata(payload)),
   };
   return attachAuditReceipt(record);
 }
@@ -2064,6 +2327,123 @@ function transitionEvent(command, orchestration) {
   }), null, 2)}\n`);
 }
 
+function handleListImports(orchestration) {
+  const options = parseOptionArgs(process.argv.slice(3));
+  rejectUnknownOptions(options, new Set(["schema"]), "list-imports");
+  const schemaFilter = options.schema || "";
+  const imports = latestImportRecords(readEventRecords()).filter((record) => !schemaFilter || record.schema_id === schemaFilter);
+  process.stdout.write(`${JSON.stringify({
+    status: "passed",
+    sync_id: proposalWorkflowSyncId,
+    count: imports.length,
+    store: proposalWorkflowStore(),
+    imports: imports.map(importPublicPayload),
+    boundaries: proposalBoundary(),
+    runner: {
+      required_capabilities: orchestration.eventRunner?.requiredCapabilities || [],
+      forbidden_capabilities: orchestration.eventRunner?.forbiddenCapabilities || [],
+    },
+  }, null, 2)}\n`);
+}
+
+function requireImportRecord(command) {
+  const options = parseOptionArgs(process.argv.slice(3));
+  rejectUnknownOptions(options, new Set(["import_id", "target_ref"]), command);
+  const importId = requireOption(options, "import_id", command);
+  const record = findLatestImport(readEventRecords(), importId);
+  if (!record) {
+    stop(`unknown Design Studio import: ${importId}`, 1);
+  }
+  return { record, options };
+}
+
+function handleProposalPreview() {
+  const { record } = requireImportRecord("proposal-preview");
+  if (record.schema_id !== "DesignChangeProposal") {
+    stop(`proposal-preview requires a DesignChangeProposal import, got ${record.schema_id}`, 1);
+  }
+  process.stdout.write(`${JSON.stringify({
+    status: "passed",
+    sync_id: proposalWorkflowSyncId,
+    store: proposalWorkflowStore(),
+    preview: proposalPreviewPublic(record),
+  }, null, 2)}\n`);
+}
+
+function handleCandidateReview() {
+  const { record } = requireImportRecord("candidate-review");
+  if (record.schema_id !== "CandidateEnvelope") {
+    stop(`candidate-review requires a CandidateEnvelope import, got ${record.schema_id}`, 1);
+  }
+  process.stdout.write(`${JSON.stringify({
+    status: "passed",
+    sync_id: proposalWorkflowSyncId,
+    store: proposalWorkflowStore(),
+    review: candidateReviewPublic(record),
+  }, null, 2)}\n`);
+}
+
+function handleAgentHandoff(orchestration) {
+  const options = parseOptionArgs(process.argv.slice(3));
+  rejectUnknownOptions(options, new Set(["event_id"]), "agent-handoff");
+  const eventId = requireOption(options, "event_id", "agent-handoff");
+  const record = findLatestEvent(readEventRecords(), eventId);
+  if (!record) {
+    stop(`unknown Design Studio event: ${eventId}`, 1);
+  }
+  process.stdout.write(`${JSON.stringify({
+    status: "passed",
+    sync_id: proposalWorkflowSyncId,
+    store: proposalWorkflowStore(),
+    handoff: agentHandoffPublic(record, orchestration),
+  }, null, 2)}\n`);
+}
+
+function handleExportProposal(orchestration) {
+  const { record, options } = requireImportRecord("export-proposal");
+  if (record.schema_id !== "DesignChangeProposal") {
+    stop(`export-proposal requires a DesignChangeProposal import, got ${record.schema_id}`, 1);
+  }
+  const targetRef = options.target_ref || "external-product";
+  process.stdout.write(`${JSON.stringify({
+    status: "passed",
+    sync_id: proposalWorkflowSyncId,
+    store: proposalWorkflowStore(),
+    export: externalProductExportPublic(record, orchestration, targetRef),
+  }, null, 2)}\n`);
+}
+
+function handleProviderPolicy(orchestration) {
+  const options = parseOptionArgs(process.argv.slice(3));
+  rejectUnknownOptions(options, new Set(["provider_mode"]), "provider-policy");
+  const providerMode = options.provider_mode || "api-key";
+  process.stdout.write(`${JSON.stringify({
+    status: "passed",
+    sync_id: proposalWorkflowSyncId,
+    provider_policy: providerPolicyPublic(orchestration, providerMode),
+  }, null, 2)}\n`);
+}
+
+function handleTransactionPreview(orchestration) {
+  const { record, options } = requireImportRecord("transaction-preview");
+  if (record.schema_id !== "DesignChangeProposal") {
+    stop(`transaction-preview requires a DesignChangeProposal import, got ${record.schema_id}`, 1);
+  }
+  const targetRef = options.target_ref || "dashboard-control-center";
+  process.stdout.write(`${JSON.stringify({
+    status: "passed",
+    sync_id: proposalWorkflowSyncId,
+    store: proposalWorkflowStore(),
+    transaction_preview: transactionPreviewPublic(record, orchestration, targetRef),
+  }, null, 2)}\n`);
+}
+
+function handleProposalStatus(orchestration) {
+  const options = parseOptionArgs(process.argv.slice(3));
+  rejectUnknownOptions(options, new Set([]), "proposal-status");
+  process.stdout.write(`${JSON.stringify(proposalWorkflowStatusPayload(orchestration), null, 2)}\n`);
+}
+
 function interactionFromOptions(component, options) {
   const current = component.interaction || {};
   return {
@@ -2223,6 +2603,22 @@ if (command === "emit-css") {
   transitionEvent(command, orchestration);
 } else if (command === "import-candidate" || command === "import-proposal") {
   handleImportCommand(command, orchestration);
+} else if (command === "list-imports") {
+  handleListImports(orchestration);
+} else if (command === "proposal-preview") {
+  handleProposalPreview();
+} else if (command === "candidate-review") {
+  handleCandidateReview();
+} else if (command === "agent-handoff") {
+  handleAgentHandoff(orchestration);
+} else if (command === "export-proposal") {
+  handleExportProposal(orchestration);
+} else if (command === "provider-policy") {
+  handleProviderPolicy(orchestration);
+} else if (command === "transaction-preview") {
+  handleTransactionPreview(orchestration);
+} else if (command === "proposal-status") {
+  handleProposalStatus(orchestration);
 } else {
   usage();
 }

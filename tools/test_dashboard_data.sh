@@ -181,6 +181,7 @@ for (const seedToken of [
   '"${settings_groups[*]}"',
   '"${settings_items[*]}"',
   '"$browser_debug_json"',
+  '"$design_studio_json"',
   '"$operational_decision_json"',
   '"${decision_page_rows[*]}"',
   '"$repository_changes_json"',
@@ -222,11 +223,20 @@ if (!data.source_files.includes('docs/workflow/PRODUCT_GATE_EVIDENCE_SCHEMA.tsv'
 if (!data.source_files.includes('tools/dashboard-browser-debug-manifest')) {
   fail('source_files does not include dashboard Browser Debug manifest generator');
 }
+if (!data.source_files.includes('tools/dashboard-design-system')) {
+  fail('source_files does not include dashboard Design Studio generator');
+}
+if (!data.source_files.includes('docs/design-system/dashboard-control-center/orchestration.json')) {
+  fail('source_files does not include dashboard Design Studio orchestration contract');
+}
 if (!data.source_commands.includes('tools/dashboard-data')) {
   fail('source_commands does not include dashboard-data');
 }
 if (!data.source_commands.includes('tools/product-repository-authority status --json')) {
   fail('source_commands does not include product repository authority status');
+}
+if (!data.source_commands.includes('tools/dashboard-design-system proposal-status')) {
+  fail('source_commands does not include Design Studio proposal status');
 }
 for (const optionalCommand of [
   'tools/check_as_built_sync_contract.sh',
@@ -271,6 +281,7 @@ for (const path of [
   'browser_debug.agent_package.status',
   'browser_debug.agent_result.status',
   'browser_debug.agent_report.status',
+  'design_studio.status',
   'operational_decision.status',
   'development.repository_changes.status',
 ]) {
@@ -920,6 +931,87 @@ for (const key of ['dashboard_executes_browser_debug', 'external_upload', 'provi
   if (browserBoundary[key] !== false) {
     fail(`browser_debug boundary must keep ${key} false`);
   }
+}
+
+const designStudio = requireField('design_studio');
+if (!designStudio || typeof designStudio !== 'object' || Array.isArray(designStudio)) {
+  fail('design_studio must be an object');
+}
+if (!allowedStates.has(designStudio.status)) {
+  fail(`invalid design_studio.status: ${designStudio.status}`);
+}
+if (designStudio.sync_id !== 'dashboard_design_studio_proposal_workflow_foundation') {
+  fail(`design_studio sync id is invalid: ${designStudio.sync_id}`);
+}
+if (!designStudio.summary || typeof designStudio.summary !== 'object' || Array.isArray(designStudio.summary)) {
+  fail('design_studio.summary must be an object');
+}
+for (const field of ['event_count', 'import_count', 'candidate_count', 'proposal_count']) {
+  if (!Number.isInteger(Number(designStudio.summary[field])) || Number(designStudio.summary[field]) < 0) {
+    fail(`design_studio.summary.${field} must be a non-negative integer`);
+  }
+}
+if (typeof designStudio.summary.next_action !== 'string' || !designStudio.summary.next_action) {
+  fail('design_studio.summary.next_action must be a safe display string');
+}
+for (const collectionName of ['events', 'imports']) {
+  if (!Array.isArray(designStudio[collectionName])) {
+    fail(`design_studio.${collectionName} must be an array`);
+  }
+}
+for (const imported of designStudio.imports) {
+  if ('payload' in imported || 'operations' in imported) {
+    fail('design_studio imports must not expose raw payload or proposal operations');
+  }
+  if (imported.proposal_only !== true) {
+    fail('design_studio imports must remain proposal-only');
+  }
+}
+const designBoundary = designStudio.boundaries;
+if (!designBoundary || typeof designBoundary !== 'object' || Array.isArray(designBoundary)) {
+  fail('design_studio.boundaries must be an object');
+}
+if (designBoundary.proposal_only !== true) {
+  fail('design_studio boundary must be proposal-only');
+}
+for (const key of ['writes_allowed', 'direct_apply_authority', 'external_product_apply', 'provider_dispatch', 'imagegen_executed', 'plan_token_created', 'apply_token_created', 'approval_receipt_created']) {
+  if (designBoundary[key] !== false) {
+    fail(`design_studio boundary must keep ${key} false`);
+  }
+}
+if (!designStudio.api_key_provider_policy || designStudio.api_key_provider_policy.api_call_available !== false) {
+  fail('design_studio api-key provider policy must keep API calls unavailable');
+}
+if (!['blocked', 'unknown'].includes(designStudio.api_key_provider_policy.status)) {
+  fail(`design_studio api-key provider status is invalid: ${designStudio.api_key_provider_policy.status}`);
+}
+if (designStudio.latest_proposal_preview) {
+  if (designStudio.latest_proposal_preview.decision_gate?.status !== 'manual_required') {
+    fail('design_studio proposal preview must require a manual gate');
+  }
+  if (designStudio.latest_proposal_preview.proposal_only !== true) {
+    fail('design_studio proposal preview must remain proposal-only');
+  }
+  if (designStudio.latest_proposal_preview.writes_allowed !== false || designStudio.latest_proposal_preview.provider_dispatch !== false) {
+    fail('design_studio proposal preview must preserve proposal-only boundaries');
+  }
+}
+if (designStudio.latest_candidate_review) {
+  if (designStudio.latest_candidate_review.decision_gate?.status !== 'manual_required') {
+    fail('design_studio candidate review must require a manual gate');
+  }
+  if (designStudio.latest_candidate_review.proposal_only !== true) {
+    fail('design_studio candidate review must remain proposal-only');
+  }
+  if (designStudio.latest_candidate_review.imagegen_executed !== false || designStudio.latest_candidate_review.external_product_apply !== false) {
+    fail('design_studio candidate review must not execute imagegen or product writes');
+  }
+}
+if (designStudio.external_product_export && designStudio.external_product_export.target_apply_mode !== 'plan-only') {
+  fail('design_studio external product export must stay plan-only');
+}
+if (designStudio.owner_tool_transaction_preview && designStudio.owner_tool_transaction_preview.dry_run !== true) {
+  fail('design_studio owner-tool transaction preview must stay dry-run');
 }
 
 for (const [collectionName, minCount] of [['approvals', 1], ['dangerous_operations', 1]]) {
