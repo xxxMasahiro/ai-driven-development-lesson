@@ -4723,7 +4723,7 @@ Stop and ask before dependency installation, CI authority changes, required chec
 
 SYNC-ID: dashboard_control_center_component_module_extraction
 STATUS: implemented
-ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,dashboard-control-center/src/App.jsx,dashboard-control-center/src/DecisionSummary.jsx,dashboard-control-center/src/dashboardData.js,dashboard-control-center/src/i18n.js,dashboard-control-center/src/styles.css,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,dashboard-control-center/src/App.jsx,dashboard-control-center/src/dashboardContext.js,dashboard-control-center/src/DecisionSummary.jsx,dashboard-control-center/src/dashboardData.js,dashboard-control-center/src/i18n.js,dashboard-control-center/src/styles.css,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
 TESTS: tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
 
 Planned order:
@@ -4731,8 +4731,9 @@ Planned order:
 1. Defer extraction until decision projection, rendering, and any required CSS refinement are implemented and tested.
 2. Identify reusable page/evidence components already implied by `App.jsx` without changing data ownership or route behavior.
 3. Extract modules in small behavior-preserving steps, keeping i18n keys and existing component props stable.
-4. Run focused i18n and Dashboard browser tests after each extraction slice.
-5. Promote only after no behavior, route, readiness, style, or accessibility regression is observed.
+4. Keep the active-menu/context selection logic in `dashboard-control-center/src/dashboardContext.js` so page rendering and context-switch refresh can share the same producer-owned resolution rules.
+5. Run focused i18n and Dashboard browser tests after each extraction slice.
+6. Promote only after no behavior, route, readiness, style, or accessibility regression is observed.
 
 Verification sequence:
 
