@@ -5033,3 +5033,21 @@ Implemented order:
 7. Promoted this sync ID to implemented after focused Design Studio, dashboard-data, Dashboard, sync, and repository-development checks passed.
 
 Stop and ask before provider API dispatch, subscription-agent background execution, imagegen calls, mock image mutation, OCR trust, external product writes, browser mutation endpoints, dependency changes, credentials, Git/CI execution, push, PR creation, merge, main sync, cleanup, or any existing-feature tradeoff.
+
+## Implemented Dashboard Design Studio History Detail Implementation Plan
+
+SYNC-ID: dashboard_design_studio_history_detail
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/DASHBOARD_DATA_SCHEMA.tsv,tools/dashboard-design-system,tools/dashboard-data,dashboard-control-center/src/dashboardData.js,dashboard-control-center/src/App.jsx,dashboard-control-center/src/i18n.js,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_design_studio_events.sh,tools/test_dashboard_data.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_dashboard_design_studio_events.sh,tools/check_dashboard_design_system.sh,tools/test_dashboard_data.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+Implemented order:
+
+1. Synchronized this planned block before runtime edits.
+2. Added `history_rows[]` projection to `tools/dashboard-design-system proposal-status`.
+3. Extended `DASHBOARD_DATA_SCHEMA.tsv`, `dashboardData.js`, and dashboard-data tests for item-level safe history rows.
+4. Rendered Design Studio history inside the existing History page with proposal-only boundary cues and safe technical metadata.
+5. Extended i18n and Playwright coverage for populated and empty history states.
+6. Promoted this sync ID to implemented after focused Design Studio, dashboard-data, Dashboard, sync, and repository-development checks passed.
+
+Stop and ask before provider dispatch, imagegen, subscription-agent execution, external product writes, automatic apply, approval mutation, browser command execution, dependency changes, credentials, push, merge, or existing-feature tradeoffs.

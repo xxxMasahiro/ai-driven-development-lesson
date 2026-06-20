@@ -2579,3 +2579,24 @@ Acceptance requirements:
 Non-scope:
 
 - Do not implement provider API dispatch, subscription-agent execution, imagegen execution, image editing, OCR trust, automatic apply, browser mutation endpoints, external product writes, dependency changes, Git/CI execution, push, merge, main sync, or credentials.
+
+## Implemented Dashboard Design Studio History Detail Requirements
+
+SYNC-ID: dashboard_design_studio_history_detail
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/DASHBOARD_DATA_SCHEMA.tsv,tools/dashboard-design-system,tools/dashboard-data,dashboard-control-center/src/dashboardData.js,dashboard-control-center/src/App.jsx,dashboard-control-center/src/i18n.js,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_design_studio_events.sh,tools/test_dashboard_data.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_dashboard_design_studio_events.sh,tools/check_dashboard_design_system.sh,tools/test_dashboard_data.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+The History page shows Design Studio event/import/proposal history as producer-owned, redacted, proposal-only dashboard data.
+It helps non-engineers see what happened and whether human review is needed while giving junior/intermediate engineers safe ids, schemas, affected files, checks, risk, and audit metadata for investigation.
+
+Acceptance requirements:
+
+- `tools/dashboard-design-system proposal-status` exposes bounded `history_rows[]` derived from existing event/import records without raw prompts, raw payloads, proposal operations, secrets, or executable browser commands.
+- Dashboard data validation and schema define item-level history fields and preserve `proposal_only: true` with all execution/write capability flags false.
+- The Control Center History page renders Design Studio history rows, empty state, manual-required status, source/check chips, and explicit no-apply/no-provider/no-imagegen/no-product-write boundaries.
+- Existing Design Studio summary, Settings, Lessons, and History behavior remain compatible with legacy snapshots where `design_studio` is absent.
+
+Non-scope:
+
+- Do not add provider dispatch, subscription-agent background execution, imagegen, OCR trust, mock editing, automatic apply, approval mutation, external product writes, Git/CI execution, credentials, dependencies, push, merge, or browser command execution.

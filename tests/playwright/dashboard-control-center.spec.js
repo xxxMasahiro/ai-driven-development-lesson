@@ -717,6 +717,67 @@ function addDesignStudioProposalWorkflowFixture(data) {
         approval_receipt_created: false,
       },
     ],
+    history_rows: [
+      {
+        row_id: "history:dse:subscription-agent-plan-0001",
+        row_kind: "event",
+        status: "manual_required",
+        event_order: 1,
+        observed_at: "2026-06-21T00:00:00Z",
+        event_id: "dse:subscription-agent-plan-0001",
+        request_id: "dsr:subscription-agent-plan-0001",
+        schema_id: "DesignStudioEvent",
+        source_id: "dse:subscription-agent-plan-0001",
+        target_ref: "dashboard-control-center",
+        provider_mode: "subscription-agent",
+        digest: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        preview: "Prepare a proposal packet for manual import by a subscribed CLI agent.",
+        redaction_state: "checked_no_secret_like_payload",
+        next_action: "return_structured_proposal_for_manual_import",
+        affected_source_files: [],
+        affected_generated_files: [],
+        check_plan: [],
+        risk_assessment: "manual_required",
+        confidence: "unknown",
+        proposal_only: true,
+        writes_allowed: false,
+        direct_apply_authority: false,
+        external_product_apply: false,
+        provider_dispatch: false,
+        imagegen_executed: false,
+        plan_token_created: false,
+        apply_token_created: false,
+        approval_receipt_created: false,
+      },
+      {
+        row_id: "history:dsi:proposal-alpha-0001",
+        row_kind: "import",
+        status: "manual_required",
+        event_order: 2,
+        observed_at: "2026-06-21T00:01:00Z",
+        import_id: "dsi:proposal-alpha-0001",
+        schema_id: "DesignChangeProposal",
+        source_id: "proposal.alpha-0001",
+        digest: "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        preview: "proposal.alpha-0001 request=request.alpha-0001 operations=1",
+        redaction_state: "payload_hash_and_preview_only",
+        next_action: "manual_preview_diff_and_plan_required",
+        affected_source_files: ["docs/design-system/dashboard-control-center/tokens.json"],
+        affected_generated_files: ["dashboard-control-center/src/design-system.generated.css"],
+        check_plan: ["tools/check_dashboard_design_system.sh"],
+        risk_assessment: "low; proposal only",
+        confidence: "medium",
+        proposal_only: true,
+        writes_allowed: false,
+        direct_apply_authority: false,
+        external_product_apply: false,
+        provider_dispatch: false,
+        imagegen_executed: false,
+        plan_token_created: false,
+        apply_token_created: false,
+        approval_receipt_created: false,
+      },
+    ],
     latest_candidate_review: {
       import_id: "dsi:candidate-alpha-0001",
       candidate_id: "candidate.alpha-0001",
@@ -1909,6 +1970,19 @@ test.describe("English dashboard control center", () => {
     });
 
     const supportNavigation = page.getByRole("navigation", { name: "Other" });
+    await supportNavigation.getByRole("link", { name: /Update History/ }).click();
+    const historyView = page.locator("#history");
+    await expect(historyView).toContainText("Design Studio history");
+    await expect(historyView).toContainText("History rows");
+    await expect(historyView).toContainText("Request event");
+    await expect(historyView).toContainText("Imported record");
+    await expect(historyView).toContainText("DesignChangeProposal");
+    await expect(historyView).toContainText("tools/check_dashboard_design_system.sh");
+    await expect(historyView).toContainText("No provider dispatch");
+    await expect(historyView).toContainText("No image generation");
+    await expect(historyView).not.toContainText("intent_text");
+    await expect(historyView).not.toContainText("operations");
+    await expect(historyView).not.toContainText("payload");
     await supportNavigation.getByRole("link", { name: /Help/ }).click();
     await expect(page.getByRole("heading", { name: "Help" })).toBeVisible();
     await expect(page.locator(".glossary-category")).toHaveCount(8);

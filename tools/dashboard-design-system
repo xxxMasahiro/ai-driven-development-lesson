@@ -2011,6 +2011,78 @@ function transactionPreviewPublic(record, orchestration, targetRef = "dashboard-
   };
 }
 
+function designStudioHistoryRowFromEvent(record) {
+  return {
+    row_id: `history:${record.event_id}`,
+    row_kind: "event",
+    status: record.lifecycle_state || record.job_state || "manual_required",
+    event_order: Number(record.event_order || 0),
+    observed_at: record.updated_at || record.created_at,
+    event_id: record.event_id,
+    request_id: record.request_id,
+    target_ref: record.target_ref,
+    target_apply_mode: record.target_apply_mode,
+    provider_mode: record.provider_mode,
+    provider_status: record.provider_status,
+    request_kind: record.request_kind,
+    schema_id: "DesignStudioEvent",
+    source_id: record.event_id,
+    digest: record.intent_digest,
+    preview: record.intent_preview,
+    redaction_state: record.redaction_state,
+    next_action: record.next_action,
+    audit_receipt: record.audit_receipt,
+    affected_source_files: [],
+    affected_generated_files: [],
+    check_plan: [],
+    risk_assessment: "manual_required",
+    confidence: "unknown",
+    ...proposalBoundary(),
+  };
+}
+
+function designStudioHistoryRowFromImport(record) {
+  const isProposal = record.schema_id === "DesignChangeProposal";
+  return {
+    row_id: `history:${record.import_id}`,
+    row_kind: "import",
+    status: "manual_required",
+    event_order: Number(record.event_order || 0),
+    observed_at: record.updated_at || record.created_at,
+    import_id: record.import_id,
+    schema_id: record.schema_id,
+    source_id: record.source_id,
+    payload_ref: record.payload_ref,
+    digest: record.payload_digest,
+    preview: record.payload_preview,
+    redaction_state: record.redaction_state,
+    next_action: record.next_action,
+    audit_receipt: record.audit_receipt,
+    affected_source_files: isProposal ? boundedStringList(record.affected_source_files, 8) : [],
+    affected_generated_files: isProposal ? boundedStringList(record.affected_generated_files, 8) : [],
+    check_plan: isProposal ? boundedStringList(record.check_plan, 8) : [],
+    risk_assessment: isProposal ? record.risk_assessment || "unknown" : "candidate_review_required",
+    confidence: record.confidence || "unknown",
+    ...proposalBoundary(),
+  };
+}
+
+function designStudioHistoryRows(events, imports) {
+  return [
+    ...events.map(designStudioHistoryRowFromEvent),
+    ...imports.map(designStudioHistoryRowFromImport),
+  ]
+    .sort((left, right) => {
+      const leftOrder = Number(left.event_order || 0);
+      const rightOrder = Number(right.event_order || 0);
+      if (leftOrder !== rightOrder) {
+        return leftOrder - rightOrder;
+      }
+      return String(left.row_id).localeCompare(String(right.row_id));
+    })
+    .slice(-20);
+}
+
 function proposalWorkflowStatusPayload(orchestration) {
   const records = readEventRecords();
   const events = latestEventRecords(records);
@@ -2030,6 +2102,7 @@ function proposalWorkflowStatusPayload(orchestration) {
     },
     events: events.slice(-5).map(eventPublicPayload),
     imports: imports.slice(-10).map(importPublicPayload),
+    history_rows: designStudioHistoryRows(events, imports),
     latest_candidate_review: candidateReviewPublic(candidate),
     latest_proposal_preview: proposalPreviewPublic(proposal),
     subscription_agent_handoff: events.length ? agentHandoffPublic(events[events.length - 1], orchestration) : null,

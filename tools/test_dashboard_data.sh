@@ -959,6 +959,33 @@ for (const collectionName of ['events', 'imports']) {
     fail(`design_studio.${collectionName} must be an array`);
   }
 }
+if (!Array.isArray(designStudio.history_rows)) {
+  fail('design_studio.history_rows must be an array');
+}
+for (const row of designStudio.history_rows) {
+  for (const field of ['row_id', 'row_kind', 'status', 'schema_id', 'source_id', 'next_action']) {
+    if (typeof row[field] !== 'string' || !row[field]) {
+      fail(`design_studio.history_rows[].${field} must be a safe display string`);
+    }
+  }
+  if (!['event', 'import'].includes(row.row_kind)) {
+    fail(`design_studio.history_rows[].row_kind is invalid: ${row.row_kind}`);
+  }
+  if (!Number.isInteger(Number(row.event_order)) || Number(row.event_order) < 0) {
+    fail('design_studio.history_rows[].event_order must be a non-negative integer');
+  }
+  if ('intent_text' in row || 'payload' in row || 'operations' in row) {
+    fail('design_studio history rows must not expose raw prompt, payload, or operations');
+  }
+  if (row.proposal_only !== true) {
+    fail('design_studio history rows must remain proposal-only');
+  }
+  for (const key of ['writes_allowed', 'direct_apply_authority', 'external_product_apply', 'provider_dispatch', 'imagegen_executed', 'plan_token_created', 'apply_token_created', 'approval_receipt_created']) {
+    if (row[key] !== false) {
+      fail(`design_studio history rows must keep ${key} false`);
+    }
+  }
+}
 for (const imported of designStudio.imports) {
   if ('payload' in imported || 'operations' in imported) {
     fail('design_studio imports must not expose raw payload or proposal operations');

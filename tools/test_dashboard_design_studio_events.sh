@@ -523,6 +523,25 @@ if (!payload.latest_proposal_preview || !payload.latest_candidate_review) {
 if (payload.api_key_provider_policy?.api_call_available !== false || payload.boundaries?.provider_dispatch !== false) {
   fail("proposal-status must expose blocked provider and dispatch boundaries");
 }
+if (!Array.isArray(payload.history_rows) || payload.history_rows.length < 2) {
+  fail("proposal-status must expose bounded Design Studio history rows");
+}
+for (const row of payload.history_rows) {
+  if (!["event", "import"].includes(row.row_kind)) {
+    fail(`invalid Design Studio history row kind: ${row.row_kind}`);
+  }
+  if (row.proposal_only !== true) {
+    fail("Design Studio history rows must remain proposal-only");
+  }
+  if ("intent_text" in row || "payload" in row || "operations" in row) {
+    fail("Design Studio history rows must not expose raw prompt, payload, or operations");
+  }
+  for (const key of ["writes_allowed", "direct_apply_authority", "external_product_apply", "provider_dispatch", "imagegen_executed", "plan_token_created", "apply_token_created", "approval_receipt_created"]) {
+    if (row[key] !== false) {
+      fail(`Design Studio history row ${key} must be false`);
+    }
+  }
+}
 NODE
 
 wrong_preview_err="$TMP_DIR/wrong-preview.err"

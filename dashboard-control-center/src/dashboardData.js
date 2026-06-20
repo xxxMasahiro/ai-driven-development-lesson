@@ -2141,6 +2141,41 @@ function validateDesignStudioCandidateReview(review, label) {
   validateDesignStudioBoundary(source, label);
 }
 
+function validateDesignStudioHistoryRow(row, label) {
+  const source = asObject(row, label);
+  for (const key of ["row_id", "row_kind", "status", "source_id", "schema_id", "next_action"]) {
+    if (!displayText(source[key], "")) {
+      throw new Error(`${label} ${key} is missing`);
+    }
+  }
+  if (!["event", "import"].includes(displayText(source.row_kind, ""))) {
+    throw new Error(`${label} row_kind is invalid`);
+  }
+  if (!ALLOWED_STATES.has(displayText(source.status, "")) && displayText(source.status, "") !== "queued") {
+    throw new Error(`${label} status is invalid`);
+  }
+  if ("intent_text" in source || "payload" in source || "operations" in source) {
+    throw new Error(`${label} must not expose raw prompt, payload, or operations`);
+  }
+  validateNonNegativeInteger(Number(source.event_order || 0), `${label} event_order`);
+  for (const file of asArray(source.affected_source_files)) {
+    if (!safeRelativePath(file)) {
+      throw new Error(`${label} affected_source_files contains an unsafe path`);
+    }
+  }
+  for (const file of asArray(source.affected_generated_files)) {
+    if (!safeRelativePath(file)) {
+      throw new Error(`${label} affected_generated_files contains an unsafe path`);
+    }
+  }
+  for (const command of asArray(source.check_plan)) {
+    if (!safeDisplayCommand(command)) {
+      throw new Error(`${label} check_plan contains an unsafe command`);
+    }
+  }
+  validateDesignStudioBoundary(source, label);
+}
+
 function validateDesignStudio(data) {
   if (data.design_studio === undefined || data.design_studio === null) {
     return;
@@ -2171,6 +2206,9 @@ function validateDesignStudio(data) {
       throw new Error("dashboard design_studio import must expose redacted metadata");
     }
     validateDesignStudioBoundary(source, "dashboard design_studio import");
+  }
+  for (const row of asArray(designStudio.history_rows)) {
+    validateDesignStudioHistoryRow(row, "dashboard design_studio history row");
   }
   validateDesignStudioCandidateReview(designStudio.latest_candidate_review, "dashboard design_studio latest_candidate_review");
   validateDesignStudioProposalPreview(designStudio.latest_proposal_preview, "dashboard design_studio latest_proposal_preview");

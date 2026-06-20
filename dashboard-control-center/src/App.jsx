@@ -7046,6 +7046,7 @@ function designStudioWorkflowState(data) {
     summary,
     events: asArray(source.events),
     imports: asArray(source.imports),
+    historyRows: asArray(source.history_rows),
     candidate: source.latest_candidate_review || null,
     proposal: source.latest_proposal_preview || null,
     handoff: source.subscription_agent_handoff || null,
@@ -7185,6 +7186,58 @@ function DesignStudioProposalWorkflowPanel({ data, t }) {
       </div>
       <div className="design-studio-orchestration__flow" aria-label={t("designStudio.proposalWorkflow.boundaryTitle")}>
         {boundaryRows.map(([key, label]) => (
+          <div className="design-studio-orchestration__flow-step" key={key}>
+            <StatusPill value={workflow.boundaries[key] === false ? "ready" : "blocked"} t={t} label={workflow.boundaries[key] === false ? label : statusLabelForChip("blocked", t)} />
+          </div>
+        ))}
+      </div>
+    </DetailSection>
+  );
+}
+
+function DesignStudioHistorySection({ data, t }) {
+  const workflow = designStudioWorkflowState(data);
+  const rows = workflow.historyRows;
+  return (
+    <DetailSection id="history-design-studio" title={t("historyPage.designStudio.title")} Icon={ListChecks}>
+      <div className="design-studio-orchestration__intro">
+        <StatusPill value={workflow.status} t={t} label={statusLabelForChip(workflow.status, t)} />
+        <p>{rows.length ? t("historyPage.designStudio.detail") : t("historyPage.designStudio.emptyDetail")}</p>
+        <small>{t("designStudio.proposalWorkflow.syncId")}: {technicalChip(workflow.syncId)}</small>
+      </div>
+      <div className="design-studio-orchestration__cards">
+        <DesignStudioWorkflowMetric label={t("designStudio.proposalWorkflow.events")} value={workflow.summary.event_count ?? workflow.events.length} />
+        <DesignStudioWorkflowMetric label={t("designStudio.proposalWorkflow.imports")} value={workflow.summary.import_count ?? workflow.imports.length} />
+        <DesignStudioWorkflowMetric label={t("historyPage.designStudio.historyRows")} value={rows.length} />
+      </div>
+      {rows.length ? (
+        <div className="history-issue-list">
+          {rows.slice(-8).reverse().map((row) => (
+            <article className="history-issue" key={displayText(row.row_id)}>
+              {row.row_kind === "event" ? <Clock aria-hidden="true" size={18} /> : <FileCheck2 aria-hidden="true" size={18} />}
+              <div>
+                <strong>{row.row_kind === "event" ? t("historyPage.designStudio.eventRow") : t("historyPage.designStudio.importRow")}</strong>
+                <p>{displayText(row.next_action, t("historyPage.designStudio.manualReview"))}</p>
+                <small>{t("historyPage.designStudio.schema")}: {displayText(row.schema_id)} / {t("historyPage.designStudio.source")}: {displayText(row.source_id)}</small>
+                <small>{t("historyPage.designStudio.digest")}: {displayText(shortIdentifier(row.digest, 12, 6), t("summary.none"))}</small>
+                {displayText(row.risk_assessment, "") ? <small>{t("designStudio.proposalWorkflow.risk")}: {displayText(row.risk_assessment)}</small> : null}
+                <SourceBoundaryChips values={row.affected_source_files} t={t} limit={2} variant="files" labelKey="maintenance.sourceFileItem" tooltipKey="maintenance.sourceFileTooltip" />
+                <SourceBoundaryChips values={row.check_plan} t={t} limit={2} variant="commands" labelKey="maintenance.sourceCommandItem" tooltipKey="maintenance.sourceCommandTooltip" />
+              </div>
+              <StatusPill value={normalizeState(row.status || "manual_required")} t={t} label={statusLabelForChip(normalizeState(row.status || "manual_required"), t)} />
+            </article>
+          ))}
+        </div>
+      ) : (
+        <SidebarPageCard Icon={CheckCircle2} title={t("historyPage.designStudio.emptyTitle")} detail={displayText(workflow.summary.next_action, t("historyPage.designStudio.emptyDetail"))} status="ready" t={t} />
+      )}
+      <div className="design-studio-orchestration__flow" aria-label={t("designStudio.proposalWorkflow.boundaryTitle")}>
+        {[
+          ["provider_dispatch", t("designStudio.proposalWorkflow.noProviderDispatch")],
+          ["imagegen_executed", t("designStudio.proposalWorkflow.noImagegenExecution")],
+          ["external_product_apply", t("designStudio.proposalWorkflow.noProductWrite")],
+          ["direct_apply_authority", t("designStudio.proposalWorkflow.noDirectApply")],
+        ].map(([key, label]) => (
           <div className="design-studio-orchestration__flow-step" key={key}>
             <StatusPill value={workflow.boundaries[key] === false ? "ready" : "blocked"} t={t} label={workflow.boundaries[key] === false ? label : statusLabelForChip("blocked", t)} />
           </div>
@@ -8903,6 +8956,7 @@ function HistoryPage({ data, locale, t }) {
       <DetailSection id="history-issues" title={t("historyPage.issuesTitle")} Icon={AlertTriangle}>
         <HistoryIssueList warnings={warnings} failures={failures} t={t} />
       </DetailSection>
+      <DesignStudioHistorySection data={data} t={t} />
       <WorkflowRecentTable rows={data.development?.recent_runs} data={data} t={t} />
       <DetailSection id="history-warnings" title={t("summary.warnings")} Icon={AlertTriangle}>
         {warnings.length ? (
