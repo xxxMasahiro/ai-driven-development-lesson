@@ -229,6 +229,9 @@ if (!data.source_files.includes('tools/dashboard-design-system')) {
 if (!data.source_files.includes('docs/design-system/dashboard-control-center/orchestration.json')) {
   fail('source_files does not include dashboard Design Studio orchestration contract');
 }
+if (!data.source_files.includes('docs/design-system/dashboard-control-center/templates.json')) {
+  fail('source_files does not include dashboard Design Studio template registry');
+}
 if (!data.source_commands.includes('tools/dashboard-data')) {
   fail('source_commands does not include dashboard-data');
 }
@@ -1033,6 +1036,80 @@ if (designStudio.latest_candidate_review) {
   if (designStudio.latest_candidate_review.imagegen_executed !== false || designStudio.latest_candidate_review.external_product_apply !== false) {
     fail('design_studio candidate review must not execute imagegen or product writes');
   }
+}
+if (!designStudio.template_library || typeof designStudio.template_library !== 'object' || Array.isArray(designStudio.template_library)) {
+  fail('design_studio.template_library must expose the template proposal library');
+}
+const templateLibrary = designStudio.template_library;
+if (templateLibrary.sync_id !== 'dashboard_design_studio_template_proposal_library') {
+  fail(`design_studio.template_library sync id is invalid: ${templateLibrary.sync_id}`);
+}
+if (!templateLibrary.registry || templateLibrary.registry.path !== 'docs/design-system/dashboard-control-center/templates.json') {
+  fail('design_studio.template_library registry path is invalid');
+}
+for (const field of ['template_count', 'ready_count']) {
+  if (!Number.isInteger(Number(templateLibrary[field])) || Number(templateLibrary[field]) < 1) {
+    fail(`design_studio.template_library.${field} must be a positive integer`);
+  }
+}
+if (!Array.isArray(templateLibrary.templates) || templateLibrary.templates.length < 1) {
+  fail('design_studio.template_library.templates must expose safe template metadata');
+}
+for (const template of templateLibrary.templates) {
+  for (const field of ['template_id', 'version', 'display_name', 'summary', 'product_type', 'lifecycle_state', 'redaction_state']) {
+    if (typeof template[field] !== 'string' || !template[field]) {
+      fail(`design_studio.template_library template ${field} is missing`);
+    }
+  }
+  if (!/^sha256:[a-f0-9]{64}$/.test(template.template_digest || '')) {
+    fail('design_studio.template_library template must expose a sha256 digest');
+  }
+  if ('payload' in template || 'operations' in template || 'candidate_operations' in template) {
+    fail('design_studio.template_library templates must not expose raw payload or candidate operations');
+  }
+  for (const check of template.required_checks || []) {
+    requireSafeDisplayCommand(check, 'design_studio.template_library required check');
+  }
+  if (template.proposal_only !== true || template.writes_allowed !== false || template.provider_dispatch !== false) {
+    fail('design_studio.template_library templates must remain proposal-only');
+  }
+}
+const templatePreview = templateLibrary.latest_preview;
+if (!templatePreview || typeof templatePreview !== 'object' || Array.isArray(templatePreview)) {
+  fail('design_studio.template_library.latest_preview must expose a template proposal preview');
+}
+if (templatePreview.schema_id !== 'TemplateProposal' || templatePreview.decision_gate?.status !== 'manual_required') {
+  fail('design_studio.template_library.latest_preview must be a manual TemplateProposal preview');
+}
+if (!/^sha256:[a-f0-9]{64}$/.test(templatePreview.template_digest || '')) {
+  fail('design_studio.template_library.latest_preview must expose a sha256 digest');
+}
+if (!Number.isInteger(Number(templatePreview.candidate_operation_count)) || Number(templatePreview.candidate_operation_count) < 1) {
+  fail('design_studio.template_library.latest_preview must expose candidate operation count');
+}
+for (const operation of templatePreview.candidate_operations || []) {
+  for (const field of ['operation_id', 'kind', 'summary', 'target_ref', 'allowed_output', 'authority']) {
+    if (typeof operation[field] !== 'string' || !operation[field]) {
+      fail(`design_studio.template_library.latest_preview candidate operation ${field} is missing`);
+    }
+  }
+  if (operation.authority !== 'proposal_only' || !isSafeScopedPath(operation.allowed_output)) {
+    fail('design_studio.template_library.latest_preview candidate operation must stay proposal-only and path-scoped');
+  }
+}
+for (const file of [...(templatePreview.affected_source_files || []), ...(templatePreview.affected_generated_files || [])]) {
+  if (!isSafeScopedPath(file)) {
+    fail(`design_studio.template_library.latest_preview affected file is unsafe: ${file}`);
+  }
+}
+for (const check of templatePreview.check_plan || []) {
+  requireSafeDisplayCommand(check, 'design_studio.template_library.latest_preview check');
+}
+if (templatePreview.proposal_only !== true || templatePreview.writes_allowed !== false || templatePreview.provider_dispatch !== false || templatePreview.imagegen_executed !== false || templatePreview.external_product_apply !== false) {
+  fail('design_studio.template_library.latest_preview must preserve proposal-only boundaries');
+}
+if (templateLibrary.proposal_only !== true || templateLibrary.writes_allowed !== false || templateLibrary.provider_dispatch !== false) {
+  fail('design_studio.template_library must preserve proposal-only boundaries');
 }
 if (designStudio.subscription_agent_handoff) {
   const handoff = designStudio.subscription_agent_handoff;

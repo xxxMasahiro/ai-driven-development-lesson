@@ -227,6 +227,164 @@ if grep -F 'PASSWORD=abcdefghijkl' "$STORE_DIR/events.jsonl" >/dev/null; then
   exit 1
 fi
 
+templates_out="$TMP_DIR/templates.json"
+"$ROOT/tools/dashboard-design-system" list-templates >"$templates_out"
+node - "$templates_out" <<'NODE'
+const fs = require("fs");
+const payload = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
+const library = payload.template_library || {};
+function fail(message) {
+  console.error(message);
+  process.exit(1);
+}
+if (payload.status !== "passed" || payload.sync_id !== "dashboard_design_studio_template_proposal_library") {
+  fail("list-templates must expose the template library sync id");
+}
+if (library.registry?.path !== "docs/design-system/dashboard-control-center/templates.json") {
+  fail("list-templates must expose the checked template registry path");
+}
+if (library.template_count < 2 || library.ready_count < 2) {
+  fail("list-templates must expose ready template metadata");
+}
+if (!library.templates?.some((template) => template.template_id === "dashboard.readability.cards.v1")) {
+  fail("list-templates must include the dashboard readability template");
+}
+if (!library.templates?.some((template) => template.template_id === "product.design-system.kickoff.v1")) {
+  fail("list-templates must include the external product kickoff template");
+}
+for (const template of library.templates || []) {
+  if (!/^sha256:[a-f0-9]{64}$/.test(template.template_digest || "")) {
+    fail("list-templates must expose template digests");
+  }
+  if ("payload" in template || "operations" in template || "candidate_operations" in template) {
+    fail("list-templates must not expose raw payload, operations, or candidate operations");
+  }
+  if (template.proposal_only !== true || template.writes_allowed !== false || template.provider_dispatch !== false) {
+    fail("list-templates template metadata must remain proposal-only");
+  }
+}
+if (library.latest_preview?.schema_id !== "TemplateProposal") {
+  fail("list-templates must include a safe latest TemplateProposal preview");
+}
+for (const key of ["writes_allowed", "direct_apply_authority", "external_product_apply", "provider_dispatch", "imagegen_executed", "plan_token_created", "apply_token_created", "approval_receipt_created"]) {
+  if (library[key] !== false || library.latest_preview?.[key] !== false) {
+    fail(`template library boundary ${key} must be false`);
+  }
+}
+NODE
+
+template_preview_out="$TMP_DIR/template-preview.json"
+"$ROOT/tools/dashboard-design-system" template-preview \
+  --template-id dashboard.readability.cards.v1 \
+  --target-ref dashboard-control-center \
+  >"$template_preview_out"
+node - "$template_preview_out" <<'NODE'
+const fs = require("fs");
+const payload = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
+const preview = payload.preview || {};
+function fail(message) {
+  console.error(message);
+  process.exit(1);
+}
+if (payload.sync_id !== "dashboard_design_studio_template_proposal_library" || preview.schema_id !== "TemplateProposal") {
+  fail("template-preview must use the template proposal sync and schema ids");
+}
+if (preview.template_id !== "dashboard.readability.cards.v1" || preview.target_apply_mode !== "owner-tool") {
+  fail("dashboard template preview must target the owner-tool dashboard adapter");
+}
+if (preview.decision_gate?.status !== "manual_required") {
+  fail("template-preview must require a manual decision gate");
+}
+if (preview.candidate_operation_count < 1 || !Array.isArray(preview.candidate_operations)) {
+  fail("template-preview must expose bounded candidate operation metadata");
+}
+for (const operation of preview.candidate_operations) {
+  if (operation.authority !== "proposal_only" || "css_patch" in operation || "script_patch" in operation) {
+    fail("template-preview candidate operations must remain metadata only");
+  }
+}
+if (!preview.check_plan?.includes("tools/check_dashboard_design_system.sh")) {
+  fail("template-preview must expose dashboard owner-tool checks");
+}
+if (!/^sha256:[a-f0-9]{64}$/.test(preview.template_digest || "")) {
+  fail("template-preview must expose a template digest");
+}
+for (const key of ["writes_allowed", "direct_apply_authority", "external_product_apply", "provider_dispatch", "imagegen_executed", "plan_token_created", "apply_token_created", "approval_receipt_created"]) {
+  if (preview[key] !== false) {
+    fail(`template-preview boundary ${key} must be false`);
+  }
+}
+NODE
+
+external_template_preview_out="$TMP_DIR/external-template-preview.json"
+"$ROOT/tools/dashboard-design-system" template-preview \
+  --template-id product.design-system.kickoff.v1 \
+  --target-ref external-product \
+  >"$external_template_preview_out"
+node - "$external_template_preview_out" <<'NODE'
+const fs = require("fs");
+const payload = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
+const preview = payload.preview || {};
+function fail(message) {
+  console.error(message);
+  process.exit(1);
+}
+if (preview.target_ref !== "external-product" || preview.target_apply_mode !== "plan-only") {
+  fail("external template preview must remain plan-only");
+}
+if (!preview.check_plan?.includes("product-local-design-system-check")) {
+  fail("external template preview must expose product-local check ids");
+}
+if (preview.external_product_apply !== false || preview.writes_allowed !== false || preview.provider_dispatch !== false) {
+  fail("external template preview must not grant product write or provider authority");
+}
+NODE
+
+unsupported_template_err="$TMP_DIR/unsupported-template.err"
+if "$ROOT/tools/dashboard-design-system" template-preview \
+  --template-id dashboard.readability.cards.v1 \
+  --target-ref external-product \
+  >"$TMP_DIR/unsupported-template.json" 2>"$unsupported_template_err"; then
+  printf 'template-preview accepted an unsupported target unexpectedly\n' >&2
+  exit 1
+fi
+grep 'does not support target ref' "$unsupported_template_err" >/dev/null
+
+node - "$ROOT/docs/design-system/dashboard-control-center/templates.json" <<'NODE'
+const fs = require("fs");
+const registry = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
+function fail(message) {
+  console.error(message);
+  process.exit(1);
+}
+const forbiddenKeys = new Set([
+  "dependency_install",
+  "network_call",
+  "credential_requirement",
+  "shell_command",
+  "auto_apply",
+  "git_operation",
+  "ci_operation",
+  "raw_api_key",
+  "secret_value",
+]);
+function walk(value) {
+  if (!value || typeof value !== "object") {
+    return;
+  }
+  for (const [key, child] of Object.entries(value)) {
+    if (forbiddenKeys.has(key)) {
+      fail(`template registry exposed forbidden key ${key}`);
+    }
+    walk(child);
+  }
+}
+walk(registry);
+if (/PASSWORD=|gh[pousr]_|AKIA[0-9A-Z]{16}|sk-[A-Za-z0-9]{20}|BEGIN (RSA |OPENSSH |EC |DSA )?PRIVATE KEY/i.test(JSON.stringify(registry))) {
+  fail("template registry exposed secret-like data");
+}
+NODE
+
 assert_import_json() {
   local file="$1"
   local expected_status="$2"
@@ -670,6 +828,21 @@ if (!handoff.package_command?.includes("agent-package --event-id")) {
 for (const key of ["writes_allowed", "direct_apply_authority", "external_product_apply", "provider_dispatch", "imagegen_executed", "plan_token_created", "apply_token_created", "approval_receipt_created", "background_execution", "credential_storage", "browser_command_execution", "raw_prompt_included", "package_uploaded"]) {
   if (handoff[key] !== false || handoff.package[key] !== false) {
     fail(`proposal-status handoff package boundary ${key} must be false`);
+  }
+}
+const templateLibrary = payload.template_library || {};
+if (templateLibrary.sync_id !== "dashboard_design_studio_template_proposal_library" || templateLibrary.template_count < 2) {
+  fail("proposal-status must expose the template proposal library");
+}
+if (templateLibrary.latest_preview?.schema_id !== "TemplateProposal" || templateLibrary.latest_preview?.decision_gate?.status !== "manual_required") {
+  fail("proposal-status template library must expose a manual TemplateProposal preview");
+}
+if (!templateLibrary.latest_preview?.check_plan?.includes("tools/check_dashboard_design_system.sh")) {
+  fail("proposal-status template preview must expose dashboard checks");
+}
+for (const key of ["writes_allowed", "direct_apply_authority", "external_product_apply", "provider_dispatch", "imagegen_executed", "plan_token_created", "apply_token_created", "approval_receipt_created"]) {
+  if (templateLibrary[key] !== false || templateLibrary.latest_preview[key] !== false) {
+    fail(`proposal-status template library boundary ${key} must be false`);
   }
 }
 if (!Array.isArray(payload.history_rows) || payload.history_rows.length < 2) {

@@ -136,6 +136,31 @@ function safeDisplayCommand(value) {
   return /^tools\/[A-Za-z0-9._-]+(?: [A-Za-z0-9._:@/%+=,-]+)*$/.test(normalized) ? normalized : "";
 }
 
+function safeDesignStudioScopedPath(value) {
+  if (typeof value !== "string") {
+    return "";
+  }
+  if (value.startsWith("product:")) {
+    const productPath = safeRelativePath(value.slice("product:".length));
+    return productPath ? `product:${productPath}` : "";
+  }
+  return safeRelativePath(value);
+}
+
+function safeDesignStudioCheckReference(value) {
+  if (safeDisplayCommand(value)) {
+    return displayText(value, "");
+  }
+  if (typeof value !== "string") {
+    return "";
+  }
+  const normalized = value.replace(/[\u0000-\u001f]/g, "").trim();
+  if (!normalized || /[;&|`$<>\\/\s]/.test(normalized) || SECRET_PATTERN.test(normalized)) {
+    return "";
+  }
+  return /^[A-Za-z0-9._:-]{4,120}$/.test(normalized) ? normalized : "";
+}
+
 function safeBrowserDebugCommand(value) {
   if (typeof value !== "string") {
     return "";
@@ -2247,6 +2272,167 @@ function validateDesignStudioSubscriptionHandoff(value, label) {
   validateDesignStudioPackageBoundary(handoff, label);
 }
 
+function validateDesignStudioTemplateOperation(value, label) {
+  const operation = asObject(value, label);
+  assertAllowedKeys(operation, new Set(["operation_id", "kind", "summary", "target_ref", "allowed_output", "authority"]), label);
+  for (const key of ["operation_id", "kind", "summary", "target_ref", "allowed_output", "authority"]) {
+    if (!displayText(operation[key], "")) {
+      throw new Error(`${label} ${key} is missing`);
+    }
+  }
+  if (operation.authority !== "proposal_only") {
+    throw new Error(`${label} authority must be proposal_only`);
+  }
+  if (!safeDesignStudioScopedPath(operation.allowed_output)) {
+    throw new Error(`${label} allowed_output is unsafe`);
+  }
+}
+
+function validateDesignStudioTemplatePreview(value, label) {
+  if (value === undefined || value === null) {
+    return;
+  }
+  const preview = asObject(value, label);
+  assertAllowedKeys(preview, new Set([
+    "template_proposal_id",
+    "record_version",
+    "schema_id",
+    "template_id",
+    "template_version",
+    "target_ref",
+    "target_apply_mode",
+    "owner_tool",
+    "compatibility",
+    "candidate_operation_count",
+    "candidate_operations",
+    "affected_source_files",
+    "affected_generated_files",
+    "manual_decisions",
+    "check_plan",
+    "risk_assessment",
+    "accessibility_notes",
+    "confidence",
+    "rollback_outline",
+    "decision_gate",
+    "template_digest",
+    "redaction_state",
+    "next_action",
+    ...DESIGN_STUDIO_BOUNDARY_KEYS,
+  ]), label);
+  for (const key of ["template_proposal_id", "record_version", "schema_id", "template_id", "template_version", "target_ref", "target_apply_mode", "template_digest", "redaction_state", "next_action"]) {
+    if (!displayText(preview[key], "")) {
+      throw new Error(`${label} ${key} is missing`);
+    }
+  }
+  if (preview.schema_id !== "TemplateProposal") {
+    throw new Error(`${label} schema_id must be TemplateProposal`);
+  }
+  validateNonNegativeInteger(Number(preview.candidate_operation_count || 0), `${label} candidate_operation_count`);
+  if (Number(preview.candidate_operation_count || 0) < 1) {
+    throw new Error(`${label} candidate_operation_count must be positive`);
+  }
+  const compatibility = asObject(preview.compatibility, `${label} compatibility`);
+  assertAllowedKeys(compatibility, new Set(["status", "target_ref", "target_apply_mode", "notes"]), `${label} compatibility`);
+  if (!ALLOWED_STATES.has(displayText(compatibility.status, ""))) {
+    throw new Error(`${label} compatibility status is invalid`);
+  }
+  for (const operation of asArray(preview.candidate_operations)) {
+    validateDesignStudioTemplateOperation(operation, `${label} candidate_operation`);
+  }
+  for (const file of [...asArray(preview.affected_source_files), ...asArray(preview.affected_generated_files)]) {
+    if (!safeDesignStudioScopedPath(file)) {
+      throw new Error(`${label} affected file is unsafe`);
+    }
+  }
+  for (const command of asArray(preview.check_plan)) {
+    if (!safeDesignStudioCheckReference(command)) {
+      throw new Error(`${label} check_plan contains an unsafe command or check id`);
+    }
+  }
+  validateDesignStudioDecisionGate(preview.decision_gate, `${label} decision_gate`);
+  validateDesignStudioSha256Digest(preview.template_digest, `${label} template_digest`);
+  validateDesignStudioBoundary(preview, label);
+}
+
+function validateDesignStudioTemplateLibrary(value, label) {
+  if (value === undefined || value === null) {
+    return;
+  }
+  const library = asObject(value, label);
+  assertAllowedKeys(library, new Set([
+    "status",
+    "sync_id",
+    "registry",
+    "registry_path",
+    "template_count",
+    "ready_count",
+    "supported_operations",
+    "unsupported_operations",
+    "templates",
+    "latest_preview",
+    ...DESIGN_STUDIO_BOUNDARY_KEYS,
+  ]), label);
+  if (library.sync_id !== "dashboard_design_studio_template_proposal_library") {
+    throw new Error(`${label} sync_id is invalid`);
+  }
+  if (!ALLOWED_STATES.has(displayText(library.status, ""))) {
+    throw new Error(`${label} status is invalid`);
+  }
+  const registry = asObject(library.registry, `${label} registry`);
+  assertAllowedKeys(registry, new Set(["registry_id", "version", "path", "source", "updated_at"]), `${label} registry`);
+  if (safeRelativePath(registry.path) !== "docs/design-system/dashboard-control-center/templates.json") {
+    throw new Error(`${label} registry path is invalid`);
+  }
+  if (safeRelativePath(library.registry_path) !== "docs/design-system/dashboard-control-center/templates.json") {
+    throw new Error(`${label} registry_path is invalid`);
+  }
+  validateNonNegativeInteger(Number(library.template_count || 0), `${label} template_count`);
+  validateNonNegativeInteger(Number(library.ready_count || 0), `${label} ready_count`);
+  for (const operation of [...asArray(library.supported_operations), ...asArray(library.unsupported_operations)]) {
+    if (!displayText(operation, "")) {
+      throw new Error(`${label} operation metadata is invalid`);
+    }
+  }
+  for (const templateValue of asArray(library.templates)) {
+    const template = asObject(templateValue, `${label} template`);
+    assertAllowedKeys(template, new Set([
+      "template_id",
+      "version",
+      "display_name",
+      "summary",
+      "product_type",
+      "supported_targets",
+      "allowed_outputs",
+      "required_checks",
+      "lifecycle_state",
+      "redaction_state",
+      "candidate_operation_count",
+      "template_digest",
+      ...DESIGN_STUDIO_BOUNDARY_KEYS,
+    ]), `${label} template`);
+    for (const key of ["template_id", "version", "display_name", "summary", "product_type", "lifecycle_state", "redaction_state"]) {
+      if (!displayText(template[key], "")) {
+        throw new Error(`${label} template ${key} is missing`);
+      }
+    }
+    validateNonNegativeInteger(Number(template.candidate_operation_count || 0), `${label} template candidate_operation_count`);
+    validateDesignStudioSha256Digest(template.template_digest, `${label} template_digest`);
+    for (const output of asArray(template.allowed_outputs)) {
+      if (!safeDesignStudioScopedPath(output)) {
+        throw new Error(`${label} template allowed_outputs contains an unsafe path`);
+      }
+    }
+    for (const command of asArray(template.required_checks)) {
+      if (!safeDesignStudioCheckReference(command)) {
+        throw new Error(`${label} template required_checks contains an unsafe command or check id`);
+      }
+    }
+    validateDesignStudioBoundary(template, `${label} template`);
+  }
+  validateDesignStudioTemplatePreview(library.latest_preview, `${label} latest_preview`);
+  validateDesignStudioBoundary(library, label);
+}
+
 function validateDesignStudioDecisionGate(value, label) {
   if (value === undefined || value === null) {
     return;
@@ -2367,6 +2553,7 @@ function validateDesignStudio(data) {
   }
   validateDesignStudioCandidateReview(designStudio.latest_candidate_review, "dashboard design_studio latest_candidate_review");
   validateDesignStudioProposalPreview(designStudio.latest_proposal_preview, "dashboard design_studio latest_proposal_preview");
+  validateDesignStudioTemplateLibrary(designStudio.template_library, "dashboard design_studio template_library");
   if (designStudio.subscription_agent_handoff) {
     validateDesignStudioSubscriptionHandoff(
       designStudio.subscription_agent_handoff,

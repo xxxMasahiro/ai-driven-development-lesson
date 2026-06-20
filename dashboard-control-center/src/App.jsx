@@ -7049,6 +7049,7 @@ function designStudioWorkflowState(data) {
     historyRows: asArray(source.history_rows),
     candidate: source.latest_candidate_review || null,
     proposal: source.latest_proposal_preview || null,
+    templateLibrary: source.template_library || null,
     handoff: source.subscription_agent_handoff || null,
     exportPlan: source.external_product_export || null,
     providerPolicy: {
@@ -7078,9 +7079,12 @@ function DesignStudioProposalWorkflowPanel({ data, t }) {
     [t("designStudio.proposalWorkflow.imports"), workflow.summary.import_count ?? workflow.imports.length],
     [t("designStudio.proposalWorkflow.candidates"), workflow.summary.candidate_count ?? 0],
     [t("designStudio.proposalWorkflow.proposals"), workflow.summary.proposal_count ?? 0],
+    [t("designStudio.proposalWorkflow.templates"), workflow.templateLibrary?.template_count ?? 0],
   ];
   const candidate = workflow.candidate;
   const proposal = workflow.proposal;
+  const templateLibrary = workflow.templateLibrary || {};
+  const templatePreview = templateLibrary.latest_preview || null;
   const providerPolicy = workflow.providerPolicy || {};
   const exportPlan = workflow.exportPlan || {};
   const transaction = workflow.transaction || {};
@@ -7143,6 +7147,27 @@ function DesignStudioProposalWorkflowPanel({ data, t }) {
             </>
           ) : (
             <p>{t("designStudio.proposalWorkflow.noProposal")}</p>
+          )}
+        </article>
+        <article className="design-studio-orchestration__card">
+          <div className="design-studio-orchestration__card-head">
+            <BookMarked aria-hidden="true" size={18} />
+            <h3>{t("designStudio.proposalWorkflow.templateLibraryTitle")}</h3>
+          </div>
+          <StatusPill value={templateLibrary.status || "unknown"} t={t} label={statusLabelForChip(templateLibrary.status || "unknown", t)} />
+          <p>{displayText(templatePreview?.next_action, t("designStudio.proposalWorkflow.templateLibraryDetail"))}</p>
+          <small>{t("designStudio.proposalWorkflow.templateCount")}: {displayText(templateLibrary.template_count, "0")}</small>
+          <small>{t("designStudio.proposalWorkflow.readyTemplates")}: {displayText(templateLibrary.ready_count, "0")}</small>
+          {templatePreview ? (
+            <>
+              <small>{t("designStudio.proposalWorkflow.latestTemplatePreview")}: {technicalChip(templatePreview.template_id)}</small>
+              <small>{t("designStudio.proposalWorkflow.targetRef")}: {displayText(templatePreview.target_ref)}</small>
+              <small>{t("designStudio.proposalWorkflow.candidateOperations")}: {displayText(templatePreview.candidate_operation_count, "0")}</small>
+              <small>{t("designStudio.proposalWorkflow.templateDigest")}: {technicalChip(templatePreview.template_digest)}</small>
+              <SourceBoundaryChips values={templatePreview.check_plan} t={t} limit={3} variant="commands" labelKey="maintenance.sourceCommandItem" tooltipKey="maintenance.sourceCommandTooltip" />
+            </>
+          ) : (
+            <small>{t("designStudio.proposalWorkflow.noTemplates")}</small>
           )}
         </article>
         <article className="design-studio-orchestration__card">

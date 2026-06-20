@@ -648,6 +648,7 @@ function addDesignStudioProposalWorkflowFixture(data) {
   data.source_files = Array.from(new Set([
     ...(Array.isArray(data.source_files) ? data.source_files : []),
     "docs/design-system/dashboard-control-center/orchestration.json",
+    "docs/design-system/dashboard-control-center/templates.json",
     "tools/dashboard-design-system",
   ]));
   data.source_commands = Array.from(new Set([
@@ -817,6 +818,113 @@ function addDesignStudioProposalWorkflowFixture(data) {
       decision_gate: {
         status: "manual_required",
         required_decision: "accept_adjust_reject_or_hold",
+      },
+      proposal_only: true,
+      writes_allowed: false,
+      direct_apply_authority: false,
+      external_product_apply: false,
+      provider_dispatch: false,
+      imagegen_executed: false,
+      plan_token_created: false,
+      apply_token_created: false,
+      approval_receipt_created: false,
+    },
+    template_library: {
+      status: "ready",
+      sync_id: "dashboard_design_studio_template_proposal_library",
+      registry: {
+        registry_id: "dashboard-control-center-template-library",
+        version: "2026-06-21.template-proposal-library",
+        path: "docs/design-system/dashboard-control-center/templates.json",
+        source: "docs/design-system/dashboard-control-center/DESIGN_SYSTEM.md",
+        updated_at: "2026-06-21T00:00:00.000Z",
+      },
+      registry_path: "docs/design-system/dashboard-control-center/templates.json",
+      template_count: 2,
+      ready_count: 2,
+      supported_operations: ["register-template", "preview-template", "template-to-proposal", "deprecate-template"],
+      unsupported_operations: ["dependency-install", "network-call", "credential-requirement", "git-or-ci-operation"],
+      templates: [
+        {
+          template_id: "dashboard.readability.cards.v1",
+          version: "1.0.0",
+          display_name: "Readable dashboard status cards",
+          summary: "Improve dashboard status-card scanning while preserving existing behavior.",
+          product_type: "web",
+          supported_targets: ["dashboard-control-center"],
+          allowed_outputs: [
+            "docs/design-system/dashboard-control-center/tokens.json",
+            "docs/design-system/dashboard-control-center/components.json",
+          ],
+          required_checks: ["tools/check_dashboard_design_system.sh", "tools/test_dashboard_control_center.sh"],
+          lifecycle_state: "ready",
+          redaction_state: "metadata_only",
+          candidate_operation_count: 2,
+          template_digest: "sha256:1212121212121212121212121212121212121212121212121212121212121212",
+          proposal_only: true,
+          writes_allowed: false,
+          direct_apply_authority: false,
+          external_product_apply: false,
+          provider_dispatch: false,
+          imagegen_executed: false,
+          plan_token_created: false,
+          apply_token_created: false,
+          approval_receipt_created: false,
+        },
+      ],
+      latest_preview: {
+        template_proposal_id: "dstp:dashboard-readability",
+        record_version: "2026-06-21.template-proposal-library",
+        schema_id: "TemplateProposal",
+        template_id: "dashboard.readability.cards.v1",
+        template_version: "1.0.0",
+        target_ref: "dashboard-control-center",
+        target_apply_mode: "owner-tool",
+        owner_tool: "tools/dashboard-design-system",
+        compatibility: {
+          status: "ready",
+          target_ref: "dashboard-control-center",
+          target_apply_mode: "owner-tool",
+          notes: "Compatible with the Dashboard Control Center owner-tool target.",
+        },
+        candidate_operation_count: 2,
+        candidate_operations: [
+          {
+            operation_id: "dashboard-card-density-review",
+            kind: "token-candidate",
+            summary: "Review card and row density tokens for easier scanning.",
+            target_ref: "dashboard-control-center",
+            allowed_output: "docs/design-system/dashboard-control-center/tokens.json",
+            authority: "proposal_only",
+          },
+        ],
+        affected_source_files: [
+          "docs/design-system/dashboard-control-center/tokens.json",
+          "docs/design-system/dashboard-control-center/components.json",
+        ],
+        affected_generated_files: ["dashboard-control-center/src/design-system.generated.css"],
+        manual_decisions: ["accept", "adjust", "reject", "hold"],
+        check_plan: ["tools/check_dashboard_design_system.sh", "tools/test_dashboard_control_center.sh"],
+        risk_assessment: "low; owner-tool proposal preview only",
+        accessibility_notes: "Keep contrast and touch-target contracts at the current baseline.",
+        confidence: "medium",
+        rollback_outline: "Keep previous source files and regenerate runtime assets.",
+        decision_gate: {
+          status: "manual_required",
+          required_decision: "accept_adjust_reject_or_hold",
+        },
+        template_digest: "sha256:1212121212121212121212121212121212121212121212121212121212121212",
+        redaction_state: "metadata_only",
+        next_action: "review_template_preview_before_import_or_owner_tool_plan",
+        proposal_only: true,
+        writes_allowed: false,
+        direct_apply_authority: false,
+        external_product_apply: false,
+        provider_dispatch: false,
+        imagegen_executed: false,
+        plan_token_created: false,
+        apply_token_created: false,
+        approval_receipt_created: false,
       },
       proposal_only: true,
       writes_allowed: false,
@@ -1808,6 +1916,10 @@ test.describe("English dashboard control center", () => {
     await expect(designStudioView).toContainText("Latest candidate");
     await expect(designStudioView).toContainText("Latest proposal");
     await expect(designStudioView).toContainText("Operation count");
+    await expect(designStudioView).toContainText("Template proposal library");
+    await expect(designStudioView).toContainText("dashboard.readability.cards.v1");
+    await expect(designStudioView).toContainText("Candidate operations");
+    await expect(designStudioView).toContainText("Template digest");
     await expect(designStudioView).toContainText("Package status");
     await expect(designStudioView).toContainText("ready");
     await expect(designStudioView).toContainText(".dashboard-design-studio-events/agent-packages/dsp:subscription-agent-plan-0001/package.json");

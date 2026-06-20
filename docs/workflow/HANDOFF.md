@@ -2918,6 +2918,23 @@ Next safe action:
 
 - Proceed to P3 only after committing the implemented P2 slice; do not execute subscription agents, provider APIs, imagegen, external product writes, browser commands, Git/CI from the dashboard, or owner-tool apply from this handoff package.
 
+## Dashboard Design Studio Template Proposal Library Handoff
+
+SYNC-ID: dashboard_design_studio_template_proposal_library
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/DASHBOARD_DATA_SCHEMA.tsv,docs/design-system/dashboard-control-center/DESIGN_SYSTEM.md,docs/design-system/dashboard-control-center/orchestration.json,docs/design-system/dashboard-control-center/templates.json,tools/dashboard-design-system,tools/dashboard-data,dashboard-control-center/src/dashboardData.js,dashboard-control-center/src/App.jsx,dashboard-control-center/src/i18n.js,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_design_studio_events.sh,tools/test_dashboard_data.sh,tools/test_dashboard_schema.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_dashboard_design_studio_events.sh,tools/check_dashboard_design_system.sh,tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+Restart context:
+
+- P3 added `docs/design-system/dashboard-control-center/templates.json` as the safe reusable template registry and owner-tool preview source for TemplateProposal metadata.
+- Template text and manifests remain untrusted data for preview; they do not become direct writes or browser-executable actions.
+- Dashboard displays template library status, counts, latest preview, checks, digest, and proposal-only boundaries from producer-owned data.
+
+Next safe action:
+
+- Commit the implemented P3 slice before proceeding to P4; do not add template apply, automatic proposal conversion, providers, imagegen, external product writes, Git/CI execution from dashboard data, approval mutation, plan/apply tokens, or browser command execution.
+
 ## Dashboard Design Studio History Detail Handoff
 
 SYNC-ID: dashboard_design_studio_history_detail

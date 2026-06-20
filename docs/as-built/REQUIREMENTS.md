@@ -2622,3 +2622,25 @@ Acceptance requirements:
 Non-scope:
 
 - Do not execute subscription agents, call provider APIs, upload packages, store credentials, create approval receipts, create plan/apply tokens, apply changes, mutate external products, run Git/CI, add dependencies, push, merge, or add browser command execution.
+
+## Dashboard Design Studio Template Proposal Library Requirements
+
+SYNC-ID: dashboard_design_studio_template_proposal_library
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/DASHBOARD_DATA_SCHEMA.tsv,docs/design-system/dashboard-control-center/DESIGN_SYSTEM.md,docs/design-system/dashboard-control-center/orchestration.json,docs/design-system/dashboard-control-center/templates.json,tools/dashboard-design-system,tools/dashboard-data,dashboard-control-center/src/dashboardData.js,dashboard-control-center/src/App.jsx,dashboard-control-center/src/i18n.js,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_design_studio_events.sh,tools/test_dashboard_data.sh,tools/test_dashboard_schema.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_dashboard_design_studio_events.sh,tools/check_dashboard_design_system.sh,tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+Design Studio must expose reusable design templates as proposal-only metadata that can be listed and previewed without treating template text as instructions.
+Template previews must explain candidate operations and checks for manual review while preserving the existing DesignChangeProposal import boundary.
+
+Acceptance requirements:
+
+- Template definitions are stored as safe manifests with id, version, product type, supported targets, allowed outputs, forbidden operations, required checks, lifecycle state, and bounded compatibility notes.
+- `tools/dashboard-design-system` can list templates and preview a TemplateProposal for a selected template/target without creating plan tokens, approval receipts, provider calls, imagegen, product writes, Git/CI operations, or browser execution.
+- Dashboard data validates and renders template library status, counts, latest preview metadata, checks, and proposal-only boundaries as read-only information.
+- Template definitions and previews reject dependency installs, network calls, credential requirements, auto-apply, Git/CI operations, scripts, raw payloads, secret-like data, absolute paths, and unsafe commands.
+- Existing candidate/proposal import, subscription handoff, external product export, provider policy, and owner-tool transaction behavior remains compatible.
+
+Non-scope:
+
+- Do not implement template apply, automatic DesignChangeProposal conversion, dependency installation, network calls, provider execution, image generation, external product writes, Git/CI execution, approval mutation, plan/apply tokens, or browser command execution.

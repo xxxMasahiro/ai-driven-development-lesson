@@ -260,6 +260,7 @@ source_files=(
   "docs/workflow/HANDOFF.md"
   "docs/memory/DEVELOPER_MEMORY.md"
   "docs/design-system/dashboard-control-center/orchestration.json"
+  "docs/design-system/dashboard-control-center/templates.json"
   "tools/dashboard-design-system"
 )
 

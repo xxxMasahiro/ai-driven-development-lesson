@@ -5069,3 +5069,21 @@ Implemented order:
 6. Promoted this sync ID to implemented after focused Design Studio, schema, i18n, dashboard-data, and design-system checks passed.
 
 Stop and ask before subscription-agent execution, provider dispatch, uploads, credentials, imagegen, external product writes, automatic apply, approval mutation, browser command execution, dependencies, push, merge, or existing-feature tradeoffs.
+
+## Dashboard Design Studio Template Proposal Library Implementation Plan
+
+SYNC-ID: dashboard_design_studio_template_proposal_library
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/DASHBOARD_DATA_SCHEMA.tsv,docs/design-system/dashboard-control-center/DESIGN_SYSTEM.md,docs/design-system/dashboard-control-center/orchestration.json,docs/design-system/dashboard-control-center/templates.json,tools/dashboard-design-system,tools/dashboard-data,dashboard-control-center/src/dashboardData.js,dashboard-control-center/src/App.jsx,dashboard-control-center/src/i18n.js,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_design_studio_events.sh,tools/test_dashboard_data.sh,tools/test_dashboard_schema.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_dashboard_design_studio_events.sh,tools/check_dashboard_design_system.sh,tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+Implemented order:
+
+1. Synchronize this planned block before runtime edits.
+2. Add a safe template registry source and validate it through `tools/dashboard-design-system check`.
+3. Add `list-templates` and `template-preview` owner-tool commands that return redacted, proposal-only TemplateProposal metadata.
+4. Extend `proposal-status`, dashboard schema, dashboard data validation, UI, i18n, and Playwright fixtures for template library status.
+5. Extend focused Design Studio and dashboard-data tests for safe template metadata, forbidden fields, unsafe paths/commands, and no execution authority.
+6. Promote this sync ID to implemented after focused Design Studio, schema, dashboard-data, Dashboard, sync, and repository-development checks pass.
+
+Stop and ask before template apply, automatic DesignChangeProposal conversion, dependency installation, network calls, provider dispatch, imagegen, external product writes, Git/CI execution, approval mutation, plan/apply token creation, browser command execution, or existing-feature tradeoffs.
