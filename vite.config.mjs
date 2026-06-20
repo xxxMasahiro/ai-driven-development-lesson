@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 
-import { DASHBOARD_LOCALE_CODES } from "./dashboard-control-center/src/i18n.js";
+import { DASHBOARD_LOCALE_CODES } from "./dashboard-control-center/src/localePolicy.js";
 
 const repoRoot = path.dirname(fileURLToPath(import.meta.url));
 const appRoot = path.join(repoRoot, "dashboard-control-center");
@@ -1385,7 +1385,17 @@ export default defineConfig({
             },
             {
               name: "dashboard-data-runtime",
-              test: /dashboard-control-center[\\/]src[\\/](dashboardData|i18n|design-system\.generated)\.js$/,
+              test: /dashboard-control-center[\\/]src[\\/]dashboardData\.js$/,
+              priority: 24,
+            },
+            {
+              name: "dashboard-i18n",
+              test: /dashboard-control-center[\\/]src[\\/]i18n\.js$/,
+              priority: 23,
+            },
+            {
+              name: "dashboard-design-system",
+              test: /dashboard-control-center[\\/]src[\\/]design-system\.generated\.js$/,
               priority: 20,
             },
             {

@@ -2691,6 +2691,7 @@ Current Status:
 Next Step:
 
 - No remaining implementation action for this sync ID. Continue to treat the board as an overview decision surface, not a browser operation runner.
+
 ## Dashboard Control Center Operational Detail Decisions Work
 
 SYNC-ID: dashboard_control_center_operational_detail_decisions
@@ -2711,3 +2712,23 @@ Current Status:
 Next Step:
 
 - No remaining implementation action for this sync ID after focused Dashboard, i18n, design-system, sync, and repository-development checks pass.
+
+## Dashboard Control Center Bundle Contract Work
+
+SYNC-ID: dashboard_control_center_bundle_contract
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,package.json,vite.config.mjs,dashboard-control-center/src/dashboardData.js,dashboard-control-center/src/i18n.js,dashboard-control-center/src/localePolicy.js,tools/check_dashboard_bundle_contract.mjs,tools/check_dashboard_bundle_contract.sh,docs/workflow/TEST_PLAN_MANIFEST.tsv,docs/workflow/GIT_HOOK_CHECKS.tsv,docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv,docs/workflow/FINAL_GATE_COVERAGE.tsv,.github/workflows/ci.yml,.github/workflows/lesson14-ci.yml,tools/test_lesson_repository.sh,tools/check_ci_workflow_structure.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/check_dashboard_bundle_contract.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/check_test_plan_coverage.sh,tools/test_test_plan.sh,tools/test_git_hooks.sh,tools/test_git_hooks_parallel.sh,tools/test_ci_final_gate.sh,tools/check_ci_workflow_structure.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+Current Status:
+
+- [x] Added the Dashboard Control Center production bundle contract.
+- [x] Separated lightweight locale metadata from the full i18n dictionary.
+- [x] Split dashboard data runtime, i18n, and generated design-system runtime into deterministic named chunks.
+- [x] Added `npm run dashboard:build-check` and the aggregate-callable shell wrapper.
+- [x] Wired the check into test-plan policy, Git hooks, final-gate coverage, CI policy jobs, CI structure validation, and aggregate repository verification.
+- [x] Preserved the default-scale chunk-size warning boundary instead of raising `chunkSizeWarningLimit`.
+
+Next Step:
+
+- No remaining implementation action for this sync ID after bundle, dashboard, test-plan, Git hooks, CI structure, sync, and repository-development checks pass.

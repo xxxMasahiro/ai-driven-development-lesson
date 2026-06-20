@@ -1,4 +1,4 @@
-import { DASHBOARD_LOCALE_CODES } from "./i18n.js";
+import { DASHBOARD_LOCALE_CODES } from "./localePolicy.js";
 import { DASHBOARD_DISPLAY_DEPTHS } from "./displayDepth.js";
 
 export const ALLOWED_STATES = new Set([

@@ -56,6 +56,7 @@ jobs:
           bash -n tools/check_developer_memory_requirements.sh
           bash -n tools/check_repository_development_workflow.sh
           bash -n tools/check_dashboard_design_system.sh
+          bash -n tools/check_dashboard_bundle_contract.sh
           bash -n tools/check_ci_workflow_structure.sh
           bash -n tools/test_lesson_playwright.sh
           bash -n tools/test_docs_tour.sh
@@ -166,6 +167,7 @@ jobs:
           ./tools/test_lesson_context.sh
           ./tools/test_menu_prerequisites.sh
           ./tools/test_dashboard_settings.sh
+          ./tools/check_dashboard_bundle_contract.sh
           ./tools/test_dashboard_browser_debug_manifest.sh
           ./tools/test_dashboard_design_studio_events.sh
           printf 'Lesson14 CI keeps the policy-regression-tests job context; common policy regressions are provided by CI / policy-regression-tests for the same commit.\n'

@@ -4871,6 +4871,7 @@ git diff --check
 ```
 
 Stop and ask before adding dependencies, changing generated design-system files as source, browser command execution, Git/CI operations, repository writes, approval writes, cleanup, push, PR creation, merge, main sync, credentials, or any existing-feature tradeoff.
+
 ## Dashboard Control Center Operational Detail Decisions Implementation Plan
 
 SYNC-ID: dashboard_control_center_operational_detail_decisions
@@ -4903,3 +4904,41 @@ git diff --check
 ```
 
 Stop and ask before adding dependencies, changing generated design-system files as source, browser command execution, Git/CI operations, repository writes, approval writes, cleanup, push, PR creation, merge, main sync, credentials, Settings authority expansion, Design Studio authority expansion, or any existing-feature tradeoff.
+
+## Dashboard Control Center Bundle Contract Implementation Plan
+
+SYNC-ID: dashboard_control_center_bundle_contract
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,package.json,vite.config.mjs,dashboard-control-center/src/dashboardData.js,dashboard-control-center/src/i18n.js,dashboard-control-center/src/localePolicy.js,tools/check_dashboard_bundle_contract.mjs,tools/check_dashboard_bundle_contract.sh,docs/workflow/TEST_PLAN_MANIFEST.tsv,docs/workflow/GIT_HOOK_CHECKS.tsv,docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv,docs/workflow/FINAL_GATE_COVERAGE.tsv,.github/workflows/ci.yml,.github/workflows/lesson14-ci.yml,tools/test_lesson_repository.sh,tools/check_ci_workflow_structure.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/check_dashboard_bundle_contract.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/check_test_plan_coverage.sh,tools/test_test_plan.sh,tools/test_git_hooks.sh,tools/test_git_hooks_parallel.sh,tools/test_ci_final_gate.sh,tools/check_ci_workflow_structure.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+Implemented order:
+
+1. Synchronize this bundle-contract plan across the as-built contract, requirements, specification, implementation plan, tracker, and handoff.
+2. Add a Dashboard Control Center bundle contract checker modeled after the FrameCue Control Center build contract.
+3. Move lightweight locale metadata out of the full i18n dictionary and split Vite output into deterministic dashboard data runtime, i18n, generated design-system, React vendor, and icon vendor chunks without raising `chunkSizeWarningLimit`.
+4. Expose the check through `npm run dashboard:build-check` and an executable `tools/check_dashboard_bundle_contract.sh` wrapper.
+5. Wire the check into test-plan policy, Git hooks, hook parallel classification, final-gate coverage, CI policy jobs, CI structure validation, and aggregate repository verification.
+6. Verify that a fresh production build emits no large-chunk warning and that all JavaScript chunks stay within the configured budgets.
+
+Verification sequence:
+
+```bash
+./tools/check_dashboard_bundle_contract.sh
+./tools/test_dashboard_i18n.sh
+./tools/test_dashboard_control_center.sh
+./tools/check_test_plan_coverage.sh
+./tools/test_test_plan.sh
+./tools/test_git_hooks.sh
+./tools/test_git_hooks_parallel.sh
+./tools/test_ci_final_gate.sh
+./tools/check_ci_workflow_structure.sh
+./tools/check_as_built_sync_contract.sh
+./tools/check_as_built_docs.sh
+./tools/check_workflow_pair_sync.sh
+./tools/check_repository_development_workflow.sh
+./tools/test_repository_development_workflow.sh
+git diff --check
+```
+
+Stop and ask before dependency changes, raising chunk-size warning limits to hide warnings, weakening Git hooks or final gates, changing generated design-system files as source, browser command execution, repository writes, cleanup, push, PR creation, merge, main sync, credentials, or any existing-feature tradeoff.

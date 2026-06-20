@@ -3,6 +3,7 @@
   "private": true,
   "scripts": {
     "dashboard:build": "vite build",
+    "dashboard:build-check": "node ./tools/check_dashboard_bundle_contract.mjs",
     "dashboard:dev": "vite",
     "test:dashboard": "tools/playwright-env test tests/playwright/dashboard.spec.js",
     "test:dashboard-control-center": "tools/playwright-env test tests/playwright/dashboard-control-center.spec.js"

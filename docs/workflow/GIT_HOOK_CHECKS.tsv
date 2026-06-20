@@ -15,6 +15,7 @@ check_review_protocol	full|fast	./tools/check_review_protocol.sh	Validate the su
 check_developer_memory_requirements	full|fast|minimal	./tools/check_developer_memory_requirements.sh	Validate developer-memory requirements.
 check_repository_development_workflow	full|fast|minimal	./tools/check_repository_development_workflow.sh	Validate repository development workflow policy, skill, and wiring.
 check_dashboard_design_system	full|fast|minimal	./tools/check_dashboard_design_system.sh	Validate Dashboard Control Center design-system source-to-runtime drift.
+check_dashboard_bundle_contract	full|fast	./tools/check_dashboard_bundle_contract.sh	Validate Dashboard Control Center Vite chunking, bundle size, and large-chunk warning policy.
 test_dashboard_design_studio_events	full|fast	./tools/test_dashboard_design_studio_events.sh	Run Dashboard Design Studio local event runner/store regression tests.
 test_docs_tour	full|fast	./tools/test_docs_tour.sh	Run documentation tour regression tests.
 test_as_built_sync_contract	full|fast	./tools/test_as_built_sync_contract.sh	Run sync-contract regression tests.

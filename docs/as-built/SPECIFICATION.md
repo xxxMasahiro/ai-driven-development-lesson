@@ -2856,6 +2856,7 @@ React may choose which existing evidence to summarize first, but it must not con
 
 The implementation is presentation-only.
 It does not add schema fields, mutate Settings authority, call GitHub, run Git commands, wait for CI, write repositories, or execute command previews.
+
 ## Dashboard Control Center Operational Detail Decisions Specification
 
 SYNC-ID: dashboard_control_center_operational_detail_decisions
@@ -2879,3 +2880,29 @@ Friendly mode may hide non-critical source ids, standard mode keeps the current 
 No mode may hide blockers, approvals, failed/stale evidence, security state, command previews, or read-only/display-only boundaries.
 
 The implementation does not add schema fields, call GitHub, run Git or CI commands, mutate repositories, write approvals, alter Settings authority, change Design Studio authority, collect credentials, or execute command previews.
+
+## Dashboard Control Center Bundle Contract Specification
+
+SYNC-ID: dashboard_control_center_bundle_contract
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,package.json,vite.config.mjs,dashboard-control-center/src/dashboardData.js,dashboard-control-center/src/i18n.js,dashboard-control-center/src/localePolicy.js,tools/check_dashboard_bundle_contract.mjs,tools/check_dashboard_bundle_contract.sh,docs/workflow/TEST_PLAN_MANIFEST.tsv,docs/workflow/GIT_HOOK_CHECKS.tsv,docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv,docs/workflow/FINAL_GATE_COVERAGE.tsv,.github/workflows/ci.yml,.github/workflows/lesson14-ci.yml,tools/test_lesson_repository.sh,tools/check_ci_workflow_structure.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/check_dashboard_bundle_contract.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/check_test_plan_coverage.sh,tools/test_test_plan.sh,tools/test_git_hooks.sh,tools/test_git_hooks_parallel.sh,tools/test_ci_final_gate.sh,tools/check_ci_workflow_structure.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+`tools/check_dashboard_bundle_contract.mjs` is the owner check for Dashboard Control Center production bundle size.
+`tools/check_dashboard_bundle_contract.sh` is the aggregate-callable wrapper and `package.json` exposes the same check as `npm run dashboard:build-check`.
+`dashboard-control-center/src/localePolicy.js` owns lightweight locale code and direction metadata so validation and Vite config code do not import the full translation dictionary.
+
+The check validates:
+
+- `dashboard:build` remains the Vite production build command.
+- `dashboard:build-check` points to the bundle contract checker.
+- `vite.config.mjs` keeps explicit code-splitting groups.
+- The config does not raise `chunkSizeWarningLimit` above the default-scale threshold.
+- A fresh build exits successfully and does not emit Vite large-chunk warning text.
+- `dist/dashboard-control-center/assets` contains multiple JavaScript chunks.
+- `index-*.js` stays at or below 300000 bytes.
+- Every JavaScript chunk stays at or below 500000 bytes.
+- Required chunk prefixes are `react-vendor-`, `icons-vendor-`, `dashboard-data-runtime-`, `dashboard-i18n-`, and `dashboard-design-system-`.
+
+The Vite config separates Dashboard data, the full i18n dictionary, and generated design-system runtime chunks instead of grouping all three into one large runtime chunk.
+The check is wired into test-plan policy, Git hook checks, final-gate coverage, CI policy regression jobs, and aggregate repository verification.

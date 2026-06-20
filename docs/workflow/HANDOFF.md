@@ -2840,6 +2840,7 @@ Next Step:
 - No remaining implementation action for this sync ID after focused Dashboard, i18n, design-system, sync, and repository-development checks pass.
 
 Stop and ask before dependency changes, generated design-system source edits, browser command execution, Git/CI operations, product repository writes, approval writes, cleanup, push, PR creation, merge, main sync, credentials, or any existing-feature tradeoff.
+
 ## Dashboard Control Center Operational Detail Decisions Handoff
 
 SYNC-ID: dashboard_control_center_operational_detail_decisions
@@ -2859,3 +2860,24 @@ Next Step:
 - No remaining implementation action for this sync ID after focused Dashboard, i18n, design-system, sync, and repository-development checks pass.
 
 Stop and ask before dependency changes, generated design-system source edits, browser command execution, Git/CI operations, product repository writes, approval writes, cleanup, push, PR creation, merge, main sync, credentials, Settings authority expansion, Design Studio authority expansion, or any existing-feature tradeoff.
+
+## Dashboard Control Center Bundle Contract Handoff
+
+SYNC-ID: dashboard_control_center_bundle_contract
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,package.json,vite.config.mjs,dashboard-control-center/src/dashboardData.js,dashboard-control-center/src/i18n.js,dashboard-control-center/src/localePolicy.js,tools/check_dashboard_bundle_contract.mjs,tools/check_dashboard_bundle_contract.sh,docs/workflow/TEST_PLAN_MANIFEST.tsv,docs/workflow/GIT_HOOK_CHECKS.tsv,docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv,docs/workflow/FINAL_GATE_COVERAGE.tsv,.github/workflows/ci.yml,.github/workflows/lesson14-ci.yml,tools/test_lesson_repository.sh,tools/check_ci_workflow_structure.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/check_dashboard_bundle_contract.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/check_test_plan_coverage.sh,tools/test_test_plan.sh,tools/test_git_hooks.sh,tools/test_git_hooks_parallel.sh,tools/test_ci_final_gate.sh,tools/check_ci_workflow_structure.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+Restart context:
+
+- This sync imports the FrameCue-style bundle warning guard into this lesson repository.
+- `npm run dashboard:build-check` runs a fresh Dashboard Control Center production build, fails on Vite large-chunk warning text, verifies named chunks, and enforces the 500 KB per-JS chunk and 300 KB entry-shell budgets.
+- `dashboard-control-center/src/localePolicy.js` keeps lightweight locale metadata reusable without pulling the full translation dictionary into validation or Vite config code.
+- Vite now splits dashboard data runtime, i18n, and generated design-system runtime into separate named chunks instead of hiding the warning through a larger `chunkSizeWarningLimit`.
+- The check is available through package scripts, Git hooks, CI policy jobs, final-gate coverage, and aggregate repository verification.
+
+Next Step:
+
+- No remaining implementation action for this sync ID after bundle, dashboard, test-plan, Git hooks, CI structure, sync, and repository-development checks pass.
+
+Stop and ask before dependency changes, raising chunk-size warning limits to hide warnings, weakening Git hooks or final gates, generated-file source edits, browser command execution, repository writes, cleanup, push, PR creation, merge, main sync, credentials, or any existing-feature tradeoff.
