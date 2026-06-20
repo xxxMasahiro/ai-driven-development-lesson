@@ -1591,6 +1591,290 @@ function overviewSecurityDetail(data, context, blockers, t) {
   return `${overviewTargetDetail(context, t)} / ${t("overview.fact.lastChecked")}: ${checkedAt} / ${t("summary.blockers")}: ${asArray(blockers).length}`;
 }
 
+function situationLiveStatusForContext(liveStatus, context) {
+  if (!liveStatus || !context) {
+    return null;
+  }
+  const contextMenuId = displayText(context.menu_id, "");
+  const liveMenuId = displayText(liveStatus.menu_id, "");
+  if (contextMenuId && liveMenuId && liveMenuId !== contextMenuId) {
+    return null;
+  }
+  const contextRepository = selectedContextRepositoryName(context);
+  const liveRepository = displayText(liveStatus.target_repository?.name, "");
+  if (contextRepository && liveRepository && contextRepository !== liveRepository) {
+    return null;
+  }
+  return liveStatus;
+}
+
+function situationNumber(value) {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) && numeric >= 0 ? numeric : 0;
+}
+
+function shortRevision(value) {
+  const text = displayText(value, "");
+  return text.length > 12 ? text.slice(0, 12) : text;
+}
+
+function situationObservedAt(value, fallback = "") {
+  return liveStatusObservedTime(value) || liveStatusObservedTime(fallback);
+}
+
+function situationWorstStatus(statuses, fallback = "ready") {
+  const normalized = statuses.map((status) => normalizeState(status)).filter(Boolean);
+  if (!normalized.length) {
+    return normalizeState(fallback);
+  }
+  return normalized
+    .map((status, index) => ({ status, index }))
+    .sort((left, right) => (statePriority[left.status] ?? 99) - (statePriority[right.status] ?? 99) || left.index - right.index)[0].status;
+}
+
+function situationRepositoryState(data, context, activeLiveStatus) {
+  const liveRepositoryState = activeLiveStatus?.repository_state || {};
+  const repositoryChanges = data.repository_changes || {};
+  const repositoryScope = data.repository_scope || {};
+  const targetRepository = activeLiveStatus?.target_repository || context.target_repository || {};
+  return {
+    branch: displayText(liveRepositoryState.branch || repositoryChanges.branch || repositoryScope.branch, ""),
+    head: displayText(liveRepositoryState.head || repositoryChanges.head || repositoryScope.head || repositoryScope.git_head, ""),
+    upstream: displayText(liveRepositoryState.upstream || repositoryChanges.upstream, ""),
+    dirtyCount: situationNumber(liveRepositoryState.dirty_count ?? repositoryChanges.dirty_count ?? repositoryChanges.unstaged_count),
+    untrackedCount: situationNumber(liveRepositoryState.untracked_count ?? repositoryChanges.untracked_count),
+    ahead: situationNumber(liveRepositoryState.ahead ?? repositoryChanges.ahead),
+    behind: situationNumber(liveRepositoryState.behind ?? repositoryChanges.behind),
+    pathState: displayText(targetRepository.path_state || repositoryScope.path_state || context.target_repository?.path_state, ""),
+    gitState: displayText(targetRepository.git_state || repositoryScope.git_state, ""),
+  };
+}
+
+function situationFirstCommand(...values) {
+  return values.map((value) => displayText(value, "")).find((value) => value && value !== "not_applicable") || "";
+}
+
+function situationCheck(activeLiveStatus, key) {
+  const check = liveCheck(activeLiveStatus, key);
+  return check && typeof check === "object" ? check : null;
+}
+
+function situationBlockingRows(data, context, activeLiveStatus) {
+  const rows = [
+    ...asArray(context?.blockers),
+    ...asArray(data.summary?.blocking_items),
+  ];
+  for (const [key, check] of objectEntries(activeLiveStatus?.checks || {})) {
+    const count = situationNumber(check?.blocker_count);
+    if (count > 0) {
+      rows.push({
+        source: displayText(check?.source_id || check?.current_item_id || key, key),
+        status: check?.status || "blocked",
+        reason: check?.reason || check?.summary,
+        required_command: check?.required_command,
+        blocker_count: count,
+      });
+    }
+  }
+  const seen = new Set();
+  return rows.filter((row) => {
+    const key = [
+      displayText(row?.source || row?.source_id || row?.id, ""),
+      displayText(row?.reason || row?.summary || row?.detail, ""),
+      displayText(row?.required_command || row?.next_command, ""),
+    ].join("|");
+    if (seen.has(key)) {
+      return false;
+    }
+    seen.add(key);
+    return true;
+  });
+}
+
+function situationStatusDetail(label, status, t) {
+  return `${label}: ${statusLabelForChip(status, t)}`;
+}
+
+function situationRepositorySummary(data, context, activeLiveStatus, t) {
+  const repo = situationRepositoryState(data, context, activeLiveStatus);
+  const localChanges = repo.dirtyCount + repo.untrackedCount;
+  const liveGit = situationCheck(activeLiveStatus, "git_sync");
+  const status = normalizeState(liveGit?.status || context.git_status || "unknown");
+  const cleanText = localChanges > 0 ? `${t("overview.situation.gitDirty")} ${localChanges}` : t("overview.current.gitClean");
+  const syncParts = [
+    repo.ahead ? `${t("overview.situation.ahead")}: ${repo.ahead}` : "",
+    repo.behind ? `${t("overview.situation.behind")}: ${repo.behind}` : "",
+    repo.untrackedCount ? `${t("overview.situation.untracked")}: ${repo.untrackedCount}` : "",
+  ].filter(Boolean);
+  const branchParts = [
+    repo.branch ? `${t("overview.fact.branch")}: ${repo.branch}` : "",
+    repo.upstream ? `${t("overview.situation.upstream")}: ${repo.upstream}` : "",
+    repo.head ? `${t("overview.situation.head")}: ${shortRevision(repo.head)}` : "",
+  ].filter(Boolean);
+  return {
+    id: "git",
+    Icon: GitBranch,
+    title: t("overview.situation.gitTitle"),
+    status,
+    value: cleanText,
+    detail: [...branchParts, ...syncParts].join(" / ") || t("overview.fact.noEvidence"),
+    source: displayText(liveGit?.source_id || liveGit?.current_item_id || repo.gitState || repo.pathState, ""),
+    command: situationFirstCommand(liveGit?.required_command, liveGit?.items?.[0]?.next_command),
+  };
+}
+
+function situationTestsCiSummary(data, context, activeLiveStatus, t) {
+  const localTests = situationCheck(activeLiveStatus, "local_tests");
+  const ci = situationCheck(activeLiveStatus, "ci");
+  const localStatus = normalizeState(localTests?.status || overviewLocalTestStatus(data.development?.product_authority || {}, context));
+  const ciStatus = normalizeState(ci?.status || context.ci_status || data.development?.ci_status || "unknown");
+  const status = situationWorstStatus([localStatus, ciStatus], "unknown");
+  const observed = [
+    situationObservedAt(localTests?.observed_at, activeLiveStatus?.generated_at),
+    situationObservedAt(ci?.observed_at, activeLiveStatus?.generated_at),
+  ].filter(Boolean)[0];
+  return {
+    id: "tests-ci",
+    Icon: CheckCircle2,
+    title: t("overview.situation.testsCiTitle"),
+    status,
+    value: `${situationStatusDetail(t("overview.situation.localTests"), localStatus, t)} / ${situationStatusDetail(t("overview.situation.ci"), ciStatus, t)}`,
+    detail: observed ? `${t("overview.fact.lastChecked")}: ${observed}` : t("overview.fact.noEvidence"),
+    source: displayText(localTests?.source_id || ci?.source_id || "", ""),
+    command: situationFirstCommand(localTests?.required_command, ci?.required_command, localTests?.items?.[0]?.next_command, ci?.items?.[0]?.next_command),
+  };
+}
+
+function situationBlockerSummary(data, context, activeLiveStatus, t) {
+  const blockers = situationBlockingRows(data, context, activeLiveStatus);
+  const first = blockers[0] || null;
+  const blockerCount = blockers.reduce((total, row) => total + Math.max(1, situationNumber(row?.blocker_count || 1)), 0);
+  return {
+    id: "blockers",
+    Icon: AlertTriangle,
+    title: t("overview.situation.blockersTitle"),
+    status: blockerCount > 0 ? "blocked" : "ready",
+    value: blockerCount > 0 ? `${blockerCount} ${t("overview.situation.blockerUnit")}` : t("overview.situation.noBlockers"),
+    detail: first ? overviewLiveLocalizedText(first.reason || first.summary || first.detail, t) : t("overview.situation.noBlockersDetail"),
+    source: displayText(first?.source || first?.source_id || first?.id, ""),
+    command: situationFirstCommand(first?.required_command, first?.next_command),
+  };
+}
+
+function situationCurrentWorkSummary(data, context, activeLiveStatus, t) {
+  const repository = repositoryDisplayName(activeLiveStatus?.target_repository?.name || context.target_repository?.name, t);
+  const menu = contextLabel(context.menu_id, t);
+  const workflow = workflowContextLabel(context.workflow_context, t);
+  const step = currentStepTextDisplay(context, t);
+  return {
+    id: "current-work",
+    Icon: Compass,
+    title: t("overview.situation.currentWorkTitle"),
+    status: context.evidence_status || "manual_required",
+    value: menu,
+    detail: [repository, workflow, step].filter(Boolean).join(" / "),
+    source: displayText(context.current_step_id || context.menu_id, ""),
+    command: "",
+  };
+}
+
+function situationNextSafeSummary(data, context, activeLiveStatus, facts, t) {
+  const nextAction = context.next_safe_action || data.summary?.primary_action || {};
+  const blockerCommand = facts.map((fact) => fact.command).find(Boolean);
+  const liveCommands = objectEntries(activeLiveStatus?.checks || {}).map(([, check]) => check?.required_command);
+  const command = situationFirstCommand(blockerCommand, ...liveCommands, asArray(data.actions?.command_previews)[0]?.command_text);
+  const status = normalizeState(nextAction.status || data.summary?.primary_action?.status || "manual_required");
+  return {
+    id: "next-safe",
+    Icon: ArrowRightCircle,
+    title: t("overview.situation.nextSafeTitle"),
+    status,
+    value: nextActionShort(context, data, t) || t("detail.nextSafeCheck"),
+    detail: displayText(nextAction.expected_result || nextAction.description, t("overview.situation.nextSafeDetail")),
+    source: displayText(nextAction.source || nextAction.target || "", ""),
+    command,
+  };
+}
+
+function situationFacts(data, context, activeLiveStatus, t) {
+  const baseFacts = [
+    situationCurrentWorkSummary(data, context, activeLiveStatus, t),
+    situationBlockerSummary(data, context, activeLiveStatus, t),
+    situationRepositorySummary(data, context, activeLiveStatus, t),
+    situationTestsCiSummary(data, context, activeLiveStatus, t),
+  ];
+  return [...baseFacts, situationNextSafeSummary(data, context, activeLiveStatus, baseFacts, t)];
+}
+
+function SituationFactCard({ fact, t, displayPolicy }) {
+  const Icon = fact.Icon;
+  const source = displayText(fact.source, "");
+  const command = displayText(fact.command, "");
+  const showSource = source && !displayPolicy.isFriendly;
+  return (
+    <article className={`operational-situation__fact operational-situation__fact--${fact.id}`} data-operational-situation-fact={fact.id}>
+      <div className="operational-situation__fact-head">
+        <span className="operational-situation__fact-icon">
+          <Icon aria-hidden="true" size={21} />
+        </span>
+        <div>
+          <h3>{fact.title}</h3>
+          <StatusPill value={fact.status} t={t} label={statusLabelForChip(fact.status, t)} />
+        </div>
+      </div>
+      <strong>{fact.value}</strong>
+      {fact.detail ? <p>{fact.detail}</p> : null}
+      {showSource || command ? (
+        <div className="operational-situation__evidence">
+          {showSource ? (
+            <span>
+              {t("overview.situation.source")}: {technicalChip(source)}
+            </span>
+          ) : null}
+          {command ? (
+            <span>
+              {t("overview.situation.command")}: <CommandChip command={command} />
+            </span>
+          ) : null}
+        </div>
+      ) : null}
+    </article>
+  );
+}
+
+function OperationalSituationBoard({ data, context, liveStatus, t }) {
+  const activeLiveStatus = situationLiveStatusForContext(liveStatus, context);
+  const facts = situationFacts(data, context, activeLiveStatus, t);
+  const overallStatus = situationWorstStatus(facts.map((fact) => fact.status), "ready");
+  const repository = repositoryDisplayName(activeLiveStatus?.target_repository?.name || context.target_repository?.name, t);
+  const liveTime = situationObservedAt(activeLiveStatus?.generated_at) || formatGenerated(data, getDashboardIntlLocale(data.summary?.ui_locale || "en"));
+  const displayPolicy = displayDepthPolicyForData(data);
+  return (
+    <section className="operational-situation" aria-labelledby="operational-situation-heading" data-operational-situation="true" data-dashboard-display-depth={displayPolicy.depth}>
+      <div className="operational-situation__header">
+        <span className="operational-situation__icon">
+          <Activity aria-hidden="true" size={24} />
+        </span>
+        <div>
+          <h2 id="operational-situation-heading">{t("overview.situation.title")}</h2>
+          <p>{t("overview.situation.subtitle")}</p>
+        </div>
+        <StatusPill value={overallStatus} t={t} label={statusLabelForChip(overallStatus, t)} />
+      </div>
+      <div className="operational-situation__meta" aria-label={t("overview.situation.meta")}>
+        <span>{t("overview.fact.target")}: <strong>{repository}</strong></span>
+        <span>{t("overview.fact.workflow")}: <strong>{workflowContextLabel(context.workflow_context, t)}</strong></span>
+        <span>{t("overview.situation.liveUpdated")}: <strong>{liveTime || t("overview.fact.noEvidence")}</strong></span>
+      </div>
+      <div className="operational-situation__grid">
+        {facts.map((fact) => (
+          <SituationFactCard key={fact.id} fact={fact} t={t} displayPolicy={displayPolicy} />
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function HorizontalProgress({ percent }) {
   const value = clampPercent(percent);
   return (
@@ -3846,6 +4130,7 @@ function OverviewSection({ data, t, locale, activeMenuId, pendingMenuId, onActiv
       <MenuTileStrip data={data} t={t} activeMenuId={activeMenuId} pendingMenuId={pendingMenuId} onActiveMenuChange={onActiveMenuChange} />
       <ContextSnapshotStrip data={data} t={t} locale={locale} />
       <ProducerDecisionSummary data={data} pageId="overview" tone="sidebar" t={t} />
+      <OperationalSituationBoard data={data} context={context} liveStatus={liveStatus} t={t} />
       <RepositorySelectionPanel selection={repositorySelection} t={t} />
       <section className="overview-status-grid" aria-label={t("overview.currentStatus")}>
         <OverviewStatusCard

@@ -2820,3 +2820,23 @@ Next Step:
 - No remaining implementation action for this sync ID. Future display-depth changes must preserve safety-signal visibility and owner authority boundaries.
 
 Stop and ask before dependency changes, Settings authority expansion, arbitrary command execution, Git/CI operations, product repository writes, Design Studio authority changes, generated-file source edits, cleanup, push, PR creation, merge, or any existing-feature tradeoff.
+
+## Dashboard Control Center Operational Situation Board Handoff
+
+SYNC-ID: dashboard_control_center_operational_situation_board
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,dashboard-control-center/src/App.jsx,dashboard-control-center/src/i18n.js,dashboard-control-center/src/styles.css,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/check_dashboard_design_system.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/check_dashboard_design_system.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+Restart context:
+
+- This sync adds a read-only Operational Situation Board to the Control Center Overview.
+- The board summarizes selected context, blockers, Git/worktree state, local tests, CI, and next safe check from existing snapshot/live-status data.
+- It is intended to help non-engineers understand what is happening now and help junior/intermediate engineers see branch, dirty/untracked, ahead/behind, status, and command-preview evidence before deciding the next development move.
+- The browser remains a renderer. It does not execute commands, run Git/CI, mutate repositories, write approvals, collect credentials, or perform cleanup.
+
+Next Step:
+
+- No remaining implementation action for this sync ID after focused Dashboard, i18n, design-system, sync, and repository-development checks pass.
+
+Stop and ask before dependency changes, generated design-system source edits, browser command execution, Git/CI operations, product repository writes, approval writes, cleanup, push, PR creation, merge, main sync, credentials, or any existing-feature tradeoff.

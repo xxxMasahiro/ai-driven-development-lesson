@@ -2835,3 +2835,24 @@ Specified behavior:
 - Source boundary and Settings technical details use the same policy for default open state.
 - Producer decision pages may use page-specific decision questions, but React must not compute readiness or authority from labels, routes, or display depth.
 - Commands remain display-only and copyable; no mode executes them.
+
+## Dashboard Control Center Operational Situation Board Specification
+
+SYNC-ID: dashboard_control_center_operational_situation_board
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,dashboard-control-center/src/App.jsx,dashboard-control-center/src/i18n.js,dashboard-control-center/src/styles.css,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/check_dashboard_design_system.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/check_dashboard_design_system.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+The overview page renders an operational situation board between the producer decision summary and the existing status cards.
+The board is a read-only projection over already available Control Center data:
+
+- `selected_context`, `contexts_by_menu`, and `available_contexts` provide menu, workflow, repository, current-step, blocker, and next-safe-action context.
+- `dashboard-live-status.json` provides fresh repository-state, local-test, Git-sync, CI, and security observations when the live payload matches the selected menu and repository.
+- Snapshot fields such as `development`, `git_workflow`, `security`, `maintenance`, and `repository_scope` remain fallback evidence when live status is unavailable.
+
+The board presents five repeated facts: current work, blockers, Git/worktree, tests and CI, and next safe check.
+Each fact carries a shared status pill, human-readable summary, concise detail line, and optional command/source detail.
+React may choose which existing evidence to summarize first, but it must not convert advisory or missing evidence into a pass state.
+
+The implementation is presentation-only.
+It does not add schema fields, mutate Settings authority, call GitHub, run Git commands, wait for CI, write repositories, or execute command previews.
