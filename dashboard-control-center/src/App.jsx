@@ -1875,6 +1875,161 @@ function OperationalSituationBoard({ data, context, liveStatus, t }) {
   );
 }
 
+function operationalDetailFacts(data, context, activeLiveStatus, t) {
+  const factsById = new Map(situationFacts(data, context, activeLiveStatus, t).map((fact) => [fact.id, fact]));
+  return ["blockers", "git", "tests-ci", "next-safe"].map((id) => factsById.get(id)).filter(Boolean);
+}
+
+function operationalDetailEvidenceRows(activeLiveStatus, keys, t, limit = 6) {
+  const rows = liveEvidenceRows(activeLiveStatus, keys, t);
+  const selected = [];
+  const selectedIds = new Set();
+  const addRow = (row) => {
+    if (!row || selectedIds.has(row.id) || selected.length >= limit) {
+      return;
+    }
+    selected.push(row);
+    selectedIds.add(row.id);
+  };
+  keys.forEach((key) => addRow(rows.find((row) => row.key === key)));
+  rows.forEach(addRow);
+  return selected;
+}
+
+function OperationalDetailDecisionCard({ fact, t, displayPolicy }) {
+  const Icon = fact.Icon;
+  const source = displayText(fact.source, "");
+  const command = displayText(fact.command, "");
+  const showSource = source && displayPolicy.isTechnical;
+  return (
+    <article className={`operational-detail-card operational-detail-card--${fact.id}`} data-operational-detail-fact={fact.id}>
+      <div className="operational-detail-card__head">
+        <span className="operational-detail-card__icon">
+          <Icon aria-hidden="true" size={20} />
+        </span>
+        <div>
+          <h3>{fact.title}</h3>
+          <StatusPill value={fact.status} t={t} label={statusLabelForChip(fact.status, t)} />
+        </div>
+      </div>
+      <strong>{fact.value}</strong>
+      {fact.detail ? <p>{fact.detail}</p> : null}
+      {showSource || command ? (
+        <div className="operational-detail-card__evidence">
+          {showSource ? (
+            <span>
+              {t("overview.situation.source")}: {technicalChip(source)}
+            </span>
+          ) : null}
+          {command ? (
+            <span>
+              {t("overview.situation.command")}: <CommandChip command={command} />
+            </span>
+          ) : null}
+        </div>
+      ) : null}
+    </article>
+  );
+}
+
+function OperationalDetailEvidenceQueue({ activeLiveStatus, keys, t, tone, displayPolicy }) {
+  const rows = operationalDetailEvidenceRows(activeLiveStatus, keys, t);
+  const showTechnicalSource = displayPolicy.isTechnical;
+  return (
+    <div className="operational-detail-evidence" data-operational-detail-evidence="true">
+      <div className="operational-detail-evidence__head">
+        <h3>{t("detail.operational.evidenceTitle")}</h3>
+        <p>{t("detail.operational.evidenceDetail")}</p>
+      </div>
+      <div className="operational-detail-evidence__list">
+        {rows.length ? rows.map((row) => {
+          const command = displayText(row.command, "");
+          const usableCommand = command && command !== "not_applicable" ? command : "";
+          return (
+            <article
+              className={`operational-detail-evidence__row operational-detail-evidence__row--${normalizeState(row.status)}`}
+              key={row.id}
+              data-operational-detail-evidence-key={row.key}
+              data-evidence-source-id={row.sourceId || undefined}
+              data-evidence-current-item-id={row.currentItemId || undefined}
+            >
+              <div>
+                <strong>{row.title}</strong>
+                <span>{row.target}{row.branch ? ` / ${row.branch}` : ""}</span>
+              </div>
+              <p>{row.summary}</p>
+              <StatusPill value={row.status} t={t} label={statusLabelForChip(row.status, t)} />
+              <span>{row.observedAt || t("workflow.table.snapshotEvidence")}</span>
+              <div className="operational-detail-evidence__reference">
+                {showTechnicalSource && row.sourceId ? technicalChip(row.sourceId) : null}
+                {usableCommand ? <CommandChip command={usableCommand} /> : null}
+                <InsightDetailButton
+                  detail={liveEvidenceRowInsight(row, t)}
+                  label={t("summary.viewDetails")}
+                  t={t}
+                  tone={tone === "safety" ? "safety" : tone === "maintenance" ? "maintenance" : "workflow"}
+                />
+              </div>
+            </article>
+          );
+        }) : (
+          <article className="operational-detail-evidence__row operational-detail-evidence__row--empty">
+            <div>
+              <strong>{t("summary.none")}</strong>
+              <span>{t("workflow.table.snapshotEvidence")}</span>
+            </div>
+            <p>{t("detail.operational.evidenceEmpty")}</p>
+            <StatusPill value="unknown" t={t} label={statusLabelForChip("unknown", t)} />
+            <span>{t("workflow.table.snapshotEvidence")}</span>
+            <div>{t("summary.none")}</div>
+          </article>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function OperationalDetailDecisionPanel({ data, context, liveStatus, t, tone = "workflow", pageId, keys }) {
+  const activeLiveStatus = situationLiveStatusForContext(liveStatus, context);
+  const facts = operationalDetailFacts(data, context, activeLiveStatus, t);
+  const displayPolicy = displayDepthPolicyForData(data);
+  const evidenceRows = liveEvidenceRows(activeLiveStatus, keys, t);
+  const overallStatus = situationWorstStatus([...facts.map((fact) => fact.status), ...evidenceRows.map((row) => row.status)], "ready");
+  const repository = repositoryDisplayName(activeLiveStatus?.target_repository?.name || context.target_repository?.name, t);
+  const liveTime = situationObservedAt(activeLiveStatus?.generated_at) || formatGenerated(data, getDashboardIntlLocale(data.summary?.ui_locale || "en"));
+  const headingId = `${pageId || tone}-operational-detail-heading`;
+  return (
+    <section
+      className={`operational-detail-panel operational-detail-panel--${tone}`}
+      aria-labelledby={headingId}
+      data-operational-detail-decisions={pageId || tone}
+      data-dashboard-display-depth={displayPolicy.depth}
+    >
+      <div className="operational-detail-panel__header">
+        <span className="operational-detail-panel__icon">
+          <Activity aria-hidden="true" size={22} />
+        </span>
+        <div>
+          <h2 id={headingId}>{t("detail.operational.title")}</h2>
+          <p>{t("detail.operational.subtitle")}</p>
+        </div>
+        <StatusPill value={overallStatus} t={t} label={statusLabelForChip(overallStatus, t)} />
+      </div>
+      <div className="operational-detail-panel__meta" aria-label={t("detail.operational.meta")}>
+        <span>{t("overview.fact.target")}: <strong>{repository}</strong></span>
+        <span>{t("overview.fact.workflow")}: <strong>{workflowContextLabel(context.workflow_context, t)}</strong></span>
+        <span>{t("overview.situation.liveUpdated")}: <strong>{liveTime || t("overview.fact.noEvidence")}</strong></span>
+      </div>
+      <div className="operational-detail-panel__grid">
+        {facts.map((fact) => (
+          <OperationalDetailDecisionCard key={fact.id} fact={fact} t={t} displayPolicy={displayPolicy} />
+        ))}
+      </div>
+      <OperationalDetailEvidenceQueue activeLiveStatus={activeLiveStatus} keys={keys} t={t} tone={tone} displayPolicy={displayPolicy} />
+    </section>
+  );
+}
+
 function HorizontalProgress({ percent }) {
   const value = clampPercent(percent);
   return (
@@ -4699,6 +4854,7 @@ function WorkflowSection({ development, gitWorkflow, data, locale, t, liveStatus
           { Icon: ArrowRightCircle, label: t("detail.nextSafeCheck"), value: step ? `${t("workflow.card.stepLabel")} ${step} ${t("detail.workflow.nextSafe")}` : t("detail.workflow.nextSafe"), detail: nextActionShort(context, data, t), cta: { href: "#lessons", label: workflowStepDetailLabel(context, t) } },
         ]}
       />
+      <OperationalDetailDecisionPanel data={data} context={context} liveStatus={liveStatus} t={t} tone="workflow" pageId="workflow" keys={["local_tests", "git_sync", "ci"]} />
       <GitOperationRail operations={development.git_operations} t={t} />
       <WorkflowStatusCards data={data} t={t} />
       <LiveEvidenceTable liveStatus={liveStatus} context={context} keys={["local_tests", "git_sync", "ci"]} title={t("detail.liveEvidence.workflowTitle")} headingId="workflow-live-evidence-heading" t={t} tone="workflow" />
@@ -5007,6 +5163,7 @@ function MaintenanceSection({ maintenance, data, locale, t, liveStatus }) {
           { Icon: ArrowRightCircle, label: t("detail.nextSafeCheck"), value: t("detail.maintenance.nextSafe"), detail: t("detail.maintenance.nextSafeDetail") },
         ]}
       />
+      <OperationalDetailDecisionPanel data={data} context={context} liveStatus={liveStatus} t={t} tone="maintenance" pageId="maintenance" keys={["local_tests", "git_sync", "ci", "security"]} />
       <MaintenanceStatusCards maintenance={maintenance} data={data} t={t} />
       <LiveEvidenceTable liveStatus={liveStatus} context={context} keys={["local_tests", "git_sync", "ci", "security"]} title={t("detail.liveEvidence.maintenanceTitle")} headingId="maintenance-live-evidence-heading" t={t} tone="maintenance" />
       <BrowserDebugHandoffPanel browserDebug={data.browser_debug} t={t} />
@@ -5168,6 +5325,7 @@ function safetyFailureInsight(item, t) {
 }
 
 function SecuritySection({ security, partialFailures, data, locale, t, liveStatus }) {
+  const context = selectedContextData(data);
   const securityItems = objectEntries(security).filter(([id]) => !["approvals", "dangerous_operations"].includes(id)).map(([id, value]) => {
     const meta = safetyItemMeta(id, t);
     const hasSecurityGateFailure = id === "gate_status" && asArray(partialFailures).some((failure) => normalizeState(failure.status) === "blocked" || displayText(failure.source) === "security_gate");
@@ -5197,8 +5355,9 @@ function SecuritySection({ security, partialFailures, data, locale, t, liveStatu
           { Icon: ArrowRightCircle, label: t("detail.nextSafeCheck"), value: t("detail.security.nextSafe"), detail: t("detail.security.nextSafeDetail"), cta: { href: "#partial-failures-heading", label: t("detail.openPartialFailures") } },
         ]}
       />
+      <OperationalDetailDecisionPanel data={data} context={context} liveStatus={liveStatus} t={t} tone="safety" pageId="safety" keys={["security", "git_sync", "ci", "local_tests"]} />
       <SecurityStatusCards security={security} partialFailures={partialFailures} data={data} t={t} />
-      <LiveEvidenceTable liveStatus={liveStatus} context={selectedContextData(data)} keys={["security"]} title={t("detail.liveEvidence.safetyTitle")} headingId="safety-live-evidence-heading" t={t} tone="safety" />
+      <LiveEvidenceTable liveStatus={liveStatus} context={context} keys={["security"]} title={t("detail.liveEvidence.safetyTitle")} headingId="safety-live-evidence-heading" t={t} tone="safety" />
       <SecurityRowsTable rows={security?.approvals} title={t("security.approvalTable")} type="approval" t={t} />
       <SecurityRowsTable rows={security?.dangerous_operations} title={t("security.dangerousOperationTable")} type="dangerous" t={t} />
       <SafetyFailuresTable items={partialFailures} t={t} />
@@ -6423,6 +6582,7 @@ function RepositoryInfoPage({ data, locale, t, liveStatus }) {
           { Icon: ClipboardCheck, label: t("repositoryInfo.summary.productContent"), value: repositoryProductContentLabel(authority, t, locale), detail: t("repositoryInfo.summary.productContentDetail") },
         ]}
       />
+      <OperationalDetailDecisionPanel data={data} context={context} liveStatus={liveStatus} t={t} tone="workflow" pageId="repository-info" keys={["git_sync", "local_tests", "ci", "security"]} />
       <DetailSection id="repository-context" title={t("repositoryInfo.contextTitle")} Icon={Compass}>
         <FieldGrid
           fields={[

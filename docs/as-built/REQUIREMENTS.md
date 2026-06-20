@@ -2426,3 +2426,43 @@ Acceptance requirements:
 - Missing, unknown, stale, not-run, manual-required, approval-required, and not-applicable states must remain distinct.
 - Display depth may reduce secondary technical detail, but it must not hide blockers, approvals, failed or stale evidence, security state, or read-only/display-only boundaries.
 - The browser must not gain command execution, Git/CI mutation, repository writes, approval writes, cleanup, dependency changes, credential handling, or external service calls.
+
+## Dashboard Control Center Operational Detail Decisions Requirements
+
+SYNC-ID: dashboard_control_center_operational_detail_decisions
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,dashboard-control-center/src/App.jsx,dashboard-control-center/src/i18n.js,dashboard-control-center/src/styles.css,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/check_dashboard_design_system.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/check_dashboard_design_system.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+Workflow, Maintenance Sync, Safety, and Repository Info detail pages must show a shared operational decision panel that turns existing snapshot and live-status evidence into page-level development judgment material.
+The panel must help non-engineers understand what is happening now and help junior/intermediate engineers inspect Git/worktree state, tests/CI evidence, blockers, and the next safe check without leaving the Control Center.
+
+Acceptance requirements:
+
+- The panel appears on the major operational detail pages, not only on the overview.
+- The same read-only summarization rules used by the overview situation board are reused for Git/worktree, tests/CI, blockers, and next-safe-action facts.
+- Detail pages include a compact evidence queue with status, observed time, source, and command-preview references where available.
+- Display depth may collapse secondary source ids in friendly mode, but it must preserve blocker, approval, failed/stale evidence, security, command-preview, and read-only/display-only signals.
+- Missing live-status evidence must degrade to existing snapshot context rather than inventing a pass state.
+- The browser must not gain command execution, Git/CI mutation, repository writes, approval writes, cleanup, dependency changes, credential handling, external service calls, or any expanded Settings/Design Studio authority.
+
+## Dashboard Control Center Bundle Contract Requirements
+
+SYNC-ID: dashboard_control_center_bundle_contract
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,package.json,vite.config.mjs,dashboard-control-center/src/dashboardData.js,dashboard-control-center/src/i18n.js,dashboard-control-center/src/localePolicy.js,tools/check_dashboard_bundle_contract.mjs,tools/check_dashboard_bundle_contract.sh,docs/workflow/TEST_PLAN_MANIFEST.tsv,docs/workflow/GIT_HOOK_CHECKS.tsv,docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv,docs/workflow/FINAL_GATE_COVERAGE.tsv,.github/workflows/ci.yml,.github/workflows/lesson14-ci.yml,tools/test_lesson_repository.sh,tools/check_ci_workflow_structure.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/check_dashboard_bundle_contract.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/check_test_plan_coverage.sh,tools/test_test_plan.sh,tools/test_git_hooks.sh,tools/test_git_hooks_parallel.sh,tools/test_ci_final_gate.sh,tools/check_ci_workflow_structure.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+Dashboard Control Center must have a reusable production-build contract that fails when Vite emits a large chunk warning or when runtime JS chunks exceed the default-scale budget.
+The check must prevent hiding warnings by raising `chunkSizeWarningLimit` and must remain callable from package scripts, Git hooks, CI policy jobs, final-gate coverage, and aggregate repository verification.
+
+Acceptance requirements:
+
+- `npm run dashboard:build-check` runs a fresh production build and inspects the emitted assets.
+- The build must not print Vite large-chunk warnings.
+- Each emitted JavaScript chunk must stay within the default-scale 500 KB budget.
+- The entry shell must stay within a stricter 300 KB budget.
+- React, icons, dashboard data runtime, i18n, and generated design-system runtime must remain separated into deterministic named chunks.
+- Dashboard locale metadata used by validation must remain separate from the full translation dictionary so the i18n chunk can be isolated.
+- `chunkSizeWarningLimit` must not be raised above the default-scale value to hide the warning.
+- The check must be wired into standalone verification, test-plan policy, Git hooks, final-gate coverage, CI structure checks, and aggregate repository verification.

@@ -52,6 +52,7 @@ jobs:
           bash -n tools/check_developer_memory_requirements.sh
           bash -n tools/check_repository_development_workflow.sh
           bash -n tools/check_dashboard_design_system.sh
+          bash -n tools/check_dashboard_bundle_contract.sh
           bash -n tools/check_ci_workflow_structure.sh
           bash -n tools/test_lesson_playwright.sh
           bash -n tools/test_docs_tour.sh
@@ -190,6 +191,15 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Install dashboard dependencies
+        run: npm ci
+
       - name: Policy and workflow regressions
         run: |
           ./tools/test_docs_tour.sh
@@ -211,6 +221,7 @@ jobs:
           ./tools/test_dashboard_data.sh
           ./tools/test_dashboard_settings.sh
           ./tools/test_dashboard_i18n.sh
+          ./tools/check_dashboard_bundle_contract.sh
           ./tools/test_dashboard_browser_debug_manifest.sh
           ./tools/test_dashboard_design_studio_events.sh
           ./tools/test_ci_final_gate.sh

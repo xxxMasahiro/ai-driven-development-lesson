@@ -1181,6 +1181,12 @@ test.describe("English dashboard control center", () => {
     const workflowProducerDecision = page.locator("#workflow .decision-summary--workflow").first();
     await expect(workflowProducerDecision).toContainText("producer.workflow");
     await expect(workflowProducerDecision).toContainText("#workflow");
+    const workflowOperationalDetail = page.locator("[data-operational-detail-decisions='workflow']");
+    await expect(workflowOperationalDetail).toContainText("Operational detail decisions");
+    await expect(workflowOperationalDetail.locator("[data-operational-detail-fact]")).toHaveCount(4);
+    await expect(workflowOperationalDetail.locator("[data-operational-detail-fact='git']")).toContainText("Worktree is clean");
+    await expect(workflowOperationalDetail.locator("[data-operational-detail-fact='next-safe']")).toContainText("./tools/product-repository-authority status --json");
+    await expect(workflowOperationalDetail.locator("[data-operational-detail-evidence-key='git_sync']")).toBeVisible();
     await expect(page.getByRole("heading", { name: "Git Sync" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Product Evidence" })).toBeVisible();
     await page.locator(".workflow-mini-card", { hasText: "Git Sync" }).getByRole("button", { name: /View details/ }).click();
@@ -1202,6 +1208,9 @@ test.describe("English dashboard control center", () => {
     await expect(page.getByRole("heading", { name: "Maintenance Sync" })).toBeVisible();
     await expectCenteredSvg(page.locator(".page-title__icon"));
     await expectCenteredSvg(page.locator(".decision-summary__icon"));
+    const maintenanceOperationalDetail = page.locator("[data-operational-detail-decisions='maintenance']");
+    await expect(maintenanceOperationalDetail).toContainText("Operational detail decisions");
+    await expect(maintenanceOperationalDetail.locator("[data-operational-detail-fact='blockers']")).toContainText("6 blocker(s)");
     await expectCenteredSvg(page.locator(".maintenance-mini-card__icon"));
     await expect(page.locator(".maintenance-mini-card")).toHaveCount(6);
     await expect(page.locator(".evidence-row")).toHaveCount(6);
@@ -1296,6 +1305,9 @@ test.describe("English dashboard control center", () => {
     await expect(page.getByRole("heading", { name: "Safety Actions" })).toBeVisible();
     await expectCenteredSvg(page.locator(".page-title__icon"));
     await expectCenteredSvg(page.locator(".decision-summary__icon"));
+    const safetyOperationalDetail = page.locator("[data-operational-detail-decisions='safety']");
+    await expect(safetyOperationalDetail).toContainText("Operational detail decisions");
+    await expect(safetyOperationalDetail.locator("[data-operational-detail-fact='blockers']")).toContainText("6 blocker(s)");
     await expectCenteredSvg(page.locator(".security-mini-card__icon"));
     await expect(page.locator(".security-mini-card")).toHaveCount(4);
     const safetyCardIconBackgrounds = await page.locator(".security-mini-card__icon").evaluateAll((icons) => icons.map((icon) => getComputedStyle(icon).backgroundColor));
@@ -1954,6 +1966,9 @@ test.describe("English dashboard control center", () => {
     await navigation.getByRole("link", { name: "Development Workflow", exact: true }).click();
     await expect(page.locator("#workflow .context-strip")).toContainText(freeRepoName);
     await expect(page.locator("#workflow")).toContainText(/Free development workflow/i);
+    const workflowOperationalDetail = page.locator("[data-operational-detail-decisions='workflow']");
+    await expect(workflowOperationalDetail).toContainText(freeRepoName);
+    await expect(workflowOperationalDetail.locator("[data-operational-detail-fact='git']")).not.toContainText("task-tracker-repository");
     await expect(page.locator("#workflow .mock-table-row--workflow")).toHaveCount(5);
     await expect(page.locator("#workflow .mock-table-row--workflow", { hasText: /Repository observation/i })).toBeVisible();
     await expect(page.locator("#workflow .mock-table-row--workflow", { hasText: /Repository index drift/i })).toBeVisible();
@@ -1965,6 +1980,9 @@ test.describe("English dashboard control center", () => {
 
     await repositoryNavigation.getByRole("link", { name: "Repository Info", exact: true }).click();
     await expect(page.locator("#repository-info")).toContainText(freeRepoName);
+    const repositoryOperationalDetail = page.locator("[data-operational-detail-decisions='repository-info']");
+    await expect(repositoryOperationalDetail).toContainText("Operational detail decisions");
+    await expect(repositoryOperationalDetail).toContainText(freeRepoName);
     await expect(page.locator("#repository-info")).toContainText("src");
     await expect(page.locator("#repository-info")).toContainText("ops");
     await expect(page.locator("#repository-file-map")).not.toContainText("App.jsx");
@@ -2178,6 +2196,11 @@ test.describe("English dashboard control center", () => {
 
     const navigation = page.getByRole("navigation", { name: "Dashboard categories" });
     await navigation.getByRole("link", { name: "Development Workflow", exact: true }).click();
+    const workflowOperationalDetail = page.locator("[data-operational-detail-decisions='workflow']");
+    await expect(workflowOperationalDetail.locator("[data-operational-detail-fact='git']")).toContainText("Uncommitted or untracked changes 3");
+    await expect(workflowOperationalDetail.locator("[data-operational-detail-evidence-key='local_tests'][data-evidence-source-id='product.tests.unit']")).toBeVisible();
+    await expect(workflowOperationalDetail.locator("[data-operational-detail-evidence-key='git_sync'][data-evidence-source-id='product.git.worktree']")).toBeVisible();
+    await expect(workflowOperationalDetail.locator("[data-operational-detail-evidence-key='ci'][data-evidence-source-id='product_ci_live']")).toBeVisible();
     await expect(page.locator("#workflow .mock-table-row--live-evidence[data-evidence-source-id='product.tests.unit']")).toBeVisible();
     await expect(page.locator("#workflow .mock-table-row--live-evidence[data-evidence-source-id='product.git.worktree']")).toBeVisible();
     await expect(page.locator("#workflow .mock-table-row--live-evidence[data-evidence-source-id='product_ci_live']")).toBeVisible();
@@ -2186,6 +2209,8 @@ test.describe("English dashboard control center", () => {
     await page.locator(".insight-detail-modal__close").click();
 
     await navigation.getByRole("link", { name: "Safety Actions", exact: true }).click();
+    const safetyOperationalDetail = page.locator("[data-operational-detail-decisions='safety']");
+    await expect(safetyOperationalDetail.locator("[data-operational-detail-evidence-key='security'][data-evidence-source-id='product.security.local_artifacts']")).toBeVisible();
     await expect(page.locator("#safety .mock-table-row--live-evidence[data-evidence-source-id='product.security.local_artifacts']")).toBeVisible();
   });
 
