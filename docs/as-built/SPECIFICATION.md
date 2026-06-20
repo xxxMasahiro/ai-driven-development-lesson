@@ -2856,3 +2856,26 @@ React may choose which existing evidence to summarize first, but it must not con
 
 The implementation is presentation-only.
 It does not add schema fields, mutate Settings authority, call GitHub, run Git commands, wait for CI, write repositories, or execute command previews.
+## Dashboard Control Center Operational Detail Decisions Specification
+
+SYNC-ID: dashboard_control_center_operational_detail_decisions
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,dashboard-control-center/src/App.jsx,dashboard-control-center/src/i18n.js,dashboard-control-center/src/styles.css,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/check_dashboard_design_system.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/check_dashboard_design_system.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+Operational detail pages render one shared decision panel after their producer decision summary.
+The panel is a read-only projection over existing Control Center data:
+
+- `selected_context`, `contexts_by_menu`, and `available_contexts` provide menu, workflow, repository, blocker, and next-safe-action context.
+- `dashboard-live-status.json` provides repository-state, local-test, Git-sync, CI, and security observations when it matches the selected menu and repository.
+- Existing snapshot fields remain fallback evidence when live status is unavailable.
+
+The panel renders four decision cards: blockers, Git/worktree, tests and CI, and next safe check.
+Each card uses the same normalized status, summary, detail, command, and source conventions as the overview situation board.
+It also renders a page-scoped evidence queue from existing live-status checks so engineers can see which source produced the current judgment.
+
+Display-depth policy controls secondary disclosure only.
+Friendly mode may hide non-critical source ids, standard mode keeps the current baseline, and technical mode prioritizes source/detail references.
+No mode may hide blockers, approvals, failed/stale evidence, security state, command previews, or read-only/display-only boundaries.
+
+The implementation does not add schema fields, call GitHub, run Git or CI commands, mutate repositories, write approvals, alter Settings authority, change Design Studio authority, collect credentials, or execute command previews.

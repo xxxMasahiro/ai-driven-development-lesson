@@ -2840,3 +2840,22 @@ Next Step:
 - No remaining implementation action for this sync ID after focused Dashboard, i18n, design-system, sync, and repository-development checks pass.
 
 Stop and ask before dependency changes, generated design-system source edits, browser command execution, Git/CI operations, product repository writes, approval writes, cleanup, push, PR creation, merge, main sync, credentials, or any existing-feature tradeoff.
+## Dashboard Control Center Operational Detail Decisions Handoff
+
+SYNC-ID: dashboard_control_center_operational_detail_decisions
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,dashboard-control-center/src/App.jsx,dashboard-control-center/src/i18n.js,dashboard-control-center/src/styles.css,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/check_dashboard_design_system.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/check_dashboard_design_system.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+Restart context:
+
+- This sync adds shared read-only operational decision panels to the major Control Center detail pages.
+- Workflow, Maintenance Sync, Safety, and Repository Info can now show blockers, Git/worktree, tests/CI, and next-safe-action judgment material without requiring users to infer that state from the CLI.
+- The panel reuses existing snapshot and live-status fields and follows display-depth policy for secondary technical disclosure.
+- The browser remains a renderer. It does not execute commands, run Git/CI, mutate repositories, write approvals, collect credentials, or perform cleanup.
+
+Next Step:
+
+- No remaining implementation action for this sync ID after focused Dashboard, i18n, design-system, sync, and repository-development checks pass.
+
+Stop and ask before dependency changes, generated design-system source edits, browser command execution, Git/CI operations, product repository writes, approval writes, cleanup, push, PR creation, merge, main sync, credentials, Settings authority expansion, Design Studio authority expansion, or any existing-feature tradeoff.

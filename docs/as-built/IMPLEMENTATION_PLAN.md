@@ -4871,3 +4871,35 @@ git diff --check
 ```
 
 Stop and ask before adding dependencies, changing generated design-system files as source, browser command execution, Git/CI operations, repository writes, approval writes, cleanup, push, PR creation, merge, main sync, credentials, or any existing-feature tradeoff.
+## Dashboard Control Center Operational Detail Decisions Implementation Plan
+
+SYNC-ID: dashboard_control_center_operational_detail_decisions
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,dashboard-control-center/src/App.jsx,dashboard-control-center/src/i18n.js,dashboard-control-center/src/styles.css,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/check_dashboard_design_system.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/check_dashboard_design_system.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+Implemented order:
+
+1. Synchronize this plan across the as-built contract, requirements, specification, implementation plan, tracker, and handoff before runtime edits.
+2. Add reusable detail-page helpers that reuse the overview situation summaries for blockers, Git/worktree, tests/CI, and next safe check.
+3. Add a shared `OperationalDetailDecisionPanel` for Workflow, Maintenance Sync, Safety, and Repository Info pages.
+4. Add localized labels for the panel and evidence queue in the Dashboard i18n layer.
+5. Add scoped responsive CSS using existing Dashboard design-system tokens and without editing generated artifacts.
+6. Extend Playwright coverage for detail-page rendering and live-status judgment material.
+7. Run focused i18n, Control Center, design-system, sync, and repository-development checks before promotion.
+
+Verification sequence:
+
+```bash
+./tools/test_dashboard_i18n.sh
+./tools/test_dashboard_control_center.sh
+./tools/check_dashboard_design_system.sh
+./tools/check_as_built_sync_contract.sh
+./tools/check_as_built_docs.sh
+./tools/check_workflow_pair_sync.sh
+./tools/check_repository_development_workflow.sh
+./tools/test_repository_development_workflow.sh
+git diff --check
+```
+
+Stop and ask before adding dependencies, changing generated design-system files as source, browser command execution, Git/CI operations, repository writes, approval writes, cleanup, push, PR creation, merge, main sync, credentials, Settings authority expansion, Design Studio authority expansion, or any existing-feature tradeoff.

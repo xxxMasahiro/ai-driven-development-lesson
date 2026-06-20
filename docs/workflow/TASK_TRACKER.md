@@ -2691,3 +2691,23 @@ Current Status:
 Next Step:
 
 - No remaining implementation action for this sync ID. Continue to treat the board as an overview decision surface, not a browser operation runner.
+## Dashboard Control Center Operational Detail Decisions Work
+
+SYNC-ID: dashboard_control_center_operational_detail_decisions
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,dashboard-control-center/src/App.jsx,dashboard-control-center/src/i18n.js,dashboard-control-center/src/styles.css,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/check_dashboard_design_system.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/check_dashboard_design_system.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+Current Status:
+
+- [x] Developer approved implementation from the detail-page decision-support direction.
+- [x] Started under `repository-development-workflow` with AGENTS invariants and sync-first discipline.
+- [x] Added this sync ID across the as-built contract and synchronized documents before runtime implementation.
+- [x] Add shared detail-page operational decision material for blockers, Git/worktree, tests/CI, and next safe check.
+- [x] Keep the panel read-only and backed by existing snapshot/live-status fields.
+- [x] Add localized labels, responsive CSS, and Playwright coverage for operational detail pages.
+- [x] Preserve Settings, Design Studio, Git/CI, approval, cleanup, and command-preview authority boundaries.
+
+Next Step:
+
+- No remaining implementation action for this sync ID after focused Dashboard, i18n, design-system, sync, and repository-development checks pass.

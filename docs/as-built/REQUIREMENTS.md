@@ -2426,3 +2426,21 @@ Acceptance requirements:
 - Missing, unknown, stale, not-run, manual-required, approval-required, and not-applicable states must remain distinct.
 - Display depth may reduce secondary technical detail, but it must not hide blockers, approvals, failed or stale evidence, security state, or read-only/display-only boundaries.
 - The browser must not gain command execution, Git/CI mutation, repository writes, approval writes, cleanup, dependency changes, credential handling, or external service calls.
+## Dashboard Control Center Operational Detail Decisions Requirements
+
+SYNC-ID: dashboard_control_center_operational_detail_decisions
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,dashboard-control-center/src/App.jsx,dashboard-control-center/src/i18n.js,dashboard-control-center/src/styles.css,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/check_dashboard_design_system.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/check_dashboard_design_system.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+Workflow, Maintenance Sync, Safety, and Repository Info detail pages must show a shared operational decision panel that turns existing snapshot and live-status evidence into page-level development judgment material.
+The panel must help non-engineers understand what is happening now and help junior/intermediate engineers inspect Git/worktree state, tests/CI evidence, blockers, and the next safe check without leaving the Control Center.
+
+Acceptance requirements:
+
+- The panel appears on the major operational detail pages, not only on the overview.
+- The same read-only summarization rules used by the overview situation board are reused for Git/worktree, tests/CI, blockers, and next-safe-action facts.
+- Detail pages include a compact evidence queue with status, observed time, source, and command-preview references where available.
+- Display depth may collapse secondary source ids in friendly mode, but it must preserve blocker, approval, failed/stale evidence, security, command-preview, and read-only/display-only signals.
+- Missing live-status evidence must degrade to existing snapshot context rather than inventing a pass state.
+- The browser must not gain command execution, Git/CI mutation, repository writes, approval writes, cleanup, dependency changes, credential handling, external service calls, or any expanded Settings/Design Studio authority.
