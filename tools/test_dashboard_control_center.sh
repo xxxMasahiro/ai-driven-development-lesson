@@ -437,15 +437,72 @@ function parseJson(response, label) {
     fail(`settings plan middleware failed with ${plan.status}: ${plan.body}`);
   }
   const planJson = parseJson(plan, "settings plan middleware");
-  if (planJson.status !== "ready" || planJson.setting_id !== "learning_mode" || planJson.requested_value !== "C" || planJson.applied !== false) {
+  if (
+    planJson.status !== "ready" ||
+    planJson.setting_id !== "learning_mode" ||
+    planJson.requested_value !== "C" ||
+    planJson.applied !== false ||
+    !/^[0-9a-f-]{36}$/i.test(String(planJson.plan_token || ""))
+  ) {
     fail("settings plan middleware returned an unexpected payload");
+  }
+
+  const applyWithoutToken = await request(
+    "POST",
+    "/dashboard-settings/apply",
+    sameOriginHeaders,
+    JSON.stringify({ setting_id: "learning_mode", value: "C", menu_id: "step_1_14", confirm: true }),
+  );
+  if (applyWithoutToken.status !== 409) {
+    fail(`settings apply middleware accepted apply without a current plan token with ${applyWithoutToken.status}`);
+  }
+
+  const applyWrongValue = await request(
+    "POST",
+    "/dashboard-settings/apply",
+    sameOriginHeaders,
+    JSON.stringify({
+      setting_id: "learning_mode",
+      value: "B",
+      menu_id: "step_1_14",
+      plan_token: planJson.plan_token,
+      snapshot_id: planJson.snapshot_id || undefined,
+      confirm: true,
+    }),
+  );
+  if (applyWrongValue.status !== 409) {
+    fail(`settings apply middleware accepted a mismatched plan token with ${applyWrongValue.status}`);
+  }
+
+  const freshPlan = await request(
+    "POST",
+    "/dashboard-settings/plan",
+    sameOriginHeaders,
+    JSON.stringify({ setting_id: "learning_mode", value: "C", menu_id: "step_1_14" }),
+  );
+  const freshPlanJson = parseJson(freshPlan, "fresh settings plan middleware");
+  const applyWrongSnapshot = await request(
+    "POST",
+    "/dashboard-settings/apply",
+    sameOriginHeaders,
+    JSON.stringify({
+      setting_id: "learning_mode",
+      value: "C",
+      menu_id: "step_1_14",
+      plan_token: freshPlanJson.plan_token,
+      snapshot_id: "stale-snapshot",
+      confirm: true,
+    }),
+  );
+  if (applyWrongSnapshot.status !== 409) {
+    fail(`settings apply middleware accepted a stale snapshot with ${applyWrongSnapshot.status}`);
   }
 
   const apply = await request(
     "POST",
     "/dashboard-settings/apply",
     sameOriginHeaders,
-    JSON.stringify({ setting_id: "learning_mode", value: "C", menu_id: "step_1_14", confirm: true }),
+    JSON.stringify({ setting_id: "learning_mode", value: "C", menu_id: "step_1_14", plan_token: freshPlanJson.plan_token, confirm: true }),
   );
   if (apply.status !== 200) {
     fail(`settings apply middleware failed with ${apply.status}: ${apply.body}`);
@@ -456,6 +513,15 @@ function parseJson(response, label) {
   }
   if (!/\tC\t/.test(fs.readFileSync(lessonMode, "utf8"))) {
     fail("settings apply middleware did not update the configured lesson setting file");
+  }
+  const replay = await request(
+    "POST",
+    "/dashboard-settings/apply",
+    sameOriginHeaders,
+    JSON.stringify({ setting_id: "learning_mode", value: "C", menu_id: "step_1_14", plan_token: freshPlanJson.plan_token, confirm: true }),
+  );
+  if (replay.status !== 409) {
+    fail(`settings apply middleware accepted a replayed plan token with ${replay.status}`);
   }
   const snapshotAfterLearningMode = parseJson(await request("GET", "/dashboard-data.json"), "dashboard data after learning-mode apply");
   if (
@@ -477,7 +543,7 @@ function parseJson(response, label) {
     fail(`workflow language plan middleware failed with ${workflowPlan.status}: ${workflowPlan.body}`);
   }
   const workflowPlanJson = parseJson(workflowPlan, "workflow language plan middleware");
-  if (workflowPlanJson.status !== "ready" || workflowPlanJson.setting_id !== "workflow_language" || workflowPlanJson.requested_value !== "en") {
+  if (workflowPlanJson.status !== "ready" || workflowPlanJson.setting_id !== "workflow_language" || workflowPlanJson.requested_value !== "en" || !/^[0-9a-f-]{36}$/i.test(String(workflowPlanJson.plan_token || ""))) {
     fail("workflow language plan middleware returned an unexpected payload");
   }
 
@@ -485,7 +551,7 @@ function parseJson(response, label) {
     "POST",
     "/dashboard-settings/apply",
     sameOriginHeaders,
-    JSON.stringify({ setting_id: "workflow_language", value: "en", menu_id: "step_1_14", confirm: true }),
+    JSON.stringify({ setting_id: "workflow_language", value: "en", menu_id: "step_1_14", plan_token: workflowPlanJson.plan_token, confirm: true }),
   );
   if (workflowApply.status !== 200) {
     fail(`workflow language apply middleware failed with ${workflowApply.status}: ${workflowApply.body}`);

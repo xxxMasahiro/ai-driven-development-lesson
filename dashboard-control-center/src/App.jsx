@@ -76,7 +76,9 @@ import {
   planDashboardSettingChange,
   planDashboardDesignSystemChange,
 } from "./dashboardData.js";
+import { DetailDecisionSummary, ProducerDecisionSummary } from "./DecisionSummary.jsx";
 import { dashboardControlCenterDesignSystem } from "./design-system.generated.js";
+import { displayDepthPolicyForData } from "./displayDepth.js";
 import { createTranslator, formatDateTime, formatRelativeAge, getDashboardIntlLocale, getDashboardLocaleDirection, resolveLocale } from "./i18n.js";
 
 const stateIcons = {
@@ -1987,7 +1989,7 @@ function workflowRunInsight(row, context, t) {
   };
 }
 
-function EvidenceRowsTable({ rows, t }) {
+function EvidenceRowsTable({ rows, t, displayPolicy = null }) {
   const items = asArray(rows);
   if (!items.length) {
     return null;
@@ -2005,6 +2007,15 @@ function EvidenceRowsTable({ rows, t }) {
         {items.map((row) => {
           const unresolvedCount = maintenanceUnresolvedCount(row);
           const observedAt = maintenanceObservedAt(row);
+          const referenceValues = maintenanceReferenceValues(row);
+          const referenceChips = referenceValues.map((reference) => (
+            <span className="evidence-row__reference-chip" key={reference} aria-label={`${maintenanceEvidenceLabel(row, t)}: ${reference}`}>
+              {technicalTooltipValue(reference, referenceTooltip(reference, t, t("maintenance.evidenceReferenceTooltip")), "evidence-row__reference-value")}
+              <button className="evidence-row__reference-copy" type="button" aria-label={`${t("maintenance.copyReference")}: ${reference}`} data-copy-tooltip={reference} onClick={() => copyTextToClipboard(reference)}>
+                <Copy aria-hidden="true" size={14} />
+              </button>
+            </span>
+          ));
           return (
             <article className="evidence-row" key={displayText(row.id)}>
               <div className="evidence-row__title">
@@ -2032,14 +2043,12 @@ function EvidenceRowsTable({ rows, t }) {
                   t={t}
                   tone="maintenance"
                 />
-                {maintenanceReferenceValues(row).map((reference) => (
-                  <span className="evidence-row__reference-chip" key={reference} aria-label={`${maintenanceEvidenceLabel(row, t)}: ${reference}`}>
-                    {technicalTooltipValue(reference, referenceTooltip(reference, t, t("maintenance.evidenceReferenceTooltip")), "evidence-row__reference-value")}
-                    <button className="evidence-row__reference-copy" type="button" aria-label={`${t("maintenance.copyReference")}: ${reference}`} data-copy-tooltip={reference} onClick={() => copyTextToClipboard(reference)}>
-                      <Copy aria-hidden="true" size={14} />
-                    </button>
-                  </span>
-                ))}
+                {displayPolicy?.collapseTechnicalDetails && referenceChips.length ? (
+                  <details className="evidence-row__technical" data-dashboard-display-depth={displayPolicy.depth} open={displayPolicy.openTechnicalDetails}>
+                    <summary>{t("settingsPage.modal.technicalDetails")}</summary>
+                    {referenceChips}
+                  </details>
+                ) : referenceChips}
               </div>
             </article>
           );
@@ -3427,47 +3436,6 @@ function lessonSummaryLines(text) {
   return [value];
 }
 
-function DetailDecisionSummary({ tone, items, t }) {
-  return (
-    <section className={`decision-summary decision-summary--${tone}`} aria-label={t("detail.summaryAria")}>
-      {items.map(({ Icon, label, value, valueLines, detail, points = [], badge, cta, tone: itemTone }) => (
-        <article className={itemTone ? `decision-summary__item decision-summary__item--${itemTone}` : "decision-summary__item"} key={label}>
-          <span className="decision-summary__icon">
-            <Icon aria-hidden="true" size={24} />
-          </span>
-          <div>
-            <span>{label}</span>
-            {valueLines?.length ? (
-              <p className="decision-summary__value-lines">
-                {valueLines.map((line, index) => (
-                  <span key={`${displayText(line)}-${index}`}>{line}</span>
-                ))}
-              </p>
-            ) : displayText(value, "") ? (
-              <strong>{value}</strong>
-            ) : null}
-            {badge ? <em>{badge}</em> : null}
-            {detail ? <p>{detail}</p> : null}
-            {points.length ? (
-              <ul className="decision-summary__points">
-                {points.map((point, index) => (
-                  <li key={`${displayText(point)}-${index}`}>{displayText(point)}</li>
-                ))}
-              </ul>
-            ) : null}
-            {cta ? (
-              <a className="decision-summary__cta" href={cta.href}>
-                {cta.label}
-                <ArrowRightCircle aria-hidden="true" size={16} />
-              </a>
-            ) : null}
-          </div>
-        </article>
-      ))}
-    </section>
-  );
-}
-
 function SummaryBullets({ items }) {
   const visibleItems = asArray(items).filter((item) => displayText(item, ""));
   if (!visibleItems.length) {
@@ -3877,6 +3845,7 @@ function OverviewSection({ data, t, locale, activeMenuId, pendingMenuId, onActiv
       <PageTitleHeader viewId="overview" Icon={Home} title={t("nav.overview")} subtitle={t("overview.subtitle")} data={data} locale={locale} t={t} actionLabel={t("detail.refreshDisplayOnly")} headingId="overview-heading" />
       <MenuTileStrip data={data} t={t} activeMenuId={activeMenuId} pendingMenuId={pendingMenuId} onActiveMenuChange={onActiveMenuChange} />
       <ContextSnapshotStrip data={data} t={t} locale={locale} />
+      <ProducerDecisionSummary data={data} pageId="overview" tone="sidebar" t={t} />
       <RepositorySelectionPanel selection={repositorySelection} t={t} />
       <section className="overview-status-grid" aria-label={t("overview.currentStatus")}>
         <OverviewStatusCard
@@ -4365,6 +4334,7 @@ function LessonSection({ lessons, data, locale, t }) {
       <section className="view-surface view-surface--lessons" id="lessons" aria-labelledby="lesson-heading">
         <PageTitleHeader viewId="lessons" Icon={BookOpen} title={t("lessons.title")} subtitle={t("lessons.description")} data={data} locale={locale} t={t} actionLabel={t("lesson.snapshotButton")} headingId="lesson-heading" />
         <ContextSnapshotStrip data={data} t={t} locale={locale} variant="workflow" />
+        <ProducerDecisionSummary data={data} pageId="lessons" tone="lessons" t={t} />
         <SidebarPageCard
           Icon={WorkflowCategoryIcon}
           title={t("lessons.notLessonTitle")}
@@ -4383,6 +4353,7 @@ function LessonSection({ lessons, data, locale, t }) {
     <section className="view-surface view-surface--lessons" id="lessons" aria-labelledby="lesson-heading">
       <PageTitleHeader viewId="lessons" Icon={BookOpen} title={t("lessons.title")} subtitle={t("lessons.description")} data={data} locale={locale} t={t} actionLabel={t("lesson.snapshotButton")} headingId="lesson-heading" />
       <ContextSnapshotStrip data={data} t={t} locale={locale} variant="lessons" />
+      <ProducerDecisionSummary data={data} pageId="lessons" tone="lessons" t={t} />
       <DetailDecisionSummary
         tone="lessons"
         t={t}
@@ -4432,6 +4403,7 @@ function WorkflowSection({ development, gitWorkflow, data, locale, t, liveStatus
     <section className="view-surface view-surface--workflow" id="workflow" aria-labelledby="workflow-heading">
       <PageTitleHeader viewId="workflow" Icon={WorkflowCategoryIcon} title={t("workflow.title")} subtitle={t("workflow.description")} data={data} locale={locale} t={t} actionLabel={t("detail.refreshDisplayOnly")} headingId="workflow-heading" />
       <ContextSnapshotStrip data={data} t={t} locale={locale} variant="workflow" />
+      <ProducerDecisionSummary data={data} pageId="workflow" tone="workflow" t={t} />
       <DetailDecisionSummary
         tone="workflow"
         t={t}
@@ -4716,6 +4688,7 @@ function BrowserDebugHandoffPanel({ browserDebug, t }) {
 function MaintenanceSection({ maintenance, data, locale, t, liveStatus }) {
   const context = selectedContextData(data);
   const activeLiveStatus = liveStatusForContext(liveStatus, context);
+  const displayPolicy = displayDepthPolicyForData(data);
   const manualFollowups = asArray(data.summary?.manual_followups);
   const warnings = asArray(data.warnings).map((warning, index) => ({
     source: `${t("summary.warningItem")} ${index + 1}`,
@@ -4738,6 +4711,7 @@ function MaintenanceSection({ maintenance, data, locale, t, liveStatus }) {
     <section className="view-surface view-surface--maintenance" id="maintenance" aria-labelledby="maintenance-heading">
       <PageTitleHeader viewId="maintenance" Icon={RefreshCw} title={t("maintenance.title")} subtitle={t("maintenance.description")} data={data} locale={locale} t={t} actionLabel={t("detail.refreshMaintenance")} headingId="maintenance-heading" />
       <ContextSnapshotStrip data={data} t={t} locale={locale} variant="maintenance" />
+      <ProducerDecisionSummary data={data} pageId="maintenance" tone="maintenance" t={t} />
       <DetailDecisionSummary
         tone="maintenance"
         t={t}
@@ -4756,7 +4730,7 @@ function MaintenanceSection({ maintenance, data, locale, t, liveStatus }) {
         <p className="section-help-text">{t("maintenance.confirmationFlowDetail")}</p>
         <MaintenanceConfirmationTable manualFollowups={manualFollowups} warnings={warnings} data={data} t={t} />
       </section>
-      {activeLiveStatus ? null : <EvidenceRowsTable rows={maintenance.evidence_rows} t={t} />}
+      {activeLiveStatus ? null : <EvidenceRowsTable rows={maintenance.evidence_rows} t={t} displayPolicy={displayPolicy} />}
       <SourceBoundary data={data} t={t} />
       <MockNotice
         tone="maintenance-warning"
@@ -4927,6 +4901,7 @@ function SecuritySection({ security, partialFailures, data, locale, t, liveStatu
     <div className="safety-primary">
       <PageTitleHeader viewId="safety" Icon={ShieldCheck} title={t("security.title")} subtitle={t("security.description")} data={data} locale={locale} t={t} actionLabel={t("detail.refreshDisplayOnly")} headingId="security-heading" />
       <ContextSnapshotStrip data={data} t={t} locale={locale} variant="safety" />
+      <ProducerDecisionSummary data={data} pageId="safety" tone="safety" t={t} />
       <DetailDecisionSummary
         tone="safety"
         t={t}
@@ -4946,7 +4921,16 @@ function SecuritySection({ security, partialFailures, data, locale, t, liveStatu
   );
 }
 
-function CommandPreviews({ actions, t }) {
+function commandPreviewTechnicalRows(preview, t) {
+  return [
+    [t("field.target"), preview.target],
+    [t("field.risk"), normalizeRisk(preview.risk_level)],
+    [t("field.approval"), preview.approval_gate_id],
+    [t("field.executionMode"), preview.execution_mode],
+  ].filter(([, value]) => displayText(value, ""));
+}
+
+function CommandPreviews({ actions, t, displayPolicy = null }) {
   const previews = asArray(actions?.command_previews);
   if (!previews.length) {
     return null;
@@ -4961,23 +4945,43 @@ function CommandPreviews({ actions, t }) {
         <p>{t("actions.description")}</p>
       </div>
       <div className="preview-list">
-        {previews.map((preview, index) => (
-          <article className={`command-preview command-preview--${normalizeRisk(preview.risk_level)}`} key={`${displayText(preview.intent)}-${index}`}>
-            <div className="command-preview__head">
-              <span className="command-preview__icon">
-                <ShieldCheck aria-hidden="true" size={18} />
-              </span>
-              <div>
-                <h3>{commandIntentLabel(preview.intent, t)}</h3>
+        {previews.map((preview, index) => {
+          const technicalRows = commandPreviewTechnicalRows(preview, t);
+          const command = <CommandPreviewCommand command={preview.command_text} t={t} />;
+          return (
+            <article className={`command-preview command-preview--${normalizeRisk(preview.risk_level)}`} key={`${displayText(preview.intent)}-${index}`}>
+              <div className="command-preview__head">
+                <span className="command-preview__icon">
+                  <ShieldCheck aria-hidden="true" size={18} />
+                </span>
+                <div>
+                  <h3>{commandIntentLabel(preview.intent, t)}</h3>
+                </div>
               </div>
-            </div>
-            <CommandPreviewCommand command={preview.command_text} t={t} />
-            <div className="command-preview__badges">
-              <span className="display-only-badge">{t("actions.displayOnly")}</span>
-              <span className="display-only-badge">{preview.non_executable === true ? t("actions.notExecutable") : t("field.unknown")}</span>
-            </div>
-          </article>
-        ))}
+              {displayPolicy?.collapseTechnicalDetails ? null : command}
+              <div className="command-preview__badges">
+                <span className="display-only-badge">{t("actions.displayOnly")}</span>
+                <span className="display-only-badge">{preview.non_executable === true ? t("actions.notExecutable") : t("field.unknown")}</span>
+              </div>
+              {displayPolicy?.commandPreviewTechnicalDetails ? (
+                <details className="command-preview__technical" data-dashboard-display-depth={displayPolicy.depth} open={displayPolicy.openTechnicalDetails}>
+                  <summary>{t("settingsPage.modal.technicalDetails")}</summary>
+                  {displayPolicy.collapseTechnicalDetails ? command : null}
+                  {technicalRows.length ? (
+                    <dl>
+                      {technicalRows.map(([label, value]) => (
+                        <div key={label}>
+                          <dt>{label}</dt>
+                          <dd>{displayText(value)}</dd>
+                        </div>
+                      ))}
+                    </dl>
+                  ) : null}
+                </details>
+              ) : null}
+            </article>
+          );
+        })}
       </div>
     </section>
   );
@@ -5029,11 +5033,12 @@ function SecurityPolicyPanel({ security, data, t }) {
 }
 
 function SafetySection({ security, actions, partialFailures, data, locale, t, liveStatus }) {
+  const displayPolicy = displayDepthPolicyForData(data);
   return (
     <section className="view-surface view-surface--safety" id="safety" aria-labelledby="security-heading">
       <SecuritySection security={security} partialFailures={partialFailures} data={data} locale={locale} t={t} liveStatus={liveStatus} />
       <div className="safety-lower-grid">
-        <CommandPreviews actions={actions} t={t} />
+        <CommandPreviews actions={actions} t={t} displayPolicy={displayPolicy} />
         <SecurityPolicyPanel security={security} data={data} t={t} />
       </div>
       <MockNotice
@@ -5731,6 +5736,7 @@ function settingGroupIconFor(group) {
   const id = displayText(group.id, "");
   const map = {
     context: Compass,
+    dashboard: Settings,
     learning: GraduationCap,
     workflow: GitBranch,
     security: ShieldCheck,
@@ -5740,6 +5746,7 @@ function settingGroupIconFor(group) {
 
 function settingItemIconFor(item) {
   const id = displayText(item.id, "");
+  if (id === "dashboard_display_depth") return Eye;
   if (id.includes("language")) return Globe2;
   if (id.includes("approval")) return UserCheck;
   if (id.includes("security") || id.includes("dangerous")) return ShieldCheck;
@@ -5790,7 +5797,10 @@ function settingWorkflowActionValueLabel(value, item, t) {
   if (normalized === "manual") {
     return t("settingsPage.value.workflow.confirmEachTime");
   }
-  if (normalized === "auto" || normalized === "after_approval" || normalized === "true") {
+  if (normalized === "after_approval") {
+    return t("settingsPage.value.workflow.afterApproval");
+  }
+  if (normalized === "auto" || normalized === "true") {
     return t("settingsPage.value.workflow.auto");
   }
   return "";
@@ -5800,7 +5810,18 @@ function settingShowsAutomationNote(item) {
   if (!settingIsWorkflowAction(item)) {
     return false;
   }
-  return settingEditableOptions(item).some((value) => ["auto", "after_approval", "true"].includes(value));
+  return settingEditableOptions(item).some((value) => ["auto", "true"].includes(value));
+}
+
+function settingShowsApprovalNote(item) {
+  if (!settingIsWorkflowAction(item)) {
+    return false;
+  }
+  return settingEditableOptions(item).some((value) => value === "after_approval");
+}
+
+function settingIsGitWorkflowSetting(item) {
+  return displayText(item?.id, "").startsWith("git_");
 }
 
 function settingValueLabel(item, t) {
@@ -5814,6 +5835,9 @@ function settingValueLabel(item, t) {
   }
   if (id === "learning_mode") {
     return t(`settingsPage.value.learningMode.${value}`, displayText(item.current_label, value));
+  }
+  if (id === "dashboard_display_depth") {
+    return t(`settingsPage.value.displayDepth.${value}`, displayText(item.current_label, value));
   }
   const workflowActionLabel = settingWorkflowActionValueLabel(value, item, t);
   if (workflowActionLabel) {
@@ -5844,6 +5868,9 @@ function settingAllowedValueLabel(value, item, t) {
   if (id === "learning_mode") {
     return t(`settingsPage.value.learningMode.${normalized}`, normalized);
   }
+  if (id === "dashboard_display_depth") {
+    return t(`settingsPage.value.displayDepth.${normalized}`, normalized);
+  }
   const workflowActionLabel = settingWorkflowActionValueLabel(normalized, item, t);
   if (workflowActionLabel) {
     return workflowActionLabel;
@@ -5857,6 +5884,9 @@ function settingAllowedValueLabel(value, item, t) {
 function settingChangeabilityLabel(item, t) {
   if (item.editable) {
     return t("settingsPage.change.editable");
+  }
+  if (["approval_required", "manual_required"].includes(normalizeState(item.status))) {
+    return t("settingsPage.change.approvalRequired");
   }
   if (item.reviewable) {
     return t("settingsPage.change.previewOnly");
@@ -5890,7 +5920,7 @@ function settingConsistencyNextAction(item, t) {
 }
 
 function settingRowActionLabel(item, t) {
-  return item.editable && settingEditableOptions(item).length ? t("settingsPage.change.editable") : t("settingsPage.modal.open");
+  return settingChangeabilityLabel(item, t);
 }
 
 function settingsSnapshotReconciles(snapshotData, settingId, requestedValue, applyResult = {}) {
@@ -5901,6 +5931,9 @@ function settingsSnapshotReconciles(snapshotData, settingId, requestedValue, app
     return false;
   }
 
+  if (settingId === "dashboard_display_depth") {
+    return displayText(snapshotData?.summary?.display_depth, "") === expectedValue;
+  }
   if (settingId !== "workflow_language") {
     return true;
   }
@@ -6094,6 +6127,7 @@ function RepositoryInfoPage({ data, locale, t, liveStatus }) {
   return (
     <section className="view-surface view-surface--repository-info sidebar-page" id="repository-info" aria-labelledby="repository-info-heading">
       <DetailPageHeader tone="repository-info" Icon={Info} title={t("repositoryInfo.title")} subtitle={t("repositoryInfo.description")} data={data} locale={locale} t={t} actionLabel={t("detail.refreshDisplayOnly")} headingId="repository-info-heading" />
+      <ProducerDecisionSummary data={data} pageId="repository-info" tone="sidebar" t={t} />
       <DetailDecisionSummary
         tone="sidebar"
         t={t}
@@ -6149,6 +6183,7 @@ function DocumentsPage({ data, locale, t }) {
   return (
     <section className="view-surface view-surface--documents sidebar-page" id="documents" aria-labelledby="documents-heading">
       <DetailPageHeader tone="documents" Icon={FileText} title={t("documentsPage.title")} subtitle={t("documentsPage.description")} data={data} locale={locale} t={t} actionLabel={t("detail.refreshDisplayOnly")} headingId="documents-heading" />
+      <ProducerDecisionSummary data={data} pageId="documents" tone="sidebar" t={t} />
       <DetailDecisionSummary
         tone="sidebar"
         t={t}
@@ -7210,7 +7245,10 @@ function DesignStudioPage({ data, locale, t }) {
                 <StatusPill value={mutationState.status === "applied" ? "passed" : "ready"} t={t} label={mutationState.status === "applied" ? t("designStudio.result.appliedShort") : t("designStudio.result.plannedShort")} />
                 <p>{t(displayText(mutationState.result.reason_key, ""), t("designStudio.result.planned"))}</p>
                 <small>{t("designStudio.result.target")}: {displayText(mutationState.result.target_file)}</small>
-                <code>{displayText(mutationState.result.tool_command)}</code>
+                <details>
+                  <summary>{t("designStudio.result.technicalDetails")}</summary>
+                  <code>{displayText(mutationState.result.tool_command)}</code>
+                </details>
               </div>
             ) : null}
             {mutationState.error ? (
@@ -7460,6 +7498,8 @@ function SettingsPage({ data, locale, t, onRefreshSnapshot }) {
   const [draftValue, setDraftValue] = useState("");
   const [confirmed, setConfirmed] = useState(false);
   const [mutationState, setMutationState] = useState({ status: "idle", result: null, error: null });
+  const [planToken, setPlanToken] = useState("");
+  const [planIdentity, setPlanIdentity] = useState(null);
   const [applyFeedback, setApplyFeedback] = useState({ status: "idle", visible: false });
   const rowRefs = useRef({});
   const modalRef = useRef(null);
@@ -7470,11 +7510,17 @@ function SettingsPage({ data, locale, t, onRefreshSnapshot }) {
   const context = selectedContextData(data);
   const authority = data.development?.product_authority || {};
   const { settings, groups, items } = settingsCatalogData(data);
+  const displayPolicy = displayDepthPolicyForData(data);
+  const displayDepth = displayPolicy.depth;
   const hasSettingsCatalog = groups.length > 0 && items.length > 0;
   const reviewItems = items.filter((item) => isReviewState(item.status));
   const selectedRepository = repositoryDisplayName(context.target_repository?.name || authority.repository?.configured_name || authority.repository?.name, t);
   const selectedSetting = items.find((item) => displayText(item.id, "") === selectedSettingId) || null;
   const selectedMenuId = displayText(context.menu_id, "step_1_14");
+  const snapshotIdentity = useMemo(() => ({
+    snapshotId: displayText(data.snapshot_id, ""),
+    contentHash: displayText(data.content_hash, ""),
+  }), [data.snapshot_id, data.content_hash]);
   const editableOptions = selectedSetting ? settingEditableOptions(selectedSetting) : [];
   const selectedSettingEditable = Boolean(selectedSetting?.editable && editableOptions.length);
   const clearApplyFeedbackTimers = () => {
@@ -7539,6 +7585,8 @@ function SettingsPage({ data, locale, t, onRefreshSnapshot }) {
   const resetMutationState = () => {
     setConfirmed(false);
     setMutationState({ status: "idle", result: null, error: null });
+    setPlanToken("");
+    setPlanIdentity(null);
   };
 
   useEffect(() => {
@@ -7556,7 +7604,7 @@ function SettingsPage({ data, locale, t, onRefreshSnapshot }) {
       resetMutationState();
     }
     return undefined;
-  }, [selectedSettingId, selectedSetting?.current_value]);
+  }, [selectedSettingId, selectedSetting?.current_value, selectedMenuId, snapshotIdentity.snapshotId, snapshotIdentity.contentHash]);
 
   useEffect(() => {
     if (!selectedSetting) {
@@ -7622,17 +7670,46 @@ function SettingsPage({ data, locale, t, onRefreshSnapshot }) {
       return;
     }
     setConfirmed(false);
+    setPlanToken("");
+    setPlanIdentity(null);
     setMutationState({ status: "planning", result: null, error: null });
     try {
       const result = await planDashboardSettingChange(displayText(selectedSetting.id), draftValue, selectedMenuId);
+      if (result.status !== "blocked" && !result.plan_token) {
+        throw new Error(t("settingsPage.modal.planTokenMissing"));
+      }
+      setPlanToken(result.plan_token || "");
+      setPlanIdentity({
+        settingId: displayText(selectedSetting.id),
+        requestedValue: draftValue,
+        menuId: selectedMenuId,
+        snapshotId: snapshotIdentity.snapshotId,
+        contentHash: snapshotIdentity.contentHash,
+      });
       setMutationState({ status: result.status === "blocked" ? "blocked" : "planned", result, error: null });
     } catch (error) {
+      setPlanToken("");
+      setPlanIdentity(null);
       setMutationState({ status: "error", result: null, error });
     }
   };
 
   const handleApplySetting = async () => {
-    if (!selectedSettingEditable || !draftValue || !selectedSetting || !confirmed || mutationState.status !== "planned") {
+    if (!selectedSettingEditable || !draftValue || !selectedSetting || !confirmed || mutationState.status !== "planned" || !planToken) {
+      return;
+    }
+    const currentPlanMatches =
+      planIdentity &&
+      planIdentity.settingId === displayText(selectedSetting.id) &&
+      planIdentity.requestedValue === draftValue &&
+      planIdentity.menuId === selectedMenuId &&
+      planIdentity.snapshotId === snapshotIdentity.snapshotId &&
+      planIdentity.contentHash === snapshotIdentity.contentHash;
+    if (!currentPlanMatches) {
+      setConfirmed(false);
+      setPlanToken("");
+      setPlanIdentity(null);
+      setMutationState({ status: "error", result: mutationState.result, error: new Error(t("settingsPage.modal.planTokenStale")) });
       return;
     }
     const settingId = displayText(selectedSetting.id);
@@ -7646,7 +7723,9 @@ function SettingsPage({ data, locale, t, onRefreshSnapshot }) {
       onRefreshSnapshot?.({ localeHint: { workflow_language: requestedValue }, immediateOnly: true });
     }
     try {
-      const result = await applyDashboardSettingChange(settingId, requestedValue, selectedMenuId);
+      const result = await applyDashboardSettingChange(settingId, requestedValue, selectedMenuId, planToken, snapshotIdentity);
+      setPlanToken("");
+      setPlanIdentity(null);
       if (!result.applied) {
         if (result.status === "blocked") {
           const reason = t(displayText(result.reason_key, ""), t("settingsPage.modal.applyFailed"));
@@ -7691,6 +7770,8 @@ function SettingsPage({ data, locale, t, onRefreshSnapshot }) {
         });
       }
     } catch (error) {
+      setPlanToken("");
+      setPlanIdentity(null);
       if (settingId === "workflow_language") {
         onRefreshSnapshot?.({ clearLocaleHint: true, immediateOnly: true });
       }
@@ -7700,8 +7781,9 @@ function SettingsPage({ data, locale, t, onRefreshSnapshot }) {
   };
 
   return (
-    <section className="view-surface view-surface--settings sidebar-page" id="settings" aria-labelledby="settings-heading">
+    <section className="view-surface view-surface--settings sidebar-page" id="settings" aria-labelledby="settings-heading" data-dashboard-display-depth={displayDepth}>
       <DetailPageHeader tone="settings" Icon={Settings} title={t("settingsPage.title")} subtitle={t("settingsPage.description")} data={data} locale={locale} t={t} actionLabel={t("detail.refreshDisplayOnly")} headingId="settings-heading" />
+      <ProducerDecisionSummary data={data} pageId="settings" tone="sidebar" t={t} />
       <DetailDecisionSummary
         tone="sidebar"
         t={t}
@@ -7870,6 +7952,12 @@ function SettingsPage({ data, locale, t, onRefreshSnapshot }) {
                     {settingShowsAutomationNote(selectedSetting) ? (
                       <small className="settings-modal__automation-note">{t("settingsPage.modal.autoMeansPriorApproval")}</small>
                     ) : null}
+                    {settingShowsApprovalNote(selectedSetting) ? (
+                      <small className="settings-modal__automation-note">{t("settingsPage.modal.afterApprovalMeansExternalApproval")}</small>
+                    ) : null}
+                    {settingIsGitWorkflowSetting(selectedSetting) ? (
+                      <small className="settings-modal__git-note">{t("settingsPage.modal.gitSettingsBoundary")}</small>
+                    ) : null}
                     <div className="settings-action-row">
                       <button type="button" onClick={handlePlanSetting} disabled={!draftValue || mutationState.status === "planning" || mutationState.status === "applying"}>
                         <Pencil aria-hidden="true" size={16} />
@@ -7890,7 +7978,7 @@ function SettingsPage({ data, locale, t, onRefreshSnapshot }) {
                         className="settings-action-button--primary"
                         type="button"
                         onClick={handleApplySetting}
-                        disabled={!confirmed || mutationState.status !== "planned" || mutationState.result?.requested_value !== draftValue}
+                        disabled={!confirmed || mutationState.status !== "planned" || mutationState.result?.requested_value !== draftValue || !planToken}
                       >
                         <Check aria-hidden="true" size={16} />
                         {mutationState.status === "applying" ? t("settingsPage.modal.applying") : t("settingsPage.modal.applyChange")}
@@ -7902,7 +7990,10 @@ function SettingsPage({ data, locale, t, onRefreshSnapshot }) {
                         <p>{mutationState.status === "applied" ? t("settingsPage.modal.applyResult") : mutationState.status === "blocked" ? t(displayText(mutationState.result.reason_key, ""), t("settingsPage.modal.planBlocked")) : t("settingsPage.modal.planResult")}</p>
                         {mutationState.status === "blocked" ? <small>{t(displayText(mutationState.result.next_action_key, ""), t("settingsPage.consistency.next.none"))}</small> : null}
                         <small>{t("settingsPage.modal.targetFile")}: {displayText(mutationState.result.target_file)}</small>
-                        <code>{displayText(mutationState.result.tool_command)}</code>
+                        <details data-dashboard-display-depth={displayDepth} open={displayPolicy.settingsTechnicalDetailsDefaultOpen}>
+                          <summary>{t("settingsPage.modal.technicalDetails")}</summary>
+                          <code>{displayText(mutationState.result.tool_command)}</code>
+                        </details>
                       </div>
                     ) : null}
                     {mutationState.error ? (
@@ -8307,6 +8398,7 @@ function HistoryPage({ data, locale, t }) {
   return (
     <section className="view-surface view-surface--history sidebar-page" id="history" aria-labelledby="history-heading">
       <DetailPageHeader tone="history" Icon={Clock} title={t("historyPage.title")} subtitle={t("historyPage.description")} data={data} locale={locale} t={t} actionLabel={t("detail.refreshDisplayOnly")} headingId="history-heading" />
+      <ProducerDecisionSummary data={data} pageId="history" tone="sidebar" t={t} />
       <DetailDecisionSummary
         tone="sidebar"
         t={t}
@@ -8360,6 +8452,8 @@ function HistoryPage({ data, locale, t }) {
 }
 
 function SourceBoundary({ data, t }) {
+  const displayPolicy = displayDepthPolicyForData(data);
+  const displayDepth = displayPolicy.depth;
   const files = asArray(data.source_files);
   const commands = asArray(data.source_commands);
   const productFiles = files.filter((value) => displayText(value, "").startsWith("product:"));
@@ -8367,7 +8461,7 @@ function SourceBoundary({ data, t }) {
   const productCommands = commands.filter((value) => /(\[absolute-path\]|--context|check_git_sync|check_ci_status|product-security)/.test(displayText(value, "")));
   const rootCommands = commands.filter((value) => !productCommands.includes(value));
   return (
-    <details className="source-boundary" aria-label={t("aria.dataBoundary")}>
+    <details className="source-boundary" aria-label={t("aria.dataBoundary")} data-dashboard-display-depth={displayDepth} open={displayPolicy.sourceBoundaryDefaultOpen}>
       <summary className="source-boundary__head">
         <FileText aria-hidden="true" size={22} />
         <div>

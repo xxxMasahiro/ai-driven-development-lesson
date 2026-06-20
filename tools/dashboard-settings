@@ -12,6 +12,8 @@ source "$ROOT/tools/lib/lesson_common.sh"
 source "$ROOT/tools/lib/git_workflow_policy.sh"
 # shellcheck source=tools/lib/product_workflow_git_usage.sh
 source "$ROOT/tools/lib/product_workflow_git_usage.sh"
+# shellcheck source=tools/lib/dashboard_display_depth.sh
+source "$ROOT/tools/lib/dashboard_display_depth.sh"
 # shellcheck source=tools/lib/dashboard_data.sh
 source "$ROOT/tools/lib/dashboard_data.sh"
 
@@ -24,9 +26,9 @@ usage() {
 Usage:
   tools/dashboard-settings catalog [--menu <menu_id>]
   tools/dashboard-settings plan <setting_id> <value> [--menu <menu_id>]
-  tools/dashboard-settings apply <setting_id> <value> --confirm [--menu <menu_id>] [--snapshot <file>]
+  tools/dashboard-settings apply <setting_id> <value> --confirm [--menu <menu_id>] [--snapshot <file>] [--expect-current-value <value>] [--expect-current-label <label>] [--expect-target-file <file>] [--expect-setting-kind <kind>]
 
-Settings writes are limited to allowlisted lesson settings, policy-backed Git workflow settings, and product workflow Git usage settings.
+Settings writes are limited to allowlisted lesson settings, policy-backed Git workflow settings, product workflow Git usage settings, and dashboard display settings.
 USAGE
 }
 
@@ -317,6 +319,32 @@ dashboard_settings_prepare_product_git_usage_setting() {
   PLAN_CURRENT_LABEL="$(product_workflow_git_usage_mode_label "$PLAN_CURRENT_VALUE")"
 }
 
+dashboard_settings_prepare_dashboard_setting() {
+  local setting_id="$1"
+  local raw_value="$2"
+  local normalized target_file
+
+  case "$setting_id" in
+    dashboard_display_depth)
+      normalized="$(dashboard_display_depth_normalize "$raw_value")"
+      target_file="$(dashboard_display_depth_file)"
+      dashboard_settings_allow_file "$target_file"
+      PLAN_KIND="dashboard"
+      PLAN_SETTING="display_depth"
+      PLAN_TARGET_FILE="$target_file"
+      PLAN_TARGET_DISPLAY="$(dashboard_settings_display_path "$target_file")"
+      PLAN_VALUE="${normalized%%$'\t'*}"
+      PLAN_LABEL="${normalized#*$'\t'}"
+      PLAN_CURRENT_VALUE="$(dashboard_display_depth_current_value "$target_file")"
+      PLAN_CURRENT_LABEL="$(dashboard_display_depth_current_label "$target_file")"
+      ;;
+    *)
+      printf 'Unsupported dashboard setting: %s\n' "$setting_id" >&2
+      return 1
+      ;;
+  esac
+}
+
 dashboard_settings_prepare_plan() {
   local setting_id="$1"
   local raw_value="$2"
@@ -345,11 +373,36 @@ dashboard_settings_prepare_plan() {
     product_git_usage_mode)
       dashboard_settings_prepare_product_git_usage_setting "$raw_value" "$menu_id"
       ;;
+    dashboard_display_depth)
+      dashboard_settings_prepare_dashboard_setting "$setting_id" "$raw_value"
+      ;;
     *)
       printf 'Unsupported dashboard setting: %s\n' "$setting_id" >&2
       return 1
       ;;
   esac
+}
+
+dashboard_settings_expectation_matches() {
+  local label="$1"
+  local expected="$2"
+  local actual="$3"
+  if [[ -n "$expected" && "$expected" != "$actual" ]]; then
+    printf 'Refusing to apply stale dashboard settings plan: %s changed.\n' "$label" >&2
+    return 1
+  fi
+}
+
+dashboard_settings_validate_expected_plan_state() {
+  local expected_current_value="$1"
+  local expected_current_label="$2"
+  local expected_target_file="$3"
+  local expected_setting_kind="$4"
+
+  dashboard_settings_expectation_matches "current value" "$expected_current_value" "$PLAN_CURRENT_VALUE"
+  dashboard_settings_expectation_matches "current label" "$expected_current_label" "$PLAN_CURRENT_LABEL"
+  dashboard_settings_expectation_matches "target file" "$expected_target_file" "$PLAN_TARGET_DISPLAY"
+  dashboard_settings_expectation_matches "setting kind" "$expected_setting_kind" "$PLAN_KIND"
 }
 
 dashboard_settings_json_result() {
@@ -462,6 +515,18 @@ dashboard_settings_apply_plan() {
     product_workflow_git_usage)
       product_workflow_git_usage_write_setting "$PLAN_SETTING" "$PLAN_VALUE"
       ;;
+    dashboard)
+      case "$PLAN_SETTING" in
+        display_depth)
+          dashboard_settings_allow_file "$PLAN_TARGET_FILE"
+          dashboard_display_depth_write_setting "$PLAN_TARGET_FILE" "$PLAN_VALUE" "$PLAN_LABEL"
+          ;;
+        *)
+          printf 'Unsupported dashboard settings plan: %s\n' "$PLAN_SETTING" >&2
+          return 1
+          ;;
+      esac
+      ;;
     *)
       printf 'Unsupported settings plan kind: %s\n' "$PLAN_KIND" >&2
       return 1
@@ -546,6 +611,10 @@ case "$cmd" in
     menu_id="$DEFAULT_MENU_ID"
     snapshot_file="$DEFAULT_SNAPSHOT_FILE"
     confirmed="false"
+    expected_current_value=""
+    expected_current_label=""
+    expected_target_file=""
+    expected_setting_kind=""
     while [[ $# -gt 0 ]]; do
       case "$1" in
         --menu)
@@ -562,6 +631,26 @@ case "$cmd" in
           confirmed="true"
           shift
           ;;
+        --expect-current-value)
+          [[ $# -ge 2 ]] || { printf '%s\n' '--expect-current-value requires a value.' >&2; exit 1; }
+          expected_current_value="$2"
+          shift 2
+          ;;
+        --expect-current-label)
+          [[ $# -ge 2 ]] || { printf '%s\n' '--expect-current-label requires a value.' >&2; exit 1; }
+          expected_current_label="$2"
+          shift 2
+          ;;
+        --expect-target-file)
+          [[ $# -ge 2 ]] || { printf '%s\n' '--expect-target-file requires a value.' >&2; exit 1; }
+          expected_target_file="$2"
+          shift 2
+          ;;
+        --expect-setting-kind)
+          [[ $# -ge 2 ]] || { printf '%s\n' '--expect-setting-kind requires a value.' >&2; exit 1; }
+          expected_setting_kind="$2"
+          shift 2
+          ;;
         *)
           usage >&2
           exit 1
@@ -573,6 +662,7 @@ case "$cmd" in
       exit 1
     }
     dashboard_settings_prepare_plan "$setting_id" "$raw_value" "$menu_id"
+    dashboard_settings_validate_expected_plan_state "$expected_current_value" "$expected_current_label" "$expected_target_file" "$expected_setting_kind"
     dashboard_settings_allow_snapshot_file "$snapshot_file"
     if [[ "${PLAN_POLICY_BLOCKED:-false}" == "true" ]]; then
       dashboard_settings_json_result blocked false

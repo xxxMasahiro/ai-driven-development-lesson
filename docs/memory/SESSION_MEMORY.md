@@ -440,3 +440,46 @@ Latest focused verification passed:
 - `./tools/check_repository_development_workflow.sh`
 - `./tools/test_repository_development_workflow.sh`
 - `git diff --check` for the touched document-root files
+
+## 2026-06-19 Session Restart Note
+
+はい。次回は以下を見れば再開できます。
+
+- 最新コミット: `f29beec Add dashboard decision evidence planning`
+- 作業ツリー: クリーン
+- ブランチ: `main`, `origin/main` より 1 commit ahead
+- 次の実装順:
+  1. `product_authority_evidence_source_completion`
+  2. `dashboard_control_center_decision_projection`
+  3. `dashboard_control_center_decision_page_rendering`
+  4. 必要時のみ CSS refinement / package-CI wiring / component extraction
+
+再開時は `AGENTS.MD` と `repository-development-workflow` を読み、[HANDOFF.md](/home/masahiro/projects/ai-driven-development-lesson/docs/workflow/HANDOFF.md:2646) の planned handoff から始めればスムーズです。
+
+## 2026-06-19 Dashboard Decision Completion
+
+Completed the remaining Dashboard decision-quality follow-ups:
+
+- Promoted `product_authority_evidence_source_completion`, `dashboard_control_center_decision_projection`, `dashboard_control_center_decision_page_rendering`, `dashboard_control_center_density_mobile_css_refinement`, `dashboard_control_center_package_ci_verification_wiring`, and `dashboard_control_center_component_module_extraction` to `implemented`.
+- Updated `tools/dashboard-data` so operational decisions, workflow evidence events, and CI evidence roles inherit source-owned product authority fields instead of inferring authority/freshness from broad status.
+- Made live CI network lookup opt-in with `DASHBOARD_LIVE_STATUS_CI_NETWORK`; default live-status uses existing authority evidence and does not call `gh api`.
+- Tightened Dashboard validation and data tests so workflow event artifact paths are single references and passed CI evidence requires current authoritative matching-HEAD proof.
+- Rendered producer decision `source_id` and `detail_page` in the shared Dashboard decision summary without exposing raw `preview_only` internals.
+- Extracted the reusable decision summary surface to `dashboard-control-center/src/DecisionSummary.jsx`.
+- Kept package/CI wiring and CSS/design-system source unchanged because existing verification and layout constraints were sufficient.
+
+Verification passed in this slice:
+
+- `bash -n tools/dashboard-data tools/test_dashboard_data.sh`
+- `node --check dashboard-control-center/src/dashboardData.js`
+- `node --check tests/playwright/dashboard-control-center.spec.js`
+- `./tools/test_dashboard_schema.sh`
+- `./tools/test_dashboard_data.sh`
+- `./tools/test_dashboard_i18n.sh`
+- `./tools/test_dashboard_control_center.sh`
+- `./tools/check_repository_development_workflow.sh`
+- `./tools/test_repository_development_workflow.sh`
+- `./tools/check_as_built_sync_contract.sh`
+- `git diff --check`
+
+Next session should start from a normal clean-up/final-gate posture, not from the old planned Dashboard decision blocks.

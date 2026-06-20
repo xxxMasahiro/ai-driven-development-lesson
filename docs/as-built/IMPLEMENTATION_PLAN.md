@@ -4520,3 +4520,321 @@ TESTS: tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/test_da
 Boundary:
 
 - Do not run Browser Debug CLI, launch browsers, call provider APIs, upload artifacts, persist credentials, mutate product repositories, or change existing Git/CI/product authority behavior in this sync.
+
+## Dashboard Control Center Operational Decision Evidence Implementation Plan
+
+SYNC-ID: dashboard_control_center_operational_decision_evidence
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/DASHBOARD_DATA_SCHEMA.tsv,tools/lib/dashboard_data.sh,tools/dashboard-data,dashboard-control-center/src/dashboardData.js,dashboard-control-center/src/App.jsx,tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/test_dashboard_control_center.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/test_dashboard_control_center.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+Implemented order:
+
+1. Extended `DASHBOARD_DATA_SCHEMA.tsv` with additive contracts for `operational_decision`, `decision_pages[]`, `development.repository_changes`, `development.repository_development`, `development.workflow_evidence_events[]`, and `development.ci_evidence[]`.
+2. Added shared dashboard-data JSON helpers for operational decisions, page decisions, workflow evidence events, and CI evidence roles.
+3. Extended `tools/dashboard-data` to emit selected-repository change summaries, repository-development workflow phase context, normalized workflow evidence events, CI evidence roles, and top-level/page-level decision data.
+4. Strengthened `dashboardData.js` validation for current producer snapshots while preserving legacy snapshot compatibility when the new optional sections are absent.
+5. Updated Control Center pages to render the producer-owned page decision summary before existing detail content, using existing `DetailDecisionSummary` styles and no new CSS primitives.
+6. Extended existing dashboard schema and data tests instead of adding one-off test files, keeping checks standalone and aggregate-callable.
+
+Verification sequence:
+
+```bash
+./tools/test_dashboard_schema.sh
+./tools/test_dashboard_data.sh
+./tools/test_dashboard_control_center.sh
+./tools/check_as_built_sync_contract.sh
+./tools/check_as_built_docs.sh
+./tools/check_workflow_pair_sync.sh
+./tools/check_repository_development_workflow.sh
+./tools/test_repository_development_workflow.sh
+git diff --check
+```
+
+Boundary:
+
+- Dashboard remains a read-only observer and command-preview surface.
+- The implementation does not run or wait for GitHub Actions, change product authority semantics, add browser-triggered repository mutation, edit design-system tokens/components, add dependencies, push, create PRs, merge, clean up, or execute external product writes.
+
+## Implemented Product Authority Evidence Source Completion Implementation Plan
+
+SYNC-ID: product_authority_evidence_source_completion
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/DASHBOARD_DATA_SCHEMA.tsv,docs/workflow/PRODUCT_GATE_EVIDENCE_SCHEMA.tsv,tools/lib/product_repository_authority.sh,tools/product-repository-authority,tools/product-gate-evidence-bootstrap,tools/test_product_repository_authority.sh,tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_product_repository_authority.sh,tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+Planned order:
+
+1. Keep `repository-development-workflow` active and finish this document-sync phase before runtime edits.
+2. Audit product authority output for source ID, authority, freshness, product HEAD, detail artifact, blocker, risk, and next-action completeness.
+3. Close gaps in the product authority owner layer and generated product-local evidence contracts without changing Dashboard UI behavior.
+4. Replace any secret-like fixture literal with split/generated test data that cannot be mistaken for real credentials.
+5. Add or strengthen focused product authority, dashboard schema, and dashboard data tests for stale, missing, advisory, head-mismatched, and blocked evidence.
+6. Promote the sync ID only after focused tests and synchronized document checks pass.
+
+Verification sequence:
+
+```bash
+./tools/test_product_repository_authority.sh
+./tools/test_dashboard_schema.sh
+./tools/test_dashboard_data.sh
+./tools/check_as_built_sync_contract.sh
+./tools/check_as_built_docs.sh
+./tools/check_workflow_pair_sync.sh
+./tools/check_repository_development_workflow.sh
+./tools/test_repository_development_workflow.sh
+git diff --check
+```
+
+Stop and ask before external service calls, credential handling, external product writes, Git push, PR creation, merge, cleanup, dependency changes, or any existing-feature tradeoff.
+
+## Implemented Dashboard Control Center Decision Projection Implementation Plan
+
+SYNC-ID: dashboard_control_center_decision_projection
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/DASHBOARD_DATA_SCHEMA.tsv,tools/lib/dashboard_data.sh,tools/dashboard-data,dashboard-control-center/src/dashboardData.js,tests/fixtures/dashboard-control-center.json,tests/fixtures/dashboard-control-center-live-update.json,tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+Planned order:
+
+1. Consume the completed product authority evidence fields as inputs.
+2. Refine `DASHBOARD_DATA_SCHEMA.tsv` for the producer-owned decision projection and page contracts.
+3. Move decision cause selection into `tools/dashboard-data` / `tools/lib/dashboard_data.sh`, including blockers, Git/worktree, repository changes, repository-development phase, test/CI evidence, and workflow events.
+4. Preserve live-status and advisory boundaries so ordinary Dashboard data generation does not poll GitHub or create product evidence.
+5. Update fixtures so the new decision layer is exercised by tests and legacy optional compatibility remains explicit.
+6. Promote only after data/schema tests prove React can render without inventing readiness.
+
+Verification sequence:
+
+```bash
+./tools/test_dashboard_schema.sh
+./tools/test_dashboard_data.sh
+./tools/check_as_built_sync_contract.sh
+./tools/check_as_built_docs.sh
+./tools/check_workflow_pair_sync.sh
+./tools/check_repository_development_workflow.sh
+./tools/test_repository_development_workflow.sh
+git diff --check
+```
+
+Stop and ask before browser-triggered evidence collection, GitHub polling, repository mutation, push, PR creation, merge, cleanup, credential handling, or any existing-feature tradeoff.
+
+## Implemented Dashboard Control Center Decision Page Rendering Implementation Plan
+
+SYNC-ID: dashboard_control_center_decision_page_rendering
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/DASHBOARD_DATA_SCHEMA.tsv,dashboard-control-center/src/App.jsx,dashboard-control-center/src/DecisionSummary.jsx,dashboard-control-center/src/dashboardData.js,dashboard-control-center/src/i18n.js,tests/fixtures/dashboard-control-center.json,tests/fixtures/dashboard-control-center-live-update.json,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+Planned order:
+
+1. Reuse the existing generic renderer and existing status/command/evidence components as far as they cover the producer contract.
+2. Add page-level decision rendering where each primary page shows current judgment, top reason, evidence confidence, next safe action, and technical drilldown.
+3. Ensure the Overview remains readable for non-engineers while detail pages expose enough source identity for junior/intermediate engineers.
+4. Extend i18n labels without hard-coding product names or product stacks.
+5. Extend focused Playwright tests to cover Dashboard-wide decision visibility, source identity, command-preview boundaries, and no-overlap/no-clipping states.
+6. Promote after schema/data/i18n/browser checks and sync checks pass.
+
+Verification sequence:
+
+```bash
+./tools/test_dashboard_schema.sh
+./tools/test_dashboard_data.sh
+./tools/test_dashboard_i18n.sh
+./tools/test_dashboard_control_center.sh
+./tools/check_as_built_sync_contract.sh
+./tools/check_as_built_docs.sh
+./tools/check_workflow_pair_sync.sh
+./tools/check_repository_development_workflow.sh
+./tools/test_repository_development_workflow.sh
+git diff --check
+```
+
+Use Playwright visual review when page layout or responsive behavior changes.
+Stop and ask before browser command execution, repository writes, Git/CI operations, credential handling, dependency changes, or any existing-feature tradeoff.
+
+## Implemented Dashboard Control Center Density And Mobile CSS Refinement Implementation Plan
+
+SYNC-ID: dashboard_control_center_density_mobile_css_refinement
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/design-system/dashboard-control-center/DESIGN_SYSTEM.md,docs/design-system/dashboard-control-center/tokens.json,docs/design-system/dashboard-control-center/components.json,dashboard-control-center/src/design-system.generated.css,dashboard-control-center/src/design-system.generated.js,dashboard-control-center/src/App.jsx,dashboard-control-center/src/styles.css,tests/playwright/dashboard-control-center.spec.js,tools/check_dashboard_design_system.sh,tools/test_dashboard_control_center.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/check_dashboard_design_system.sh,tools/test_dashboard_control_center.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+Planned order:
+
+1. First inspect the decision page rendering result with current design-system tokens.
+2. If shared token/component dimensions need adjustment, update design-system source and regenerate runtime artifacts through the owner tool.
+3. Use `styles.css` only for page-specific layout, responsive wrapping, grid constraints, and overflow prevention that remain consistent with the source tokens.
+4. Verify desktop and mobile pages with Playwright screenshots when visual changes are made.
+5. Promote only after design-system drift checks, browser checks, and sync checks pass.
+
+Verification sequence:
+
+```bash
+./tools/check_dashboard_design_system.sh
+./tools/test_dashboard_control_center.sh
+./tools/check_as_built_sync_contract.sh
+./tools/check_as_built_docs.sh
+./tools/check_workflow_pair_sync.sh
+./tools/check_repository_development_workflow.sh
+./tools/test_repository_development_workflow.sh
+git diff --check
+```
+
+Stop and ask before dependency changes, generated-file source edits, visual redesigns outside the design-system contract, external product design writes, or any existing-feature tradeoff.
+
+## Implemented Dashboard Control Center Package And CI Verification Wiring Implementation Plan
+
+SYNC-ID: dashboard_control_center_package_ci_verification_wiring
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/TEST_PLAN_MANIFEST.tsv,docs/workflow/GIT_HOOK_CHECKS.tsv,docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv,docs/workflow/FINAL_GATE_COVERAGE.tsv,package.json,package-lock.json,.github/workflows/ci.yml,.github/workflows/lesson14-ci.yml,tools/check_ci_workflow_structure.sh,tools/check_test_plan_coverage.sh,tools/test_dashboard_control_center.sh,tools/test_lesson_repository.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/check_ci_workflow_structure.sh,tools/check_test_plan_coverage.sh,tools/test_test_plan.sh,tools/test_git_hooks.sh,tools/test_git_hooks_parallel.sh,tools/test_ci_final_gate.sh,tools/test_dashboard_control_center.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+Planned order:
+
+1. Treat this as conditional and do not edit package or CI files unless P0/P1 implementation exposes a verification gap.
+2. Prefer existing standalone tests and aggregate wiring before adding package scripts or CI workflow changes.
+3. If package scripts change, preserve `package-lock.json` integrity and avoid new dependencies unless explicitly justified.
+4. If CI/hook/final-gate wiring changes, preserve required CI names, Lesson14 compatibility, full/no-cache meaning, final-gate coverage, and aggregate fallback behavior.
+5. Promote only after structure, test-plan, hook, final-gate, dashboard, aggregate, and sync checks are consistent.
+
+Verification sequence:
+
+```bash
+./tools/check_ci_workflow_structure.sh
+./tools/check_test_plan_coverage.sh
+./tools/test_test_plan.sh
+./tools/test_git_hooks.sh
+./tools/test_git_hooks_parallel.sh
+./tools/test_ci_final_gate.sh
+./tools/test_dashboard_control_center.sh
+./tools/test_lesson_repository.sh
+./tools/check_as_built_sync_contract.sh
+./tools/check_as_built_docs.sh
+./tools/check_workflow_pair_sync.sh
+./tools/check_repository_development_workflow.sh
+./tools/test_repository_development_workflow.sh
+git diff --check
+```
+
+Stop and ask before dependency installation, CI authority changes, required check renames, push, PR creation, merge, main CI waiting, cleanup, credentials, or any existing-feature tradeoff.
+
+## Implemented Dashboard Control Center Component Module Extraction Implementation Plan
+
+SYNC-ID: dashboard_control_center_component_module_extraction
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,dashboard-control-center/src/App.jsx,dashboard-control-center/src/DecisionSummary.jsx,dashboard-control-center/src/dashboardData.js,dashboard-control-center/src/i18n.js,dashboard-control-center/src/styles.css,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+Planned order:
+
+1. Defer extraction until decision projection, rendering, and any required CSS refinement are implemented and tested.
+2. Identify reusable page/evidence components already implied by `App.jsx` without changing data ownership or route behavior.
+3. Extract modules in small behavior-preserving steps, keeping i18n keys and existing component props stable.
+4. Run focused i18n and Dashboard browser tests after each extraction slice.
+5. Promote only after no behavior, route, readiness, style, or accessibility regression is observed.
+
+Verification sequence:
+
+```bash
+./tools/test_dashboard_i18n.sh
+./tools/test_dashboard_control_center.sh
+./tools/check_as_built_sync_contract.sh
+./tools/check_as_built_docs.sh
+./tools/check_workflow_pair_sync.sh
+./tools/check_repository_development_workflow.sh
+./tools/test_repository_development_workflow.sh
+git diff --check
+```
+
+Stop and ask before changing runtime behavior, data production, design-system authority, dependencies, Git/CI behavior, external product writes, or any existing-feature tradeoff.
+
+## Dashboard Control Center Settings Control Policy Refinement Implementation Plan
+
+SYNC-ID: dashboard_control_center_settings_control_policy_refinement
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,tools/dashboard-settings,vite.config.mjs,dashboard-control-center/src/dashboardData.js,dashboard-control-center/src/App.jsx,dashboard-control-center/src/i18n.js,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_settings.sh,tools/test_dashboard_control_center.sh,tools/test_dashboard_i18n.sh,tools/check_dashboard_design_system.sh,tools/test_dashboard_design_studio_events.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_dashboard_settings.sh,tools/test_dashboard_control_center.sh,tools/test_dashboard_i18n.sh,tools/check_dashboard_design_system.sh,tools/test_dashboard_design_studio_events.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+Implemented order:
+
+1. Synchronized this sync ID across the contract, requirements, specification, implementation plan, tracker, and handoff before runtime edits.
+2. Extended `tools/dashboard-settings` so guarded apply can verify expected current value, current label, setting kind, and target file at the owner layer before writes.
+3. Added Settings plan-token creation and consumption to `vite.config.mjs`, matching the Design Studio one-time server-memory token pattern and preserving same-origin, JSON, POST, body-size, unknown-field, and `execFile` boundaries.
+4. Updated `dashboard-control-center/src/dashboardData.js` so Settings mutation responses and requests validate and carry `plan_token`, `snapshot_id`, and `content_hash`.
+5. Updated `dashboard-control-center/src/App.jsx` so planned Settings changes keep token state, invalidate stale plans on draft/menu/setting/snapshot changes, require a current token for apply, and present Git workflow settings as saved settings rather than browser-run operations.
+6. Updated `dashboard-control-center/src/i18n.js` for manual, automatic, approval-required, allowed, disallowed, not-applicable, technical-details, token error, and read-only boundary language across supported Dashboard locales.
+7. Kept Design Studio target scope unchanged and verified drift/event checks still pass.
+8. Promoted this sync ID after focused Settings, Control Center, i18n, Design Studio drift/event, repository-development, and sync checks passed.
+
+Verification sequence:
+
+```bash
+./tools/test_dashboard_settings.sh
+./tools/test_dashboard_control_center.sh
+./tools/test_dashboard_i18n.sh
+./tools/check_dashboard_design_system.sh
+./tools/test_dashboard_design_studio_events.sh
+./tools/check_as_built_sync_contract.sh
+./tools/check_as_built_docs.sh
+./tools/check_workflow_pair_sync.sh
+./tools/check_repository_development_workflow.sh
+./tools/test_repository_development_workflow.sh
+git diff --check
+```
+
+Use Playwright visual review for the Settings page and updated warning/technical-detail surfaces if focused Control Center tests do not already cover the rendered behavior.
+Stop and ask before arbitrary command execution, product repository writes, external product design writes, Git operations, CI waiting, OAuth, credentials, dependency changes, generated-file source edits, cleanup, delete, push, PR creation, merge, main sync, or any existing-feature tradeoff.
+
+## Dashboard Control Center Display Depth Settings Implementation Plan
+
+SYNC-ID: dashboard_control_center_display_depth_settings
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,learning/DASHBOARD_DISPLAY_DEPTH.tsv,tools/lib/dashboard_display_depth.sh,tools/dashboard-settings,tools/dashboard-data,docs/workflow/DASHBOARD_DATA_SCHEMA.tsv,docs/workflow/TEST_PLAN_MANIFEST.tsv,vite.config.mjs,dashboard-control-center/src/dashboardData.js,dashboard-control-center/src/App.jsx,dashboard-control-center/src/i18n.js,tests/fixtures/dashboard-control-center.json,tests/fixtures/dashboard-control-center-live-update.json,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_settings.sh,tools/test_dashboard_data.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_dashboard_settings.sh,tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/check_dashboard_design_system.sh,tools/check_test_plan_coverage.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+Implemented order:
+
+1. Synchronized this planned block across the as-built contract, requirements, specification, implementation plan, tracker, and handoff before runtime edits.
+2. Added `learning/DASHBOARD_DISPLAY_DEPTH.tsv` and `tools/lib/dashboard_display_depth.sh` for strict value normalization and atomic writes.
+3. Extended `tools/dashboard-settings` to plan and apply `dashboard_display_depth` through the existing token-bound Settings mutation contract.
+4. Extended `tools/dashboard-data`, `docs/workflow/DASHBOARD_DATA_SCHEMA.tsv`, and test-plan coverage for `summary.display_depth` and the Settings catalog item.
+5. Updated Dashboard Control Center validation, labels, rendered Settings rows, and technical disclosure defaults while preserving standard mode as the existing baseline.
+6. Updated fixtures and Playwright coverage for the display-depth Settings row and technical source-boundary disclosure.
+7. Ran focused settings, schema, data, i18n, Playwright control-center, design-system, and test-plan coverage checks before promotion.
+
+Stop and ask before changing lesson step behavior, lesson mode semantics, Git workflow policy authority, Design Studio source authority, dependencies, product repository writes, arbitrary browser command execution, push, PR creation, merge, cleanup, delete, or any existing-feature tradeoff.
+
+## Dashboard Control Center Display Depth Phase 2 Implementation Plan
+
+SYNC-ID: dashboard_control_center_display_depth_phase_2
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,tools/lib/dashboard_data.sh,tools/dashboard-data,dashboard-control-center/src/displayDepth.js,dashboard-control-center/src/App.jsx,dashboard-control-center/src/DecisionSummary.jsx,dashboard-control-center/src/dashboardData.js,dashboard-control-center/src/i18n.js,tests/fixtures/dashboard-control-center.json,tests/fixtures/dashboard-control-center-live-update.json,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+Implemented order:
+
+1. Synchronized this block before runtime edits and kept the scope limited to display policy, producer-owned decision text, and shared rendering surfaces.
+2. Added `dashboard-control-center/src/displayDepth.js` as the shared Dashboard display-depth policy module.
+3. Replaced direct display-depth comparisons in shared surfaces with reusable policy flags while preserving `standard` as the current baseline.
+4. Improved producer-owned decision-page questions through existing `decision_pages[]` fields without adding schema fields.
+5. Applied the policy to `ProducerDecisionSummary`, `SourceBoundary`, Settings technical result details, evidence reference chips, and command previews without hiding safety state or adding browser execution authority.
+6. Extended Playwright coverage for `friendly`, `standard`, and `technical` behavior, including safety-signal visibility and disclosure defaults.
+7. Promoted this sync ID to implemented after focused dashboard, data/schema, i18n, sync, and repository-development checks passed.
+
+Verification sequence:
+
+```bash
+./tools/test_dashboard_schema.sh
+./tools/test_dashboard_data.sh
+./tools/test_dashboard_i18n.sh
+./tools/test_dashboard_control_center.sh
+./tools/check_as_built_sync_contract.sh
+./tools/check_as_built_docs.sh
+./tools/check_workflow_pair_sync.sh
+./tools/check_repository_development_workflow.sh
+./tools/test_repository_development_workflow.sh
+git diff --check
+```
+
+Stop and ask before dependency changes, Settings authority expansion, arbitrary command execution, Git/CI operations, product repository writes, Design Studio authority changes, generated-file source edits, cleanup, push, PR creation, merge, or any existing-feature tradeoff.

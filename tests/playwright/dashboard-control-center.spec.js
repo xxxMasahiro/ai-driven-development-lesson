@@ -310,6 +310,7 @@ function repositorySelectionFixtureForContext(context, displayName = "") {
 }
 
 async function routeSettingsApi(page, calls = [], options = {}) {
+  const planToken = "22222222-2222-4222-8222-222222222222";
   const localeMap = new Map([
     ["ja", { uiLocale: "ja", direction: "ltr" }],
     ["en", { uiLocale: "en", direction: "ltr" }],
@@ -329,6 +330,14 @@ async function routeSettingsApi(page, calls = [], options = {}) {
   async function fulfill(route, command) {
     const payload = route.request().postDataJSON();
     calls.push({ command, payload });
+    if (command === "apply" && payload.plan_token !== planToken) {
+      await route.fulfill({
+        status: 409,
+        contentType: "application/json",
+        body: JSON.stringify({ error: "settings apply requires a matching current plan token" }),
+      });
+      return;
+    }
     const delayMs = command === "apply" ? Number(options.applyDelayMs || 0) : Number(options.planDelayMs || 0);
     if (delayMs > 0) {
       await new Promise((resolve) => setTimeout(resolve, delayMs));
@@ -337,14 +346,18 @@ async function routeSettingsApi(page, calls = [], options = {}) {
     const settingId = String(payload.setting_id || "");
     const isWorkflowLanguage = settingId === "workflow_language";
     const isProductLanguage = settingId === "product_language";
-    const previousValue = isWorkflowLanguage ? (value === "ar" ? "en" : "ja") : settingId === "learning_mode" ? "A" : value;
+    const isDashboardDisplayDepth = settingId === "dashboard_display_depth";
+    const previousValue = isWorkflowLanguage ? (value === "ar" ? "en" : "ja") : settingId === "learning_mode" ? "A" : isDashboardDisplayDepth ? "standard" : value;
     const targetFile = isWorkflowLanguage
       ? "learning/WORKFLOW_DISPLAY_LANGUAGE_14_DAYS.tsv"
       : isProductLanguage
         ? "learning/PRODUCT_DEVELOPMENT_LANGUAGE_14_DAYS.tsv"
-        : settingId.startsWith("git_")
-          ? "learning/GIT_WORKFLOW_SETTINGS.tsv"
-          : "learning/LESSON_MODE_14_DAYS.tsv";
+        : isDashboardDisplayDepth
+          ? "learning/DASHBOARD_DISPLAY_DEPTH.tsv"
+          : settingId.startsWith("git_")
+            ? "learning/GIT_WORKFLOW_SETTINGS.tsv"
+            : "learning/LESSON_MODE_14_DAYS.tsv";
+    const settingKind = isDashboardDisplayDepth ? "dashboard" : settingId.startsWith("git_") ? "git" : "lesson";
     const localeMetadata = isWorkflowLanguage ? localeMap.get(value) || localeMap.get("en") : null;
     const blocked =
       (command === "plan" && options.blockedPlanSettingId === settingId) ||
@@ -360,7 +373,7 @@ async function routeSettingsApi(page, calls = [], options = {}) {
         affected_setting_ids: blocked ? ["branch_allowed", "main_direct_work_allowed"] : [],
         setting_id: settingId,
         menu_id: String(payload.menu_id || "step_1_14"),
-        setting_kind: settingId.startsWith("git_") ? "git" : "lesson",
+        setting_kind: settingKind,
         requested_value: value,
         requested_label: value,
         current_value: previousValue,
@@ -371,6 +384,7 @@ async function routeSettingsApi(page, calls = [], options = {}) {
         snapshot_regenerated: command === "apply" && !blocked,
         snapshot_file: command === "apply" && !blocked ? ".dashboard-control-center/dashboard-data.json" : undefined,
         tool_command: `tools/dashboard-settings apply ${settingId} ${value} --menu ${payload.menu_id || "step_1_14"} --confirm`,
+        ...(command === "plan" && !blocked ? { plan_token: planToken } : {}),
         ...(localeMetadata
           ? {
               workflow_language: value,
@@ -584,7 +598,13 @@ function dashboardSettingFixture(settingId, value, hashCharacter) {
     throw new Error(`fixture is missing ${settingId} setting`);
   }
   item.current_value = value;
-  item.current_label = settingId === "learning_mode" ? `${value}: Detailed guidance` : String(value);
+  if (settingId === "dashboard_display_depth") {
+    const labels = { friendly: "Guide", standard: "Standard", technical: "Technical detail" };
+    item.current_label = labels[value] || String(value);
+    data.summary.display_depth = value;
+  } else {
+    item.current_label = settingId === "learning_mode" ? `${value}: Detailed guidance` : String(value);
+  }
   return data;
 }
 
@@ -926,6 +946,58 @@ function selectedMenuProducerFixture(baseFixture, menuId, hashCharacter) {
   return data;
 }
 
+function addProducerDecisionPages(data) {
+  const titles = {
+    overview: "Dashboard",
+    lessons: "Lessons",
+    workflow: "Development Workflow",
+    maintenance: "Maintenance Sync",
+    safety: "Safety Actions",
+    "repository-info": "Repository Info",
+    documents: "Documents",
+    settings: "Settings",
+    history: "Update History",
+  };
+  data.operational_decision = {
+    status: "stale",
+    decision_question: "Can the current development workflow safely continue?",
+    primary_blocker_source_id: "producer.overview",
+    why_blocked: "Producer decision evidence is stale in this fixture.",
+    next_safe_action: "Review producer-owned evidence.",
+    done_condition: "Current judgment and evidence source are visible.",
+    approval_boundary: "Dashboard remains read-only.",
+    risk_level: "medium",
+    freshness_state: "stale",
+    authority: "manual_required",
+    source_id: "producer.overview",
+    audience_briefs: {
+      non_engineer: "The producer says this state needs review.",
+      junior_engineer: "Check source_id and detail_page before treating this as complete.",
+    },
+    command_execution_mode: "preview_only",
+  };
+  data.decision_pages = Object.entries(titles).map(([id, title]) => ({
+    id,
+    title,
+    scope: `${title} producer decision scope`,
+    audiences: ["non_engineer", "junior_engineer"],
+    status: id === "workflow" ? "stale" : "manual_required",
+    decision_question: `What should ${title} decide now?`,
+    current_judgment: `${title} needs producer-owned review`,
+    top_reason: `${title} is using producer decision data.`,
+    evidence_confidence: "manual review required",
+    must_review: [`producer.${id}`, "command_preview_boundary"],
+    next_safe_action: `Review ${title} evidence`,
+    detail_page: `#${id}`,
+    owner_source: "dashboard-data",
+    source_id: `producer.${id}`,
+    authority: "manual_required",
+    freshness_state: "stale",
+    risk_level: "medium",
+    command_execution_mode: "preview_only",
+  }));
+}
+
 async function expectCenteredSvg(locator, tolerance = 1) {
   const deltas = await locator.evaluateAll((elements) =>
     elements.map((element) => {
@@ -976,6 +1048,7 @@ test.describe("English dashboard control center", () => {
       "tools/product-repository-authority status --json",
     ]));
     addDesignSystemRepositoryScope(sourceBoundaryFixture);
+    addProducerDecisionPages(sourceBoundaryFixture);
     await page.unroute(dashboardDataRoutePattern);
     await routeDashboardData(page, sourceBoundaryFixture);
     await page.goto("http://lesson.local/dashboard-control-center/index.html?refresh_ms=60000");
@@ -991,7 +1064,7 @@ test.describe("English dashboard control center", () => {
     await expect(repositoryNavigation.locator(".category-nav__link")).toHaveCount(4);
     await expect(repositoryNavigation.getByRole("link", { name: /Design Studio/ })).toBeVisible();
     await expect(page.getByRole("navigation", { name: "Other" }).locator(".category-nav__link")).toHaveCount(2);
-    await expect(page.getByText("Read-only outside Settings.")).toBeVisible();
+    await expect(page.getByText("Read-only except allowed Settings and Design Studio changes.")).toBeVisible();
 
     await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible();
     await expect(page.getByText("Category Health")).toHaveCount(0);
@@ -1012,6 +1085,10 @@ test.describe("English dashboard control center", () => {
     await expect(page.locator("[data-overview-status-card='ci']")).toContainText("CI run status checked");
     await expect(page.locator("[data-overview-status-card='security']")).toContainText("Blockers: 1");
     await expect(page.locator("[data-overview-status-card='security']")).toContainText("Risky operations, approvals, and blockers checked");
+    const overviewProducerDecision = page.locator("#overview .decision-summary--sidebar").first();
+    await expect(overviewProducerDecision).toContainText("producer.overview");
+    await expect(overviewProducerDecision).toContainText("#overview");
+    await expect(overviewProducerDecision).toContainText("dashboard-data");
     await expect(page.locator(".common-status-card--git .common-status-op")).toHaveCount(4);
     await expect(page.locator(".common-status-card--git .common-status-op", { hasText: "Merge" })).toContainText("Allowed");
     await expectCenteredSvg(page.locator(".common-status-card--git .common-status-op__label"));
@@ -1061,16 +1138,16 @@ test.describe("English dashboard control center", () => {
 
     await navigation.getByRole("link", { name: /Lessons/ }).click();
     await expect(page.getByRole("heading", { name: "Lessons" })).toBeVisible();
-    await expect(page.getByLabel("Detail page decision summary")).toBeVisible();
+    await expect(page.locator("#lessons").getByLabel("Detail page decision summary").first()).toBeVisible();
     await expectCenteredSvg(page.locator(".page-title__icon"));
     await expectCenteredSvg(page.locator(".decision-summary__icon"));
     await expect(page.locator(".context-strip")).toContainText(/Step\s*12\s*\/\s*14/);
     await expect(page.locator(".context-strip--lessons .mini-progress-ring--icon")).toHaveCount(1);
-    await expect(page.getByText("What this page checks")).toBeVisible();
-    await expect(page.getByText("Current judgment")).toBeVisible();
-    await expect(page.getByText("Must review")).toBeVisible();
-    await expect(page.getByText("Next safe check")).toBeVisible();
-    await expect(page.locator(".decision-summary--lessons")).toContainText(/Check\s*Git\/CI status on the workflow page/);
+    await expect(page.locator("#lessons").getByText("What this page checks").first()).toBeVisible();
+    await expect(page.locator("#lessons").getByText("Current judgment").first()).toBeVisible();
+    await expect(page.locator("#lessons").getByText("Must review").first()).toBeVisible();
+    await expect(page.locator("#lessons").getByText("Next safe check").first()).toBeVisible();
+    await expect(page.locator("#lessons .decision-summary--lessons").filter({ hasText: /Check\s*Git\/CI status on the workflow page/ })).toBeVisible();
     await expect(page.getByRole("heading", { name: "STEP 1-7 Basic Lesson" })).toBeVisible();
     await expect(page.locator(".lesson-progress-card")).toHaveCount(3);
     await expect(page.getByRole("heading", { name: "Applied Lesson" })).toBeVisible();
@@ -1093,6 +1170,9 @@ test.describe("English dashboard control center", () => {
     await expect(page.locator(".operation-chip", { hasText: "Merge" })).toContainText("Allowed");
     await expect(page.locator(".workflow-mini-card")).toHaveCount(5);
     await expectCenteredSvg(page.locator(".workflow-mini-card__icon"));
+    const workflowProducerDecision = page.locator("#workflow .decision-summary--workflow").first();
+    await expect(workflowProducerDecision).toContainText("producer.workflow");
+    await expect(workflowProducerDecision).toContainText("#workflow");
     await expect(page.getByRole("heading", { name: "Git Sync" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Product Evidence" })).toBeVisible();
     await page.locator(".workflow-mini-card", { hasText: "Git Sync" }).getByRole("button", { name: /View details/ }).click();
@@ -1254,6 +1334,7 @@ test.describe("English dashboard control center", () => {
     await repositoryNavigation.getByRole("link", { name: /Settings/ }).click();
     const settingsView = page.locator("#settings");
     await expect(settingsView).toBeVisible();
+    await expect(settingsView).toHaveAttribute("data-dashboard-display-depth", "standard");
     await expect(settingsView.locator(".settings-row")).toHaveCount(fixtureSettingsCount);
     await expect(settingsView.locator(".settings-change-chip")).toHaveCount(0);
     const learningModeRow = settingsView.locator(".settings-row", { hasText: "Learning mode" });
@@ -1264,6 +1345,17 @@ test.describe("English dashboard control center", () => {
     await expect(productNameRow.locator(".settings-row__open")).toContainText("Review");
     await expect(productNameRow.locator(".settings-row__meta")).not.toContainText("Review only");
     await expect(productNameRow).toContainText("Repository Info");
+    const displayDepthRow = settingsView.locator(".settings-row[data-settings-row-id='dashboard_display_depth']");
+    await expect(displayDepthRow).toContainText("Dashboard display depth");
+    await expect(displayDepthRow).toContainText("Standard");
+    await expect(displayDepthRow.locator(".settings-row__open")).toContainText("Editable here");
+    await displayDepthRow.click();
+    await expect(page.locator(".settings-modal__allowed")).toContainText("Guide");
+    await expect(page.locator(".settings-modal__allowed")).toContainText("Standard");
+    await expect(page.locator(".settings-modal__allowed")).toContainText("Technical detail");
+    await expect(page.locator(".settings-value-select select")).toContainText("Technical detail");
+    await page.locator(".settings-modal__close").click();
+    await expect(page.locator(".settings-modal")).toHaveCount(0);
     const branchAllowedRow = settingsView.locator(".settings-row[data-settings-row-id='git_branch_allowed']");
     await expect(branchAllowedRow).toContainText("Allowed");
     await branchAllowedRow.click();
@@ -1285,14 +1377,15 @@ test.describe("English dashboard control center", () => {
     await expect(settingsView.locator(".settings-row[data-settings-row-id='git_push_automation']").locator(".settings-row__open")).toContainText("Editable here");
     const mergeExecutionRow = settingsView.locator(".settings-row[data-settings-row-id='git_merge_execution']");
     await expect(mergeExecutionRow.locator(".settings-row__open")).toContainText("Editable here");
-    await expect(mergeExecutionRow).toContainText("Auto");
+    await expect(mergeExecutionRow).toContainText("After approval");
     await mergeExecutionRow.click();
     await expect(page.locator(".settings-modal__allowed")).toContainText("Ask each time");
-    await expect(page.locator(".settings-modal__allowed")).toContainText("Auto");
+    await expect(page.locator(".settings-modal__allowed")).toContainText("After approval");
     await expect(page.locator(".settings-value-select select")).toContainText("Ask each time");
-    await expect(page.locator(".settings-value-select select")).toContainText("Auto");
+    await expect(page.locator(".settings-value-select select")).toContainText("After approval");
     await expect(page.locator(".settings-modal__automation-note")).toHaveCount(1);
-    await expect(page.locator(".settings-modal__automation-note")).toContainText("prior approval");
+    await expect(page.locator(".settings-modal__automation-note")).toContainText("requires an approval");
+    await expect(page.locator(".settings-modal__git-note")).toContainText("are not executed from this screen");
     await page.locator(".settings-modal__close").click();
     await expect(page.locator(".settings-modal")).toHaveCount(0);
     await learningModeRow.click();
@@ -1315,15 +1408,25 @@ test.describe("English dashboard control center", () => {
     await page.locator(".settings-value-select select").selectOption("B");
     await page.getByRole("button", { name: /Review change/ }).click();
     await expect(page.locator(".settings-result")).toContainText("Plan ready");
+    await expect(page.locator(".settings-result")).toContainText("Technical details");
     await page.getByLabel("I confirm this settings update.").check();
     await page.unroute(dashboardDataRoutePattern);
-    await routeDashboardDataPayload(page, addDesignSystemRepositoryScope(dashboardSettingFixture("learning_mode", "B", "6")));
+    const updatedSettingsFixture = addDesignSystemRepositoryScope(dashboardSettingFixture("learning_mode", "B", "6"));
+    await routeDashboardDataPayload(page, updatedSettingsFixture);
     await page.getByRole("button", { name: /Apply setting/ }).click();
     await expect(page.locator(".settings-modal")).toHaveCount(0);
     await expect(page.locator(".settings-apply-feedback")).toHaveCount(0);
     await expect(learningModeRow).toContainText("B: Short guidance");
     expect(settingsCalls.map((call) => call.command)).toEqual(["plan", "apply"]);
-    expect(settingsCalls[1].payload).toMatchObject({ setting_id: "learning_mode", value: "B", menu_id: "step_1_14", confirm: true });
+    expect(settingsCalls[1].payload).toMatchObject({
+      setting_id: "learning_mode",
+      value: "B",
+      menu_id: "step_1_14",
+      plan_token: "22222222-2222-4222-8222-222222222222",
+      snapshot_id: sourceBoundaryFixture.snapshot_id,
+      content_hash: sourceBoundaryFixture.content_hash,
+      confirm: true,
+    });
 
     const designSystemCalls = [];
     await routeDesignSystemApi(page, designSystemCalls);
@@ -1546,6 +1649,67 @@ test.describe("English dashboard control center", () => {
     await expect(page.locator(".insight-detail-modal")).toContainText("Why it matters");
     await page.keyboard.press("Escape");
     await expect(page.locator(".insight-detail-modal")).toHaveCount(0);
+  });
+
+  test("collapses technical references in friendly display depth while preserving safety actions", async ({ page }) => {
+    const friendlyFixture = dashboardSettingFixture("dashboard_display_depth", "friendly", "f");
+    addProducerDecisionPages(friendlyFixture);
+    await page.unroute(dashboardDataRoutePattern);
+    await routeDashboardDataPayload(page, friendlyFixture);
+    await page.goto("http://lesson.local/dashboard-control-center/index.html#safety");
+
+    const safetyView = page.locator("#safety");
+    await expect(safetyView).toBeVisible();
+    await expect(safetyView.locator(".decision-summary__technical").first()).toHaveAttribute("data-dashboard-display-depth", "friendly");
+    await expect(safetyView.locator(".decision-summary__technical").first()).not.toHaveAttribute("open", "");
+    await expect(page.getByRole("heading", { name: "Command Previews (display only)" })).toBeVisible();
+    await expect(safetyView.locator(".command-preview__technical").first()).toHaveAttribute("data-dashboard-display-depth", "friendly");
+    await expect(safetyView.locator(".command-preview__technical").first()).not.toHaveAttribute("open", "");
+    await expect(safetyView.locator(".display-only-badge").first()).toContainText("Display only");
+    await expect(safetyView.locator("[data-state='approval_required']").first()).toBeVisible();
+    await expect(page.getByRole("button", { name: /^(Run|Execute|Apply|Merge|Push|Check)$/i })).toHaveCount(0);
+  });
+
+  test("keeps standard display depth as the current disclosure baseline", async ({ page }) => {
+    const standardFixture = dashboardSettingFixture("dashboard_display_depth", "standard", "d");
+    addProducerDecisionPages(standardFixture);
+    await page.unroute(dashboardDataRoutePattern);
+    await routeDashboardDataPayload(page, standardFixture);
+    await page.goto("http://lesson.local/dashboard-control-center/index.html#safety");
+
+    const safetyView = page.locator("#safety");
+    await expect(safetyView).toBeVisible();
+    await expect(safetyView.locator(".decision-summary__technical")).toHaveCount(0);
+    await expect(safetyView.locator(".command-preview__technical")).toHaveCount(0);
+    await expect(safetyView.locator(".command-preview .command-chip")).toHaveCount(4);
+
+    await page.goto("http://lesson.local/dashboard-control-center/index.html#repository-info");
+    const sourceBoundary = page.locator("#repository-info .source-boundary");
+    await expect(sourceBoundary).toHaveAttribute("data-dashboard-display-depth", "standard");
+    await expect(sourceBoundary).not.toHaveAttribute("open", "");
+  });
+
+  test("opens source and technical details by default in technical display depth", async ({ page }) => {
+    const technicalFixture = dashboardSettingFixture("dashboard_display_depth", "technical", "c");
+    addProducerDecisionPages(technicalFixture);
+    await page.unroute(dashboardDataRoutePattern);
+    await routeDashboardDataPayload(page, technicalFixture);
+    await page.goto("http://lesson.local/dashboard-control-center/index.html#repository-info");
+
+    const repositoryView = page.locator("#repository-info");
+    await expect(repositoryView).toBeVisible();
+    await expect(repositoryView.locator(".decision-summary__technical").first()).toHaveAttribute("data-dashboard-display-depth", "technical");
+    await expect(repositoryView.locator(".decision-summary__technical").first()).toHaveAttribute("open", "");
+    await expect(repositoryView.locator(".decision-summary__technical").first()).toContainText("producer.repository-info");
+    const sourceBoundary = repositoryView.locator(".source-boundary");
+    await expect(sourceBoundary).toHaveAttribute("data-dashboard-display-depth", "technical");
+    await expect(sourceBoundary).toHaveAttribute("open", "");
+
+    await page.goto("http://lesson.local/dashboard-control-center/index.html#safety");
+    const safetyView = page.locator("#safety");
+    await expect(safetyView.locator(".command-preview__technical").first()).toHaveAttribute("data-dashboard-display-depth", "technical");
+    await expect(safetyView.locator(".command-preview__technical").first()).toHaveAttribute("open", "");
+    await expect(safetyView.locator(".command-preview .command-chip")).toHaveCount(4);
   });
 
   test("renders every dashboard page without losing selected context", async ({ page }) => {
@@ -2625,7 +2789,7 @@ test.describe("Japanese dashboard control center", () => {
     await expect(navigation.getByRole("link", { name: /開発ワークフロー/ })).toBeVisible();
     await expect(navigation.getByRole("link", { name: /保守・同期/ })).toBeVisible();
     await expect(navigation.getByRole("link", { name: /安全確認/ })).toBeVisible();
-    await expect(page.getByText("設定以外は読み取り専用です。")).toBeVisible();
+    await expect(page.getByText("Settings と Design Studio の許可済み操作以外は読み取り専用です。")).toBeVisible();
     await expect(page.getByText("カテゴリ別の状態")).toHaveCount(0);
     await expect(page.locator(".menu-tile.is-selected")).toContainText(/STEP 1-14\s*実践レッスン/);
     await expect(page.locator("[data-overview-status-card='lessons']")).toContainText(/11\s*\/\s*14/);

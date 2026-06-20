@@ -181,6 +181,12 @@ for (const seedToken of [
   '"${settings_groups[*]}"',
   '"${settings_items[*]}"',
   '"$browser_debug_json"',
+  '"$operational_decision_json"',
+  '"${decision_page_rows[*]}"',
+  '"$repository_changes_json"',
+  '"$repository_development_json"',
+  '"${workflow_evidence_events[*]}"',
+  '"${ci_evidence_roles[*]}"',
 ]) {
   if (!producerRaw.includes(seedToken)) {
     fail(`content_hash seed must include document payload token: ${seedToken}`);
@@ -265,6 +271,8 @@ for (const path of [
   'browser_debug.agent_package.status',
   'browser_debug.agent_result.status',
   'browser_debug.agent_report.status',
+  'operational_decision.status',
+  'development.repository_changes.status',
 ]) {
   const value = requireField(path);
   if (!allowedStates.has(value) && path !== 'summary.mode') {
@@ -533,6 +541,253 @@ for (const row of recentRuns) {
     fail(`invalid recent workflow status: ${row.status}`);
   }
 }
+
+const riskLevels = new Set(['low', 'medium', 'high', 'critical']);
+const freshnessStates = new Set(['current', 'stale', 'not_collected', 'unknown']);
+const evidenceAuthorities = new Set(['authoritative', 'manual_required', 'advisory', 'not_collected']);
+const decisionIds = new Set(['overview', 'lessons', 'workflow', 'maintenance', 'safety', 'repository-info', 'documents', 'settings', 'history']);
+const decisionOwnerSources = new Set(['dashboard-data', 'product-authority', 'git-workflow', 'repository-development-workflow']);
+const decisionAudiences = new Set(['non_engineer', 'junior_engineer']);
+const repositoryDevelopmentPhases = new Set(['context_triage', 'proposal', 'implementation_plan', 'fast_loop', 'mid_tests', 'release_gate', 'main_sync_cleanup']);
+const runnerRecordStatuses = new Set(['missing', 'current', 'stale']);
+const ciEvidenceRoles = new Set(['branch_ci', 'pr_ci', 'main_ci', 'local_tests', 'provider_visibility']);
+const ciHeadMatchStates = new Set(['matched', 'different', 'unknown']);
+
+function requireTextObjectField(object, field, label) {
+  if (typeof object[field] !== 'string' || object[field].length === 0) {
+    fail(`${label} missing ${field}`);
+  }
+}
+
+function requireEvidenceState(row, label) {
+  if (!allowedStates.has(row.status)) {
+    fail(`${label} has invalid status: ${row.status}`);
+  }
+  if (!freshnessStates.has(row.freshness_state)) {
+    fail(`${label} has invalid freshness_state: ${row.freshness_state}`);
+  }
+  if (!evidenceAuthorities.has(row.authority)) {
+    fail(`${label} has invalid authority: ${row.authority}`);
+  }
+}
+
+const operationalDecision = requireField('operational_decision');
+if (!operationalDecision || typeof operationalDecision !== 'object' || Array.isArray(operationalDecision)) {
+  fail('operational_decision must be an object');
+}
+for (const field of ['decision_question', 'primary_blocker_source_id', 'why_blocked', 'next_safe_action', 'done_condition', 'approval_boundary', 'source_id']) {
+  requireTextObjectField(operationalDecision, field, 'operational_decision');
+}
+requireEvidenceState(operationalDecision, 'operational_decision');
+if (!riskLevels.has(operationalDecision.risk_level)) {
+  fail(`operational_decision risk_level is invalid: ${operationalDecision.risk_level}`);
+}
+if (operationalDecision.command_execution_mode !== 'preview_only') {
+  fail('operational_decision command_execution_mode must be preview_only');
+}
+if (!operationalDecision.audience_briefs || typeof operationalDecision.audience_briefs !== 'object' || Array.isArray(operationalDecision.audience_briefs)) {
+  fail('operational_decision audience_briefs must be an object');
+}
+for (const audience of decisionAudiences) {
+  if (typeof operationalDecision.audience_briefs[audience] !== 'string' || operationalDecision.audience_briefs[audience].length === 0) {
+    fail(`operational_decision audience brief missing ${audience}`);
+  }
+}
+if (Array.isArray(selectedContext.blockers) && selectedContext.blockers.length > 0) {
+  const topLevelBlockers = Array.isArray(data.blocking_items) ? data.blocking_items : [];
+  if (topLevelBlockers.length === 0) {
+    const selectedBlockerSource = selectedContext.blockers[0].source;
+    if (operationalDecision.primary_blocker_source_id !== selectedBlockerSource || operationalDecision.source_id !== selectedBlockerSource) {
+      fail(`operational_decision must identify the selected context blocker source: ${selectedBlockerSource}`);
+    }
+  }
+}
+
+const decisionPages = requireField('decision_pages');
+if (!Array.isArray(decisionPages) || decisionPages.length < decisionIds.size) {
+  fail('decision_pages must cover all primary dashboard pages');
+}
+const seenDecisionPages = new Set();
+for (const page of decisionPages) {
+  if (!page || typeof page !== 'object' || Array.isArray(page)) {
+    fail('decision page must be an object');
+  }
+  if (!decisionIds.has(page.id)) {
+    fail(`invalid decision page id: ${page.id}`);
+  }
+  if (seenDecisionPages.has(page.id)) {
+    fail(`duplicate decision page id: ${page.id}`);
+  }
+  seenDecisionPages.add(page.id);
+  for (const field of ['title', 'scope', 'decision_question', 'current_judgment', 'top_reason', 'evidence_confidence', 'next_safe_action', 'source_id']) {
+    requireTextObjectField(page, field, `decision_pages.${page.id}`);
+  }
+  requireEvidenceState(page, `decision_pages.${page.id}`);
+  if (!riskLevels.has(page.risk_level)) {
+    fail(`decision page risk level is invalid: ${page.id}`);
+  }
+  if (page.command_execution_mode !== 'preview_only') {
+    fail(`decision page command_execution_mode must be preview_only: ${page.id}`);
+  }
+  if (page.detail_page !== `#${page.id}`) {
+    fail(`decision page detail target must match page id: ${page.id}`);
+  }
+  if (page.owner_source === 'ui' || !decisionOwnerSources.has(page.owner_source)) {
+    fail(`decision page owner_source must be producer-owned: ${page.id}`);
+  }
+  if (!Array.isArray(page.audiences)) {
+    fail(`decision page audiences must be an array: ${page.id}`);
+  }
+  const pageAudiences = new Set(page.audiences);
+  for (const audience of decisionAudiences) {
+    if (!pageAudiences.has(audience)) {
+      fail(`decision page must include ${audience}: ${page.id}`);
+    }
+  }
+  if (!Array.isArray(page.must_review) || page.must_review.length === 0 || page.must_review.some((item) => typeof item !== 'string' || item.length === 0)) {
+    fail(`decision page must_review must be a non-empty string list: ${page.id}`);
+  }
+}
+for (const id of decisionIds) {
+  if (!seenDecisionPages.has(id)) {
+    fail(`missing decision page: ${id}`);
+  }
+}
+
+const repositoryChanges = requireField('development.repository_changes');
+if (!repositoryChanges || typeof repositoryChanges !== 'object' || Array.isArray(repositoryChanges)) {
+  fail('development.repository_changes must be an object');
+}
+if (!allowedStates.has(repositoryChanges.status)) {
+  fail(`invalid repository_changes status: ${repositoryChanges.status}`);
+}
+for (const field of ['observed_at', 'path_state', 'git_state', 'stale_reason']) {
+  requireTextObjectField(repositoryChanges, field, 'development.repository_changes');
+}
+if (!['configured', 'missing', 'not_applicable', 'unknown'].includes(repositoryChanges.path_state) || !['configured', 'missing', 'not_applicable', 'unknown'].includes(repositoryChanges.git_state)) {
+  fail('repository_changes path_state/git_state must use repository state vocabulary');
+}
+if (typeof repositoryChanges.detached !== 'boolean') {
+  fail('repository_changes.detached must be boolean');
+}
+for (const field of ['staged_count', 'unstaged_count', 'untracked_count', 'ahead', 'behind', 'worktree_count']) {
+  if (!Number.isInteger(repositoryChanges[field]) || repositoryChanges[field] < 0) {
+    fail(`repository_changes ${field} must be a non-negative integer`);
+  }
+}
+if (!repositoryChanges.changed_role_counts || typeof repositoryChanges.changed_role_counts !== 'object' || Array.isArray(repositoryChanges.changed_role_counts)) {
+  fail('repository_changes.changed_role_counts must be an object');
+}
+if (
+  repositoryChanges.changed_role_counts.staged !== repositoryChanges.staged_count ||
+  repositoryChanges.changed_role_counts.unstaged !== repositoryChanges.unstaged_count ||
+  repositoryChanges.changed_role_counts.untracked !== repositoryChanges.untracked_count
+) {
+  fail('repository_changes changed_role_counts must match top-level counts');
+}
+if (!Array.isArray(repositoryChanges.safe_changed_file_samples)) {
+  fail('repository_changes.safe_changed_file_samples must be an array');
+}
+for (const sample of repositoryChanges.safe_changed_file_samples) {
+  if (!isSafeScopedPath(sample)) {
+    fail(`repository_changes safe_changed_file_samples must be safe relative paths: ${sample}`);
+  }
+}
+
+const repositoryDevelopment = requireField('development.repository_development');
+if (!repositoryDevelopment || typeof repositoryDevelopment !== 'object' || Array.isArray(repositoryDevelopment)) {
+  fail('development.repository_development must be an object');
+}
+if (!repositoryDevelopmentPhases.has(repositoryDevelopment.current_phase)) {
+  fail(`invalid repository_development current_phase: ${repositoryDevelopment.current_phase}`);
+}
+if (!Number.isInteger(repositoryDevelopment.phase_order) || repositoryDevelopment.phase_order < 0) {
+  fail('repository_development.phase_order must be a non-negative integer');
+}
+if (!runnerRecordStatuses.has(repositoryDevelopment.runner_records_status)) {
+  fail(`invalid repository_development runner_records_status: ${repositoryDevelopment.runner_records_status}`);
+}
+for (const field of ['inference_reason', 'purpose', 'required_inputs', 'allowed_writes', 'recommended_checks', 'required_checks', 'git_ci_expectations', 'required_approvals', 'cleanup_behavior', 'stop_conditions']) {
+  requireTextObjectField(repositoryDevelopment, field, 'development.repository_development');
+}
+if (!Array.isArray(repositoryDevelopment.source_files) || repositoryDevelopment.source_files.length < 2) {
+  fail('repository_development.source_files must identify workflow policy files');
+}
+for (const sourceFile of repositoryDevelopment.source_files) {
+  if (!isSafeScopedPath(sourceFile)) {
+    fail(`repository_development source file must be safe: ${sourceFile}`);
+  }
+}
+if (!repositoryDevelopment.source_files.includes('docs/workflow/REPOSITORY_DEVELOPMENT_WORKFLOW.tsv')) {
+  fail('repository_development.source_files must include repository workflow policy');
+}
+
+const workflowEvidenceEvents = requireField('development.workflow_evidence_events');
+if (!Array.isArray(workflowEvidenceEvents) || workflowEvidenceEvents.length < 5) {
+  fail('development.workflow_evidence_events must include the core evidence events');
+}
+const workflowEventIds = new Set();
+for (const event of workflowEvidenceEvents) {
+  if (!event || typeof event !== 'object' || Array.isArray(event)) {
+    fail('workflow evidence event must be an object');
+  }
+  for (const field of ['event_id', 'source_id', 'observed_at', 'repository_head', 'detail_artifact_path', 'summary']) {
+    requireTextObjectField(event, field, 'development.workflow_evidence_events');
+  }
+  if (workflowEventIds.has(event.event_id)) {
+    fail(`duplicate workflow evidence event id: ${event.event_id}`);
+  }
+  workflowEventIds.add(event.event_id);
+  requireEvidenceState(event, `workflow evidence event ${event.event_id}`);
+  if (event.detail_artifact_path.includes(';')) {
+    fail(`workflow evidence event detail_artifact_path must be a single artifact reference: ${event.detail_artifact_path}`);
+  }
+  if (event.detail_artifact_path !== 'not_collected' && !isSafeScopedPath(event.detail_artifact_path)) {
+    fail(`workflow evidence event detail_artifact_path must be safe: ${event.detail_artifact_path}`);
+  }
+}
+for (const eventId of ['repository-observation', 'repository-index-drift', 'git-sync', 'ci-main', 'security-gate']) {
+  if (!workflowEventIds.has(eventId)) {
+    fail(`missing workflow evidence event: ${eventId}`);
+  }
+}
+
+const ciEvidence = requireField('development.ci_evidence');
+if (!Array.isArray(ciEvidence) || ciEvidence.length < ciEvidenceRoles.size) {
+  fail('development.ci_evidence must include branch, PR, main, local, and provider roles');
+}
+const seenCiRoles = new Set();
+for (const row of ciEvidence) {
+  if (!row || typeof row !== 'object' || Array.isArray(row)) {
+    fail('CI evidence row must be an object');
+  }
+  if (!ciEvidenceRoles.has(row.role)) {
+    fail(`invalid CI evidence role: ${row.role}`);
+  }
+  if (seenCiRoles.has(row.role)) {
+    fail(`duplicate CI evidence role: ${row.role}`);
+  }
+  seenCiRoles.add(row.role);
+  requireEvidenceState(row, `CI evidence role ${row.role}`);
+  if (!ciHeadMatchStates.has(row.head_match_status)) {
+    fail(`invalid CI evidence head_match_status: ${row.head_match_status}`);
+  }
+  if (
+    row.status === 'passed' &&
+    (row.head_match_status !== 'matched' || row.freshness_state !== 'current' || row.authority !== 'authoritative')
+  ) {
+    fail(`passed CI evidence must be current authoritative matching HEAD proof: ${row.role}`);
+  }
+  for (const field of ['source_id', 'summary', 'observed_at']) {
+    requireTextObjectField(row, field, `development.ci_evidence.${row.role}`);
+  }
+}
+for (const role of ciEvidenceRoles) {
+  if (!seenCiRoles.has(role)) {
+    fail(`missing CI evidence role: ${role}`);
+  }
+}
+
 for (const row of gitOperations) {
   for (const field of ['id', 'label', 'status', 'mode', 'detail']) {
     if (!(field in row) || row[field] === '') {
@@ -957,7 +1212,7 @@ for (const item of settings.items) {
   }
   if (item.editable) {
     editableSettingIds.add(item.id);
-    if (!item.reviewable || !['learning', 'workflow'].includes(item.scope)) {
+    if (!item.reviewable || !['learning', 'workflow', 'dashboard'].includes(item.scope)) {
       fail(`editable settings item has invalid scope: ${item.id}`);
     }
     if (!item.allowed_values.length || item.requires_confirmation !== true) {
@@ -968,10 +1223,20 @@ for (const item of settings.items) {
     }
   }
 }
-for (const expectedEditable of ['learning_mode', 'workflow_language', 'product_language', 'git_push_automation']) {
+for (const expectedEditable of ['dashboard_display_depth', 'learning_mode', 'workflow_language', 'product_language', 'git_push_automation']) {
   if (!editableSettingIds.has(expectedEditable)) {
     fail(`missing expected editable settings row: ${expectedEditable}`);
   }
+}
+const dashboardDisplayDepthItem = settings.items.find((item) => item.id === 'dashboard_display_depth');
+if (!dashboardDisplayDepthItem) {
+  fail('settings.items must include dashboard_display_depth');
+}
+if (!['friendly', 'standard', 'technical'].includes(data.summary.display_depth)) {
+  fail(`summary.display_depth is invalid: ${data.summary.display_depth}`);
+}
+if (data.summary.display_depth !== dashboardDisplayDepthItem.current_value) {
+  fail('summary.display_depth must match the Settings dashboard_display_depth current value');
 }
 const workflowLanguageItem = settings.items.find((item) => item.id === 'workflow_language');
 if (!workflowLanguageItem) {
@@ -1326,10 +1591,25 @@ assert_contains "$output" '"contexts_by_menu"'
 assert_contains "$output" '"evidence_rows"'
 
 LIVE_STATUS_FILE="$TMP_DIR/dashboard-live-status.json"
+FAKE_GH_CALLED="$TMP_DIR/fake-gh-called"
+FAKE_BIN="$TMP_DIR/fake-bin"
+mkdir -p "$FAKE_BIN"
+cat >"$FAKE_BIN/gh" <<'SH'
+#!/usr/bin/env bash
+: >"${FAKE_GH_CALLED:?}"
+exit 99
+SH
+chmod +x "$FAKE_BIN/gh"
 DASHBOARD_DATA_GENERATED_AT="2026-06-05T00:00:00Z" \
   DASHBOARD_SELECTED_MENU_ID="free-development" \
   DASHBOARD_LIVE_STATUS_TIMEOUT_SECONDS="1" \
+  FAKE_GH_CALLED="$FAKE_GH_CALLED" \
+  PATH="$FAKE_BIN:$PATH" \
   "$ROOT/tools/dashboard-data" live-status >"$LIVE_STATUS_FILE"
+if [[ -e "$FAKE_GH_CALLED" ]]; then
+  printf 'dashboard live-status must not call gh unless DASHBOARD_LIVE_STATUS_CI_NETWORK is enabled\n' >&2
+  exit 1
+fi
 node - "$LIVE_STATUS_FILE" <<'NODE'
 const fs = require('fs');
 const data = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
@@ -1413,6 +1693,12 @@ for (const key of ['local_tests', 'git_sync', 'ci', 'security']) {
     }
     if (!headMatchStates.has(check.head_match_status)) {
       fail(`live check ci has invalid head_match_status: ${check.head_match_status}`);
+    }
+    if (
+      check.status === 'passed' &&
+      (check.head_match_status !== 'matched' || check.freshness_state !== 'current' || check.authority !== 'authoritative')
+    ) {
+      fail('passed live CI check must be current authoritative matching HEAD proof');
     }
   }
   for (const item of check.items) {
