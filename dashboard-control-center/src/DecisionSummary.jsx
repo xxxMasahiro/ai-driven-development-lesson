@@ -62,7 +62,7 @@ export function DetailDecisionSummary({ tone, items, t, displayPolicy = null }) 
     <section className={`decision-summary decision-summary--${tone}`} aria-label={t("detail.summaryAria")}>
       {items.map(({ Icon, label, value, valueLines, detail, points = [], badge, cta, tone: itemTone, technicalReferences = [] }) => {
         const references = technicalReferenceItems(technicalReferences);
-        const showTechnicalReferences = Boolean(displayPolicy?.showDecisionTechnicalReferences && references.length);
+        const showTechnicalReferences = Boolean(displayPolicy?.renderDecisionTechnicalReferenceDisclosure && references.length);
         return (
           <article className={itemTone ? `decision-summary__item decision-summary__item--${itemTone}` : "decision-summary__item"} key={label}>
             <span className="decision-summary__icon">

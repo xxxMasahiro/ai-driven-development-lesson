@@ -1440,6 +1440,26 @@ function situationObservedAt(value, fallback = "") {
   return liveStatusObservedTime(value) || liveStatusObservedTime(fallback);
 }
 
+function situationFreshnessMeta(data, activeLiveStatus, t) {
+  if (activeLiveStatus) {
+    return {
+      label: t("overview.situation.liveObservation"),
+      time: situationObservedAt(activeLiveStatus.generated_at) || t("overview.fact.noEvidence"),
+    };
+  }
+  const snapshotTime = formatGenerated(data, getDashboardIntlLocale(data.summary?.ui_locale || "en"));
+  if (snapshotTime) {
+    return {
+      label: t("overview.situation.savedSnapshotFallback"),
+      time: snapshotTime,
+    };
+  }
+  return {
+    label: t("overview.situation.lastValidatedSnapshot"),
+    time: t("overview.fact.noEvidence"),
+  };
+}
+
 function situationWorstStatus(statuses, fallback = "ready") {
   const normalized = statuses.map((status) => normalizeState(status)).filter(Boolean);
   if (!normalized.length) {
@@ -1665,7 +1685,7 @@ function OperationalSituationBoard({ data, context, liveStatus, t }) {
   const facts = situationFacts(data, context, activeLiveStatus, t);
   const overallStatus = situationWorstStatus(facts.map((fact) => fact.status), "ready");
   const repository = repositoryDisplayName(activeLiveStatus?.target_repository?.name || context.target_repository?.name, t);
-  const liveTime = situationObservedAt(activeLiveStatus?.generated_at) || formatGenerated(data, getDashboardIntlLocale(data.summary?.ui_locale || "en"));
+  const freshness = situationFreshnessMeta(data, activeLiveStatus, t);
   const displayPolicy = displayDepthPolicyForData(data);
   return (
     <section className="operational-situation" aria-labelledby="operational-situation-heading" data-operational-situation="true" data-dashboard-display-depth={displayPolicy.depth}>
@@ -1682,7 +1702,7 @@ function OperationalSituationBoard({ data, context, liveStatus, t }) {
       <div className="operational-situation__meta" aria-label={t("overview.situation.meta")}>
         <span>{t("overview.fact.target")}: <strong>{repository}</strong></span>
         <span>{t("overview.fact.workflow")}: <strong>{workflowContextLabel(context.workflow_context, t)}</strong></span>
-        <span>{t("overview.situation.liveUpdated")}: <strong>{liveTime || t("overview.fact.noEvidence")}</strong></span>
+        <span>{freshness.label}: <strong>{freshness.time}</strong></span>
       </div>
       <div className="operational-situation__grid">
         {facts.map((fact) => (
@@ -1814,7 +1834,7 @@ function OperationalDetailDecisionPanel({ data, context, liveStatus, t, tone = "
   const evidenceRows = liveEvidenceRows(activeLiveStatus, keys, t);
   const overallStatus = situationWorstStatus([...facts.map((fact) => fact.status), ...evidenceRows.map((row) => row.status)], "ready");
   const repository = repositoryDisplayName(activeLiveStatus?.target_repository?.name || context.target_repository?.name, t);
-  const liveTime = situationObservedAt(activeLiveStatus?.generated_at) || formatGenerated(data, getDashboardIntlLocale(data.summary?.ui_locale || "en"));
+  const freshness = situationFreshnessMeta(data, activeLiveStatus, t);
   const headingId = `${pageId || tone}-operational-detail-heading`;
   return (
     <section
@@ -1836,7 +1856,7 @@ function OperationalDetailDecisionPanel({ data, context, liveStatus, t, tone = "
       <div className="operational-detail-panel__meta" aria-label={t("detail.operational.meta")}>
         <span>{t("overview.fact.target")}: <strong>{repository}</strong></span>
         <span>{t("overview.fact.workflow")}: <strong>{workflowContextLabel(context.workflow_context, t)}</strong></span>
-        <span>{t("overview.situation.liveUpdated")}: <strong>{liveTime || t("overview.fact.noEvidence")}</strong></span>
+        <span>{freshness.label}: <strong>{freshness.time}</strong></span>
       </div>
       <div className="operational-detail-panel__grid">
         {facts.map((fact) => (
@@ -2143,16 +2163,19 @@ function WorkflowStatusCards({ data, t }) {
 }
 
 function workflowCardInsight(id, card, context, data, t) {
+  const productAuthority = data.development?.product_authority || {};
+  const ciGuidancePoints = id === "product-evidence" ? productAuthorityCiGuidancePoints(productAuthority, t) : [];
   return {
     title: card.title,
     eyebrow: t("workflow.detail.eyebrow"),
     summary: card.detail,
     where: t(`workflow.detail.${id}.where`, t("workflow.detail.default.where")),
     why: t(`workflow.detail.${id}.why`, t("workflow.detail.default.why")),
-    action: t(`workflow.detail.${id}.action`, t("workflow.detail.default.action")),
+    action: ciGuidancePoints.length ? t("workflow.ciEvidence.action") : t(`workflow.detail.${id}.action`, t("workflow.detail.default.action")),
     source: workflowCardSource(id, context, data, t),
     status: card.status || "unknown",
     statusLabel: card.value,
+    points: ciGuidancePoints,
   };
 }
 
@@ -3100,6 +3123,23 @@ function productEvidenceDetail(productAuthority, t) {
     return `${t("workflow.card.evidence")}: ${collected} / ${evidenceItems.length} ${t("workflow.card.collectedUnit")}`;
   }
   return t("workflow.card.productEvidenceDetail");
+}
+
+function productAuthorityCiGuidancePoints(productAuthority, t) {
+  return asArray(productAuthority?.evidence_summary?.items)
+    .filter((item) => displayText(item?.source_id, "").startsWith("product.ci."))
+    .filter((item) => !["passed", "ready", "not_applicable"].includes(normalizeState(item?.status)))
+    .map((item) => {
+      const command = displayText(item?.next_command || item?.required_command, "");
+      if (!command || command === "not_applicable") {
+        return "";
+      }
+      const source = sourcePresentationKey(item.source_id, t);
+      const status = statusLabelForChip(item.status, t);
+      return `${t("workflow.ciEvidence.suggestedCheck")}: ${source} / ${status} / ${t("workflow.ciEvidence.displayOnly")}: ${command}`;
+    })
+    .filter(Boolean)
+    .slice(0, 3);
 }
 
 function currentStepNumber(context) {
@@ -5225,7 +5265,7 @@ function CommandPreviews({ actions, t, displayPolicy = null }) {
                 <span className="display-only-badge">{t("actions.displayOnly")}</span>
                 <span className="display-only-badge">{preview.non_executable === true ? t("actions.notExecutable") : t("field.unknown")}</span>
               </div>
-              {displayPolicy?.commandPreviewTechnicalDetails ? (
+              {displayPolicy?.renderCommandTechnicalDisclosure ? (
                 <details className="command-preview__technical" data-dashboard-display-depth={displayPolicy.depth} open={displayPolicy.openTechnicalDetails}>
                   <summary>{t("settingsPage.modal.technicalDetails")}</summary>
                   {displayPolicy.collapseTechnicalDetails ? command : null}

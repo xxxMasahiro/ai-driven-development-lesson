@@ -1370,10 +1370,10 @@ product_gate_evidence_ci_status() {
   if [[ ! -s "$manifest" ]]; then
     product_gate_evidence_record "product.ci.github_actions" "$context" "blocked" "true" "manual_required" "$max_age_seconds" "ops/CI_MANIFEST.tsv" "product.ci.github_actions" "tools/check_product_structure.sh"
     if ! product_gate_evidence_existing_current_passed "product.ci.main" "$context"; then
-      product_gate_evidence_record "product.ci.main" "$context" "not_run" "true" "manual_required" "$max_age_seconds" "ops/CI_MANIFEST.tsv" "product.ci.github_actions" "tools/check_ci_status.sh --product --required"
+      product_gate_evidence_record "product.ci.main" "$context" "not_run" "true" "manual_required" "$max_age_seconds" "ops/CI_MANIFEST.tsv" "product.ci.github_actions" "tools/product-gate-evidence ci-runs $context $max_age_seconds"
     fi
     if ! product_gate_evidence_existing_current_passed "product.ci.pr" "$context"; then
-      product_gate_evidence_record "product.ci.pr" "$context" "not_run" "false" "manual_required" "$max_age_seconds" "ops/CI_MANIFEST.tsv" "product.ci.github_actions" "gh pr checks"
+      product_gate_evidence_record "product.ci.pr" "$context" "not_run" "false" "manual_required" "$max_age_seconds" "ops/CI_MANIFEST.tsv" "product.ci.github_actions" "tools/product-gate-evidence ci-runs $context $max_age_seconds --pr <number>"
     fi
     return 1
   fi
@@ -1416,7 +1416,11 @@ product_gate_evidence_ci_status() {
       *) required_in_context="true" ;;
     esac
     source_artifacts="ops/CI_MANIFEST.tsv;ci_id=$ci_id;workflow_file=$workflow_file;workflow_name=$workflow_name;branch_policy=$branch_policy"
-    next_command="tools/check_ci_status.sh --product --required"
+    if [[ "$source_id" == "product.ci.pr" ]]; then
+      next_command="tools/product-gate-evidence ci-runs $context $max_age_seconds --pr <number>"
+    else
+      next_command="tools/product-gate-evidence ci-runs $context $max_age_seconds"
+    fi
     if product_gate_evidence_existing_current_passed "$source_id" "$context"; then
       continue
     fi
@@ -1443,10 +1447,10 @@ product_gate_evidence_ci_status() {
     provider_blocker=""
     provider_artifacts="ops/CI_MANIFEST.tsv;.github/workflows;matching_rows=$matching_rows"
   fi
-  product_gate_evidence_record "product.ci.github_actions" "$context" "$provider_status" "$provider_required" "$provider_authority" "$max_age_seconds" "$provider_artifacts" "$provider_blocker" "tools/check_ci_status.sh --product --required"
+  product_gate_evidence_record "product.ci.github_actions" "$context" "$provider_status" "$provider_required" "$provider_authority" "$max_age_seconds" "$provider_artifacts" "$provider_blocker" "tools/product-gate-evidence ci-runs $context $max_age_seconds"
 
   if [[ "$emitted_pr" -eq 0 ]] && ! product_gate_evidence_existing_current_passed "product.ci.pr" "$context"; then
-    product_gate_evidence_record "product.ci.pr" "$context" "not_run" "false" "manual_required" "$max_age_seconds" "ops/CI_MANIFEST.tsv;source=pr-checks-not-observed" "product.ci.pr" "gh pr checks"
+    product_gate_evidence_record "product.ci.pr" "$context" "not_run" "false" "manual_required" "$max_age_seconds" "ops/CI_MANIFEST.tsv;source=pr-checks-not-observed" "product.ci.pr" "tools/product-gate-evidence ci-runs $context $max_age_seconds --pr <number>"
   fi
 
   [[ "$provider_status" == "passed" ]]

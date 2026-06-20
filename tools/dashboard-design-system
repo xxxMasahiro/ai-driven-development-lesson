@@ -20,6 +20,8 @@ const eventStoreDir = process.env.DASHBOARD_DESIGN_STUDIO_EVENT_STORE_DIR
 const eventStorePath = path.join(eventStoreDir, "events.jsonl");
 const eventStoreSyncId = "dashboard_design_studio_event_runner_store";
 const eventStoreRecordVersion = "2026-06-18.design-studio-event-store";
+const candidateImportSyncId = "dashboard_design_studio_candidate_import_foundation";
+const candidateImportRecordVersion = "2026-06-20.design-studio-candidate-import";
 const secretLikePattern = /(SECRET|TOKEN|API_KEY|PASSWORD|PRIVATE_KEY)\s*[:=]\s*[^",\s]{8,}|sk-[A-Za-z0-9]{20,}|BEGIN (RSA |OPENSSH |EC |DSA )?PRIVATE KEY/i;
 const supportedInteractionValues = {
   component: new Set(["tooltip-copy"]),
@@ -1408,7 +1410,7 @@ function loadSources() {
 }
 
 function usage() {
-  console.error("Usage: ./tools/dashboard-design-system <check|write|emit-css|emit-js|emit-orchestration|plan-interaction|apply-interaction|queue-request|list-events|event-status|cancel-event|retry-event|dead-letter-event> [--component tooltip-copy] [--target-scope dashboard-control-center] [--theme-accent blue|teal|slate] [--density compact|balanced|comfortable] [--radius-scale compact|standard|soft] [--typography-scale standard|large] [--action-control-height 32px|34px|38px] [--action-control-padding '6px 10px'|'8px 11px'|'9px 13px'] [--compact-control-height 30px|32px|34px] [--compact-control-padding '4px 8px'|'5px 10px'|'6px 12px'] [--form-control-height 38px|40px|44px] [--form-control-padding '0 9px'|'0 10px'|'0 12px'] [--icon-button-size 34px|38px|42px] [--control-font-size 0.82rem|0.84rem|0.9rem] [--card-padding 12px|14px|16px] [--card-gap 8px|10px|12px] [--row-padding '9px 10px'|'10px 12px'|'12px 14px'] [--row-gap 8px|10px|12px] [--technical-affordance-gap 4px|6px|8px] [--technical-source-max-width 220px|260px|300px] [--technical-evidence-max-width 260px|292px|320px] [--technical-preview-chip-max-width 320px|360px|420px] [--page-header-padding '16px 18px'|'18px 20px'|'20px 22px'] [--metadata-gap 6px|8px|10px] [--page-icon-size 44px|52px|56px] [--badge-gap 4px|5px|6px] [--badge-height 24px|26px|28px] [--mode-badge-padding '3px 10px'|'4px 14px'|'5px 16px'] [--badge-font-size 0.72rem|0.76rem|0.8rem] [--mode-badge-font-size 0.74rem|0.78rem|0.82rem] [--tooltip-trigger hover-only|disabled] [--tooltip-hide-policy pointer-leave] [--tooltip-placement top] [--copy-feedback-trigger hover-only|disabled] [--copy-feedback-placement top] [--target-ref dashboard-control-center|external-product] [--provider-mode manual|subscription-agent|api-key] [--request-kind design-intent|mock|template|manual-proposal] [--intent-text text] [--event-id id] [--reason text] [--confirm]");
+  console.error("Usage: ./tools/dashboard-design-system <check|write|emit-css|emit-js|emit-orchestration|plan-interaction|apply-interaction|queue-request|list-events|event-status|cancel-event|retry-event|dead-letter-event|import-candidate|import-proposal> [--component tooltip-copy] [--target-scope dashboard-control-center] [--theme-accent blue|teal|slate] [--density compact|balanced|comfortable] [--radius-scale compact|standard|soft] [--typography-scale standard|large] [--action-control-height 32px|34px|38px] [--action-control-padding '6px 10px'|'8px 11px'|'9px 13px'] [--compact-control-height 30px|32px|34px] [--compact-control-padding '4px 8px'|'5px 10px'|'6px 12px'] [--form-control-height 38px|40px|44px] [--form-control-padding '0 9px'|'0 10px'|'0 12px'] [--icon-button-size 34px|38px|42px] [--control-font-size 0.82rem|0.84rem|0.9rem] [--card-padding 12px|14px|16px] [--card-gap 8px|10px|12px] [--row-padding '9px 10px'|'10px 12px'|'12px 14px'] [--row-gap 8px|10px|12px] [--technical-affordance-gap 4px|6px|8px] [--technical-source-max-width 220px|260px|300px] [--technical-evidence-max-width 260px|292px|320px] [--technical-preview-chip-max-width 320px|360px|420px] [--page-header-padding '16px 18px'|'18px 20px'|'20px 22px'] [--metadata-gap 6px|8px|10px] [--page-icon-size 44px|52px|56px] [--badge-gap 4px|5px|6px] [--badge-height 24px|26px|28px] [--mode-badge-padding '3px 10px'|'4px 14px'|'5px 16px'] [--badge-font-size 0.72rem|0.76rem|0.8rem] [--mode-badge-font-size 0.74rem|0.78rem|0.82rem] [--tooltip-trigger hover-only|disabled] [--tooltip-hide-policy pointer-leave] [--tooltip-placement top] [--copy-feedback-trigger hover-only|disabled] [--copy-feedback-placement top] [--target-ref dashboard-control-center|external-product] [--provider-mode manual|subscription-agent|api-key] [--request-kind design-intent|mock|template|manual-proposal] [--intent-text text] [--event-id id] [--reason text] [--input file.json] [--idempotency-key key] [--confirm]");
   process.exit(2);
 }
 
@@ -1623,6 +1625,226 @@ function eventOutput(status, record, orchestration, extra = {}) {
     ...extra,
     event: record ? eventPublicPayload(record) : null,
   };
+}
+
+function schemaContract(orchestration, schemaId) {
+  const schema = (orchestration.schemas || []).find((candidate) => candidate.id === schemaId);
+  if (!schema) {
+    stop(`orchestration schema is missing ${schemaId}`, 1);
+  }
+  return schema;
+}
+
+function readImportJson(inputPath, command) {
+  const value = requireOption({ input: inputPath }, "input", command);
+  const resolved = path.resolve(value);
+  let raw = "";
+  try {
+    raw = fs.readFileSync(resolved, "utf8");
+  } catch (error) {
+    stop(`${command} cannot read --input: ${error.message}`, 1);
+  }
+  try {
+    return { payload: JSON.parse(raw), resolved };
+  } catch (error) {
+    stop(`${command} requires valid JSON input: ${error.message}`, 1);
+  }
+  return { payload: null, resolved };
+}
+
+function rejectForbiddenPayloadFields(value, forbiddenFields, label, currentPath = "") {
+  if (!value || typeof value !== "object") {
+    return;
+  }
+  if (Array.isArray(value)) {
+    value.forEach((item, index) => rejectForbiddenPayloadFields(item, forbiddenFields, label, `${currentPath}[${index}]`));
+    return;
+  }
+  for (const [key, nested] of Object.entries(value)) {
+    const nextPath = currentPath ? `${currentPath}.${key}` : key;
+    if (forbiddenFields.has(key)) {
+      stop(`${label} must not contain forbidden field: ${nextPath}`);
+    }
+    rejectForbiddenPayloadFields(nested, forbiddenFields, label, nextPath);
+  }
+}
+
+function validateImportPayload(payload, schema, schemaId) {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    stop(`${schemaId} import payload must be an object`);
+  }
+  assertNoSecretLikePayload(payload, `${schemaId} import payload`);
+  for (const field of schema.requiredFields || []) {
+    if (!Object.hasOwn(payload, field) || payload[field] === "" || payload[field] == null) {
+      stop(`${schemaId} import payload is missing required field: ${field}`);
+    }
+  }
+  const extraForbidden = [
+    "raw_api_key",
+    "raw_secret",
+    "shell_command",
+    "direct_apply",
+    "auto_apply",
+    "apply_token",
+    "plan_token",
+    "approval_receipt",
+    "credential_value",
+    "trusted_instruction",
+    "owner_write_path",
+    "secret_value",
+    "css_patch",
+    "script_patch",
+    "external_product_apply",
+    "direct_apply_authority",
+  ];
+  rejectForbiddenPayloadFields(payload, new Set([...(schema.forbiddenFields || []), ...extraForbidden]), `${schemaId} import payload`);
+  if (schemaId === "DesignChangeProposal" && payload.proposal_only !== true) {
+    stop("DesignChangeProposal import payload must set proposal_only true");
+  }
+}
+
+function importSourceId(schemaId, payload) {
+  if (schemaId === "CandidateEnvelope") {
+    return validateStoreIdentifier(String(payload.candidate_id), "candidate id");
+  }
+  return validateStoreIdentifier(String(payload.proposal_id), "proposal id");
+}
+
+function importPayloadPreview(schemaId, payload) {
+  if (schemaId === "CandidateEnvelope") {
+    return compactPreview(`${payload.candidate_id} ${payload.source_kind} ${payload.payload_ref}`, 160);
+  }
+  return compactPreview(`${payload.proposal_id} request=${payload.request_id} operations=${Array.isArray(payload.operations) ? payload.operations.length : "unknown"}`, 160);
+}
+
+function importPublicPayload(record) {
+  return {
+    import_id: record.import_id,
+    import_type: record.import_type,
+    idempotency_key: record.idempotency_key,
+    schema_id: record.schema_id,
+    source_id: record.source_id,
+    payload_ref: record.payload_ref,
+    payload_digest: record.payload_digest,
+    payload_preview: record.payload_preview,
+    redaction_state: record.redaction_state,
+    proposal_only: record.proposal_only,
+    writes_allowed: record.writes_allowed,
+    direct_apply_authority: record.direct_apply_authority,
+    external_product_apply: record.external_product_apply,
+    provider_dispatch: record.provider_dispatch,
+    imagegen_executed: record.imagegen_executed,
+    plan_token_created: record.plan_token_created,
+    apply_token_created: record.apply_token_created,
+    approval_receipt_created: record.approval_receipt_created,
+    event_order: record.event_order,
+    created_at: record.created_at,
+    updated_at: record.updated_at,
+    audit_receipt: record.audit_receipt,
+    next_action: record.next_action,
+  };
+}
+
+function importOutput(status, record, orchestration, extra = {}) {
+  return {
+    status,
+    sync_id: candidateImportSyncId,
+    store: {
+      format: "jsonl",
+      path: relativeStorePath(),
+      append_only: true,
+      retention_policy: "metadata_and_redacted_preview_only",
+    },
+    runner: {
+      required_capabilities: orchestration.eventRunner?.requiredCapabilities || [],
+      forbidden_capabilities: orchestration.eventRunner?.forbiddenCapabilities || [],
+    },
+    ...extra,
+    import: record ? importPublicPayload(record) : null,
+  };
+}
+
+function latestImportRecords(records) {
+  const latestByImport = new Map();
+  for (const record of records) {
+    if (!record || record.sync_id !== candidateImportSyncId || !record.import_id) {
+      continue;
+    }
+    const previous = latestByImport.get(record.import_id);
+    if (!previous || Number(record.event_order || 0) >= Number(previous.event_order || 0)) {
+      latestByImport.set(record.import_id, record);
+    }
+  }
+  return [...latestByImport.values()].sort((left, right) => Number(left.event_order || 0) - Number(right.event_order || 0));
+}
+
+function buildImportRecord(command, payload, inputPath, orchestration, records, options) {
+  const schemaId = command === "import-candidate" ? "CandidateEnvelope" : "DesignChangeProposal";
+  const schema = schemaContract(orchestration, schemaId);
+  validateImportPayload(payload, schema, schemaId);
+  const sourceId = importSourceId(schemaId, payload);
+  const payloadText = JSON.stringify(payload);
+  const payloadDigest = `sha256:${sha256Text(payloadText)}`;
+  const idempotencyKey = validateStoreIdentifier(
+    options.idempotency_key || `idem:${sha256Text(`${schemaId}:${sourceId}:${payloadDigest}`).slice(0, 32)}`,
+    "idempotency key",
+  );
+  const importId = `dsi:${sha256Text(`import:${idempotencyKey}`).slice(0, 24)}`;
+  const now = isoNow();
+  const payloadRef = schemaId === "CandidateEnvelope" ? String(payload.payload_ref) : path.relative(root, inputPath) || path.basename(inputPath);
+  const record = {
+    record_version: candidateImportRecordVersion,
+    sync_id: candidateImportSyncId,
+    record_type: "design_studio_import",
+    import_type: schemaId === "CandidateEnvelope" ? "candidate_envelope_imported" : "design_change_proposal_imported",
+    record_id: `record:${sha256Text(`${importId}:${records.length + 1}:${now}`).slice(0, 24)}`,
+    import_id: importId,
+    idempotency_key: idempotencyKey,
+    schema_id: schemaId,
+    source_id: sourceId,
+    payload_ref: compactPreview(payloadRef, 160),
+    payload_digest: payloadDigest,
+    payload_preview: importPayloadPreview(schemaId, payload),
+    redaction_state: "checked_no_secret_like_payload",
+    proposal_only: true,
+    writes_allowed: false,
+    direct_apply_authority: false,
+    external_product_apply: false,
+    provider_dispatch: false,
+    imagegen_executed: false,
+    plan_token_created: false,
+    apply_token_created: false,
+    approval_receipt_created: false,
+    payload_policy: "metadata_and_redacted_preview_only",
+    event_order: records.length + 1,
+    created_at: now,
+    updated_at: now,
+    next_action: schemaId === "CandidateEnvelope" ? "manual_accept_adjust_reject_or_hold_required" : "manual_preview_diff_and_plan_required",
+    source_command: `tools/dashboard-design-system ${command}`,
+    audit_receipt: null,
+  };
+  return attachAuditReceipt(record);
+}
+
+function handleImportCommand(command, orchestration) {
+  const options = parseOptionArgs(process.argv.slice(3));
+  rejectUnknownOptions(options, new Set(["input", "idempotency_key"]), command);
+  const { payload, resolved } = readImportJson(options.input, command);
+  const records = readEventRecords();
+  const record = buildImportRecord(command, payload, resolved, orchestration, records, options);
+  const duplicate = latestImportRecords(records).find((candidate) => candidate.idempotency_key === record.idempotency_key);
+  if (duplicate) {
+    process.stdout.write(`${JSON.stringify(importOutput("deduplicated", duplicate, orchestration, {
+      reason_code: "design_studio_import_idempotency_key_exists",
+      next_action: duplicate.next_action,
+    }), null, 2)}\n`);
+    return;
+  }
+  appendEventRecord(record);
+  process.stdout.write(`${JSON.stringify(importOutput("imported", record, orchestration, {
+    reason_code: "design_studio_import_recorded",
+    next_action: record.next_action,
+  }), null, 2)}\n`);
 }
 
 function attachAuditReceipt(record) {
@@ -1999,6 +2221,8 @@ if (command === "emit-css") {
   handleEventStatus(orchestration);
 } else if (command === "cancel-event" || command === "retry-event" || command === "dead-letter-event") {
   transitionEvent(command, orchestration);
+} else if (command === "import-candidate" || command === "import-proposal") {
+  handleImportCommand(command, orchestration);
 } else {
   usage();
 }

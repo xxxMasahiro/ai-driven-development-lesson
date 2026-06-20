@@ -1049,6 +1049,29 @@ test.describe("English dashboard control center", () => {
     ]));
     addDesignSystemRepositoryScope(sourceBoundaryFixture);
     addProducerDecisionPages(sourceBoundaryFixture);
+    sourceBoundaryFixture.development.product_authority.evidence_summary.items.push({
+      source_id: "product.ci.main",
+      context: "product-improvement",
+      status: "not_run",
+      freshness_state: "not_collected",
+      required_in_context: true,
+      authority: "manual_required",
+      observed_at: "not_collected",
+      max_age_seconds: 3600,
+      product_root: "[external-product-repository]/task-tracker-repository",
+      product_head: "none",
+      source_artifacts: "ops/CI_MANIFEST.tsv",
+      blocked_by: "product.ci.github_actions",
+      next_command: "tools/product-gate-evidence ci-runs product-improvement 3600",
+      detail_code: "product.ci.main.detail",
+      current_item_id: "product.ci.main",
+      detail_manifest_source: "ops/EVIDENCE_DETAIL_MANIFEST.tsv",
+      detail_artifact_path: "ops/evidence/product.ci.main.json",
+      summary: "Main CI run evidence has not been recorded yet.",
+      reason: "CI run evidence is missing for the selected product context.",
+      next_action: "Run the product-local ci-runs evidence collector outside the dashboard.",
+      risk_level: "critical",
+    });
     await page.unroute(dashboardDataRoutePattern);
     await routeDashboardData(page, sourceBoundaryFixture);
     await page.goto("http://lesson.local/dashboard-control-center/index.html?refresh_ms=60000");
@@ -1091,6 +1114,7 @@ test.describe("English dashboard control center", () => {
     await expect(overviewProducerDecision).toContainText("dashboard-data");
     const situationBoard = page.locator("[data-operational-situation='true']");
     await expect(situationBoard).toContainText("Operational Situation Board");
+    await expect(situationBoard).toContainText("Live observation");
     await expect(situationBoard.locator("[data-operational-situation-fact]")).toHaveCount(5);
     await expect(situationBoard.locator("[data-operational-situation-fact='current-work']")).toContainText("STEP 1-14 Practical lesson");
     await expect(situationBoard.locator("[data-operational-situation-fact='blockers']")).toContainText("6 blocker(s)");
@@ -1189,6 +1213,12 @@ test.describe("English dashboard control center", () => {
     await expect(workflowOperationalDetail.locator("[data-operational-detail-evidence-key='git_sync']")).toBeVisible();
     await expect(page.getByRole("heading", { name: "Git Sync" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Product Evidence" })).toBeVisible();
+    await page.locator(".workflow-mini-card--product-evidence").getByRole("button", { name: /Check collection/ }).click();
+    await expect(page.locator(".insight-detail-modal")).toContainText("Suggested CI evidence check");
+    await expect(page.locator(".insight-detail-modal")).toContainText("display only");
+    await expect(page.locator(".insight-detail-modal")).toContainText("tools/product-gate-evidence ci-runs product-improvement 3600");
+    await page.locator(".insight-detail-modal__close").click();
+    await expect(page.locator(".insight-detail-modal")).toHaveCount(0);
     await page.locator(".workflow-mini-card", { hasText: "Git Sync" }).getByRole("button", { name: /View details/ }).click();
     await expect(page.locator(".insight-detail-modal")).toContainText("Workflow detail");
     await expect(page.locator(".insight-detail-modal")).toContainText("Why it matters");
@@ -2170,6 +2200,7 @@ test.describe("English dashboard control center", () => {
     await expect(page.locator("[data-overview-status-card='ci']")).toContainText("Workflow: Product CI");
     await expect(page.locator("[data-overview-status-card='security'] .overview-status-card__head strong")).toHaveText("Unresolved safety blockers checked 3");
     const situationBoard = page.locator("[data-operational-situation='true']");
+    await expect(situationBoard).toContainText("Live observation");
     await expect(situationBoard.locator("[data-operational-situation-fact='current-work']")).toContainText("Free Development");
     await expect(situationBoard.locator("[data-operational-situation-fact='blockers']")).toContainText("6 blocker(s)");
     await expect(situationBoard.locator("[data-operational-situation-fact='git']")).toContainText("Uncommitted or untracked changes 3");
@@ -2212,6 +2243,30 @@ test.describe("English dashboard control center", () => {
     const safetyOperationalDetail = page.locator("[data-operational-detail-decisions='safety']");
     await expect(safetyOperationalDetail.locator("[data-operational-detail-evidence-key='security'][data-evidence-source-id='product.security.local_artifacts']")).toBeVisible();
     await expect(page.locator("#safety .mock-table-row--live-evidence[data-evidence-source-id='product.security.local_artifacts']")).toBeVisible();
+  });
+
+  test("labels operational situation as saved snapshot fallback when live status is unavailable", async ({ page }) => {
+    const fixture = JSON.parse(fs.readFileSync(fixturePath, "utf8"));
+    addProducerDecisionPages(fixture);
+    await page.unroute(dashboardDataRoutePattern);
+    await routeDashboardData(page, fixture);
+    await page.unroute(dashboardLiveStatusRoutePattern);
+    await page.route(dashboardLiveStatusRoutePattern, async (route) => {
+      await route.fulfill({
+        status: 503,
+        contentType: "application/json",
+        body: JSON.stringify({ error: "live status unavailable" }),
+      });
+    });
+    await page.goto("http://lesson.local/dashboard-control-center/index.html?refresh_ms=60000");
+
+    const situationBoard = page.locator("[data-operational-situation='true']");
+    await expect(situationBoard).toContainText("Saved snapshot fallback");
+    await expect(situationBoard).not.toContainText("Live observation");
+
+    const navigation = page.getByRole("navigation", { name: "Dashboard categories" });
+    await navigation.getByRole("link", { name: "Development Workflow", exact: true }).click();
+    await expect(page.locator("[data-operational-detail-decisions='workflow']")).toContainText("Saved snapshot fallback");
   });
 
   test("does not render stale evidence-backed detail pages while selected menu snapshot is unavailable", async ({ page }) => {

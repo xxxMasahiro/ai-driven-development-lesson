@@ -2467,3 +2467,91 @@ Acceptance requirements:
 - Dashboard locale metadata used by validation must remain separate from the full translation dictionary so the i18n chunk can be isolated.
 - `chunkSizeWarningLimit` must not be raised above the default-scale value to hide the warning.
 - The check must be wired into standalone verification, test-plan policy, Git hooks, final-gate coverage, CI structure checks, and aggregate repository verification.
+
+## Implemented Product AGENTS Lesson Gate Alignment Requirements
+
+SYNC-ID: product_agents_lesson_gate_alignment
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,lesson/SYNC_GATES_14_DAYS.tsv,lesson/LESSON_FLOW_14_DAYS.tsv,lesson/LESSON_FLOW.tsv,tools/check_lesson14_sync.sh,tools/test_lesson14.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/check_lesson14_sync.sh,tools/test_lesson14.sh,tools/test_product_scaffold_check.sh,tools/check_agents_skills.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+Lesson flows and synchronization gates must teach the current product repository agent entry standard.
+The product repository standard is `AGENTS.MD`; legacy product-side `AGENT.md` may be mentioned only as a deprecated migration target.
+STEP 1-7 and STEP 1-14 guidance must not require or normalize new `AGENT.md` files.
+
+Acceptance requirements:
+
+- STEP 1-14 sync gates require `AGENTS.MD` where product agent rules are required.
+- STEP 1-7 and STEP 1-14 lesson prose points learners to `AGENTS.MD` and explains legacy `AGENT.md` only as a migration/deprecation concern.
+- Lesson14 sync checks fail when required product-document lists reintroduce legacy `AGENT.md`.
+- Existing product scaffold checks remain the product-side authority for rejecting legacy root `AGENT.md`.
+
+Non-scope:
+
+- Do not write to an external product repository, delete a product-side legacy file, or change AGENTS.MD invariants.
+- Do not change lesson progression, Git/CI authority, Dashboard UI, or product scaffold semantics beyond the lesson/gate alignment.
+
+## Implemented Dashboard Control Center Evidence Presentation Clarity Requirements
+
+SYNC-ID: dashboard_control_center_evidence_presentation_clarity
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,dashboard-control-center/src/displayDepth.js,dashboard-control-center/src/App.jsx,dashboard-control-center/src/DecisionSummary.jsx,dashboard-control-center/src/i18n.js,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/check_dashboard_design_system.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+Dashboard display depth and operational freshness labels must help both non-engineers and junior/intermediate engineers understand what they are seeing.
+Friendly mode remains a guide-level mode, standard remains the current baseline, and technical mode prioritizes existing technical evidence.
+Live-status absence or failure must not be labeled as a live update.
+
+Acceptance requirements:
+
+- Display-depth policy names and rendered behavior make clear that friendly keeps technical references available as folded detail, standard preserves the baseline, and technical opens or prioritizes technical evidence.
+- Overview and detail operational panels distinguish live observation, saved snapshot fallback, and last validated snapshot wording.
+- Live-status fetch failure may safely fall back to snapshot data, but the UI must not imply fresh live evidence when only snapshot data is displayed.
+- No mode hides blockers, approvals, failed/stale evidence, command previews, read-only boundaries, Settings boundaries, or Design Studio boundaries.
+
+Non-scope:
+
+- Do not add new authority fields, execute commands, call GitHub, mutate repositories, change Settings authority, change Design Studio authority, add dependencies, or redesign the dashboard.
+
+## Implemented Dashboard Control Center CI Evidence Guidance Requirements
+
+SYNC-ID: dashboard_control_center_ci_evidence_guidance
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/PRODUCT_GATE_EVIDENCE_SCHEMA.tsv,tools/product-gate-evidence-bootstrap,tools/lib/dashboard_data.sh,tools/dashboard-data,dashboard-control-center/src/App.jsx,dashboard-control-center/src/i18n.js,tests/playwright/dashboard-control-center.spec.js,tools/test_product_gate_tools.sh,tools/test_dashboard_data.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_product_gate_tools.sh,tools/test_dashboard_data.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+The Control Center must explain CI evidence without becoming a CI runner.
+Existing product-local `ci-runs` evidence collection remains an explicit agent-run command outside the browser.
+The dashboard may show read-only command previews and missing/stale/manual-required reasons so users know what evidence to collect next.
+
+Acceptance requirements:
+
+- Product CI evidence keeps local manifest/provider readiness distinct from real PR/main run evidence.
+- Missing, not-run, stale, failed, manual-required, and unavailable provider states are preserved instead of being collapsed to ready.
+- Suggested CI collection commands are rendered as display-only command previews.
+- The browser does not call `gh`, poll GitHub, run product-local commands, store credentials, push, merge, wait for CI, or write product repositories.
+
+Non-scope:
+
+- Do not add browser-triggered CI collection, background polling, OAuth, credential storage, new CI authority, or external product source mutation.
+
+## Implemented Dashboard Design Studio Candidate Import Foundation Requirements
+
+SYNC-ID: dashboard_design_studio_candidate_import_foundation
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,tools/dashboard-design-system,tools/test_dashboard_design_studio_events.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_dashboard_design_studio_events.sh,tools/check_dashboard_design_system.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+Design Studio must be able to import local structured candidate and proposal metadata without trusting it as instructions or granting apply authority.
+CandidateEnvelope and DesignChangeProposal import is an owner-tool boundary for local structured JSON only.
+
+Acceptance requirements:
+
+- `tools/dashboard-design-system` accepts valid local CandidateEnvelope and DesignChangeProposal JSON and stores append-only redacted metadata.
+- Required fields and forbidden fields are validated against the orchestration contract.
+- Secret-like payloads, raw credentials, shell commands, trusted-instruction fields, direct apply fields, apply tokens, CSS patches, script patches, and external product apply authority are rejected.
+- Import does not generate plan tokens, apply tokens, approval receipts, provider dispatch, subscription-agent execution, imagegen calls, Git/CI operations, or product repository writes.
+
+Non-scope:
+
+- Do not implement provider API dispatch, imagegen execution, mock image mutation, automatic apply, external product source writes, browser mutation endpoints, dependency changes, or credential handling.

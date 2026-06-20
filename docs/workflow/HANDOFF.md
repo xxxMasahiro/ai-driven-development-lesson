@@ -2882,3 +2882,71 @@ Next Step:
 - No remaining implementation action for this sync ID after bundle, dashboard, test-plan, Git hooks, CI structure, sync, and repository-development checks pass.
 
 Stop and ask before dependency changes, raising chunk-size warning limits to hide warnings, weakening Git hooks or final gates, generated-file source edits, browser command execution, repository writes, cleanup, push, PR creation, merge, main sync, credentials, or any existing-feature tradeoff.
+
+## Product AGENTS Lesson Gate Alignment Handoff
+
+SYNC-ID: product_agents_lesson_gate_alignment
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,lesson/SYNC_GATES_14_DAYS.tsv,lesson/LESSON_FLOW_14_DAYS.tsv,lesson/LESSON_FLOW.tsv,tools/check_lesson14_sync.sh,tools/test_lesson14.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/check_lesson14_sync.sh,tools/test_lesson14.sh,tools/test_product_scaffold_check.sh,tools/check_agents_skills.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+Restart context:
+
+- The product repository agent entry standard is `AGENTS.MD`.
+- Lesson14 gates and lesson prose now require product `AGENTS.MD` where product agent rules are required.
+- Preserve legacy `AGENT.md` wording only when it clearly describes migration or deprecation.
+
+Next safe action:
+
+- No remaining implementation action for this sync ID after focused verification.
+
+## Dashboard Control Center Evidence Presentation Clarity Handoff
+
+SYNC-ID: dashboard_control_center_evidence_presentation_clarity
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,dashboard-control-center/src/displayDepth.js,dashboard-control-center/src/App.jsx,dashboard-control-center/src/DecisionSummary.jsx,dashboard-control-center/src/i18n.js,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/check_dashboard_design_system.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+Restart context:
+
+- Display depth is presentation-only: friendly guides and folds technical detail, standard remains baseline, technical prioritizes existing evidence.
+- Operational freshness labels now distinguish matching live observation from saved snapshot fallback.
+- The browser remains read-only for operational evidence and command previews.
+
+Next safe action:
+
+- No remaining implementation action for this sync ID after focused verification.
+
+## Dashboard Control Center CI Evidence Guidance Handoff
+
+SYNC-ID: dashboard_control_center_ci_evidence_guidance
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/PRODUCT_GATE_EVIDENCE_SCHEMA.tsv,tools/product-gate-evidence-bootstrap,tools/lib/dashboard_data.sh,tools/dashboard-data,dashboard-control-center/src/App.jsx,dashboard-control-center/src/i18n.js,tests/playwright/dashboard-control-center.spec.js,tools/test_product_gate_tools.sh,tools/test_dashboard_data.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_product_gate_tools.sh,tools/test_dashboard_data.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+Restart context:
+
+- Product-local `ci-runs` is the explicit evidence collection path.
+- The Dashboard shows read-only suggested command previews but must not run CI, call `gh`, poll providers, or write product repositories.
+- Preserve missing, not-run, stale, failed, and manual-required states.
+
+Next safe action:
+
+- No remaining implementation action for this sync ID after focused verification.
+
+## Dashboard Design Studio Candidate Import Foundation Handoff
+
+SYNC-ID: dashboard_design_studio_candidate_import_foundation
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,tools/dashboard-design-system,tools/test_dashboard_design_studio_events.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_dashboard_design_studio_events.sh,tools/check_dashboard_design_system.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+Restart context:
+
+- CandidateEnvelope and DesignChangeProposal import is local, structured, redacted, append-only metadata.
+- Imported candidate/proposal data remains untrusted and proposal-only.
+- Import must not create provider dispatch, imagegen execution, plan tokens, apply tokens, direct apply authority, or external product writes.
+
+Next safe action:
+
+- No remaining implementation action for this sync ID after focused verification.

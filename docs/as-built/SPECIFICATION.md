@@ -2907,3 +2907,47 @@ The check validates:
 
 The Vite config separates Dashboard data, the full i18n dictionary, and generated design-system runtime chunks instead of grouping all three into one large runtime chunk.
 The check is wired into test-plan policy, Git hook checks, final-gate coverage, CI policy regression jobs, and aggregate repository verification.
+
+## Implemented Product AGENTS Lesson Gate Alignment Specification
+
+SYNC-ID: product_agents_lesson_gate_alignment
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,lesson/SYNC_GATES_14_DAYS.tsv,lesson/LESSON_FLOW_14_DAYS.tsv,lesson/LESSON_FLOW.tsv,tools/check_lesson14_sync.sh,tools/test_lesson14.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/check_lesson14_sync.sh,tools/test_lesson14.sh,tools/test_product_scaffold_check.sh,tools/check_agents_skills.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+The lesson flow/gate sources must use `AGENTS.MD` as the product agent entry standard.
+`AGENT.md` is allowed only in explanatory migration language that clearly marks it as legacy and deprecated.
+`tools/check_lesson14_sync.sh` must mechanically prevent the required-document gate from drifting back to legacy product `AGENT.md`.
+
+## Implemented Dashboard Control Center Evidence Presentation Clarity Specification
+
+SYNC-ID: dashboard_control_center_evidence_presentation_clarity
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,dashboard-control-center/src/displayDepth.js,dashboard-control-center/src/App.jsx,dashboard-control-center/src/DecisionSummary.jsx,dashboard-control-center/src/i18n.js,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/check_dashboard_design_system.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+The display-depth renderer remains a presentation policy over existing data.
+It must expose clear helper names for folded technical references, baseline standard behavior, and expanded technical detail.
+Operational freshness labels must be derived from whether matching live-status data exists, not from the fallback timestamp alone.
+
+## Implemented Dashboard Control Center CI Evidence Guidance Specification
+
+SYNC-ID: dashboard_control_center_ci_evidence_guidance
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/PRODUCT_GATE_EVIDENCE_SCHEMA.tsv,tools/product-gate-evidence-bootstrap,tools/lib/dashboard_data.sh,tools/dashboard-data,dashboard-control-center/src/App.jsx,dashboard-control-center/src/i18n.js,tests/playwright/dashboard-control-center.spec.js,tools/test_product_gate_tools.sh,tools/test_dashboard_data.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_product_gate_tools.sh,tools/test_dashboard_data.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+CI evidence guidance is read-only.
+The product evidence producer may provide `next_command` or required-command text for explicit agent execution, and the Dashboard may render that text through existing command-preview components.
+Dashboard data generation must not run `gh`, poll CI providers, or collapse unavailable run evidence into success.
+
+## Implemented Dashboard Design Studio Candidate Import Foundation Specification
+
+SYNC-ID: dashboard_design_studio_candidate_import_foundation
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,tools/dashboard-design-system,tools/test_dashboard_design_studio_events.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_dashboard_design_studio_events.sh,tools/check_dashboard_design_system.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+`tools/dashboard-design-system` must import CandidateEnvelope and DesignChangeProposal JSON as untrusted local metadata.
+Imported records are append-only, redacted, hashable, and proposal-only.
+The import path must validate orchestration-required fields, reject forbidden fields, avoid raw payload persistence, and never create plan/apply authority.

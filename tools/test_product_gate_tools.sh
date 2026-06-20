@@ -450,12 +450,16 @@ awk -F '\t' '$1 == "product.ci.main" && $2 == "all" && $3 == "passed" && $5 == "
   "$product_repo/.git/product-gate-evidence/index.tsv"
 awk -F '\t' '$1 == "product.ci.pr" && $2 == "product-improvement" && $3 == "not_run" && $5 == "false" && $6 == "manual_required" { found = 1 } END { exit found ? 0 : 1 }' \
   "$product_repo/.git/product-gate-evidence/index.tsv"
+awk -F '\t' '$1 == "product.ci.pr" && $2 == "product-improvement" && $13 == "tools/product-gate-evidence ci-runs product-improvement 3600 --pr <number>" { found = 1 } END { exit found ? 0 : 1 }' \
+  "$product_repo/.git/product-gate-evidence/index.tsv"
 PATH="$fake_bin:$PATH" "$product_repo/tools/product-gate-evidence" ci-runs product-improvement 3600 --pr 12 >/dev/null
 awk -F '\t' '$1 == "product.ci.github_actions" && $2 == "product-improvement" && $3 == "passed" && $5 == "true" && $6 == "authoritative" { found = 1 } END { exit found ? 0 : 1 }' \
   "$product_repo/.git/product-gate-evidence/index.tsv"
 awk -F '\t' '$1 == "product.ci.main" && $2 == "product-improvement" && $3 == "passed" && $5 == "true" && $6 == "authoritative" { found = 1 } END { exit found ? 0 : 1 }' \
   "$product_repo/.git/product-gate-evidence/index.tsv"
 awk -F '\t' '$1 == "product.ci.pr" && $2 == "product-improvement" && $3 == "passed" && $5 == "true" && $6 == "authoritative" { found = 1 } END { exit found ? 0 : 1 }' \
+  "$product_repo/.git/product-gate-evidence/index.tsv"
+awk -F '\t' '$1 == "product.ci.pr" && $2 == "product-improvement" && $13 == "tools/product-gate-evidence ci-runs product-improvement 3600 --pr 12" { found = 1 } END { exit found ? 0 : 1 }' \
   "$product_repo/.git/product-gate-evidence/index.tsv"
 "$product_repo/tools/product-gate-evidence" security-status external-integration 3600 >/dev/null
 awk -F '\t' '$1 == "product.security.secrets" && $2 == "external-integration" && $3 == "passed" && $5 == "true" && $6 == "authoritative" { found = 1 } END { exit found ? 0 : 1 }' \
