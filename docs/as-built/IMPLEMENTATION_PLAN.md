@@ -4838,3 +4838,36 @@ git diff --check
 ```
 
 Stop and ask before dependency changes, Settings authority expansion, arbitrary command execution, Git/CI operations, product repository writes, Design Studio authority changes, generated-file source edits, cleanup, push, PR creation, merge, or any existing-feature tradeoff.
+
+## Dashboard Control Center Operational Situation Board Implementation Plan
+
+SYNC-ID: dashboard_control_center_operational_situation_board
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,dashboard-control-center/src/App.jsx,dashboard-control-center/src/i18n.js,dashboard-control-center/src/styles.css,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/check_dashboard_design_system.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/check_dashboard_design_system.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+Implemented order:
+
+1. Synchronize this plan across the as-built contract, requirements, specification, implementation plan, tracker, and handoff before runtime edits.
+2. Add reusable Overview helpers that summarize selected context, matching live repository state, blockers, Git/worktree counts, local tests, CI, and next-safe-action text without changing data authority.
+3. Add an `OperationalSituationBoard` overview component using existing status, command-preview, source, and display-depth conventions.
+4. Add localized labels for the board in the Dashboard i18n layer while relying on generated locale fallbacks for non-English/non-Japanese locales.
+5. Add page-specific responsive CSS for the board using existing Dashboard tokens and without editing generated design-system artifacts.
+6. Extend Playwright coverage for default overview rendering and live-status updates, including dirty worktree, branch, tests, CI, blockers, and next safe check visibility.
+7. Run focused i18n, Control Center, design-system, sync, and repository-development checks before promotion.
+
+Verification sequence:
+
+```bash
+./tools/test_dashboard_i18n.sh
+./tools/test_dashboard_control_center.sh
+./tools/check_dashboard_design_system.sh
+./tools/check_as_built_sync_contract.sh
+./tools/check_as_built_docs.sh
+./tools/check_workflow_pair_sync.sh
+./tools/check_repository_development_workflow.sh
+./tools/test_repository_development_workflow.sh
+git diff --check
+```
+
+Stop and ask before adding dependencies, changing generated design-system files as source, browser command execution, Git/CI operations, repository writes, approval writes, cleanup, push, PR creation, merge, main sync, credentials, or any existing-feature tradeoff.

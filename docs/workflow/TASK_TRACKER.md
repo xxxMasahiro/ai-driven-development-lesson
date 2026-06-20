@@ -26,6 +26,7 @@ The latest implemented dashboard control center live snapshot sync is documented
 The current implemented dashboard control center mock-aligned Overview is documented as `dashboard_control_center_mock_aligned_overview`; it makes the Overview more closely match the mock while keeping Partial Failures stable, manual follow-ups separate, and the browser read-only.
 The current implemented dashboard control center detail-page mock parity follow-up is documented as `dashboard_control_center_detail_mock_parity`; it aligns the four category detail pages with the approved detail mock images as UI/UX source references and makes each page explain what it checks, what judgment it supports, and what must be reviewed next.
 The current implemented dashboard control center Settings safe change is documented as `dashboard_control_center_settings_safe_change_plan`; it provides guarded Settings edits, immediate post-apply snapshot refresh, and workflow display language control for Dashboard fixed UI labels without a page reload.
+The latest implemented dashboard control center operational situation board is documented as `dashboard_control_center_operational_situation_board`; it summarizes selected context, blockers, Git/worktree, tests/CI, and next safe check on the Overview without adding browser command execution authority.
 Safe product repository cleanup remains implemented for the external product repository created by the 7-day or 14-day lessons.
 It also preserves the 7-day and 14-day learning-mode, workflow display language, product development language, and expanded language-list controls.
 The shared standard language list remains `ja`, `en`, `ko`, `zh-CN`, `zh-TW`, `es`, `pt-BR`, `fr`, `de`, `id`, `vi`, `th`, `hi`, and `ar`, while `zh` remains a `zh-CN` alias and `custom` remains available.
@@ -149,6 +150,7 @@ The following developer-memory remediation items are implemented and mechanicall
 - The implemented product security workflow gate is synchronized in the same five documents as menu 4/5/6 runtime security gate enforcement.
 - The implemented CI timing and approved auto-improvement cycle is synchronized in the same five documents as the evidence-driven CI optimization proposal mechanism.
 - The implemented dashboard control center data layer is synchronized in the same five documents as the read-only dashboard data implementation.
+- The implemented dashboard control center operational situation board is synchronized in the same five documents as the overview decision-support surface for non-engineers and junior/intermediate engineers.
 - The synchronization passes only when the implemented content is present in all five documents.
 - Preserve refactorability, ecosystem fit, reusable design, generality, and the no-existing-feature-tradeoff rule while maintaining the implemented remediation.
 
@@ -2668,3 +2670,24 @@ Current Status:
 Next Step:
 
 - No remaining implementation action for this sync ID. Continue to keep display depth as presentation policy only.
+
+## Dashboard Control Center Operational Situation Board Work
+
+SYNC-ID: dashboard_control_center_operational_situation_board
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,dashboard-control-center/src/App.jsx,dashboard-control-center/src/i18n.js,dashboard-control-center/src/styles.css,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/check_dashboard_design_system.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/check_dashboard_design_system.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+Current Status:
+
+- [x] Developer approved implementation from the Overview decision-support proposal.
+- [x] Started under `repository-development-workflow` with AGENTS invariants and sync-first discipline.
+- [x] Added this sync ID across the as-built contract and synchronized documents before runtime implementation.
+- [x] Added the Overview Operational Situation Board for current work, blockers, Git/worktree, tests/CI, and next safe check.
+- [x] Kept the board read-only and backed by existing snapshot/live-status fields.
+- [x] Added localized board labels, responsive CSS, and Playwright coverage for snapshot and live-status behavior.
+- [x] Preserved Settings, Design Studio, Git/CI, approval, cleanup, and command-preview authority boundaries.
+
+Next Step:
+
+- No remaining implementation action for this sync ID. Continue to treat the board as an overview decision surface, not a browser operation runner.

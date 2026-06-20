@@ -1089,6 +1089,14 @@ test.describe("English dashboard control center", () => {
     await expect(overviewProducerDecision).toContainText("producer.overview");
     await expect(overviewProducerDecision).toContainText("#overview");
     await expect(overviewProducerDecision).toContainText("dashboard-data");
+    const situationBoard = page.locator("[data-operational-situation='true']");
+    await expect(situationBoard).toContainText("Operational Situation Board");
+    await expect(situationBoard.locator("[data-operational-situation-fact]")).toHaveCount(5);
+    await expect(situationBoard.locator("[data-operational-situation-fact='current-work']")).toContainText("STEP 1-14 Practical lesson");
+    await expect(situationBoard.locator("[data-operational-situation-fact='blockers']")).toContainText("6 blocker(s)");
+    await expect(situationBoard.locator("[data-operational-situation-fact='git']")).toContainText("Worktree is clean");
+    await expect(situationBoard.locator("[data-operational-situation-fact='git']")).toContainText("Branch: main");
+    await expect(situationBoard.locator("[data-operational-situation-fact='next-safe']")).toContainText("./tools/product-repository-authority status --json");
     await expect(page.locator(".common-status-card--git .common-status-op")).toHaveCount(4);
     await expect(page.locator(".common-status-card--git .common-status-op", { hasText: "Merge" })).toContainText("Allowed");
     await expectCenteredSvg(page.locator(".common-status-card--git .common-status-op__label"));
@@ -2143,6 +2151,13 @@ test.describe("English dashboard control center", () => {
     await expect(page.locator("[data-overview-status-card='ci'] .overview-status-card__head strong")).toHaveText("CI is running");
     await expect(page.locator("[data-overview-status-card='ci']")).toContainText("Workflow: Product CI");
     await expect(page.locator("[data-overview-status-card='security'] .overview-status-card__head strong")).toHaveText("Unresolved safety blockers checked 3");
+    const situationBoard = page.locator("[data-operational-situation='true']");
+    await expect(situationBoard.locator("[data-operational-situation-fact='current-work']")).toContainText("Free Development");
+    await expect(situationBoard.locator("[data-operational-situation-fact='blockers']")).toContainText("6 blocker(s)");
+    await expect(situationBoard.locator("[data-operational-situation-fact='git']")).toContainText("Uncommitted or untracked changes 3");
+    await expect(situationBoard.locator("[data-operational-situation-fact='git']")).toContainText("Branch: main");
+    await expect(situationBoard.locator("[data-operational-situation-fact='tests-ci']")).toContainText("CI");
+    await expect(situationBoard.locator("[data-operational-situation-fact='next-safe']")).toContainText("./tools/product-repository-authority status --json");
 
     const localTestsCard = page.locator("[data-overview-status-card='workflow']");
     const gitCard = page.locator("[data-overview-status-card='git']");

@@ -2407,3 +2407,22 @@ Acceptance requirements:
 - `technical` opens or prioritizes existing producer-owned source, authority, freshness, detail target, command-preview, and evidence references.
 - No mode may hide blockers, approval requirements, failed or stale evidence, command-preview access, security state, Settings boundaries, Design Studio boundaries, or read-only/display-only wording.
 - The browser must not gain new command execution, Git/CI mutation, product repository write, dependency, credential, cleanup, or arbitrary Settings authority.
+
+## Dashboard Control Center Operational Situation Board Requirements
+
+SYNC-ID: dashboard_control_center_operational_situation_board
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,dashboard-control-center/src/App.jsx,dashboard-control-center/src/i18n.js,dashboard-control-center/src/styles.css,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/check_dashboard_design_system.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/check_dashboard_design_system.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+The Dashboard overview must include an operational situation board that makes the current workflow understandable before users inspect detailed pages.
+It must summarize the selected menu and repository, current blockers, Git/worktree state, local test and CI state, and the next safe check using existing producer-owned snapshot and live-status fields.
+
+Acceptance requirements:
+
+- Non-engineers can read one board to understand what is happening now, whether anything is blocked, and where to look next.
+- Junior and intermediate engineers can see branch, dirty/untracked counts, ahead/behind counts, test/CI status, source evidence, and command-preview references without opening the CLI first.
+- The board must not compute new authority from labels, routes, colors, or local UI state; it may only summarize existing snapshot or live-status fields.
+- Missing, unknown, stale, not-run, manual-required, approval-required, and not-applicable states must remain distinct.
+- Display depth may reduce secondary technical detail, but it must not hide blockers, approvals, failed or stale evidence, security state, or read-only/display-only boundaries.
+- The browser must not gain command execution, Git/CI mutation, repository writes, approval writes, cleanup, dependency changes, credential handling, or external service calls.
