@@ -54,6 +54,15 @@ mv "$tmp_gates" "$bad_learning_files/lesson/SYNC_GATES_14_DAYS.tsv"
 (cd "$bad_learning_files" && ./tools/check_lesson14_sync.sh >/tmp/lesson14-bad-learning-files.out 2>&1 && exit 1 || true)
 grep 'sync gates must use 14-day learning files only' /tmp/lesson14-bad-learning-files.out >/dev/null
 
+bad_legacy_agent="$work/bad-legacy-agent"
+fixture_copy_repo "$work/lesson" "$bad_legacy_agent"
+tmp_gates="$(mktemp)"
+awk -F '\t' -v OFS='\t' '$1 !~ /^#/ && $1 == "Step 3/14" { $3 = "AGENT.md,docs/memory/SESSION_MEMORY.md" } { print }' "$bad_legacy_agent/lesson/SYNC_GATES_14_DAYS.tsv" > "$tmp_gates"
+mv "$tmp_gates" "$bad_legacy_agent/lesson/SYNC_GATES_14_DAYS.tsv"
+(cd "$bad_legacy_agent" && ./tools/check_lesson14_sync.sh >/tmp/lesson14-bad-legacy-agent.out 2>&1 && exit 1 || true)
+grep 'sync gates must not require legacy product AGENT.md at Step 3/14' /tmp/lesson14-bad-legacy-agent.out >/dev/null
+grep 'Step 3/14 must require product AGENTS.MD' /tmp/lesson14-bad-legacy-agent.out >/dev/null
+
 bad_day14_gate="$work/bad-day14-gate"
 fixture_copy_repo "$work/lesson" "$bad_day14_gate"
 tmp_gates="$(mktemp)"

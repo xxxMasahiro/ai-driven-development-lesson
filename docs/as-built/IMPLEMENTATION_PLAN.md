@@ -4943,3 +4943,147 @@ git diff --check
 ```
 
 Stop and ask before dependency changes, raising chunk-size warning limits to hide warnings, weakening Git hooks or final gates, changing generated design-system files as source, browser command execution, repository writes, cleanup, push, PR creation, merge, main sync, credentials, or any existing-feature tradeoff.
+
+## Implemented Product AGENTS Lesson Gate Alignment Implementation Plan
+
+SYNC-ID: product_agents_lesson_gate_alignment
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,lesson/SYNC_GATES_14_DAYS.tsv,lesson/LESSON_FLOW_14_DAYS.tsv,lesson/LESSON_FLOW.tsv,tools/check_lesson14_sync.sh,tools/test_lesson14.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/check_lesson14_sync.sh,tools/test_lesson14.sh,tools/test_product_scaffold_check.sh,tools/check_agents_skills.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+Implemented order:
+
+1. Synchronized this planned block before runtime edits.
+2. Replaced product required-document references from `AGENT.md` to `AGENTS.MD` in STEP 1-14 gates and lesson flows.
+3. Preserved any legacy `AGENT.md` mention only when it is clearly described as a migration/deprecation target.
+4. Added sync and regression checks that fail when required product docs reintroduce legacy `AGENT.md`.
+5. Promoted this sync ID to implemented after focused lesson and synchronization checks passed.
+
+Stop and ask before editing AGENTS.MD invariants, mutating external product repositories, deleting product files, changing lesson progression, changing Git/CI authority, or accepting an existing-feature tradeoff.
+
+## Implemented Dashboard Control Center Evidence Presentation Clarity Implementation Plan
+
+SYNC-ID: dashboard_control_center_evidence_presentation_clarity
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,dashboard-control-center/src/displayDepth.js,dashboard-control-center/src/App.jsx,dashboard-control-center/src/DecisionSummary.jsx,dashboard-control-center/src/i18n.js,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/check_dashboard_design_system.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+Implemented order:
+
+1. Synchronized this planned block before runtime edits.
+2. Renamed or supplemented display-depth policy fields so folded technical reference behavior is explicit and `standard` remains the compatibility baseline.
+3. Added live/snapshot freshness helpers and localized labels for live observation, saved snapshot fallback, and last validated snapshot.
+4. Used the helper in overview and operational detail freshness displays without changing data authority.
+5. Extended Playwright coverage for display-depth semantics and live/snapshot fallback wording.
+6. Promoted this sync ID to implemented after focused Dashboard, i18n, design-system, sync, and repository-development checks passed.
+
+Stop and ask before adding command execution, new live authority, GitHub calls, repository writes, Settings authority, Design Studio authority, dependencies, or broad visual redesign.
+
+## Implemented Dashboard Control Center CI Evidence Guidance Implementation Plan
+
+SYNC-ID: dashboard_control_center_ci_evidence_guidance
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/PRODUCT_GATE_EVIDENCE_SCHEMA.tsv,tools/product-gate-evidence-bootstrap,tools/lib/dashboard_data.sh,tools/dashboard-data,dashboard-control-center/src/App.jsx,dashboard-control-center/src/i18n.js,tests/playwright/dashboard-control-center.spec.js,tools/test_product_gate_tools.sh,tools/test_dashboard_data.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_product_gate_tools.sh,tools/test_dashboard_data.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+Implemented order:
+
+1. Synchronized this planned block before runtime edits.
+2. Kept `ci-runs` execution product-local and explicit while improving next-command/read-only guidance for missing or manual-required CI run evidence.
+3. Reused existing product authority and recent-run fields before adding schema fields.
+4. Rendered CI collection guidance through existing command-preview/read-only UI.
+5. Extended product-gate, dashboard-data, i18n, and Control Center tests for not-run/manual-required/stale guidance.
+6. Promoted this sync ID to implemented after focused product-gate, dashboard-data, Dashboard, sync, and repository-development checks passed.
+
+Stop and ask before browser-triggered CI collection, background polling, OAuth, credentials, provider calls from Dashboard data, Git operations, external product writes, push, merge, or main CI waiting.
+
+## Implemented Dashboard Design Studio Candidate Import Foundation Implementation Plan
+
+SYNC-ID: dashboard_design_studio_candidate_import_foundation
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,tools/dashboard-design-system,tools/test_dashboard_design_studio_events.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_dashboard_design_studio_events.sh,tools/check_dashboard_design_system.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+Implemented order:
+
+1. Synchronized this planned block before runtime edits.
+2. Added owner-tool import commands for local CandidateEnvelope and DesignChangeProposal JSON.
+3. Validated required/forbidden fields from the orchestration contract and rejected secret-like, direct-apply, credential, shell, patch, and external-product-apply payloads.
+4. Persisted append-only redacted metadata with hashes and bounded previews in the existing Design Studio runtime store model.
+5. Added regression coverage for valid imports, missing fields, forbidden fields, secret-like payloads, raw payload persistence, blocked provider boundaries, and no generated plan/apply tokens.
+6. Promoted this sync ID to implemented after focused Design Studio, design-system, sync, and repository-development checks passed.
+
+Stop and ask before provider API dispatch, subscription-agent background execution, imagegen calls, mock image mutation, external product writes, browser mutation endpoints, dependencies, credentials, Git/CI execution, cleanup, push, PR creation, merge, or any existing-feature tradeoff.
+
+## Implemented Dashboard Design Studio Proposal Workflow Foundation Implementation Plan
+
+SYNC-ID: dashboard_design_studio_proposal_workflow_foundation
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/DASHBOARD_DATA_SCHEMA.tsv,docs/design-system/dashboard-control-center/orchestration.json,dashboard-control-center/src/design-system.generated.js,tools/dashboard-design-system,tools/dashboard-data,dashboard-control-center/src/App.jsx,dashboard-control-center/src/i18n.js,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_design_studio_events.sh,tools/test_dashboard_data.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_dashboard_design_studio_events.sh,tools/check_dashboard_design_system.sh,tools/test_dashboard_data.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+Implemented order:
+
+1. Synchronized this planned block before runtime edits.
+2. Extended the Design Studio owner tool with proposal-only commands: imported proposal preview, subscription-agent handoff metadata, external-product plan-only export, blocked API-key provider policy inspection, and owner-tool transaction dry run.
+3. Kept CandidateEnvelope mock/image/imagegen data as untrusted imported metadata and added review summaries without imagegen execution or image mutation.
+4. Added `design_studio` producer data to `tools/dashboard-data` and documented the schema contract.
+5. Rendered imported candidates, imported proposals, preview decisions, provider boundaries, external-product plan-only export, and dry-run transaction state in the Design Studio page.
+6. Extended event-store, dashboard-data, i18n, and Playwright tests for P0-P6 behavior and forbidden capabilities.
+7. Promoted this sync ID to implemented after focused Design Studio, dashboard-data, Dashboard, sync, and repository-development checks passed.
+
+Stop and ask before provider API dispatch, subscription-agent background execution, imagegen calls, mock image mutation, OCR trust, external product writes, browser mutation endpoints, dependency changes, credentials, Git/CI execution, push, PR creation, merge, main sync, cleanup, or any existing-feature tradeoff.
+
+## Implemented Dashboard Design Studio History Detail Implementation Plan
+
+SYNC-ID: dashboard_design_studio_history_detail
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/DASHBOARD_DATA_SCHEMA.tsv,tools/dashboard-design-system,tools/dashboard-data,dashboard-control-center/src/dashboardData.js,dashboard-control-center/src/App.jsx,dashboard-control-center/src/i18n.js,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_design_studio_events.sh,tools/test_dashboard_data.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_dashboard_design_studio_events.sh,tools/check_dashboard_design_system.sh,tools/test_dashboard_data.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+Implemented order:
+
+1. Synchronized this planned block before runtime edits.
+2. Added `history_rows[]` projection to `tools/dashboard-design-system proposal-status`.
+3. Extended `DASHBOARD_DATA_SCHEMA.tsv`, `dashboardData.js`, and dashboard-data tests for item-level safe history rows.
+4. Rendered Design Studio history inside the existing History page with proposal-only boundary cues and safe technical metadata.
+5. Extended i18n and Playwright coverage for populated and empty history states.
+6. Promoted this sync ID to implemented after focused Design Studio, dashboard-data, Dashboard, sync, and repository-development checks passed.
+
+Stop and ask before provider dispatch, imagegen, subscription-agent execution, external product writes, automatic apply, approval mutation, browser command execution, dependency changes, credentials, push, merge, or existing-feature tradeoffs.
+
+## Implemented Dashboard Design Studio Subscription-Agent Handoff Package Implementation Plan
+
+SYNC-ID: dashboard_design_studio_subscription_agent_handoff_package
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/DASHBOARD_DATA_SCHEMA.tsv,tools/dashboard-design-system,tools/dashboard-data,dashboard-control-center/src/dashboardData.js,dashboard-control-center/src/App.jsx,dashboard-control-center/src/i18n.js,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_design_studio_events.sh,tools/test_dashboard_data.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_dashboard_design_studio_events.sh,tools/check_dashboard_design_system.sh,tools/test_dashboard_data.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+Implemented order:
+
+1. Synchronized this block before runtime edits.
+2. Added local `agent-package` command with constrained output path, package digest, metadata-only store record, and symlink-escape rejection.
+3. Restricted `proposal-status` handoff projection to subscription-agent events and exposed package readiness metadata.
+4. Extended dashboard schema, validation, UI, and tests for package fields and false execution boundaries.
+5. Kept package creation local, redacted, and proposal-only; dashboard display remains read-only.
+6. Promoted this sync ID to implemented after focused Design Studio, schema, i18n, dashboard-data, and design-system checks passed.
+
+Stop and ask before subscription-agent execution, provider dispatch, uploads, credentials, imagegen, external product writes, automatic apply, approval mutation, browser command execution, dependencies, push, merge, or existing-feature tradeoffs.
+
+## Dashboard Design Studio Template Proposal Library Implementation Plan
+
+SYNC-ID: dashboard_design_studio_template_proposal_library
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/DASHBOARD_DATA_SCHEMA.tsv,docs/design-system/dashboard-control-center/DESIGN_SYSTEM.md,docs/design-system/dashboard-control-center/orchestration.json,docs/design-system/dashboard-control-center/templates.json,tools/dashboard-design-system,tools/dashboard-data,dashboard-control-center/src/dashboardData.js,dashboard-control-center/src/App.jsx,dashboard-control-center/src/i18n.js,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_design_studio_events.sh,tools/test_dashboard_data.sh,tools/test_dashboard_schema.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_dashboard_design_studio_events.sh,tools/check_dashboard_design_system.sh,tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+Implemented order:
+
+1. Synchronize this planned block before runtime edits.
+2. Add a safe template registry source and validate it through `tools/dashboard-design-system check`.
+3. Add `list-templates` and `template-preview` owner-tool commands that return redacted, proposal-only TemplateProposal metadata.
+4. Extend `proposal-status`, dashboard schema, dashboard data validation, UI, i18n, and Playwright fixtures for template library status.
+5. Extend focused Design Studio and dashboard-data tests for safe template metadata, forbidden fields, unsafe paths/commands, and no execution authority.
+6. Promote this sync ID to implemented after focused Design Studio, schema, dashboard-data, Dashboard, sync, and repository-development checks pass.
+
+Stop and ask before template apply, automatic DesignChangeProposal conversion, dependency installation, network calls, provider dispatch, imagegen, external product writes, Git/CI execution, approval mutation, plan/apply token creation, browser command execution, or existing-feature tradeoffs.

@@ -259,11 +259,15 @@ source_files=(
   "docs/workflow/TASK_TRACKER.md"
   "docs/workflow/HANDOFF.md"
   "docs/memory/DEVELOPER_MEMORY.md"
+  "docs/design-system/dashboard-control-center/orchestration.json"
+  "docs/design-system/dashboard-control-center/templates.json"
+  "tools/dashboard-design-system"
 )
 
 source_commands=(
   "tools/dashboard-data"
   "tools/product-repository-authority status --json"
+  "tools/dashboard-design-system proposal-status"
 )
 
 partial_failures=()
@@ -4630,6 +4634,11 @@ dashboard_repository_development_json() {
 browser_debug_json="$(dashboard_browser_debug_status_json)"
 browser_debug_status="$(dashboard_json_get_field "$browser_debug_json" status 2>/dev/null || printf 'unknown')"
 dashboard_data_allowed_state "$browser_debug_status" || browser_debug_status="unknown"
+design_studio_json="$(
+  "$ROOT/tools/dashboard-design-system" proposal-status 2>/dev/null || printf '%s' '{"status":"unknown","sync_id":"dashboard_design_studio_proposal_workflow_foundation","summary":{"event_count":0,"import_count":0,"candidate_count":0,"proposal_count":0,"next_action":"proposal_status_unavailable"},"events":[],"imports":[],"history_rows":[],"latest_candidate_review":null,"latest_proposal_preview":null,"subscription_agent_handoff":null,"external_product_export":null,"api_key_provider_policy":{"provider_mode":"api-key","status":"blocked","api_call_available":false},"owner_tool_transaction_preview":null,"boundaries":{"proposal_only":true,"writes_allowed":false,"direct_apply_authority":false,"external_product_apply":false,"provider_dispatch":false,"imagegen_executed":false,"plan_token_created":false,"apply_token_created":false,"approval_receipt_created":false}}'
+)"
+design_studio_status="$(dashboard_json_get_field "$design_studio_json" status 2>/dev/null || printf 'unknown')"
+dashboard_data_allowed_state "$design_studio_status" || design_studio_status="unknown"
 dashboard_display_source_files=("${source_files[@]}")
 dashboard_display_source_commands=("${source_commands[@]}")
 if [[ "$(dashboard_context_product_repo_required "$SELECTED_MENU_ID")" == "true" ]]; then
@@ -5099,6 +5108,7 @@ maintenance_evidence_rows=(
   "$(dashboard_json_evidence_row "developer_memory" "Developer memory" "required" "$developer_memory_status" "docs/memory/DEVELOPER_MEMORY.md" "Development decision memory" "Confirms implementation decisions and unresolved UI concerns are recorded." "./tools/check_developer_memory_requirements.sh" "memory" "$generated_at" "" "" "medium" "docs/memory/DEVELOPER_MEMORY.md" "0")"
   "$(dashboard_json_evidence_row "workflow_pair" "Workflow pair" "required" "$workflow_pair_status" "docs/workflow/TASK_TRACKER.md;docs/workflow/HANDOFF.md" "Task tracker and handoff pair" "Confirms progress and restart notes stay synchronized for handoff." "./tools/check_workflow_pair_sync.sh" "workflow_pair" "$generated_at" "" "" "medium" "docs/workflow/TASK_TRACKER.md;docs/workflow/HANDOFF.md" "0")"
   "$(dashboard_json_evidence_row "browser_debug_agent_handoff" "Browser Debug agent handoff" "optional" "$browser_debug_status" "tools/dashboard-browser-debug-manifest;.browser-debug/review-artifacts;.browser-debug/agent-packages;.browser-debug/agent-results;.browser-debug/reports" "Dashboard Control Center review handoff" "Confirms Browser Debug CLI review package, agent ingest, and report handoff state without executing provider APIs from the dashboard." "tools/dashboard-browser-debug-manifest --output .tmp/dashboard-browser-debug-target.json" "browser_debug" "$generated_at" "" "" "medium" "tools/dashboard-browser-debug-manifest;.browser-debug/review-artifacts;.browser-debug/agent-packages;.browser-debug/agent-results;.browser-debug/reports" "0")"
+  "$(dashboard_json_evidence_row "design_studio_proposal_workflow" "Design Studio proposal workflow" "required" "$design_studio_status" "tools/dashboard-design-system;docs/design-system/dashboard-control-center/orchestration.json" "Design Studio imported proposal workflow" "Confirms Design Studio candidate imports, proposal previews, API-key provider policy, external product export, and owner-tool transaction preview remain proposal-only." "tools/dashboard-design-system proposal-status" "design_studio" "$generated_at" "" "" "medium" "tools/dashboard-design-system;docs/design-system/dashboard-control-center/orchestration.json" "0")"
 )
 
 security_approvals=(
@@ -5145,6 +5155,7 @@ content_seed="$(
     "$repository_selection_json" \
     "$repository_scope_json" \
     "$browser_debug_json" \
+    "$design_studio_json" \
     "$operational_decision_json" \
     "${decision_page_rows[*]}" \
     "$product_repository_status" \
@@ -5228,6 +5239,9 @@ printf '%s' "$repository_scope_json"
 printf ',\n'
 printf '  "browser_debug": '
 printf '%s' "$browser_debug_json"
+printf ',\n'
+printf '  "design_studio": '
+printf '%s' "$design_studio_json"
 printf ',\n'
 printf '  "operational_decision": '
 printf '%s' "$operational_decision_json"

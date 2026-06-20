@@ -10,7 +10,7 @@
 009	day2.remote-sync	Step 2/14	remote、push、pull、fetchの役割を確認する	ローカルとリモート同期の理解
 010	day2.sync-gate	Step 2/14	Step 2/14同期ゲートを通過する	GitHub接続と学習記録の同期
 011	day3.product-repo	Step 3/14	成果物リポジトリを教材外に作る流れを確認する	成果物リポジトリ境界と別CLI起動の理解
-012	day3.memory-docs	Step 3/14	AGENT.mdとdocs/memory配下のメモリー文書の役割を確認する	メモリー文書の役割理解
+012	day3.memory-docs	Step 3/14	AGENTS.MDとdocs/memory配下のメモリー文書の役割を確認する	メモリー文書の役割理解
 013	day3.initial-commit	Step 3/14	成果物リポジトリで初回commitを体験する	初回commit体験
 014	day3.sync-gate	Step 3/14	Step 3/14同期ゲートを通過する	成果物リポジトリ状態と学習記録の同期
 015	day4.requirements	Step 4/14	docs/product/REQUIREMENTS.mdを作成する	要件初期案

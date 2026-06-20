@@ -71,6 +71,25 @@ if grep -Eq 'LEARNING_TASK_TRACKER\.md|LEARNING_HANDOFF\.md' "$SYNC_GATES"; then
   missing=1
 fi
 
+if ! awk -F '\t' '
+  $1 !~ /^#/ {
+    split($3, docs, ",")
+    for (i in docs) {
+      if (docs[i] == "AGENT.md") {
+        printf "sync gates must not require legacy product AGENT.md at %s\n", $1 > "/dev/stderr"
+        bad = 1
+      }
+    }
+    if (($1 == "Step 3/14" || $1 == "Step 13/14") && $3 !~ /(^|,)AGENTS\.MD(,|$)/) {
+      printf "%s must require product AGENTS.MD\n", $1 > "/dev/stderr"
+      bad = 1
+    }
+  }
+  END { exit bad }
+' "$SYNC_GATES"; then
+  missing=1
+fi
+
 for step_number in $(seq 1 14); do
   step_label="Step $step_number/14"
   if ! awk -F '\t' -v step_label="$step_label" '$1 !~ /^#/ && $3 == step_label { found=1 } END { exit found ? 0 : 1 }' "$FLOW"; then

@@ -2733,3 +2733,165 @@ Current Status:
 Next Step:
 
 - No remaining implementation action for this sync ID after bundle, dashboard, test-plan, Git hooks, CI structure, sync, and repository-development checks pass.
+
+## Product AGENTS Lesson Gate Alignment Work
+
+SYNC-ID: product_agents_lesson_gate_alignment
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,lesson/SYNC_GATES_14_DAYS.tsv,lesson/LESSON_FLOW_14_DAYS.tsv,lesson/LESSON_FLOW.tsv,tools/check_lesson14_sync.sh,tools/test_lesson14.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/check_lesson14_sync.sh,tools/test_lesson14.sh,tools/test_product_scaffold_check.sh,tools/check_agents_skills.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+Current Status:
+
+- [x] Developer approved implementation from the xhigh review-based plan.
+- [x] Started under `repository-development-workflow` with AGENTS invariants and sync-first discipline.
+- [x] Added this sync ID across synchronized documents before runtime edits.
+- [x] Align STEP 1-7 and STEP 1-14 lesson/gate references with product `AGENTS.MD`.
+- [x] Add regression coverage for legacy `AGENT.md` reintroduction in required product docs.
+- [x] Promoted this sync ID to implemented after focused checks passed.
+
+Next Step:
+
+- No remaining implementation action for this sync ID after lesson14, product scaffold, AGENTS/skills, sync, and repository-development checks pass.
+
+## Dashboard Control Center Evidence Presentation Clarity Work
+
+SYNC-ID: dashboard_control_center_evidence_presentation_clarity
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,dashboard-control-center/src/displayDepth.js,dashboard-control-center/src/App.jsx,dashboard-control-center/src/DecisionSummary.jsx,dashboard-control-center/src/i18n.js,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/check_dashboard_design_system.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+Current Status:
+
+- [x] Developer approved implementation from the xhigh review-based plan.
+- [x] Started under `repository-development-workflow` with AGENTS invariants and sync-first discipline.
+- [x] Added this sync ID across synchronized documents before runtime edits.
+- [x] Clarify display-depth policy naming while preserving `standard` as baseline.
+- [x] Distinguish live observation, saved snapshot fallback, and last validated snapshot in rendered labels.
+- [x] Promoted this sync ID to implemented after focused Dashboard checks passed.
+
+Next Step:
+
+- No remaining implementation action for this sync ID after Dashboard, i18n, design-system, sync, and repository-development checks pass.
+
+## Dashboard Control Center CI Evidence Guidance Work
+
+SYNC-ID: dashboard_control_center_ci_evidence_guidance
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/PRODUCT_GATE_EVIDENCE_SCHEMA.tsv,tools/product-gate-evidence-bootstrap,tools/lib/dashboard_data.sh,tools/dashboard-data,dashboard-control-center/src/App.jsx,dashboard-control-center/src/i18n.js,tests/playwright/dashboard-control-center.spec.js,tools/test_product_gate_tools.sh,tools/test_dashboard_data.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_product_gate_tools.sh,tools/test_dashboard_data.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+Current Status:
+
+- [x] Developer approved implementation from the xhigh review-based plan.
+- [x] Started under `repository-development-workflow` with AGENTS invariants and sync-first discipline.
+- [x] Added this sync ID across synchronized documents before runtime edits.
+- [x] Improve read-only CI run evidence guidance and command previews.
+- [x] Add focused product-gate, dashboard-data, and Control Center coverage.
+- [x] Promoted this sync ID to implemented after focused checks passed.
+
+Next Step:
+
+- No remaining implementation action for this sync ID after product-gate, dashboard-data, Dashboard, sync, and repository-development checks pass.
+
+## Dashboard Design Studio Candidate Import Foundation Work
+
+SYNC-ID: dashboard_design_studio_candidate_import_foundation
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,tools/dashboard-design-system,tools/test_dashboard_design_studio_events.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_dashboard_design_studio_events.sh,tools/check_dashboard_design_system.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+Current Status:
+
+- [x] Developer approved implementation from the xhigh review-based plan.
+- [x] Started under `repository-development-workflow` with AGENTS invariants and sync-first discipline.
+- [x] Added this sync ID across synchronized documents before runtime edits.
+- [x] Add local CandidateEnvelope and DesignChangeProposal import commands.
+- [x] Add validation and redacted append-only metadata tests.
+- [x] Promoted this sync ID to implemented after focused checks passed.
+
+Next Step:
+
+- No remaining implementation action for this sync ID after Design Studio, design-system, sync, and repository-development checks pass.
+
+## Dashboard Design Studio Proposal Workflow Foundation Work
+
+SYNC-ID: dashboard_design_studio_proposal_workflow_foundation
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/DASHBOARD_DATA_SCHEMA.tsv,docs/design-system/dashboard-control-center/orchestration.json,dashboard-control-center/src/design-system.generated.js,tools/dashboard-design-system,tools/dashboard-data,dashboard-control-center/src/App.jsx,dashboard-control-center/src/i18n.js,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_design_studio_events.sh,tools/test_dashboard_data.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_dashboard_design_studio_events.sh,tools/check_dashboard_design_system.sh,tools/test_dashboard_data.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+Current Status:
+
+- [x] Developer approved P0-P6 implementation direction.
+- [x] Started under `repository-development-workflow` with AGENTS invariants and sync-first discipline.
+- [x] Add this planned sync ID across synchronized documents before runtime edits.
+- [x] Add proposal-only CLI commands for preview, handoff, external-product export, provider policy, and transaction dry-run.
+- [x] Project Design Studio event/import/proposal state into Dashboard data.
+- [x] Render imported proposal viewer and decision gate in the Control Center.
+- [x] Promote this sync ID to implemented after focused checks pass.
+
+Next Step:
+
+- No remaining implementation action for this sync ID after focused Design Studio, dashboard-data, Dashboard, sync, and repository-development checks passed.
+
+## Dashboard Design Studio Subscription-Agent Handoff Package Work
+
+SYNC-ID: dashboard_design_studio_subscription_agent_handoff_package
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/DASHBOARD_DATA_SCHEMA.tsv,tools/dashboard-design-system,tools/dashboard-data,dashboard-control-center/src/dashboardData.js,dashboard-control-center/src/App.jsx,dashboard-control-center/src/i18n.js,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_design_studio_events.sh,tools/test_dashboard_data.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_dashboard_design_studio_events.sh,tools/check_dashboard_design_system.sh,tools/test_dashboard_data.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+Current Status:
+
+- [x] Developer approved autonomous P2 implementation direction.
+- [x] Reviewed by xhigh sub-agents for package contract, security, validation, and tests.
+- [x] Add this planned sync ID across synchronized documents before runtime edits.
+- [x] Add safe local subscription-agent handoff package command.
+- [x] Validate and render package metadata as read-only dashboard data.
+- [x] Reject non-subscription events, unsafe output paths, symlink escapes, raw prompt/payload/operation keys, and secret-like payloads.
+- [x] Promote this sync ID to implemented after focused checks pass.
+
+Next Step:
+
+- No remaining implementation action for this sync ID after focused Design Studio, schema, i18n, dashboard-data, and design-system checks passed.
+
+## Dashboard Design Studio Template Proposal Library Work
+
+SYNC-ID: dashboard_design_studio_template_proposal_library
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/DASHBOARD_DATA_SCHEMA.tsv,docs/design-system/dashboard-control-center/DESIGN_SYSTEM.md,docs/design-system/dashboard-control-center/orchestration.json,docs/design-system/dashboard-control-center/templates.json,tools/dashboard-design-system,tools/dashboard-data,dashboard-control-center/src/dashboardData.js,dashboard-control-center/src/App.jsx,dashboard-control-center/src/i18n.js,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_design_studio_events.sh,tools/test_dashboard_data.sh,tools/test_dashboard_schema.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_dashboard_design_studio_events.sh,tools/check_dashboard_design_system.sh,tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+Current Status:
+
+- [x] Developer approved autonomous P3 implementation direction.
+- [x] Reviewed by xhigh sub-agents for minimal template/proposal scope and reuse of existing Design Studio contracts.
+- [x] Add this planned sync ID across synchronized documents before runtime edits.
+- [x] Add safe template registry source and owner-tool list/preview commands.
+- [x] Validate and render template proposal metadata as read-only dashboard data.
+- [x] Promote this sync ID to implemented after focused checks pass.
+
+Next Step:
+
+- No remaining implementation action for this sync ID after focused Design Studio, schema, i18n, dashboard-data, Dashboard, sync, and repository-development checks passed.
+
+## Dashboard Design Studio History Detail Work
+
+SYNC-ID: dashboard_design_studio_history_detail
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/DASHBOARD_DATA_SCHEMA.tsv,tools/dashboard-design-system,tools/dashboard-data,dashboard-control-center/src/dashboardData.js,dashboard-control-center/src/App.jsx,dashboard-control-center/src/i18n.js,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_design_studio_events.sh,tools/test_dashboard_data.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_dashboard_design_studio_events.sh,tools/check_dashboard_design_system.sh,tools/test_dashboard_data.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+Current Status:
+
+- [x] Developer approved autonomous P1 implementation direction.
+- [x] Reviewed by xhigh sub-agents for History page, schema, owner-tool, and test risks.
+- [x] Add this planned sync ID across synchronized documents before runtime edits.
+- [x] Add safe Design Studio history row projection.
+- [x] Validate and render Design Studio history details.
+- [x] Promote this sync ID to implemented after focused checks pass.
+
+Next Step:
+
+- No remaining implementation action for this sync ID after focused Design Studio, dashboard-data, Dashboard, sync, and repository-development checks passed.

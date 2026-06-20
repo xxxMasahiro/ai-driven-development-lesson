@@ -2907,3 +2907,97 @@ The check validates:
 
 The Vite config separates Dashboard data, the full i18n dictionary, and generated design-system runtime chunks instead of grouping all three into one large runtime chunk.
 The check is wired into test-plan policy, Git hook checks, final-gate coverage, CI policy regression jobs, and aggregate repository verification.
+
+## Implemented Product AGENTS Lesson Gate Alignment Specification
+
+SYNC-ID: product_agents_lesson_gate_alignment
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,lesson/SYNC_GATES_14_DAYS.tsv,lesson/LESSON_FLOW_14_DAYS.tsv,lesson/LESSON_FLOW.tsv,tools/check_lesson14_sync.sh,tools/test_lesson14.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/check_lesson14_sync.sh,tools/test_lesson14.sh,tools/test_product_scaffold_check.sh,tools/check_agents_skills.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+The lesson flow/gate sources must use `AGENTS.MD` as the product agent entry standard.
+`AGENT.md` is allowed only in explanatory migration language that clearly marks it as legacy and deprecated.
+`tools/check_lesson14_sync.sh` must mechanically prevent the required-document gate from drifting back to legacy product `AGENT.md`.
+
+## Implemented Dashboard Control Center Evidence Presentation Clarity Specification
+
+SYNC-ID: dashboard_control_center_evidence_presentation_clarity
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,dashboard-control-center/src/displayDepth.js,dashboard-control-center/src/App.jsx,dashboard-control-center/src/DecisionSummary.jsx,dashboard-control-center/src/i18n.js,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/check_dashboard_design_system.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+The display-depth renderer remains a presentation policy over existing data.
+It must expose clear helper names for folded technical references, baseline standard behavior, and expanded technical detail.
+Operational freshness labels must be derived from whether matching live-status data exists, not from the fallback timestamp alone.
+
+## Implemented Dashboard Control Center CI Evidence Guidance Specification
+
+SYNC-ID: dashboard_control_center_ci_evidence_guidance
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/PRODUCT_GATE_EVIDENCE_SCHEMA.tsv,tools/product-gate-evidence-bootstrap,tools/lib/dashboard_data.sh,tools/dashboard-data,dashboard-control-center/src/App.jsx,dashboard-control-center/src/i18n.js,tests/playwright/dashboard-control-center.spec.js,tools/test_product_gate_tools.sh,tools/test_dashboard_data.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_product_gate_tools.sh,tools/test_dashboard_data.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+CI evidence guidance is read-only.
+The product evidence producer may provide `next_command` or required-command text for explicit agent execution, and the Dashboard may render that text through existing command-preview components.
+Dashboard data generation must not run `gh`, poll CI providers, or collapse unavailable run evidence into success.
+
+## Implemented Dashboard Design Studio Candidate Import Foundation Specification
+
+SYNC-ID: dashboard_design_studio_candidate_import_foundation
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,tools/dashboard-design-system,tools/test_dashboard_design_studio_events.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_dashboard_design_studio_events.sh,tools/check_dashboard_design_system.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+`tools/dashboard-design-system` must import CandidateEnvelope and DesignChangeProposal JSON as untrusted local metadata.
+Imported records are append-only, redacted, hashable, and proposal-only.
+The import path must validate orchestration-required fields, reject forbidden fields, avoid raw payload persistence, and never create plan/apply authority.
+
+## Implemented Dashboard Design Studio Proposal Workflow Foundation Specification
+
+SYNC-ID: dashboard_design_studio_proposal_workflow_foundation
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/DASHBOARD_DATA_SCHEMA.tsv,docs/design-system/dashboard-control-center/orchestration.json,dashboard-control-center/src/design-system.generated.js,tools/dashboard-design-system,tools/dashboard-data,dashboard-control-center/src/App.jsx,dashboard-control-center/src/i18n.js,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_design_studio_events.sh,tools/test_dashboard_data.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_dashboard_design_studio_events.sh,tools/check_dashboard_design_system.sh,tools/test_dashboard_data.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+`tools/dashboard-design-system` exposes proposal-only commands for previewing imported proposals, preparing subscription-agent handoff metadata, exporting external-product plan-only proposal metadata, inspecting blocked API-key provider policy, and dry-running owner-tool transaction design.
+The event/import store remains append-only JSONL metadata and no command persists raw prompt payloads, raw proposal payloads, secrets, credentials, plan tokens, apply tokens, or approval receipts.
+
+`tools/dashboard-data` projects the latest Design Studio event/import state into a `design_studio` object with queue, import, proposal, provider, external-product, and transaction summaries.
+The Control Center Design Studio page renders that producer-owned `design_studio` state as review cards and decision gates.
+The browser must not execute Design Studio owner-tool commands; command strings are display-only.
+
+## Implemented Dashboard Design Studio History Detail Specification
+
+SYNC-ID: dashboard_design_studio_history_detail
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/DASHBOARD_DATA_SCHEMA.tsv,tools/dashboard-design-system,tools/dashboard-data,dashboard-control-center/src/dashboardData.js,dashboard-control-center/src/App.jsx,dashboard-control-center/src/i18n.js,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_design_studio_events.sh,tools/test_dashboard_data.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_dashboard_design_studio_events.sh,tools/check_dashboard_design_system.sh,tools/test_dashboard_data.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+`tools/dashboard-design-system proposal-status` includes a bounded `history_rows[]` array that normalizes event and import metadata into safe display rows.
+History rows must include row id, kind, status or lifecycle, event/import order, safe ids, schema or provider metadata, optional affected files/check plan, digest/audit metadata, next action, and proposal-only boundaries.
+The History page renders those rows from dashboard data only and must not parse Design Studio JSONL files or execute owner-tool commands in the browser.
+
+## Implemented Dashboard Design Studio Subscription-Agent Handoff Package Specification
+
+SYNC-ID: dashboard_design_studio_subscription_agent_handoff_package
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/DASHBOARD_DATA_SCHEMA.tsv,tools/dashboard-design-system,tools/dashboard-data,dashboard-control-center/src/dashboardData.js,dashboard-control-center/src/App.jsx,dashboard-control-center/src/i18n.js,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_design_studio_events.sh,tools/test_dashboard_data.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_dashboard_design_studio_events.sh,tools/check_dashboard_design_system.sh,tools/test_dashboard_data.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+`tools/dashboard-design-system` exposes `agent-package` as a local owner-tool command for building a redacted package artifact under the Design Studio event store.
+The package contains response schema contracts and display-only import commands, not raw request text or authority to execute anything.
+`proposal-status` reports package readiness and handoff metadata for the latest subscription-agent event only.
+The browser renders package metadata as read-only text and does not create, send, upload, or execute a package.
+
+## Dashboard Design Studio Template Proposal Library Specification
+
+SYNC-ID: dashboard_design_studio_template_proposal_library
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/DASHBOARD_DATA_SCHEMA.tsv,docs/design-system/dashboard-control-center/DESIGN_SYSTEM.md,docs/design-system/dashboard-control-center/orchestration.json,docs/design-system/dashboard-control-center/templates.json,tools/dashboard-design-system,tools/dashboard-data,dashboard-control-center/src/dashboardData.js,dashboard-control-center/src/App.jsx,dashboard-control-center/src/i18n.js,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_design_studio_events.sh,tools/test_dashboard_data.sh,tools/test_dashboard_schema.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_dashboard_design_studio_events.sh,tools/check_dashboard_design_system.sh,tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+`docs/design-system/dashboard-control-center/templates.json` is the template registry source for safe reusable template manifests.
+`tools/dashboard-design-system list-templates` returns bounded template metadata and registry summary.
+`tools/dashboard-design-system template-preview --template-id ... --target-ref ...` returns a TemplateProposal preview with compatibility, candidate operations, manual decisions, check plan, and proposal-only boundaries.
+`proposal-status` exposes template library summary and latest preview metadata from the owner tool.
+The browser renders template library status as read-only dashboard data and must not execute, apply, dispatch, upload, or mutate anything from a template preview.

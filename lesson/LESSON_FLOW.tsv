@@ -4,7 +4,7 @@
 003	day1.mode	Step 1/7	デモモードと実作業モード、承認ルールを確認する	モードと承認ルールの了承
 004	day1.project-directory	Step 1/7	教材リポジトリと成果物リポジトリの並列配置を確認する	配置方針と別CLI起動の了承
 005	day1.folder-overview	Step 1/7	全体のフォルダ構成を確認する	フォルダ構成の確認
-006	day1.memory-files	Step 1/7	AGENT.mdなどメモリー用Markdownの役割を確認する	メモリー文書の役割理解
+006	day1.memory-files	Step 1/7	AGENTS.MDなどメモリー用Markdownの役割を確認する	メモリー文書の役割理解
 007	day1.requirements	Step 1/7	docs/product/REQUIREMENTS.mdの初期案を作成する	要件初期案
 008	day1.specification	Step 1/7	docs/product/SPECIFICATION.mdの初期案を作成する	仕様初期案
 009	day1.implementation-plan	Step 1/7	docs/product/IMPLEMENTATION_PLAN.mdの初期案を作成する	実装計画初期案

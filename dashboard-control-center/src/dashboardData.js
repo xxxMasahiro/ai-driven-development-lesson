@@ -136,6 +136,31 @@ function safeDisplayCommand(value) {
   return /^tools\/[A-Za-z0-9._-]+(?: [A-Za-z0-9._:@/%+=,-]+)*$/.test(normalized) ? normalized : "";
 }
 
+function safeDesignStudioScopedPath(value) {
+  if (typeof value !== "string") {
+    return "";
+  }
+  if (value.startsWith("product:")) {
+    const productPath = safeRelativePath(value.slice("product:".length));
+    return productPath ? `product:${productPath}` : "";
+  }
+  return safeRelativePath(value);
+}
+
+function safeDesignStudioCheckReference(value) {
+  if (safeDisplayCommand(value)) {
+    return displayText(value, "");
+  }
+  if (typeof value !== "string") {
+    return "";
+  }
+  const normalized = value.replace(/[\u0000-\u001f]/g, "").trim();
+  if (!normalized || /[;&|`$<>\\/\s]/.test(normalized) || SECRET_PATTERN.test(normalized)) {
+    return "";
+  }
+  return /^[A-Za-z0-9._:-]{4,120}$/.test(normalized) ? normalized : "";
+}
+
 function safeBrowserDebugCommand(value) {
   if (typeof value !== "string") {
     return "";
@@ -2071,6 +2096,491 @@ function validateBrowserDebug(data) {
   }
 }
 
+function validateDesignStudioBoundary(boundary, label) {
+  const source = asObject(boundary, label);
+  if (source.proposal_only !== true) {
+    throw new Error(`${label} proposal_only must be true`);
+  }
+  for (const key of [
+    "writes_allowed",
+    "direct_apply_authority",
+    "external_product_apply",
+    "provider_dispatch",
+    "imagegen_executed",
+    "plan_token_created",
+    "apply_token_created",
+    "approval_receipt_created",
+  ]) {
+    if (source[key] !== false) {
+      throw new Error(`${label} ${key} must be false`);
+    }
+  }
+}
+
+const DESIGN_STUDIO_BOUNDARY_KEYS = [
+  "proposal_only",
+  "writes_allowed",
+  "direct_apply_authority",
+  "external_product_apply",
+  "provider_dispatch",
+  "imagegen_executed",
+  "plan_token_created",
+  "apply_token_created",
+  "approval_receipt_created",
+];
+
+const DESIGN_STUDIO_PACKAGE_BOUNDARY_KEYS = [
+  ...DESIGN_STUDIO_BOUNDARY_KEYS,
+  "background_execution",
+  "credential_storage",
+  "browser_command_execution",
+  "raw_prompt_included",
+  "package_uploaded",
+];
+
+function validateDesignStudioPackageBoundary(boundary, label) {
+  validateDesignStudioBoundary(boundary, label);
+  const source = asObject(boundary, label);
+  for (const key of ["background_execution", "credential_storage", "browser_command_execution", "raw_prompt_included", "package_uploaded"]) {
+    if (source[key] !== false) {
+      throw new Error(`${label} ${key} must be false`);
+    }
+  }
+}
+
+function validateDesignStudioSha256Digest(value, label) {
+  if (!/^sha256:[a-f0-9]{64}$/i.test(displayText(value, ""))) {
+    throw new Error(`${label} must be a sha256 digest`);
+  }
+}
+
+function safeDesignStudioPackagePath(value) {
+  const normalized = safeRelativePath(displayText(value, ""));
+  if (!normalized) {
+    return "";
+  }
+  const allowedPrefixes = [
+    ".dashboard-design-studio-events/agent-packages/",
+    "external-test-store/agent-packages/",
+  ];
+  if (!allowedPrefixes.some((prefix) => normalized.startsWith(prefix)) || !normalized.endsWith("/package.json")) {
+    return "";
+  }
+  return normalized;
+}
+
+function validateDesignStudioResponseContracts(value, label) {
+  const contracts = asArray(value);
+  const schemaIds = new Set();
+  for (const contractValue of contracts) {
+    const contract = asObject(contractValue, `${label} response contract`);
+    assertAllowedKeys(contract, new Set(["schema_id", "required_fields", "forbidden_fields"]), `${label} response contract`);
+    const schemaId = displayText(contract.schema_id, "");
+    if (!["CandidateEnvelope", "DesignChangeProposal"].includes(schemaId)) {
+      throw new Error(`${label} response contract schema_id is invalid`);
+    }
+    schemaIds.add(schemaId);
+    for (const field of [...asArray(contract.required_fields), ...asArray(contract.forbidden_fields)]) {
+      if (!displayText(field, "")) {
+        throw new Error(`${label} response contract field is invalid`);
+      }
+    }
+  }
+  if (!schemaIds.has("CandidateEnvelope") || !schemaIds.has("DesignChangeProposal")) {
+    throw new Error(`${label} response contracts must include candidate and proposal schemas`);
+  }
+}
+
+function validateDesignStudioHandoffPackage(value, label, parent = {}) {
+  if (value === undefined || value === null) {
+    return;
+  }
+  const source = asObject(value, label);
+  assertAllowedKeys(source, new Set([
+    "package_id",
+    "package_version",
+    "package_status",
+    "package_path",
+    "package_digest",
+    "event_id",
+    "request_id",
+    "created_at",
+    "expires_at",
+    "next_action",
+    ...DESIGN_STUDIO_PACKAGE_BOUNDARY_KEYS,
+  ]), label);
+  for (const key of ["package_id", "package_version", "event_id", "request_id", "created_at", "expires_at", "next_action"]) {
+    if (!displayText(source[key], "")) {
+      throw new Error(`${label} ${key} is missing`);
+    }
+  }
+  if (displayText(source.package_status, "") !== "ready") {
+    throw new Error(`${label} package_status must be ready`);
+  }
+  if (!safeDesignStudioPackagePath(source.package_path)) {
+    throw new Error(`${label} package_path is invalid`);
+  }
+  if (parent.event_id && displayText(source.event_id, "") !== displayText(parent.event_id, "")) {
+    throw new Error(`${label} event_id must match the parent handoff`);
+  }
+  if (parent.request_id && displayText(source.request_id, "") !== displayText(parent.request_id, "")) {
+    throw new Error(`${label} request_id must match the parent handoff`);
+  }
+  validateDesignStudioSha256Digest(source.package_digest, `${label} package_digest`);
+  validateDesignStudioPackageBoundary(source, label);
+}
+
+function validateDesignStudioSubscriptionHandoff(value, label) {
+  const handoff = asObject(value, label);
+  assertAllowedKeys(handoff, new Set([
+    "handoff_id",
+    "event_id",
+    "request_id",
+    "target_ref",
+    "provider_mode",
+    "provider_status",
+    "request_kind",
+    "intent_digest",
+    "purpose_preview",
+    "base_snapshot_hash",
+    "response_contracts",
+    "import_commands",
+    "package_command",
+    "package",
+    "next_action",
+    ...DESIGN_STUDIO_PACKAGE_BOUNDARY_KEYS,
+  ]), label);
+  for (const key of ["handoff_id", "event_id", "request_id", "target_ref", "provider_status", "request_kind", "purpose_preview", "base_snapshot_hash", "next_action"]) {
+    if (!displayText(handoff[key], "")) {
+      throw new Error(`${label} ${key} is missing`);
+    }
+  }
+  if (displayText(handoff.provider_mode, "") !== "subscription-agent") {
+    throw new Error(`${label} provider_mode must be subscription-agent`);
+  }
+  validateDesignStudioSha256Digest(handoff.intent_digest, `${label} intent_digest`);
+  validateDesignStudioResponseContracts(handoff.response_contracts, label);
+  for (const command of asArray(handoff.import_commands)) {
+    if (!safeDisplayCommand(command)) {
+      throw new Error(`${label} import command is invalid`);
+    }
+  }
+  if (!safeDisplayCommand(handoff.package_command)) {
+    throw new Error(`${label} package command is invalid`);
+  }
+  validateDesignStudioHandoffPackage(handoff.package, `${label} package`, handoff);
+  validateDesignStudioPackageBoundary(handoff, label);
+}
+
+function validateDesignStudioTemplateOperation(value, label) {
+  const operation = asObject(value, label);
+  assertAllowedKeys(operation, new Set(["operation_id", "kind", "summary", "target_ref", "allowed_output", "authority"]), label);
+  for (const key of ["operation_id", "kind", "summary", "target_ref", "allowed_output", "authority"]) {
+    if (!displayText(operation[key], "")) {
+      throw new Error(`${label} ${key} is missing`);
+    }
+  }
+  if (operation.authority !== "proposal_only") {
+    throw new Error(`${label} authority must be proposal_only`);
+  }
+  if (!safeDesignStudioScopedPath(operation.allowed_output)) {
+    throw new Error(`${label} allowed_output is unsafe`);
+  }
+}
+
+function validateDesignStudioTemplatePreview(value, label) {
+  if (value === undefined || value === null) {
+    return;
+  }
+  const preview = asObject(value, label);
+  assertAllowedKeys(preview, new Set([
+    "template_proposal_id",
+    "record_version",
+    "schema_id",
+    "template_id",
+    "template_version",
+    "target_ref",
+    "target_apply_mode",
+    "owner_tool",
+    "compatibility",
+    "candidate_operation_count",
+    "candidate_operations",
+    "affected_source_files",
+    "affected_generated_files",
+    "manual_decisions",
+    "check_plan",
+    "risk_assessment",
+    "accessibility_notes",
+    "confidence",
+    "rollback_outline",
+    "decision_gate",
+    "template_digest",
+    "redaction_state",
+    "next_action",
+    ...DESIGN_STUDIO_BOUNDARY_KEYS,
+  ]), label);
+  for (const key of ["template_proposal_id", "record_version", "schema_id", "template_id", "template_version", "target_ref", "target_apply_mode", "template_digest", "redaction_state", "next_action"]) {
+    if (!displayText(preview[key], "")) {
+      throw new Error(`${label} ${key} is missing`);
+    }
+  }
+  if (preview.schema_id !== "TemplateProposal") {
+    throw new Error(`${label} schema_id must be TemplateProposal`);
+  }
+  validateNonNegativeInteger(Number(preview.candidate_operation_count || 0), `${label} candidate_operation_count`);
+  if (Number(preview.candidate_operation_count || 0) < 1) {
+    throw new Error(`${label} candidate_operation_count must be positive`);
+  }
+  const compatibility = asObject(preview.compatibility, `${label} compatibility`);
+  assertAllowedKeys(compatibility, new Set(["status", "target_ref", "target_apply_mode", "notes"]), `${label} compatibility`);
+  if (!ALLOWED_STATES.has(displayText(compatibility.status, ""))) {
+    throw new Error(`${label} compatibility status is invalid`);
+  }
+  for (const operation of asArray(preview.candidate_operations)) {
+    validateDesignStudioTemplateOperation(operation, `${label} candidate_operation`);
+  }
+  for (const file of [...asArray(preview.affected_source_files), ...asArray(preview.affected_generated_files)]) {
+    if (!safeDesignStudioScopedPath(file)) {
+      throw new Error(`${label} affected file is unsafe`);
+    }
+  }
+  for (const command of asArray(preview.check_plan)) {
+    if (!safeDesignStudioCheckReference(command)) {
+      throw new Error(`${label} check_plan contains an unsafe command or check id`);
+    }
+  }
+  validateDesignStudioDecisionGate(preview.decision_gate, `${label} decision_gate`);
+  validateDesignStudioSha256Digest(preview.template_digest, `${label} template_digest`);
+  validateDesignStudioBoundary(preview, label);
+}
+
+function validateDesignStudioTemplateLibrary(value, label) {
+  if (value === undefined || value === null) {
+    return;
+  }
+  const library = asObject(value, label);
+  assertAllowedKeys(library, new Set([
+    "status",
+    "sync_id",
+    "registry",
+    "registry_path",
+    "template_count",
+    "ready_count",
+    "supported_operations",
+    "unsupported_operations",
+    "templates",
+    "latest_preview",
+    ...DESIGN_STUDIO_BOUNDARY_KEYS,
+  ]), label);
+  if (library.sync_id !== "dashboard_design_studio_template_proposal_library") {
+    throw new Error(`${label} sync_id is invalid`);
+  }
+  if (!ALLOWED_STATES.has(displayText(library.status, ""))) {
+    throw new Error(`${label} status is invalid`);
+  }
+  const registry = asObject(library.registry, `${label} registry`);
+  assertAllowedKeys(registry, new Set(["registry_id", "version", "path", "source", "updated_at"]), `${label} registry`);
+  if (safeRelativePath(registry.path) !== "docs/design-system/dashboard-control-center/templates.json") {
+    throw new Error(`${label} registry path is invalid`);
+  }
+  if (safeRelativePath(library.registry_path) !== "docs/design-system/dashboard-control-center/templates.json") {
+    throw new Error(`${label} registry_path is invalid`);
+  }
+  validateNonNegativeInteger(Number(library.template_count || 0), `${label} template_count`);
+  validateNonNegativeInteger(Number(library.ready_count || 0), `${label} ready_count`);
+  for (const operation of [...asArray(library.supported_operations), ...asArray(library.unsupported_operations)]) {
+    if (!displayText(operation, "")) {
+      throw new Error(`${label} operation metadata is invalid`);
+    }
+  }
+  for (const templateValue of asArray(library.templates)) {
+    const template = asObject(templateValue, `${label} template`);
+    assertAllowedKeys(template, new Set([
+      "template_id",
+      "version",
+      "display_name",
+      "summary",
+      "product_type",
+      "supported_targets",
+      "allowed_outputs",
+      "required_checks",
+      "lifecycle_state",
+      "redaction_state",
+      "candidate_operation_count",
+      "template_digest",
+      ...DESIGN_STUDIO_BOUNDARY_KEYS,
+    ]), `${label} template`);
+    for (const key of ["template_id", "version", "display_name", "summary", "product_type", "lifecycle_state", "redaction_state"]) {
+      if (!displayText(template[key], "")) {
+        throw new Error(`${label} template ${key} is missing`);
+      }
+    }
+    validateNonNegativeInteger(Number(template.candidate_operation_count || 0), `${label} template candidate_operation_count`);
+    validateDesignStudioSha256Digest(template.template_digest, `${label} template_digest`);
+    for (const output of asArray(template.allowed_outputs)) {
+      if (!safeDesignStudioScopedPath(output)) {
+        throw new Error(`${label} template allowed_outputs contains an unsafe path`);
+      }
+    }
+    for (const command of asArray(template.required_checks)) {
+      if (!safeDesignStudioCheckReference(command)) {
+        throw new Error(`${label} template required_checks contains an unsafe command or check id`);
+      }
+    }
+    validateDesignStudioBoundary(template, `${label} template`);
+  }
+  validateDesignStudioTemplatePreview(library.latest_preview, `${label} latest_preview`);
+  validateDesignStudioBoundary(library, label);
+}
+
+function validateDesignStudioDecisionGate(value, label) {
+  if (value === undefined || value === null) {
+    return;
+  }
+  const gate = asObject(value, label);
+  if (displayText(gate.status, "") !== "manual_required") {
+    throw new Error(`${label} status must be manual_required`);
+  }
+}
+
+function validateDesignStudioProposalPreview(preview, label) {
+  if (preview === undefined || preview === null) {
+    return;
+  }
+  const source = asObject(preview, label);
+  validateNonNegativeInteger(Number(source.operation_count || 0), `${label} operation_count`);
+  for (const file of asArray(source.affected_source_files)) {
+    if (!safeRelativePath(file)) {
+      throw new Error(`${label} affected_source_files contains an unsafe path`);
+    }
+  }
+  for (const file of asArray(source.affected_generated_files)) {
+    if (!safeRelativePath(file)) {
+      throw new Error(`${label} affected_generated_files contains an unsafe path`);
+    }
+  }
+  for (const command of asArray(source.check_plan)) {
+    if (!safeDisplayCommand(command)) {
+      throw new Error(`${label} check_plan contains an unsafe command`);
+    }
+  }
+  validateDesignStudioDecisionGate(source.decision_gate, `${label} decision_gate`);
+  validateDesignStudioBoundary(source, label);
+}
+
+function validateDesignStudioCandidateReview(review, label) {
+  if (review === undefined || review === null) {
+    return;
+  }
+  const source = asObject(review, label);
+  for (const key of ["import_id", "candidate_id", "source_kind", "payload_digest"]) {
+    if (!displayText(source[key], "")) {
+      throw new Error(`${label} ${key} is missing`);
+    }
+  }
+  validateDesignStudioDecisionGate(source.decision_gate, `${label} decision_gate`);
+  validateDesignStudioBoundary(source, label);
+}
+
+function validateDesignStudioHistoryRow(row, label) {
+  const source = asObject(row, label);
+  for (const key of ["row_id", "row_kind", "status", "source_id", "schema_id", "next_action"]) {
+    if (!displayText(source[key], "")) {
+      throw new Error(`${label} ${key} is missing`);
+    }
+  }
+  if (!["event", "import"].includes(displayText(source.row_kind, ""))) {
+    throw new Error(`${label} row_kind is invalid`);
+  }
+  if (!ALLOWED_STATES.has(displayText(source.status, "")) && displayText(source.status, "") !== "queued") {
+    throw new Error(`${label} status is invalid`);
+  }
+  if ("intent_text" in source || "payload" in source || "operations" in source) {
+    throw new Error(`${label} must not expose raw prompt, payload, or operations`);
+  }
+  validateNonNegativeInteger(Number(source.event_order || 0), `${label} event_order`);
+  for (const file of asArray(source.affected_source_files)) {
+    if (!safeRelativePath(file)) {
+      throw new Error(`${label} affected_source_files contains an unsafe path`);
+    }
+  }
+  for (const file of asArray(source.affected_generated_files)) {
+    if (!safeRelativePath(file)) {
+      throw new Error(`${label} affected_generated_files contains an unsafe path`);
+    }
+  }
+  for (const command of asArray(source.check_plan)) {
+    if (!safeDisplayCommand(command)) {
+      throw new Error(`${label} check_plan contains an unsafe command`);
+    }
+  }
+  validateDesignStudioBoundary(source, label);
+}
+
+function validateDesignStudio(data) {
+  if (data.design_studio === undefined || data.design_studio === null) {
+    return;
+  }
+  const designStudio = asObject(data.design_studio, "dashboard design_studio");
+  if (!ALLOWED_STATES.has(displayText(designStudio.status, ""))) {
+    throw new Error("dashboard design_studio status is invalid");
+  }
+  if (!displayText(designStudio.sync_id, "")) {
+    throw new Error("dashboard design_studio sync_id is missing");
+  }
+  const summary = asObject(designStudio.summary, "dashboard design_studio summary");
+  for (const key of ["event_count", "import_count", "candidate_count", "proposal_count"]) {
+    validateNonNegativeInteger(Number(summary[key] || 0), `dashboard design_studio summary ${key}`);
+  }
+  if (!displayText(summary.next_action, "")) {
+    throw new Error("dashboard design_studio next_action is missing");
+  }
+  for (const event of asArray(designStudio.events)) {
+    const source = asObject(event, "dashboard design_studio event");
+    if (!displayText(source.event_id, "") || "intent_text" in source) {
+      throw new Error("dashboard design_studio event must expose redacted metadata");
+    }
+  }
+  for (const imported of asArray(designStudio.imports)) {
+    const source = asObject(imported, "dashboard design_studio import");
+    if (!displayText(source.import_id, "") || "payload" in source || "operations" in source) {
+      throw new Error("dashboard design_studio import must expose redacted metadata");
+    }
+    validateDesignStudioBoundary(source, "dashboard design_studio import");
+  }
+  for (const row of asArray(designStudio.history_rows)) {
+    validateDesignStudioHistoryRow(row, "dashboard design_studio history row");
+  }
+  validateDesignStudioCandidateReview(designStudio.latest_candidate_review, "dashboard design_studio latest_candidate_review");
+  validateDesignStudioProposalPreview(designStudio.latest_proposal_preview, "dashboard design_studio latest_proposal_preview");
+  validateDesignStudioTemplateLibrary(designStudio.template_library, "dashboard design_studio template_library");
+  if (designStudio.subscription_agent_handoff) {
+    validateDesignStudioSubscriptionHandoff(
+      designStudio.subscription_agent_handoff,
+      "dashboard design_studio subscription_agent_handoff",
+    );
+  }
+  if (designStudio.external_product_export) {
+    const exported = asObject(designStudio.external_product_export, "dashboard design_studio external_product_export");
+    if (displayText(exported.target_apply_mode, "") !== "plan-only") {
+      throw new Error("dashboard design_studio external_product_export must be plan-only");
+    }
+    validateDesignStudioBoundary(exported, "dashboard design_studio external_product_export");
+  }
+  const providerPolicy = asObject(designStudio.api_key_provider_policy, "dashboard design_studio api_key_provider_policy");
+  if (providerPolicy.api_call_available !== false) {
+    throw new Error("dashboard design_studio api_key_provider_policy api_call_available must be false");
+  }
+  if (designStudio.owner_tool_transaction_preview) {
+    const transaction = asObject(designStudio.owner_tool_transaction_preview, "dashboard design_studio owner_tool_transaction_preview");
+    if (transaction.dry_run !== true) {
+      throw new Error("dashboard design_studio owner_tool_transaction_preview must be dry-run");
+    }
+    validateDesignStudioBoundary(transaction, "dashboard design_studio owner_tool_transaction_preview");
+  }
+  validateDesignStudioBoundary(designStudio.boundaries, "dashboard design_studio boundaries");
+}
+
 function validateSecurityRows(security) {
   for (const collectionName of ["approvals", "dangerous_operations"]) {
     for (const row of asArray(security[collectionName])) {
@@ -2153,6 +2663,7 @@ export function validateDashboardData(data) {
   validateDocuments(data);
   validateSettings(data);
   validateBrowserDebug(data);
+  validateDesignStudio(data);
   validateMaintenanceEvidence(data.maintenance);
   validateSecurityRows(data.security);
   validateCommandPreviews(data.actions);

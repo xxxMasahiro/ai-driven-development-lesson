@@ -15,18 +15,20 @@ export function displayDepthPolicy(value) {
   const depth = normalizeDashboardDisplayDepth(value);
   const isFriendly = depth === "friendly";
   const isTechnical = depth === "technical";
+  const renderFoldedTechnicalReferences = isFriendly || isTechnical;
   return {
     depth,
     isFriendly,
     isStandard: depth === "standard",
     isTechnical,
     collapseTechnicalDetails: isFriendly,
-    showDecisionTechnicalReferences: isFriendly || isTechnical,
+    renderFoldedTechnicalReferences,
+    renderDecisionTechnicalReferenceDisclosure: renderFoldedTechnicalReferences,
     openTechnicalDetails: isTechnical,
     sourceBoundaryDefaultOpen: isTechnical,
     settingsTechnicalDetailsDefaultOpen: isTechnical,
-    commandPreviewTechnicalDetails: isFriendly || isTechnical,
-    evidenceReferenceTechnicalDetails: isFriendly || isTechnical,
+    renderCommandTechnicalDisclosure: renderFoldedTechnicalReferences,
+    renderEvidenceReferenceDisclosure: renderFoldedTechnicalReferences,
   };
 }
 

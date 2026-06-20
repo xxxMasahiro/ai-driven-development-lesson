@@ -2467,3 +2467,180 @@ Acceptance requirements:
 - Dashboard locale metadata used by validation must remain separate from the full translation dictionary so the i18n chunk can be isolated.
 - `chunkSizeWarningLimit` must not be raised above the default-scale value to hide the warning.
 - The check must be wired into standalone verification, test-plan policy, Git hooks, final-gate coverage, CI structure checks, and aggregate repository verification.
+
+## Implemented Product AGENTS Lesson Gate Alignment Requirements
+
+SYNC-ID: product_agents_lesson_gate_alignment
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,lesson/SYNC_GATES_14_DAYS.tsv,lesson/LESSON_FLOW_14_DAYS.tsv,lesson/LESSON_FLOW.tsv,tools/check_lesson14_sync.sh,tools/test_lesson14.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/check_lesson14_sync.sh,tools/test_lesson14.sh,tools/test_product_scaffold_check.sh,tools/check_agents_skills.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+Lesson flows and synchronization gates must teach the current product repository agent entry standard.
+The product repository standard is `AGENTS.MD`; legacy product-side `AGENT.md` may be mentioned only as a deprecated migration target.
+STEP 1-7 and STEP 1-14 guidance must not require or normalize new `AGENT.md` files.
+
+Acceptance requirements:
+
+- STEP 1-14 sync gates require `AGENTS.MD` where product agent rules are required.
+- STEP 1-7 and STEP 1-14 lesson prose points learners to `AGENTS.MD` and explains legacy `AGENT.md` only as a migration/deprecation concern.
+- Lesson14 sync checks fail when required product-document lists reintroduce legacy `AGENT.md`.
+- Existing product scaffold checks remain the product-side authority for rejecting legacy root `AGENT.md`.
+
+Non-scope:
+
+- Do not write to an external product repository, delete a product-side legacy file, or change AGENTS.MD invariants.
+- Do not change lesson progression, Git/CI authority, Dashboard UI, or product scaffold semantics beyond the lesson/gate alignment.
+
+## Implemented Dashboard Control Center Evidence Presentation Clarity Requirements
+
+SYNC-ID: dashboard_control_center_evidence_presentation_clarity
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,dashboard-control-center/src/displayDepth.js,dashboard-control-center/src/App.jsx,dashboard-control-center/src/DecisionSummary.jsx,dashboard-control-center/src/i18n.js,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/check_dashboard_design_system.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+Dashboard display depth and operational freshness labels must help both non-engineers and junior/intermediate engineers understand what they are seeing.
+Friendly mode remains a guide-level mode, standard remains the current baseline, and technical mode prioritizes existing technical evidence.
+Live-status absence or failure must not be labeled as a live update.
+
+Acceptance requirements:
+
+- Display-depth policy names and rendered behavior make clear that friendly keeps technical references available as folded detail, standard preserves the baseline, and technical opens or prioritizes technical evidence.
+- Overview and detail operational panels distinguish live observation, saved snapshot fallback, and last validated snapshot wording.
+- Live-status fetch failure may safely fall back to snapshot data, but the UI must not imply fresh live evidence when only snapshot data is displayed.
+- No mode hides blockers, approvals, failed/stale evidence, command previews, read-only boundaries, Settings boundaries, or Design Studio boundaries.
+
+Non-scope:
+
+- Do not add new authority fields, execute commands, call GitHub, mutate repositories, change Settings authority, change Design Studio authority, add dependencies, or redesign the dashboard.
+
+## Implemented Dashboard Control Center CI Evidence Guidance Requirements
+
+SYNC-ID: dashboard_control_center_ci_evidence_guidance
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/PRODUCT_GATE_EVIDENCE_SCHEMA.tsv,tools/product-gate-evidence-bootstrap,tools/lib/dashboard_data.sh,tools/dashboard-data,dashboard-control-center/src/App.jsx,dashboard-control-center/src/i18n.js,tests/playwright/dashboard-control-center.spec.js,tools/test_product_gate_tools.sh,tools/test_dashboard_data.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_product_gate_tools.sh,tools/test_dashboard_data.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+The Control Center must explain CI evidence without becoming a CI runner.
+Existing product-local `ci-runs` evidence collection remains an explicit agent-run command outside the browser.
+The dashboard may show read-only command previews and missing/stale/manual-required reasons so users know what evidence to collect next.
+
+Acceptance requirements:
+
+- Product CI evidence keeps local manifest/provider readiness distinct from real PR/main run evidence.
+- Missing, not-run, stale, failed, manual-required, and unavailable provider states are preserved instead of being collapsed to ready.
+- Suggested CI collection commands are rendered as display-only command previews.
+- The browser does not call `gh`, poll GitHub, run product-local commands, store credentials, push, merge, wait for CI, or write product repositories.
+
+Non-scope:
+
+- Do not add browser-triggered CI collection, background polling, OAuth, credential storage, new CI authority, or external product source mutation.
+
+## Implemented Dashboard Design Studio Candidate Import Foundation Requirements
+
+SYNC-ID: dashboard_design_studio_candidate_import_foundation
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,tools/dashboard-design-system,tools/test_dashboard_design_studio_events.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_dashboard_design_studio_events.sh,tools/check_dashboard_design_system.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+Design Studio must be able to import local structured candidate and proposal metadata without trusting it as instructions or granting apply authority.
+CandidateEnvelope and DesignChangeProposal import is an owner-tool boundary for local structured JSON only.
+
+Acceptance requirements:
+
+- `tools/dashboard-design-system` accepts valid local CandidateEnvelope and DesignChangeProposal JSON and stores append-only redacted metadata.
+- Required fields and forbidden fields are validated against the orchestration contract.
+- Secret-like payloads, raw credentials, shell commands, trusted-instruction fields, direct apply fields, apply tokens, CSS patches, script patches, and external product apply authority are rejected.
+- Import does not generate plan tokens, apply tokens, approval receipts, provider dispatch, subscription-agent execution, imagegen calls, Git/CI operations, or product repository writes.
+
+Non-scope:
+
+- Do not implement provider API dispatch, imagegen execution, mock image mutation, automatic apply, external product source writes, browser mutation endpoints, dependency changes, or credential handling.
+
+## Implemented Dashboard Design Studio Proposal Workflow Foundation Requirements
+
+SYNC-ID: dashboard_design_studio_proposal_workflow_foundation
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/DASHBOARD_DATA_SCHEMA.tsv,docs/design-system/dashboard-control-center/orchestration.json,dashboard-control-center/src/design-system.generated.js,tools/dashboard-design-system,tools/dashboard-data,dashboard-control-center/src/App.jsx,dashboard-control-center/src/i18n.js,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_design_studio_events.sh,tools/test_dashboard_data.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_dashboard_design_studio_events.sh,tools/check_dashboard_design_system.sh,tools/test_dashboard_data.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+Design Studio turns imported candidates and proposals into visible, reviewable proposal state before any broader provider, image, external-product, or apply work is considered.
+The workflow remains proposal-only and helps non-engineers understand what was imported while giving junior/intermediate engineers enough structured detail to judge risk, required decisions, affected files, and checks.
+
+Acceptance requirements:
+
+- Imported CandidateEnvelope and DesignChangeProposal records are visible in Dashboard data and the Control Center Design Studio page without exposing raw payloads or secrets.
+- DesignChangeProposal imports produce a read-only preview/decision gate that summarizes operation count, affected source and generated files, risk, confidence, manual decision points, rollback outline, and check plan.
+- Subscription-agent handoff is available as redacted local metadata only; no background agent dispatch, provider API call, command execution, or credential handling occurs.
+- Mock/image/imagegen-related input remains CandidateEnvelope data and can be reviewed as untrusted candidates; imagegen execution and mock image mutation are not implemented.
+- External-product proposals can be exported as plan-only metadata and do not write product files or claim product-local apply authority.
+- API-key provider policy is represented as blocked, secret-reference-only, consent/cost/rate-limit required metadata; API calls remain unavailable.
+- Owner-tool apply transaction design is represented as a dry-run, proposal-only transaction preview; no plan token, apply token, approval receipt, or direct apply authority is created.
+
+Non-scope:
+
+- Do not implement provider API dispatch, subscription-agent execution, imagegen execution, image editing, OCR trust, automatic apply, browser mutation endpoints, external product writes, dependency changes, Git/CI execution, push, merge, main sync, or credentials.
+
+## Implemented Dashboard Design Studio History Detail Requirements
+
+SYNC-ID: dashboard_design_studio_history_detail
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/DASHBOARD_DATA_SCHEMA.tsv,tools/dashboard-design-system,tools/dashboard-data,dashboard-control-center/src/dashboardData.js,dashboard-control-center/src/App.jsx,dashboard-control-center/src/i18n.js,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_design_studio_events.sh,tools/test_dashboard_data.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_dashboard_design_studio_events.sh,tools/check_dashboard_design_system.sh,tools/test_dashboard_data.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+The History page shows Design Studio event/import/proposal history as producer-owned, redacted, proposal-only dashboard data.
+It helps non-engineers see what happened and whether human review is needed while giving junior/intermediate engineers safe ids, schemas, affected files, checks, risk, and audit metadata for investigation.
+
+Acceptance requirements:
+
+- `tools/dashboard-design-system proposal-status` exposes bounded `history_rows[]` derived from existing event/import records without raw prompts, raw payloads, proposal operations, secrets, or executable browser commands.
+- Dashboard data validation and schema define item-level history fields and preserve `proposal_only: true` with all execution/write capability flags false.
+- The Control Center History page renders Design Studio history rows, empty state, manual-required status, source/check chips, and explicit no-apply/no-provider/no-imagegen/no-product-write boundaries.
+- Existing Design Studio summary, Settings, Lessons, and History behavior remain compatible with legacy snapshots where `design_studio` is absent.
+
+Non-scope:
+
+- Do not add provider dispatch, subscription-agent background execution, imagegen, OCR trust, mock editing, automatic apply, approval mutation, external product writes, Git/CI execution, credentials, dependencies, push, merge, or browser command execution.
+
+## Implemented Dashboard Design Studio Subscription-Agent Handoff Package Requirements
+
+SYNC-ID: dashboard_design_studio_subscription_agent_handoff_package
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/DASHBOARD_DATA_SCHEMA.tsv,tools/dashboard-design-system,tools/dashboard-data,dashboard-control-center/src/dashboardData.js,dashboard-control-center/src/App.jsx,dashboard-control-center/src/i18n.js,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_design_studio_events.sh,tools/test_dashboard_data.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_dashboard_design_studio_events.sh,tools/check_dashboard_design_system.sh,tools/test_dashboard_data.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+Design Studio creates a local, redacted, display-only package for handing a subscription-agent event to an external CLI agent without running that agent.
+The package makes return contracts clear and preserves proposal-only boundaries while the dashboard renders only safe package metadata.
+
+Acceptance requirements:
+
+- `tools/dashboard-design-system agent-package --event-id ... --output ...` writes only under `.dashboard-design-studio-events/agent-packages/` or the test event-store equivalent and records metadata without executing agents, providers, browsers, Git/CI, imagegen, or product writes.
+- Package metadata includes package id/version, event/request ids, target, provider mode, response contracts, import commands, digest, expiry, and explicit false execution/write boundary flags.
+- Package contents and dashboard projections exclude raw prompt text, raw payloads, proposal operations, secrets, credentials, plan tokens, apply tokens, approval receipts, absolute paths, and executable browser commands.
+- `proposal-status` exposes subscription-agent handoff metadata only for subscription-agent events, not arbitrary manual events.
+- Dashboard validation, tests, and UI show package readiness as read-only metadata.
+
+Non-scope:
+
+- Do not execute subscription agents, call provider APIs, upload packages, store credentials, create approval receipts, create plan/apply tokens, apply changes, mutate external products, run Git/CI, add dependencies, push, merge, or add browser command execution.
+
+## Dashboard Design Studio Template Proposal Library Requirements
+
+SYNC-ID: dashboard_design_studio_template_proposal_library
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/DASHBOARD_DATA_SCHEMA.tsv,docs/design-system/dashboard-control-center/DESIGN_SYSTEM.md,docs/design-system/dashboard-control-center/orchestration.json,docs/design-system/dashboard-control-center/templates.json,tools/dashboard-design-system,tools/dashboard-data,dashboard-control-center/src/dashboardData.js,dashboard-control-center/src/App.jsx,dashboard-control-center/src/i18n.js,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_design_studio_events.sh,tools/test_dashboard_data.sh,tools/test_dashboard_schema.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_dashboard_design_studio_events.sh,tools/check_dashboard_design_system.sh,tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+Design Studio must expose reusable design templates as proposal-only metadata that can be listed and previewed without treating template text as instructions.
+Template previews must explain candidate operations and checks for manual review while preserving the existing DesignChangeProposal import boundary.
+
+Acceptance requirements:
+
+- Template definitions are stored as safe manifests with id, version, product type, supported targets, allowed outputs, forbidden operations, required checks, lifecycle state, and bounded compatibility notes.
+- `tools/dashboard-design-system` can list templates and preview a TemplateProposal for a selected template/target without creating plan tokens, approval receipts, provider calls, imagegen, product writes, Git/CI operations, or browser execution.
+- Dashboard data validates and renders template library status, counts, latest preview metadata, checks, and proposal-only boundaries as read-only information.
+- Template definitions and previews reject dependency installs, network calls, credential requirements, auto-apply, Git/CI operations, scripts, raw payloads, secret-like data, absolute paths, and unsafe commands.
+- Existing candidate/proposal import, subscription handoff, external product export, provider policy, and owner-tool transaction behavior remains compatible.
+
+Non-scope:
+
+- Do not implement template apply, automatic DesignChangeProposal conversion, dependency installation, network calls, provider execution, image generation, external product writes, Git/CI execution, approval mutation, plan/apply tokens, or browser command execution.

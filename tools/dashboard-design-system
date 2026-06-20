@@ -9,6 +9,7 @@ const designRoot = path.join(root, "docs/design-system/dashboard-control-center"
 const tokensPath = path.join(designRoot, "tokens.json");
 const componentsPath = path.join(designRoot, "components.json");
 const orchestrationPath = path.join(designRoot, "orchestration.json");
+const templatesPath = path.join(designRoot, "templates.json");
 const designSystemPath = path.join(designRoot, "DESIGN_SYSTEM.md");
 const generatedCssPath = path.join(root, "dashboard-control-center/src/design-system.generated.css");
 const generatedJsPath = path.join(root, "dashboard-control-center/src/design-system.generated.js");
@@ -20,7 +21,16 @@ const eventStoreDir = process.env.DASHBOARD_DESIGN_STUDIO_EVENT_STORE_DIR
 const eventStorePath = path.join(eventStoreDir, "events.jsonl");
 const eventStoreSyncId = "dashboard_design_studio_event_runner_store";
 const eventStoreRecordVersion = "2026-06-18.design-studio-event-store";
-const secretLikePattern = /(SECRET|TOKEN|API_KEY|PASSWORD|PRIVATE_KEY)\s*[:=]\s*[^",\s]{8,}|sk-[A-Za-z0-9]{20,}|BEGIN (RSA |OPENSSH |EC |DSA )?PRIVATE KEY/i;
+const candidateImportSyncId = "dashboard_design_studio_candidate_import_foundation";
+const candidateImportRecordVersion = "2026-06-20.design-studio-candidate-import";
+const proposalWorkflowSyncId = "dashboard_design_studio_proposal_workflow_foundation";
+const proposalWorkflowRecordVersion = "2026-06-21.design-studio-proposal-workflow";
+const subscriptionHandoffPackageSyncId = "dashboard_design_studio_subscription_agent_handoff_package";
+const subscriptionHandoffPackageRecordVersion = "2026-06-21.subscription-agent-handoff-package";
+const templateLibrarySyncId = "dashboard_design_studio_template_proposal_library";
+const templateLibraryRecordVersion = "2026-06-21.template-proposal-library";
+const agentPackageDir = path.join(eventStoreDir, "agent-packages");
+const secretLikePattern = /(SECRET|TOKEN|API_KEY|PASSWORD|PRIVATE_KEY)\s*[:=]\s*[^",\s]{8,}|sk-[A-Za-z0-9]{20,}|gh[pousr]_[A-Za-z0-9_]{20,}|AKIA[0-9A-Z]{16}|BEGIN (RSA |OPENSSH |EC |DSA )?PRIVATE KEY/i;
 const supportedInteractionValues = {
   component: new Set(["tooltip-copy"]),
   tooltip_trigger: new Set(["hover-only", "disabled"]),
@@ -1231,6 +1241,181 @@ function validateOrchestration(orchestration) {
   requireStringArray(orchestration.checks, "orchestration checks");
 }
 
+function failOnUnknownKeys(value, allowedKeys, label) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    fail(`${label} must be an object`);
+    return;
+  }
+  for (const key of Object.keys(value)) {
+    if (!allowedKeys.has(key)) {
+      fail(`${label} contains an unsupported field: ${key}`);
+    }
+  }
+}
+
+function validateTemplateRegistry(registry, orchestration) {
+  validateNoSecretLikePayload(registry, "template registry");
+  failOnUnknownKeys(registry, new Set([
+    "schema_version",
+    "sync_id",
+    "registry_id",
+    "version",
+    "source",
+    "updated_at",
+    "templates",
+  ]), "template registry");
+  if (registry.schema_version !== "1.0.0") {
+    fail(`invalid template registry schema_version: ${registry.schema_version}`);
+  }
+  if (registry.sync_id !== templateLibrarySyncId) {
+    fail(`invalid template registry sync_id: ${registry.sync_id}`);
+  }
+  if (registry.source !== "docs/design-system/dashboard-control-center/DESIGN_SYSTEM.md") {
+    fail(`invalid template registry source: ${registry.source}`);
+  }
+  requireString(registry.registry_id, "template registry id");
+  requireString(registry.version, "template registry version");
+  requireString(registry.updated_at, "template registry updated_at");
+  if (!Array.isArray(registry.templates) || registry.templates.length < 1) {
+    fail("template registry templates must be a non-empty array");
+    return;
+  }
+  const definitionSchema = (orchestration.schemas || []).find((candidate) => candidate.id === "TemplateDefinition");
+  if (!definitionSchema) {
+    fail("orchestration schema is missing TemplateDefinition");
+    return;
+  }
+  const forbiddenTemplateKeys = new Set([
+    ...(definitionSchema.forbiddenFields || []),
+    "raw_api_key",
+    "raw_secret",
+    "secret_value",
+    "shell_command",
+    "script_patch",
+    "css_patch",
+    "direct_apply",
+    "auto_apply",
+    "apply_token",
+    "plan_token",
+    "approval_receipt",
+    "credential_value",
+    "credential_requirement",
+    "network_call",
+    "dependency_install",
+    "git_operation",
+    "ci_operation",
+    "provider_dispatch",
+    "imagegen_executed",
+    "browser_command_execution",
+    "external_product_write",
+    "owner_write_path",
+    "trusted_instruction",
+  ]);
+  const seenTemplateIds = new Set();
+  const templateKeys = new Set([
+    "template_id",
+    "version",
+    "display_name",
+    "summary",
+    "product_type",
+    "supported_targets",
+    "required_tokens",
+    "optional_tokens",
+    "components",
+    "patterns",
+    "page_templates",
+    "allowed_outputs",
+    "forbidden_operations",
+    "required_checks",
+    "compatibility",
+    "lifecycle_state",
+    "redaction_state",
+    "candidate_operations",
+    "affected_source_files",
+    "affected_generated_files",
+    "manual_decisions",
+    "risk_assessment",
+    "accessibility_notes",
+    "confidence",
+    "rollback_outline",
+  ]);
+  const operationKeys = new Set(["operation_id", "kind", "summary", "target_ref", "allowed_output"]);
+  const compatibilityKeys = new Set(["status", "notes"]);
+  for (const template of registry.templates) {
+    failOnUnknownKeys(template, templateKeys, "template definition");
+    rejectForbiddenPayloadFields(template, forbiddenTemplateKeys, "template definition");
+    for (const field of definitionSchema.requiredFields || []) {
+      if (!Object.hasOwn(template, field) || template[field] === "" || template[field] == null) {
+        fail(`template definition is missing required field: ${field}`);
+      }
+    }
+    for (const field of ["display_name", "summary", "redaction_state", "risk_assessment", "accessibility_notes", "confidence", "rollback_outline"]) {
+      requireString(template[field], `template ${template.template_id || "(unknown)"} ${field}`);
+    }
+    validateStoreIdentifier(String(template.template_id || ""), "template id");
+    if (seenTemplateIds.has(template.template_id)) {
+      fail(`duplicate template id: ${template.template_id}`);
+    }
+    seenTemplateIds.add(template.template_id);
+    if (!/^[0-9]+\.[0-9]+\.[0-9]+$/.test(String(template.version || ""))) {
+      fail(`template ${template.template_id} version must use semver`);
+    }
+    if (!["ready", "draft", "deprecated"].includes(template.lifecycle_state)) {
+      fail(`template ${template.template_id} lifecycle_state is invalid`);
+    }
+    if (template.redaction_state !== "metadata_only") {
+      fail(`template ${template.template_id} redaction_state must be metadata_only`);
+    }
+    const supportedTargets = requireStringArray(template.supported_targets, `template ${template.template_id} supported_targets`);
+    for (const targetRef of supportedTargets) {
+      targetAdapterContract(orchestration, targetRef);
+    }
+    for (const arrayField of ["required_tokens", "optional_tokens", "components", "patterns", "page_templates", "allowed_outputs", "forbidden_operations", "required_checks", "manual_decisions", "affected_source_files", "affected_generated_files"]) {
+      requireStringArray(template[arrayField], `template ${template.template_id} ${arrayField}`, { min: arrayField === "optional_tokens" || arrayField === "affected_generated_files" ? 0 : 1 });
+    }
+    for (const output of template.allowed_outputs) {
+      if (!safeScopedDisplayPath(output)) {
+        fail(`template ${template.template_id} allowed_outputs contains an unsafe path: ${output}`);
+      }
+    }
+    for (const file of [...template.affected_source_files, ...template.affected_generated_files]) {
+      if (!safeScopedDisplayPath(file)) {
+        fail(`template ${template.template_id} affected files contain an unsafe path: ${file}`);
+      }
+    }
+    const requiresOwnerToolChecks = supportedTargets.includes("dashboard-control-center");
+    for (const command of template.required_checks) {
+      if (!safeTemplateCheckReference(command)) {
+        fail(`template ${template.template_id} required_checks contains an unsafe check reference: ${command}`);
+      }
+      if (requiresOwnerToolChecks && !safeOwnerToolCommand(command)) {
+        fail(`template ${template.template_id} dashboard checks must be owner-tool commands: ${command}`);
+      }
+    }
+    failOnUnknownKeys(template.compatibility, compatibilityKeys, `template ${template.template_id} compatibility`);
+    requireString(template.compatibility?.status, `template ${template.template_id} compatibility status`);
+    requireString(template.compatibility?.notes, `template ${template.template_id} compatibility notes`);
+    if (!Array.isArray(template.candidate_operations) || template.candidate_operations.length < 1) {
+      fail(`template ${template.template_id} candidate_operations must be a non-empty metadata array`);
+      continue;
+    }
+    for (const operation of template.candidate_operations) {
+      failOnUnknownKeys(operation, operationKeys, `template ${template.template_id} candidate operation`);
+      rejectForbiddenPayloadFields(operation, forbiddenTemplateKeys, `template ${template.template_id} candidate operation`);
+      validateStoreIdentifier(String(operation.operation_id || ""), "template candidate operation id");
+      for (const field of ["kind", "summary", "target_ref", "allowed_output"]) {
+        requireString(operation[field], `template ${template.template_id} candidate operation ${field}`);
+      }
+      if (!supportedTargets.includes(operation.target_ref)) {
+        fail(`template ${template.template_id} candidate operation target_ref is not supported: ${operation.target_ref}`);
+      }
+      if (!safeScopedDisplayPath(operation.allowed_output) || !template.allowed_outputs.includes(operation.allowed_output)) {
+        fail(`template ${template.template_id} candidate operation allowed_output is invalid: ${operation.allowed_output}`);
+      }
+    }
+  }
+}
+
 function validateInteractionContract(components) {
   const tooltipCopy = components.components.find((component) => component.id === "tooltip-copy");
   const tooltip = tooltipCopy?.interaction?.tooltip;
@@ -1402,13 +1587,43 @@ function loadSources() {
   const tokens = readJson(tokensPath);
   const components = readJson(componentsPath);
   const orchestration = readJson(orchestrationPath);
+  const templates = readJson(templatesPath);
   validateSource(tokens, components);
   validateOrchestration(orchestration);
-  return { tokens, components, orchestration };
+  validateTemplateRegistry(templates, orchestration);
+  return { tokens, components, orchestration, templates };
 }
 
 function usage() {
-  console.error("Usage: ./tools/dashboard-design-system <check|write|emit-css|emit-js|emit-orchestration|plan-interaction|apply-interaction|queue-request|list-events|event-status|cancel-event|retry-event|dead-letter-event> [--component tooltip-copy] [--target-scope dashboard-control-center] [--theme-accent blue|teal|slate] [--density compact|balanced|comfortable] [--radius-scale compact|standard|soft] [--typography-scale standard|large] [--action-control-height 32px|34px|38px] [--action-control-padding '6px 10px'|'8px 11px'|'9px 13px'] [--compact-control-height 30px|32px|34px] [--compact-control-padding '4px 8px'|'5px 10px'|'6px 12px'] [--form-control-height 38px|40px|44px] [--form-control-padding '0 9px'|'0 10px'|'0 12px'] [--icon-button-size 34px|38px|42px] [--control-font-size 0.82rem|0.84rem|0.9rem] [--card-padding 12px|14px|16px] [--card-gap 8px|10px|12px] [--row-padding '9px 10px'|'10px 12px'|'12px 14px'] [--row-gap 8px|10px|12px] [--technical-affordance-gap 4px|6px|8px] [--technical-source-max-width 220px|260px|300px] [--technical-evidence-max-width 260px|292px|320px] [--technical-preview-chip-max-width 320px|360px|420px] [--page-header-padding '16px 18px'|'18px 20px'|'20px 22px'] [--metadata-gap 6px|8px|10px] [--page-icon-size 44px|52px|56px] [--badge-gap 4px|5px|6px] [--badge-height 24px|26px|28px] [--mode-badge-padding '3px 10px'|'4px 14px'|'5px 16px'] [--badge-font-size 0.72rem|0.76rem|0.8rem] [--mode-badge-font-size 0.74rem|0.78rem|0.82rem] [--tooltip-trigger hover-only|disabled] [--tooltip-hide-policy pointer-leave] [--tooltip-placement top] [--copy-feedback-trigger hover-only|disabled] [--copy-feedback-placement top] [--target-ref dashboard-control-center|external-product] [--provider-mode manual|subscription-agent|api-key] [--request-kind design-intent|mock|template|manual-proposal] [--intent-text text] [--event-id id] [--reason text] [--confirm]");
+  const commands = [
+    "check",
+    "write",
+    "emit-css",
+    "emit-js",
+    "emit-orchestration",
+    "plan-interaction",
+    "apply-interaction",
+    "queue-request",
+    "list-events",
+    "event-status",
+    "cancel-event",
+    "retry-event",
+    "dead-letter-event",
+    "import-candidate",
+    "import-proposal",
+    "list-imports",
+    "proposal-preview",
+    "candidate-review",
+    "agent-handoff",
+    "agent-package",
+    "export-proposal",
+    "provider-policy",
+    "transaction-preview",
+    "list-templates",
+    "template-preview",
+    "proposal-status",
+  ].join("|");
+  console.error(`Usage: ./tools/dashboard-design-system <${commands}> [--component tooltip-copy] [--target-ref dashboard-control-center|external-product] [--provider-mode manual|subscription-agent|api-key] [--request-kind design-intent|mock|template|manual-proposal] [--template-id id] [--intent-text text] [--event-id id] [--import-id id] [--reason text] [--input file.json] [--output file.json] [--idempotency-key key] [--confirm]`);
   process.exit(2);
 }
 
@@ -1489,6 +1704,59 @@ function validateStoreIdentifier(value, label) {
     stop(`${label} must use only letters, numbers, dot, underscore, colon, or hyphen and be at least 8 characters`);
   }
   return value;
+}
+
+function safeRelativeDisplayPath(value) {
+  if (typeof value !== "string") {
+    return "";
+  }
+  const normalized = value.replace(/[\u0000-\u001f]/g, "").trim();
+  if (
+    !normalized ||
+    normalized.startsWith("/") ||
+    normalized.startsWith("\\") ||
+    /^[A-Za-z]:[\\/]/.test(normalized) ||
+    normalized.split(/[\\/]+/).some((part) => part === "..")
+  ) {
+    return "";
+  }
+  return normalized;
+}
+
+function safeScopedDisplayPath(value) {
+  if (typeof value !== "string") {
+    return "";
+  }
+  if (value.startsWith("product:")) {
+    const productPath = safeRelativeDisplayPath(value.slice("product:".length));
+    return productPath ? `product:${productPath}` : "";
+  }
+  return safeRelativeDisplayPath(value);
+}
+
+function safeOwnerToolCommand(value) {
+  if (typeof value !== "string") {
+    return "";
+  }
+  const normalized = value.replace(/[\u0000-\u001f]/g, "").replace(/\s+/g, " ").trim();
+  if (!normalized || /[;&|`$<>\\]/.test(normalized)) {
+    return "";
+  }
+  return /^tools\/[A-Za-z0-9._-]+(?: [A-Za-z0-9._:@/%+=,-]+)*$/.test(normalized) ? normalized : "";
+}
+
+function safeTemplateCheckReference(value) {
+  if (safeOwnerToolCommand(value)) {
+    return value.replace(/\s+/g, " ").trim();
+  }
+  if (typeof value !== "string") {
+    return "";
+  }
+  const normalized = value.replace(/[\u0000-\u001f]/g, "").trim();
+  if (!normalized || /[;&|`$<>\\/\s]/.test(normalized) || secretLikePattern.test(normalized)) {
+    return "";
+  }
+  return /^[A-Za-z0-9._:-]{4,120}$/.test(normalized) ? normalized : "";
 }
 
 function baseSnapshotHash(tokens, components, orchestration) {
@@ -1623,6 +1891,873 @@ function eventOutput(status, record, orchestration, extra = {}) {
     ...extra,
     event: record ? eventPublicPayload(record) : null,
   };
+}
+
+function schemaContract(orchestration, schemaId) {
+  const schema = (orchestration.schemas || []).find((candidate) => candidate.id === schemaId);
+  if (!schema) {
+    stop(`orchestration schema is missing ${schemaId}`, 1);
+  }
+  return schema;
+}
+
+function readImportJson(inputPath, command) {
+  const value = requireOption({ input: inputPath }, "input", command);
+  const resolved = path.resolve(value);
+  let raw = "";
+  try {
+    raw = fs.readFileSync(resolved, "utf8");
+  } catch (error) {
+    stop(`${command} cannot read --input: ${error.message}`, 1);
+  }
+  try {
+    return { payload: JSON.parse(raw), resolved };
+  } catch (error) {
+    stop(`${command} requires valid JSON input: ${error.message}`, 1);
+  }
+  return { payload: null, resolved };
+}
+
+function rejectForbiddenPayloadFields(value, forbiddenFields, label, currentPath = "") {
+  if (!value || typeof value !== "object") {
+    return;
+  }
+  if (Array.isArray(value)) {
+    value.forEach((item, index) => rejectForbiddenPayloadFields(item, forbiddenFields, label, `${currentPath}[${index}]`));
+    return;
+  }
+  for (const [key, nested] of Object.entries(value)) {
+    const nextPath = currentPath ? `${currentPath}.${key}` : key;
+    if (forbiddenFields.has(key)) {
+      stop(`${label} must not contain forbidden field: ${nextPath}`);
+    }
+    rejectForbiddenPayloadFields(nested, forbiddenFields, label, nextPath);
+  }
+}
+
+function validateImportPayload(payload, schema, schemaId) {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    stop(`${schemaId} import payload must be an object`);
+  }
+  assertNoSecretLikePayload(payload, `${schemaId} import payload`);
+  for (const field of schema.requiredFields || []) {
+    if (!Object.hasOwn(payload, field) || payload[field] === "" || payload[field] == null) {
+      stop(`${schemaId} import payload is missing required field: ${field}`);
+    }
+  }
+  const extraForbidden = [
+    "raw_api_key",
+    "raw_secret",
+    "shell_command",
+    "direct_apply",
+    "auto_apply",
+    "apply_token",
+    "plan_token",
+    "approval_receipt",
+    "credential_value",
+    "trusted_instruction",
+    "owner_write_path",
+    "secret_value",
+    "css_patch",
+    "script_patch",
+    "external_product_apply",
+    "direct_apply_authority",
+  ];
+  rejectForbiddenPayloadFields(payload, new Set([...(schema.forbiddenFields || []), ...extraForbidden]), `${schemaId} import payload`);
+  if (schemaId === "DesignChangeProposal" && payload.proposal_only !== true) {
+    stop("DesignChangeProposal import payload must set proposal_only true");
+  }
+}
+
+function importSourceId(schemaId, payload) {
+  if (schemaId === "CandidateEnvelope") {
+    return validateStoreIdentifier(String(payload.candidate_id), "candidate id");
+  }
+  return validateStoreIdentifier(String(payload.proposal_id), "proposal id");
+}
+
+function importPayloadPreview(schemaId, payload) {
+  if (schemaId === "CandidateEnvelope") {
+    return compactPreview(`${payload.candidate_id} ${payload.source_kind} ${payload.payload_ref}`, 160);
+  }
+  return compactPreview(`${payload.proposal_id} request=${payload.request_id} operations=${Array.isArray(payload.operations) ? payload.operations.length : "unknown"}`, 160);
+}
+
+function importPublicPayload(record) {
+  return {
+    import_id: record.import_id,
+    import_type: record.import_type,
+    idempotency_key: record.idempotency_key,
+    schema_id: record.schema_id,
+    source_id: record.source_id,
+    payload_ref: record.payload_ref,
+    payload_digest: record.payload_digest,
+    payload_preview: record.payload_preview,
+    redaction_state: record.redaction_state,
+    proposal_only: record.proposal_only,
+    writes_allowed: record.writes_allowed,
+    direct_apply_authority: record.direct_apply_authority,
+    external_product_apply: record.external_product_apply,
+    provider_dispatch: record.provider_dispatch,
+    imagegen_executed: record.imagegen_executed,
+    plan_token_created: record.plan_token_created,
+    apply_token_created: record.apply_token_created,
+    approval_receipt_created: record.approval_receipt_created,
+    event_order: record.event_order,
+    created_at: record.created_at,
+    updated_at: record.updated_at,
+    audit_receipt: record.audit_receipt,
+    next_action: record.next_action,
+    source_kind: record.source_kind,
+    confidence: record.confidence,
+    instruction_denial: record.instruction_denial,
+    operation_count: record.operation_count,
+    affected_source_files: record.affected_source_files,
+    affected_generated_files: record.affected_generated_files,
+    risk_assessment: record.risk_assessment,
+    accessibility_notes: record.accessibility_notes,
+    check_plan: record.check_plan,
+    manual_decision_points: record.manual_decision_points,
+    rollback_outline: record.rollback_outline,
+  };
+}
+
+function importOutput(status, record, orchestration, extra = {}) {
+  return {
+    status,
+    sync_id: candidateImportSyncId,
+    store: {
+      format: "jsonl",
+      path: relativeStorePath(),
+      append_only: true,
+      retention_policy: "metadata_and_redacted_preview_only",
+    },
+    runner: {
+      required_capabilities: orchestration.eventRunner?.requiredCapabilities || [],
+      forbidden_capabilities: orchestration.eventRunner?.forbiddenCapabilities || [],
+    },
+    ...extra,
+    import: record ? importPublicPayload(record) : null,
+  };
+}
+
+function latestImportRecords(records) {
+  const latestByImport = new Map();
+  for (const record of records) {
+    if (!record || record.sync_id !== candidateImportSyncId || !record.import_id) {
+      continue;
+    }
+    const previous = latestByImport.get(record.import_id);
+    if (!previous || Number(record.event_order || 0) >= Number(previous.event_order || 0)) {
+      latestByImport.set(record.import_id, record);
+    }
+  }
+  return [...latestByImport.values()].sort((left, right) => Number(left.event_order || 0) - Number(right.event_order || 0));
+}
+
+function latestPackageRecords(records) {
+  const latestByPackage = new Map();
+  for (const record of records) {
+    if (!record || record.sync_id !== subscriptionHandoffPackageSyncId || !record.package_id) {
+      continue;
+    }
+    const previous = latestByPackage.get(record.package_id);
+    if (!previous || Number(record.event_order || 0) >= Number(previous.event_order || 0)) {
+      latestByPackage.set(record.package_id, record);
+    }
+  }
+  return [...latestByPackage.values()].sort((left, right) => Number(left.event_order || 0) - Number(right.event_order || 0));
+}
+
+function latestPackageForEvent(records, eventId) {
+  return [...latestPackageRecords(records)].reverse().find((record) => record.event_id === eventId) || null;
+}
+
+function latestSubscriptionEvent(records) {
+  return [...latestEventRecords(records)].reverse().find((record) => record.provider_mode === "subscription-agent") || null;
+}
+
+function boundedStringList(value, limit = 8) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value
+    .map((item) => compactPreview(item && typeof item === "object" ? JSON.stringify(item) : String(item), 120))
+    .filter(Boolean)
+    .slice(0, limit);
+}
+
+function candidateImportMetadata(payload) {
+  return {
+    source_kind: compactPreview(payload.source_kind, 80),
+    confidence: compactPreview(payload.confidence, 40),
+    instruction_denial: compactPreview(payload.instruction_denial, 160),
+  };
+}
+
+function proposalImportMetadata(payload) {
+  return {
+    request_id: compactPreview(payload.request_id, 120),
+    operation_count: Array.isArray(payload.operations) ? payload.operations.length : 0,
+    affected_source_files: boundedStringList(payload.affected_source_files, 8),
+    affected_generated_files: boundedStringList(payload.affected_generated_files, 8),
+    risk_assessment: compactPreview(payload.risk_assessment, 200),
+    accessibility_notes: compactPreview(payload.accessibility_notes, 200),
+    check_plan: boundedStringList(payload.check_plan, 8),
+    confidence: compactPreview(payload.confidence, 40),
+    manual_decision_points: boundedStringList(payload.manual_decision_points, 8),
+    rollback_outline: compactPreview(payload.rollback_outline, 200),
+  };
+}
+
+function findLatestImport(records, importId) {
+  return latestImportRecords(records).find((record) => record.import_id === importId);
+}
+
+function latestProposalImport(records) {
+  return [...latestImportRecords(records)].reverse().find((record) => record.schema_id === "DesignChangeProposal") || null;
+}
+
+function latestCandidateImport(records) {
+  return [...latestImportRecords(records)].reverse().find((record) => record.schema_id === "CandidateEnvelope") || null;
+}
+
+function proposalWorkflowStore() {
+  return {
+    format: "jsonl",
+    path: relativeStorePath(),
+    append_only: true,
+    retention_policy: "metadata_and_redacted_preview_only",
+  };
+}
+
+function proposalBoundary() {
+  return {
+    proposal_only: true,
+    writes_allowed: false,
+    direct_apply_authority: false,
+    external_product_apply: false,
+    provider_dispatch: false,
+    imagegen_executed: false,
+    plan_token_created: false,
+    apply_token_created: false,
+    approval_receipt_created: false,
+  };
+}
+
+function proposalPreviewPublic(record) {
+  if (!record || record.schema_id !== "DesignChangeProposal") {
+    return null;
+  }
+  return {
+    import_id: record.import_id,
+    proposal_id: record.source_id,
+    request_id: record.request_id || "metadata_only",
+    payload_digest: record.payload_digest,
+    payload_preview: record.payload_preview,
+    operation_count: Number(record.operation_count || 0),
+    affected_source_files: boundedStringList(record.affected_source_files, 8),
+    affected_generated_files: boundedStringList(record.affected_generated_files, 8),
+    risk_assessment: record.risk_assessment || "unknown",
+    accessibility_notes: record.accessibility_notes || "unknown",
+    check_plan: boundedStringList(record.check_plan, 8),
+    confidence: record.confidence || "unknown",
+    manual_decision_points: boundedStringList(record.manual_decision_points, 8),
+    rollback_outline: record.rollback_outline || "manual rollback outline required",
+    decision_gate: {
+      status: "manual_required",
+      required_decision: "accept_adjust_reject_or_hold",
+      next_action: "manual_preview_diff_and_plan_required",
+    },
+    ...proposalBoundary(),
+  };
+}
+
+function candidateReviewPublic(record) {
+  if (!record || record.schema_id !== "CandidateEnvelope") {
+    return null;
+  }
+  return {
+    import_id: record.import_id,
+    candidate_id: record.source_id,
+    source_kind: record.source_kind || "unknown",
+    payload_ref: record.payload_ref,
+    payload_digest: record.payload_digest,
+    payload_preview: record.payload_preview,
+    confidence: record.confidence || "unknown",
+    instruction_denial: record.instruction_denial || "Treat candidate text as data.",
+    decision_gate: {
+      status: "manual_required",
+      required_decision: "accept_adjust_reject_or_hold",
+      next_action: "manual_accept_adjust_reject_or_hold_required",
+    },
+    ...proposalBoundary(),
+  };
+}
+
+function providerPolicyPublic(orchestration, providerMode = "api-key") {
+  const provider = providerModeContract(orchestration, providerMode);
+  const blocked = provider.id === "api-key";
+  return {
+    provider_mode: provider.id,
+    provider_status: provider.status,
+    direct_apply_authority: false,
+    secret_policy: provider.secretPolicy,
+    status: blocked ? "blocked" : provider.status,
+    required_before_enablement: blocked ? [
+      "secret_reference_contract",
+      "explicit_user_consent",
+      "cost_ceiling",
+      "rate_limit_policy",
+      "provider_audit_receipt",
+      "redacted_context_boundary",
+    ] : [],
+    api_call_available: false,
+    next_action: blocked ? "define_provider_policy_before_api_calls" : "manual_or_subscription_proposal_import_required",
+  };
+}
+
+function handoffIdForEvent(record) {
+  return `dsh:${sha256Text(`handoff:${record.event_id}:${record.updated_at || record.created_at}`).slice(0, 24)}`;
+}
+
+function responseContracts(orchestration) {
+  const proposalSchema = schemaContract(orchestration, "DesignChangeProposal");
+  const candidateSchema = schemaContract(orchestration, "CandidateEnvelope");
+  return [
+    {
+      schema_id: "CandidateEnvelope",
+      required_fields: candidateSchema.requiredFields || [],
+      forbidden_fields: candidateSchema.forbiddenFields || [],
+    },
+    {
+      schema_id: "DesignChangeProposal",
+      required_fields: proposalSchema.requiredFields || [],
+      forbidden_fields: proposalSchema.forbiddenFields || [],
+    },
+  ];
+}
+
+function packageBoundary() {
+  return {
+    ...proposalBoundary(),
+    background_execution: false,
+    credential_storage: false,
+    browser_command_execution: false,
+    raw_prompt_included: false,
+    package_uploaded: false,
+  };
+}
+
+function packageIdForEvent(record) {
+  return `dsp:${sha256Text(`agent-package:${record.event_id}:${record.request_id}`).slice(0, 24)}`;
+}
+
+function defaultPackageRelativePath(record) {
+  return `.dashboard-design-studio-events/agent-packages/${packageIdForEvent(record)}/package.json`;
+}
+
+function relativePackagePath(filePath) {
+  const rootRelative = path.relative(root, filePath);
+  if (!rootRelative.startsWith("..") && !path.isAbsolute(rootRelative)) {
+    return rootRelative;
+  }
+  const storeRelative = path.relative(eventStoreDir, filePath);
+  if (!storeRelative.startsWith("..") && !path.isAbsolute(storeRelative)) {
+    return `external-test-store/${storeRelative.replace(/\\/g, "/")}`;
+  }
+  return "external-test-store/agent-packages/package.json";
+}
+
+function safePackageOutputPath(value, record) {
+  const fallback = path.join(agentPackageDir, packageIdForEvent(record), "package.json");
+  const resolved = value ? path.resolve(root, value) : fallback;
+  fs.mkdirSync(agentPackageDir, { recursive: true });
+  const relative = path.relative(agentPackageDir, resolved);
+  if (relative.startsWith("..") || path.isAbsolute(relative)) {
+    stop("agent-package output must stay under .dashboard-design-studio-events/agent-packages");
+  }
+  if (path.basename(resolved) !== "package.json") {
+    stop("agent-package output file must be named package.json");
+  }
+  const outputStat = fs.existsSync(resolved) ? fs.lstatSync(resolved) : null;
+  if (outputStat?.isSymbolicLink()) {
+    stop("agent-package output must not use a symlinked package file");
+  }
+  const packageRootReal = fs.realpathSync.native(agentPackageDir);
+  let existingParent = path.dirname(resolved);
+  while (!fs.existsSync(existingParent)) {
+    const nextParent = path.dirname(existingParent);
+    if (nextParent === existingParent) {
+      stop("agent-package output parent could not be resolved safely");
+    }
+    existingParent = nextParent;
+  }
+  const parentReal = fs.realpathSync.native(existingParent);
+  const realRelative = path.relative(packageRootReal, parentReal);
+  if (realRelative.startsWith("..") || path.isAbsolute(realRelative)) {
+    stop("agent-package output must stay under the real agent package directory");
+  }
+  return resolved;
+}
+
+function packageExpiresAt(now) {
+  const value = new Date(Date.parse(now) + 7 * 24 * 60 * 60 * 1000);
+  return Number.isNaN(value.getTime()) ? "manual_expiry_required" : value.toISOString();
+}
+
+function buildAgentPackagePayload(record, orchestration, outputPath, now) {
+  const payload = {
+    package_id: packageIdForEvent(record),
+    package_version: subscriptionHandoffPackageRecordVersion,
+    sync_id: subscriptionHandoffPackageSyncId,
+    event_id: record.event_id,
+    request_id: record.request_id,
+    handoff_id: handoffIdForEvent(record),
+    target_ref: record.target_ref,
+    target_apply_mode: record.target_apply_mode,
+    provider_mode: "subscription-agent",
+    provider_status: record.provider_status,
+    request_kind: record.request_kind,
+    base_snapshot_hash: record.base_snapshot_hash,
+    purpose_digest: record.purpose_digest,
+    purpose_preview: record.purpose_preview,
+    intent_digest: record.intent_digest,
+    intent_length: record.intent_length,
+    response_contracts: responseContracts(orchestration),
+    import_commands: [
+      "tools/dashboard-design-system import-candidate --input candidate.json",
+      "tools/dashboard-design-system import-proposal --input proposal.json",
+    ],
+    return_policy: "return_candidate_or_proposal_json_for_manual_import",
+    package_path: relativePackagePath(outputPath),
+    created_at: now,
+    expires_at: packageExpiresAt(now),
+    next_action: "run_subscription_agent_outside_dashboard_and_return_structured_json",
+    ...packageBoundary(),
+  };
+  assertNoSecretLikePayload(payload, "agent package");
+  return {
+    ...payload,
+    package_digest: `sha256:${sha256Text(JSON.stringify(payload))}`,
+  };
+}
+
+function buildPackageRecord(packagePayload, outputPath, records, now) {
+  const record = {
+    record_version: subscriptionHandoffPackageRecordVersion,
+    sync_id: subscriptionHandoffPackageSyncId,
+    record_type: "design_studio_handoff_package",
+    record_id: `record:${sha256Text(`${packagePayload.package_id}:${records.length + 1}:${now}`).slice(0, 24)}`,
+    package_id: packagePayload.package_id,
+    package_version: packagePayload.package_version,
+    package_status: "ready",
+    package_path: relativePackagePath(outputPath),
+    package_digest: packagePayload.package_digest,
+    event_id: packagePayload.event_id,
+    request_id: packagePayload.request_id,
+    provider_mode: "subscription-agent",
+    target_ref: packagePayload.target_ref,
+    created_at: now,
+    updated_at: now,
+    expires_at: packagePayload.expires_at,
+    event_order: records.length + 1,
+    next_action: packagePayload.next_action,
+    audit_receipt: null,
+    ...packageBoundary(),
+  };
+  return attachAuditReceipt(record);
+}
+
+function packageRecordPublic(record) {
+  if (!record) {
+    return null;
+  }
+  return {
+    package_id: record.package_id,
+    package_version: record.package_version,
+    package_status: record.package_status,
+    package_path: record.package_path,
+    package_digest: record.package_digest,
+    event_id: record.event_id,
+    request_id: record.request_id,
+    created_at: record.created_at,
+    expires_at: record.expires_at,
+    next_action: record.next_action,
+    ...packageBoundary(),
+  };
+}
+
+function agentHandoffPublic(record, orchestration, packageRecord = null) {
+  if (!record || record.provider_mode !== "subscription-agent") {
+    return null;
+  }
+  return {
+    handoff_id: handoffIdForEvent(record),
+    event_id: record.event_id,
+    request_id: record.request_id,
+    target_ref: record.target_ref,
+    provider_mode: record.provider_mode,
+    provider_status: record.provider_status,
+    request_kind: record.request_kind,
+    intent_digest: record.intent_digest,
+    purpose_preview: record.purpose_preview,
+    base_snapshot_hash: record.base_snapshot_hash,
+    response_contracts: responseContracts(orchestration),
+    import_commands: [
+      "tools/dashboard-design-system import-candidate --input candidate.json",
+      "tools/dashboard-design-system import-proposal --input proposal.json",
+    ],
+    package_command: `tools/dashboard-design-system agent-package --event-id ${record.event_id}`,
+    package: packageRecordPublic(packageRecord),
+    next_action: "return_structured_proposal_for_manual_import",
+    ...packageBoundary(),
+  };
+}
+
+function externalProductExportPublic(record, orchestration, targetRef = "external-product") {
+  const target = targetAdapterContract(orchestration, targetRef);
+  return {
+    export_id: record ? `dse:${sha256Text(`export:${record.import_id}:${target.id}`).slice(0, 24)}` : "",
+    target_ref: target.id,
+    target_apply_mode: target.applyMode,
+    owner_tool: target.ownerTool,
+    proposal: record ? proposalPreviewPublic(record) : null,
+    allowed_outputs: target.allowedOutputs || [],
+    required_checks: target.requiredChecks || [],
+    export_policy: target.id === "external-product" ? "plan_only_no_product_write" : "owner_tool_mediated",
+    next_action: target.id === "external-product" ? "copy_plan_to_product_local_workflow_after_approval" : "manual_preview_diff_and_plan_required",
+    ...proposalBoundary(),
+  };
+}
+
+function transactionPreviewPublic(record, orchestration, targetRef = "dashboard-control-center") {
+  const target = targetAdapterContract(orchestration, targetRef);
+  return {
+    transaction_preview_id: record ? `dst:${sha256Text(`transaction:${record.import_id}:${target.id}`).slice(0, 24)}` : "",
+    record_version: proposalWorkflowRecordVersion,
+    target_ref: target.id,
+    target_apply_mode: target.applyMode,
+    owner_tool: target.ownerTool,
+    proposal: record ? proposalPreviewPublic(record) : null,
+    dry_run: true,
+    transaction_state: "manual_required",
+    required_before_apply: [
+      "preview_diff",
+      "explicit_approval",
+      "owner_tool_plan",
+      "focused_verification",
+      "rollback_ready_evidence",
+    ],
+    required_checks: target.requiredChecks || [],
+    next_action: "manual_preview_diff_and_plan_required",
+    ...proposalBoundary(),
+  };
+}
+
+function relativeTemplateRegistryPath() {
+  return path.relative(root, templatesPath).replace(/\\/g, "/");
+}
+
+function templateDigest(template) {
+  return `sha256:${sha256Text(JSON.stringify(template))}`;
+}
+
+function templateRegistryPublic(registry) {
+  return {
+    registry_id: registry.registry_id,
+    version: registry.version,
+    path: relativeTemplateRegistryPath(),
+    source: registry.source,
+    updated_at: registry.updated_at,
+  };
+}
+
+function templateOperationPublic(operation) {
+  return {
+    operation_id: operation.operation_id,
+    kind: operation.kind,
+    summary: compactPreview(operation.summary, 180),
+    target_ref: operation.target_ref,
+    allowed_output: operation.allowed_output,
+    authority: "proposal_only",
+  };
+}
+
+function templatePublic(template) {
+  return {
+    template_id: template.template_id,
+    version: template.version,
+    display_name: template.display_name,
+    summary: compactPreview(template.summary, 220),
+    product_type: template.product_type,
+    supported_targets: boundedStringList(template.supported_targets, 6),
+    allowed_outputs: boundedStringList(template.allowed_outputs, 8),
+    required_checks: boundedStringList(template.required_checks, 8),
+    lifecycle_state: template.lifecycle_state,
+    redaction_state: template.redaction_state,
+    candidate_operation_count: Array.isArray(template.candidate_operations) ? template.candidate_operations.length : 0,
+    template_digest: templateDigest(template),
+    ...proposalBoundary(),
+  };
+}
+
+function findTemplate(registry, templateId) {
+  const template = (registry.templates || []).find((candidate) => candidate.template_id === templateId);
+  if (!template) {
+    stop(`unknown Design Studio template: ${templateId}`, 1);
+  }
+  return template;
+}
+
+function templateDefaultTarget(template) {
+  if ((template.supported_targets || []).includes("dashboard-control-center")) {
+    return "dashboard-control-center";
+  }
+  return template.supported_targets?.[0] || "dashboard-control-center";
+}
+
+function templatePreviewPublic(template, orchestration, targetRef = templateDefaultTarget(template)) {
+  const target = targetAdapterContract(orchestration, targetRef);
+  if (!(template.supported_targets || []).includes(target.id)) {
+    stop(`template ${template.template_id} does not support target ref: ${target.id}`, 1);
+  }
+  const digest = templateDigest(template);
+  const manualRequired = target.applyMode === "plan-only" || template.compatibility?.status === "manual_required";
+  const operations = (template.candidate_operations || [])
+    .filter((operation) => operation.target_ref === target.id)
+    .map(templateOperationPublic)
+    .slice(0, 8);
+  return {
+    template_proposal_id: `dstp:${sha256Text(`${template.template_id}:${template.version}:${target.id}:${digest}`).slice(0, 24)}`,
+    record_version: templateLibraryRecordVersion,
+    schema_id: "TemplateProposal",
+    template_id: template.template_id,
+    template_version: template.version,
+    target_ref: target.id,
+    target_apply_mode: target.applyMode,
+    owner_tool: target.ownerTool,
+    compatibility: {
+      status: manualRequired ? "manual_required" : "ready",
+      target_ref: target.id,
+      target_apply_mode: target.applyMode,
+      notes: template.compatibility?.notes || "manual review required",
+    },
+    candidate_operation_count: operations.length,
+    candidate_operations: operations,
+    affected_source_files: boundedStringList(template.affected_source_files, 8),
+    affected_generated_files: boundedStringList(template.affected_generated_files, 8),
+    manual_decisions: boundedStringList(template.manual_decisions, 8),
+    check_plan: boundedStringList(template.required_checks, 8),
+    risk_assessment: template.risk_assessment,
+    accessibility_notes: template.accessibility_notes,
+    confidence: template.confidence,
+    rollback_outline: template.rollback_outline,
+    decision_gate: {
+      status: "manual_required",
+      required_decision: "accept_adjust_reject_or_hold",
+    },
+    template_digest: digest,
+    redaction_state: template.redaction_state,
+    next_action: target.id === "external-product"
+      ? "copy_template_preview_to_product_local_workflow_after_approval"
+      : "review_template_preview_before_import_or_owner_tool_plan",
+    ...proposalBoundary(),
+  };
+}
+
+function templateLibraryPublic(registry, orchestration) {
+  const templates = registry.templates || [];
+  const readyTemplates = templates.filter((template) => template.lifecycle_state === "ready");
+  const firstReadyTemplate = readyTemplates[0] || templates[0] || null;
+  return {
+    status: firstReadyTemplate ? "ready" : "missing",
+    sync_id: templateLibrarySyncId,
+    registry: templateRegistryPublic(registry),
+    registry_path: relativeTemplateRegistryPath(),
+    template_count: templates.length,
+    ready_count: readyTemplates.length,
+    supported_operations: boundedStringList(orchestration.templateLibrary?.supportedOperations, 8),
+    unsupported_operations: boundedStringList(orchestration.templateLibrary?.unsupportedOperations, 8),
+    templates: templates.map(templatePublic),
+    latest_preview: firstReadyTemplate ? templatePreviewPublic(firstReadyTemplate, orchestration, templateDefaultTarget(firstReadyTemplate)) : null,
+    ...proposalBoundary(),
+  };
+}
+
+function designStudioHistoryRowFromEvent(record) {
+  return {
+    row_id: `history:${record.event_id}`,
+    row_kind: "event",
+    status: record.lifecycle_state || record.job_state || "manual_required",
+    event_order: Number(record.event_order || 0),
+    observed_at: record.updated_at || record.created_at,
+    event_id: record.event_id,
+    request_id: record.request_id,
+    target_ref: record.target_ref,
+    target_apply_mode: record.target_apply_mode,
+    provider_mode: record.provider_mode,
+    provider_status: record.provider_status,
+    request_kind: record.request_kind,
+    schema_id: "DesignStudioEvent",
+    source_id: record.event_id,
+    digest: record.intent_digest,
+    preview: record.intent_preview,
+    redaction_state: record.redaction_state,
+    next_action: record.next_action,
+    audit_receipt: record.audit_receipt,
+    affected_source_files: [],
+    affected_generated_files: [],
+    check_plan: [],
+    risk_assessment: "manual_required",
+    confidence: "unknown",
+    ...proposalBoundary(),
+  };
+}
+
+function designStudioHistoryRowFromImport(record) {
+  const isProposal = record.schema_id === "DesignChangeProposal";
+  return {
+    row_id: `history:${record.import_id}`,
+    row_kind: "import",
+    status: "manual_required",
+    event_order: Number(record.event_order || 0),
+    observed_at: record.updated_at || record.created_at,
+    import_id: record.import_id,
+    schema_id: record.schema_id,
+    source_id: record.source_id,
+    payload_ref: record.payload_ref,
+    digest: record.payload_digest,
+    preview: record.payload_preview,
+    redaction_state: record.redaction_state,
+    next_action: record.next_action,
+    audit_receipt: record.audit_receipt,
+    affected_source_files: isProposal ? boundedStringList(record.affected_source_files, 8) : [],
+    affected_generated_files: isProposal ? boundedStringList(record.affected_generated_files, 8) : [],
+    check_plan: isProposal ? boundedStringList(record.check_plan, 8) : [],
+    risk_assessment: isProposal ? record.risk_assessment || "unknown" : "candidate_review_required",
+    confidence: record.confidence || "unknown",
+    ...proposalBoundary(),
+  };
+}
+
+function designStudioHistoryRows(events, imports) {
+  return [
+    ...events.map(designStudioHistoryRowFromEvent),
+    ...imports.map(designStudioHistoryRowFromImport),
+  ]
+    .sort((left, right) => {
+      const leftOrder = Number(left.event_order || 0);
+      const rightOrder = Number(right.event_order || 0);
+      if (leftOrder !== rightOrder) {
+        return leftOrder - rightOrder;
+      }
+      return String(left.row_id).localeCompare(String(right.row_id));
+    })
+    .slice(-20);
+}
+
+function proposalWorkflowStatusPayload(orchestration, templates) {
+  const records = readEventRecords();
+  const events = latestEventRecords(records);
+  const imports = latestImportRecords(records);
+  const proposal = latestProposalImport(records);
+  const candidate = latestCandidateImport(records);
+  const subscriptionEvent = latestSubscriptionEvent(records);
+  const subscriptionPackage = subscriptionEvent ? latestPackageForEvent(records, subscriptionEvent.event_id) : null;
+  return {
+    status: "passed",
+    sync_id: proposalWorkflowSyncId,
+    store: proposalWorkflowStore(),
+    summary: {
+      event_count: events.length,
+      import_count: imports.length,
+      candidate_count: imports.filter((record) => record.schema_id === "CandidateEnvelope").length,
+      proposal_count: imports.filter((record) => record.schema_id === "DesignChangeProposal").length,
+      next_action: proposal ? "manual_preview_diff_and_plan_required" : "import_candidate_or_proposal_required",
+    },
+    events: events.slice(-5).map(eventPublicPayload),
+    imports: imports.slice(-10).map(importPublicPayload),
+    history_rows: designStudioHistoryRows(events, imports),
+    latest_candidate_review: candidateReviewPublic(candidate),
+    latest_proposal_preview: proposalPreviewPublic(proposal),
+    subscription_agent_handoff: subscriptionEvent ? agentHandoffPublic(subscriptionEvent, orchestration, subscriptionPackage) : null,
+    template_library: templateLibraryPublic(templates, orchestration),
+    external_product_export: proposal ? externalProductExportPublic(proposal, orchestration, "external-product") : null,
+    api_key_provider_policy: providerPolicyPublic(orchestration, "api-key"),
+    owner_tool_transaction_preview: proposal ? transactionPreviewPublic(proposal, orchestration, "dashboard-control-center") : null,
+    boundaries: proposalBoundary(),
+  };
+}
+
+function buildImportRecord(command, payload, inputPath, orchestration, records, options) {
+  const schemaId = command === "import-candidate" ? "CandidateEnvelope" : "DesignChangeProposal";
+  const schema = schemaContract(orchestration, schemaId);
+  validateImportPayload(payload, schema, schemaId);
+  const sourceId = importSourceId(schemaId, payload);
+  const payloadText = JSON.stringify(payload);
+  const payloadDigest = `sha256:${sha256Text(payloadText)}`;
+  const idempotencyKey = validateStoreIdentifier(
+    options.idempotency_key || `idem:${sha256Text(`${schemaId}:${sourceId}:${payloadDigest}`).slice(0, 32)}`,
+    "idempotency key",
+  );
+  const importId = `dsi:${sha256Text(`import:${idempotencyKey}`).slice(0, 24)}`;
+  const now = isoNow();
+  const payloadRef = schemaId === "CandidateEnvelope" ? String(payload.payload_ref) : path.relative(root, inputPath) || path.basename(inputPath);
+  const record = {
+    record_version: candidateImportRecordVersion,
+    sync_id: candidateImportSyncId,
+    record_type: "design_studio_import",
+    import_type: schemaId === "CandidateEnvelope" ? "candidate_envelope_imported" : "design_change_proposal_imported",
+    record_id: `record:${sha256Text(`${importId}:${records.length + 1}:${now}`).slice(0, 24)}`,
+    import_id: importId,
+    idempotency_key: idempotencyKey,
+    schema_id: schemaId,
+    source_id: sourceId,
+    payload_ref: compactPreview(payloadRef, 160),
+    payload_digest: payloadDigest,
+    payload_preview: importPayloadPreview(schemaId, payload),
+    redaction_state: "checked_no_secret_like_payload",
+    proposal_only: true,
+    writes_allowed: false,
+    direct_apply_authority: false,
+    external_product_apply: false,
+    provider_dispatch: false,
+    imagegen_executed: false,
+    plan_token_created: false,
+    apply_token_created: false,
+    approval_receipt_created: false,
+    payload_policy: "metadata_and_redacted_preview_only",
+    event_order: records.length + 1,
+    created_at: now,
+    updated_at: now,
+    next_action: schemaId === "CandidateEnvelope" ? "manual_accept_adjust_reject_or_hold_required" : "manual_preview_diff_and_plan_required",
+    source_command: `tools/dashboard-design-system ${command}`,
+    audit_receipt: null,
+    ...(schemaId === "CandidateEnvelope" ? candidateImportMetadata(payload) : proposalImportMetadata(payload)),
+  };
+  return attachAuditReceipt(record);
+}
+
+function handleImportCommand(command, orchestration) {
+  const options = parseOptionArgs(process.argv.slice(3));
+  rejectUnknownOptions(options, new Set(["input", "idempotency_key"]), command);
+  const { payload, resolved } = readImportJson(options.input, command);
+  const records = readEventRecords();
+  const record = buildImportRecord(command, payload, resolved, orchestration, records, options);
+  const duplicate = latestImportRecords(records).find((candidate) => candidate.idempotency_key === record.idempotency_key);
+  if (duplicate) {
+    process.stdout.write(`${JSON.stringify(importOutput("deduplicated", duplicate, orchestration, {
+      reason_code: "design_studio_import_idempotency_key_exists",
+      next_action: duplicate.next_action,
+    }), null, 2)}\n`);
+    return;
+  }
+  appendEventRecord(record);
+  process.stdout.write(`${JSON.stringify(importOutput("imported", record, orchestration, {
+    reason_code: "design_studio_import_recorded",
+    next_action: record.next_action,
+  }), null, 2)}\n`);
 }
 
 function attachAuditReceipt(record) {
@@ -1842,6 +2977,200 @@ function transitionEvent(command, orchestration) {
   }), null, 2)}\n`);
 }
 
+function handleListImports(orchestration) {
+  const options = parseOptionArgs(process.argv.slice(3));
+  rejectUnknownOptions(options, new Set(["schema"]), "list-imports");
+  const schemaFilter = options.schema || "";
+  const imports = latestImportRecords(readEventRecords()).filter((record) => !schemaFilter || record.schema_id === schemaFilter);
+  process.stdout.write(`${JSON.stringify({
+    status: "passed",
+    sync_id: proposalWorkflowSyncId,
+    count: imports.length,
+    store: proposalWorkflowStore(),
+    imports: imports.map(importPublicPayload),
+    boundaries: proposalBoundary(),
+    runner: {
+      required_capabilities: orchestration.eventRunner?.requiredCapabilities || [],
+      forbidden_capabilities: orchestration.eventRunner?.forbiddenCapabilities || [],
+    },
+  }, null, 2)}\n`);
+}
+
+function requireImportRecord(command) {
+  const options = parseOptionArgs(process.argv.slice(3));
+  rejectUnknownOptions(options, new Set(["import_id", "target_ref"]), command);
+  const importId = requireOption(options, "import_id", command);
+  const record = findLatestImport(readEventRecords(), importId);
+  if (!record) {
+    stop(`unknown Design Studio import: ${importId}`, 1);
+  }
+  return { record, options };
+}
+
+function handleProposalPreview() {
+  const { record } = requireImportRecord("proposal-preview");
+  if (record.schema_id !== "DesignChangeProposal") {
+    stop(`proposal-preview requires a DesignChangeProposal import, got ${record.schema_id}`, 1);
+  }
+  process.stdout.write(`${JSON.stringify({
+    status: "passed",
+    sync_id: proposalWorkflowSyncId,
+    store: proposalWorkflowStore(),
+    preview: proposalPreviewPublic(record),
+  }, null, 2)}\n`);
+}
+
+function handleCandidateReview() {
+  const { record } = requireImportRecord("candidate-review");
+  if (record.schema_id !== "CandidateEnvelope") {
+    stop(`candidate-review requires a CandidateEnvelope import, got ${record.schema_id}`, 1);
+  }
+  process.stdout.write(`${JSON.stringify({
+    status: "passed",
+    sync_id: proposalWorkflowSyncId,
+    store: proposalWorkflowStore(),
+    review: candidateReviewPublic(record),
+  }, null, 2)}\n`);
+}
+
+function handleAgentHandoff(orchestration) {
+  const options = parseOptionArgs(process.argv.slice(3));
+  rejectUnknownOptions(options, new Set(["event_id"]), "agent-handoff");
+  const eventId = requireOption(options, "event_id", "agent-handoff");
+  const records = readEventRecords();
+  const record = findLatestEvent(records, eventId);
+  if (!record) {
+    stop(`unknown Design Studio event: ${eventId}`, 1);
+  }
+  if (record.provider_mode !== "subscription-agent") {
+    stop("agent-handoff requires a subscription-agent event", 1);
+  }
+  const packageRecord = latestPackageForEvent(records, eventId);
+  process.stdout.write(`${JSON.stringify({
+    status: "passed",
+    sync_id: proposalWorkflowSyncId,
+    store: proposalWorkflowStore(),
+    handoff: agentHandoffPublic(record, orchestration, packageRecord),
+  }, null, 2)}\n`);
+}
+
+function handleAgentPackage(orchestration) {
+  const options = parseOptionArgs(process.argv.slice(3));
+  rejectUnknownOptions(options, new Set(["event_id", "output"]), "agent-package");
+  const eventId = requireOption(options, "event_id", "agent-package");
+  const records = readEventRecords();
+  const record = findLatestEvent(records, eventId);
+  if (!record) {
+    stop(`unknown Design Studio event: ${eventId}`, 1);
+  }
+  if (record.provider_mode !== "subscription-agent") {
+    stop("agent-package requires a subscription-agent event", 1);
+  }
+  const outputPath = safePackageOutputPath(options.output, record);
+  const previous = latestPackageForEvent(records, eventId);
+  if (previous && previous.package_path === relativePackagePath(outputPath) && fs.existsSync(outputPath)) {
+    process.stdout.write(`${JSON.stringify({
+      status: "deduplicated",
+      sync_id: subscriptionHandoffPackageSyncId,
+      package: packageRecordPublic(previous),
+      handoff: agentHandoffPublic(record, orchestration, previous),
+    }, null, 2)}\n`);
+    return;
+  }
+  const now = isoNow();
+  const payload = buildAgentPackagePayload(record, orchestration, outputPath, now);
+  fs.mkdirSync(path.dirname(outputPath), { recursive: true });
+  fs.writeFileSync(outputPath, `${JSON.stringify(payload, null, 2)}\n`, "utf8");
+  const packageRecord = buildPackageRecord(payload, outputPath, records, now);
+  appendEventRecord(packageRecord);
+  process.stdout.write(`${JSON.stringify({
+    status: "passed",
+    sync_id: subscriptionHandoffPackageSyncId,
+    package: packageRecordPublic(packageRecord),
+    handoff: agentHandoffPublic(record, orchestration, packageRecord),
+  }, null, 2)}\n`);
+}
+
+function handleExportProposal(orchestration) {
+  const { record, options } = requireImportRecord("export-proposal");
+  if (record.schema_id !== "DesignChangeProposal") {
+    stop(`export-proposal requires a DesignChangeProposal import, got ${record.schema_id}`, 1);
+  }
+  const targetRef = options.target_ref || "external-product";
+  process.stdout.write(`${JSON.stringify({
+    status: "passed",
+    sync_id: proposalWorkflowSyncId,
+    store: proposalWorkflowStore(),
+    export: externalProductExportPublic(record, orchestration, targetRef),
+  }, null, 2)}\n`);
+}
+
+function handleProviderPolicy(orchestration) {
+  const options = parseOptionArgs(process.argv.slice(3));
+  rejectUnknownOptions(options, new Set(["provider_mode"]), "provider-policy");
+  const providerMode = options.provider_mode || "api-key";
+  process.stdout.write(`${JSON.stringify({
+    status: "passed",
+    sync_id: proposalWorkflowSyncId,
+    provider_policy: providerPolicyPublic(orchestration, providerMode),
+  }, null, 2)}\n`);
+}
+
+function handleTransactionPreview(orchestration) {
+  const { record, options } = requireImportRecord("transaction-preview");
+  if (record.schema_id !== "DesignChangeProposal") {
+    stop(`transaction-preview requires a DesignChangeProposal import, got ${record.schema_id}`, 1);
+  }
+  const targetRef = options.target_ref || "dashboard-control-center";
+  process.stdout.write(`${JSON.stringify({
+    status: "passed",
+    sync_id: proposalWorkflowSyncId,
+    store: proposalWorkflowStore(),
+    transaction_preview: transactionPreviewPublic(record, orchestration, targetRef),
+  }, null, 2)}\n`);
+}
+
+function handleListTemplates(orchestration, templates) {
+  const options = parseOptionArgs(process.argv.slice(3));
+  rejectUnknownOptions(options, new Set(["target_ref"]), "list-templates");
+  const targetRef = options.target_ref || "";
+  const selectedTemplates = targetRef
+    ? {
+      ...templates,
+      templates: (templates.templates || []).filter((template) => (template.supported_targets || []).includes(targetRef)),
+    }
+    : templates;
+  if (targetRef) {
+    targetAdapterContract(orchestration, targetRef);
+  }
+  process.stdout.write(`${JSON.stringify({
+    status: "passed",
+    sync_id: templateLibrarySyncId,
+    registry: templateRegistryPublic(templates),
+    template_library: templateLibraryPublic(selectedTemplates, orchestration),
+  }, null, 2)}\n`);
+}
+
+function handleTemplatePreview(orchestration, templates) {
+  const options = parseOptionArgs(process.argv.slice(3));
+  rejectUnknownOptions(options, new Set(["template_id", "target_ref"]), "template-preview");
+  const templateId = requireOption(options, "template_id", "template-preview");
+  const template = findTemplate(templates, templateId);
+  const targetRef = options.target_ref || templateDefaultTarget(template);
+  process.stdout.write(`${JSON.stringify({
+    status: "passed",
+    sync_id: templateLibrarySyncId,
+    registry: templateRegistryPublic(templates),
+    preview: templatePreviewPublic(template, orchestration, targetRef),
+  }, null, 2)}\n`);
+}
+
+function handleProposalStatus(orchestration, templates) {
+  const options = parseOptionArgs(process.argv.slice(3));
+  rejectUnknownOptions(options, new Set([]), "proposal-status");
+  process.stdout.write(`${JSON.stringify(proposalWorkflowStatusPayload(orchestration, templates), null, 2)}\n`);
+}
+
 function interactionFromOptions(component, options) {
   const current = component.interaction || {};
   return {
@@ -1968,7 +3297,7 @@ function handleInteractionCommand(command, tokens, components) {
 }
 
 const command = process.argv[2] || "check";
-const { tokens, components, orchestration } = loadSources();
+const { tokens, components, orchestration, templates } = loadSources();
 const css = generatedCss(tokens, components);
 const js = generatedJs(tokens, components, orchestration);
 
@@ -1999,6 +3328,30 @@ if (command === "emit-css") {
   handleEventStatus(orchestration);
 } else if (command === "cancel-event" || command === "retry-event" || command === "dead-letter-event") {
   transitionEvent(command, orchestration);
+} else if (command === "import-candidate" || command === "import-proposal") {
+  handleImportCommand(command, orchestration);
+} else if (command === "list-imports") {
+  handleListImports(orchestration);
+} else if (command === "proposal-preview") {
+  handleProposalPreview();
+} else if (command === "candidate-review") {
+  handleCandidateReview();
+} else if (command === "agent-handoff") {
+  handleAgentHandoff(orchestration);
+} else if (command === "agent-package") {
+  handleAgentPackage(orchestration);
+} else if (command === "export-proposal") {
+  handleExportProposal(orchestration);
+} else if (command === "provider-policy") {
+  handleProviderPolicy(orchestration);
+} else if (command === "transaction-preview") {
+  handleTransactionPreview(orchestration);
+} else if (command === "list-templates") {
+  handleListTemplates(orchestration, templates);
+} else if (command === "template-preview") {
+  handleTemplatePreview(orchestration, templates);
+} else if (command === "proposal-status") {
+  handleProposalStatus(orchestration, templates);
 } else {
   usage();
 }

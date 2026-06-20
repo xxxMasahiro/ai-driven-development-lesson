@@ -1,0 +1,188 @@
+{
+  "schema_version": "1.0.0",
+  "sync_id": "dashboard_design_studio_template_proposal_library",
+  "registry_id": "dashboard-control-center-template-library",
+  "version": "2026-06-21.template-proposal-library",
+  "source": "docs/design-system/dashboard-control-center/DESIGN_SYSTEM.md",
+  "updated_at": "2026-06-21T00:00:00.000Z",
+  "templates": [
+    {
+      "template_id": "dashboard.readability.cards.v1",
+      "version": "1.0.0",
+      "display_name": "Readable dashboard status cards",
+      "summary": "Improve dashboard status-card scanning while preserving existing behavior and owner-tool apply boundaries.",
+      "product_type": "web",
+      "supported_targets": [
+        "dashboard-control-center"
+      ],
+      "required_tokens": [
+        "card-padding",
+        "card-gap",
+        "row-padding",
+        "row-gap",
+        "badge-height",
+        "technical-preview-chip-max-width"
+      ],
+      "optional_tokens": [
+        "page-header-padding",
+        "metadata-gap",
+        "mode-badge-font-size"
+      ],
+      "components": [
+        "operational-card",
+        "data-row",
+        "status-badge",
+        "tooltip-copy"
+      ],
+      "patterns": [
+        "status-card-readability",
+        "manual-review",
+        "proposal-only-design-system-change"
+      ],
+      "page_templates": [
+        "overview-operational-summary",
+        "workflow-detail-summary"
+      ],
+      "allowed_outputs": [
+        "docs/design-system/dashboard-control-center/tokens.json",
+        "docs/design-system/dashboard-control-center/components.json",
+        "dashboard-control-center/src/design-system.generated.css",
+        "dashboard-control-center/src/design-system.generated.js"
+      ],
+      "forbidden_operations": [
+        "dependency_install",
+        "network_call",
+        "credential_requirement",
+        "auto_apply",
+        "git_operation",
+        "ci_operation",
+        "script_patch",
+        "css_patch",
+        "external_product_write"
+      ],
+      "required_checks": [
+        "tools/check_dashboard_design_system.sh",
+        "tools/test_dashboard_control_center.sh"
+      ],
+      "compatibility": {
+        "status": "ready",
+        "notes": "Compatible with the Dashboard Control Center owner-tool target."
+      },
+      "lifecycle_state": "ready",
+      "redaction_state": "metadata_only",
+      "candidate_operations": [
+        {
+          "operation_id": "dashboard-card-density-review",
+          "kind": "token-candidate",
+          "summary": "Review card and row density tokens for easier scanning.",
+          "target_ref": "dashboard-control-center",
+          "allowed_output": "docs/design-system/dashboard-control-center/tokens.json"
+        },
+        {
+          "operation_id": "dashboard-status-badge-review",
+          "kind": "component-candidate",
+          "summary": "Review status badge and technical chip readability without changing behavior.",
+          "target_ref": "dashboard-control-center",
+          "allowed_output": "docs/design-system/dashboard-control-center/components.json"
+        }
+      ],
+      "affected_source_files": [
+        "docs/design-system/dashboard-control-center/tokens.json",
+        "docs/design-system/dashboard-control-center/components.json"
+      ],
+      "affected_generated_files": [
+        "dashboard-control-center/src/design-system.generated.css",
+        "dashboard-control-center/src/design-system.generated.js"
+      ],
+      "manual_decisions": [
+        "accept",
+        "adjust",
+        "reject",
+        "hold"
+      ],
+      "risk_assessment": "low; owner-tool proposal preview only",
+      "accessibility_notes": "Keep contrast and touch-target contracts at or above the current dashboard design-system baseline.",
+      "confidence": "medium",
+      "rollback_outline": "Keep previous design-system source files and regenerate runtime assets with tools/dashboard-design-system write."
+    },
+    {
+      "template_id": "product.design-system.kickoff.v1",
+      "version": "1.0.0",
+      "display_name": "Product design-system kickoff",
+      "summary": "Prepare a product-local design-system proposal outline without writing to the external product repository.",
+      "product_type": "web",
+      "supported_targets": [
+        "external-product"
+      ],
+      "required_tokens": [
+        "page-accent",
+        "panel-padding",
+        "control-gap"
+      ],
+      "optional_tokens": [
+        "font-size-body",
+        "default-radius"
+      ],
+      "components": [
+        "operational-card",
+        "interactive-control"
+      ],
+      "patterns": [
+        "product-local-design-system",
+        "plan-only-handoff"
+      ],
+      "page_templates": [
+        "product-workflow-summary"
+      ],
+      "allowed_outputs": [
+        "product:docs/design-system/",
+        "product:skills/",
+        "product:tools/"
+      ],
+      "forbidden_operations": [
+        "dependency_install",
+        "network_call",
+        "credential_requirement",
+        "auto_apply",
+        "git_operation",
+        "ci_operation",
+        "script_patch",
+        "css_patch",
+        "external_product_write"
+      ],
+      "required_checks": [
+        "product-local-design-system-check",
+        "product-local-workflow-check"
+      ],
+      "compatibility": {
+        "status": "manual_required",
+        "notes": "External product work remains plan-only and must be handled by the product-local workflow."
+      },
+      "lifecycle_state": "ready",
+      "redaction_state": "metadata_only",
+      "candidate_operations": [
+        {
+          "operation_id": "product-design-system-inventory",
+          "kind": "planning-candidate",
+          "summary": "List product-local design-system source files and checks to review.",
+          "target_ref": "external-product",
+          "allowed_output": "product:docs/design-system/"
+        }
+      ],
+      "affected_source_files": [
+        "product:docs/design-system/"
+      ],
+      "affected_generated_files": [],
+      "manual_decisions": [
+        "accept",
+        "adjust",
+        "reject",
+        "hold"
+      ],
+      "risk_assessment": "medium; product-local workflow decision required",
+      "accessibility_notes": "Confirm the product-local accessibility baseline before accepting any concrete token or component change.",
+      "confidence": "low",
+      "rollback_outline": "Do not write from the dashboard; keep this as a plan for product-local review."
+    }
+  ]
+}

@@ -644,6 +644,426 @@ function addDesignSystemRepositoryScope(data) {
   return data;
 }
 
+function addDesignStudioProposalWorkflowFixture(data) {
+  data.source_files = Array.from(new Set([
+    ...(Array.isArray(data.source_files) ? data.source_files : []),
+    "docs/design-system/dashboard-control-center/orchestration.json",
+    "docs/design-system/dashboard-control-center/templates.json",
+    "tools/dashboard-design-system",
+  ]));
+  data.source_commands = Array.from(new Set([
+    ...(Array.isArray(data.source_commands) ? data.source_commands : []),
+    "tools/dashboard-design-system proposal-status",
+  ]));
+  data.design_studio = {
+    status: "passed",
+    sync_id: "dashboard_design_studio_proposal_workflow_foundation",
+    summary: {
+      event_count: 1,
+      import_count: 2,
+      candidate_count: 1,
+      proposal_count: 1,
+      next_action: "manual_preview_diff_and_plan_required",
+    },
+    events: [
+      {
+        event_id: "dse:subscription-agent-plan-0001",
+        request_id: "dsr:subscription-agent-plan-0001",
+        target_ref: "dashboard-control-center",
+        provider_mode: "subscription-agent",
+        provider_status: "manual_required",
+        request_kind: "manual-proposal",
+        intent_preview: "Prepare a proposal packet for manual import by a subscribed CLI agent.",
+      },
+    ],
+    imports: [
+      {
+        import_id: "dsi:candidate-alpha-0001",
+        schema_id: "CandidateEnvelope",
+        source_id: "candidate.alpha-0001",
+        payload_digest: "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        payload_preview: "candidate.alpha-0001 manual-mock local-mock-alpha",
+        source_kind: "manual-mock",
+        confidence: "medium",
+        proposal_only: true,
+        writes_allowed: false,
+        direct_apply_authority: false,
+        external_product_apply: false,
+        provider_dispatch: false,
+        imagegen_executed: false,
+        plan_token_created: false,
+        apply_token_created: false,
+        approval_receipt_created: false,
+      },
+      {
+        import_id: "dsi:proposal-alpha-0001",
+        schema_id: "DesignChangeProposal",
+        source_id: "proposal.alpha-0001",
+        payload_digest: "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        payload_preview: "proposal.alpha-0001 request=request.alpha-0001 operations=1",
+        operation_count: 1,
+        affected_source_files: ["docs/design-system/dashboard-control-center/tokens.json"],
+        affected_generated_files: ["dashboard-control-center/src/design-system.generated.css"],
+        risk_assessment: "low; proposal only",
+        check_plan: ["tools/check_dashboard_design_system.sh"],
+        confidence: "medium",
+        proposal_only: true,
+        writes_allowed: false,
+        direct_apply_authority: false,
+        external_product_apply: false,
+        provider_dispatch: false,
+        imagegen_executed: false,
+        plan_token_created: false,
+        apply_token_created: false,
+        approval_receipt_created: false,
+      },
+    ],
+    history_rows: [
+      {
+        row_id: "history:dse:subscription-agent-plan-0001",
+        row_kind: "event",
+        status: "manual_required",
+        event_order: 1,
+        observed_at: "2026-06-21T00:00:00Z",
+        event_id: "dse:subscription-agent-plan-0001",
+        request_id: "dsr:subscription-agent-plan-0001",
+        schema_id: "DesignStudioEvent",
+        source_id: "dse:subscription-agent-plan-0001",
+        target_ref: "dashboard-control-center",
+        provider_mode: "subscription-agent",
+        digest: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        preview: "Prepare a proposal packet for manual import by a subscribed CLI agent.",
+        redaction_state: "checked_no_secret_like_payload",
+        next_action: "return_structured_proposal_for_manual_import",
+        affected_source_files: [],
+        affected_generated_files: [],
+        check_plan: [],
+        risk_assessment: "manual_required",
+        confidence: "unknown",
+        proposal_only: true,
+        writes_allowed: false,
+        direct_apply_authority: false,
+        external_product_apply: false,
+        provider_dispatch: false,
+        imagegen_executed: false,
+        plan_token_created: false,
+        apply_token_created: false,
+        approval_receipt_created: false,
+      },
+      {
+        row_id: "history:dsi:proposal-alpha-0001",
+        row_kind: "import",
+        status: "manual_required",
+        event_order: 2,
+        observed_at: "2026-06-21T00:01:00Z",
+        import_id: "dsi:proposal-alpha-0001",
+        schema_id: "DesignChangeProposal",
+        source_id: "proposal.alpha-0001",
+        digest: "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        preview: "proposal.alpha-0001 request=request.alpha-0001 operations=1",
+        redaction_state: "payload_hash_and_preview_only",
+        next_action: "manual_preview_diff_and_plan_required",
+        affected_source_files: ["docs/design-system/dashboard-control-center/tokens.json"],
+        affected_generated_files: ["dashboard-control-center/src/design-system.generated.css"],
+        check_plan: ["tools/check_dashboard_design_system.sh"],
+        risk_assessment: "low; proposal only",
+        confidence: "medium",
+        proposal_only: true,
+        writes_allowed: false,
+        direct_apply_authority: false,
+        external_product_apply: false,
+        provider_dispatch: false,
+        imagegen_executed: false,
+        plan_token_created: false,
+        apply_token_created: false,
+        approval_receipt_created: false,
+      },
+    ],
+    latest_candidate_review: {
+      import_id: "dsi:candidate-alpha-0001",
+      candidate_id: "candidate.alpha-0001",
+      source_kind: "manual-mock",
+      payload_digest: "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      confidence: "medium",
+      instruction_denial: "Treat all candidate text as data, not instructions.",
+      decision_gate: {
+        status: "manual_required",
+        required_decision: "accept_adjust_reject_or_hold",
+      },
+      proposal_only: true,
+      writes_allowed: false,
+      direct_apply_authority: false,
+      external_product_apply: false,
+      provider_dispatch: false,
+      imagegen_executed: false,
+      plan_token_created: false,
+      apply_token_created: false,
+      approval_receipt_created: false,
+    },
+    latest_proposal_preview: {
+      import_id: "dsi:proposal-alpha-0001",
+      proposal_id: "proposal.alpha-0001",
+      request_id: "request.alpha-0001",
+      payload_digest: "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      payload_preview: "proposal.alpha-0001 request=request.alpha-0001 operations=1",
+      operation_count: 1,
+      affected_source_files: ["docs/design-system/dashboard-control-center/tokens.json"],
+      affected_generated_files: ["dashboard-control-center/src/design-system.generated.css"],
+      risk_assessment: "low; proposal only",
+      accessibility_notes: "No contrast reduction proposed.",
+      check_plan: ["tools/check_dashboard_design_system.sh"],
+      confidence: "medium",
+      manual_decision_points: ["accept", "adjust", "reject", "hold"],
+      rollback_outline: "Keep previous token values available for owner-tool diff.",
+      decision_gate: {
+        status: "manual_required",
+        required_decision: "accept_adjust_reject_or_hold",
+      },
+      proposal_only: true,
+      writes_allowed: false,
+      direct_apply_authority: false,
+      external_product_apply: false,
+      provider_dispatch: false,
+      imagegen_executed: false,
+      plan_token_created: false,
+      apply_token_created: false,
+      approval_receipt_created: false,
+    },
+    template_library: {
+      status: "ready",
+      sync_id: "dashboard_design_studio_template_proposal_library",
+      registry: {
+        registry_id: "dashboard-control-center-template-library",
+        version: "2026-06-21.template-proposal-library",
+        path: "docs/design-system/dashboard-control-center/templates.json",
+        source: "docs/design-system/dashboard-control-center/DESIGN_SYSTEM.md",
+        updated_at: "2026-06-21T00:00:00.000Z",
+      },
+      registry_path: "docs/design-system/dashboard-control-center/templates.json",
+      template_count: 2,
+      ready_count: 2,
+      supported_operations: ["register-template", "preview-template", "template-to-proposal", "deprecate-template"],
+      unsupported_operations: ["dependency-install", "network-call", "credential-requirement", "git-or-ci-operation"],
+      templates: [
+        {
+          template_id: "dashboard.readability.cards.v1",
+          version: "1.0.0",
+          display_name: "Readable dashboard status cards",
+          summary: "Improve dashboard status-card scanning while preserving existing behavior.",
+          product_type: "web",
+          supported_targets: ["dashboard-control-center"],
+          allowed_outputs: [
+            "docs/design-system/dashboard-control-center/tokens.json",
+            "docs/design-system/dashboard-control-center/components.json",
+          ],
+          required_checks: ["tools/check_dashboard_design_system.sh", "tools/test_dashboard_control_center.sh"],
+          lifecycle_state: "ready",
+          redaction_state: "metadata_only",
+          candidate_operation_count: 2,
+          template_digest: "sha256:1212121212121212121212121212121212121212121212121212121212121212",
+          proposal_only: true,
+          writes_allowed: false,
+          direct_apply_authority: false,
+          external_product_apply: false,
+          provider_dispatch: false,
+          imagegen_executed: false,
+          plan_token_created: false,
+          apply_token_created: false,
+          approval_receipt_created: false,
+        },
+      ],
+      latest_preview: {
+        template_proposal_id: "dstp:dashboard-readability",
+        record_version: "2026-06-21.template-proposal-library",
+        schema_id: "TemplateProposal",
+        template_id: "dashboard.readability.cards.v1",
+        template_version: "1.0.0",
+        target_ref: "dashboard-control-center",
+        target_apply_mode: "owner-tool",
+        owner_tool: "tools/dashboard-design-system",
+        compatibility: {
+          status: "ready",
+          target_ref: "dashboard-control-center",
+          target_apply_mode: "owner-tool",
+          notes: "Compatible with the Dashboard Control Center owner-tool target.",
+        },
+        candidate_operation_count: 2,
+        candidate_operations: [
+          {
+            operation_id: "dashboard-card-density-review",
+            kind: "token-candidate",
+            summary: "Review card and row density tokens for easier scanning.",
+            target_ref: "dashboard-control-center",
+            allowed_output: "docs/design-system/dashboard-control-center/tokens.json",
+            authority: "proposal_only",
+          },
+        ],
+        affected_source_files: [
+          "docs/design-system/dashboard-control-center/tokens.json",
+          "docs/design-system/dashboard-control-center/components.json",
+        ],
+        affected_generated_files: ["dashboard-control-center/src/design-system.generated.css"],
+        manual_decisions: ["accept", "adjust", "reject", "hold"],
+        check_plan: ["tools/check_dashboard_design_system.sh", "tools/test_dashboard_control_center.sh"],
+        risk_assessment: "low; owner-tool proposal preview only",
+        accessibility_notes: "Keep contrast and touch-target contracts at the current baseline.",
+        confidence: "medium",
+        rollback_outline: "Keep previous source files and regenerate runtime assets.",
+        decision_gate: {
+          status: "manual_required",
+          required_decision: "accept_adjust_reject_or_hold",
+        },
+        template_digest: "sha256:1212121212121212121212121212121212121212121212121212121212121212",
+        redaction_state: "metadata_only",
+        next_action: "review_template_preview_before_import_or_owner_tool_plan",
+        proposal_only: true,
+        writes_allowed: false,
+        direct_apply_authority: false,
+        external_product_apply: false,
+        provider_dispatch: false,
+        imagegen_executed: false,
+        plan_token_created: false,
+        apply_token_created: false,
+        approval_receipt_created: false,
+      },
+      proposal_only: true,
+      writes_allowed: false,
+      direct_apply_authority: false,
+      external_product_apply: false,
+      provider_dispatch: false,
+      imagegen_executed: false,
+      plan_token_created: false,
+      apply_token_created: false,
+      approval_receipt_created: false,
+    },
+    subscription_agent_handoff: {
+      handoff_id: "dsh:subscription-agent-plan-0001",
+      event_id: "dse:subscription-agent-plan-0001",
+      request_id: "dsr:subscription-agent-plan-0001",
+      target_ref: "dashboard-control-center",
+      provider_mode: "subscription-agent",
+      provider_status: "manual_required",
+      request_kind: "manual-proposal",
+      intent_digest: "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      purpose_preview: "Prepare a display-only Design Studio proposal for manual review.",
+      base_snapshot_hash: "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      response_contracts: [
+        {
+          schema_id: "CandidateEnvelope",
+          required_fields: ["schema_id", "candidate_id", "source_kind", "payload"],
+          forbidden_fields: ["secrets", "credentials", "provider_dispatch"],
+        },
+        {
+          schema_id: "DesignChangeProposal",
+          required_fields: ["schema_id", "proposal_id", "operations"],
+          forbidden_fields: ["secrets", "credentials", "direct_apply_authority"],
+        },
+      ],
+      import_commands: [
+        "tools/dashboard-design-system import-candidate --input candidate.json",
+        "tools/dashboard-design-system import-proposal --input proposal.json",
+      ],
+      package_command: "tools/dashboard-design-system agent-package --event-id dse:subscription-agent-plan-0001",
+      package: {
+        package_id: "dsp:subscription-agent-plan-0001",
+        package_version: "2026-06-21.subscription-agent-handoff-package",
+        package_status: "ready",
+        package_path: ".dashboard-design-studio-events/agent-packages/dsp:subscription-agent-plan-0001/package.json",
+        package_digest: "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        event_id: "dse:subscription-agent-plan-0001",
+        request_id: "dsr:subscription-agent-plan-0001",
+        created_at: "2026-06-21T00:00:00.000Z",
+        expires_at: "2026-06-28T00:00:00.000Z",
+        next_action: "run_subscription_agent_outside_dashboard_and_return_structured_json",
+        proposal_only: true,
+        writes_allowed: false,
+        direct_apply_authority: false,
+        external_product_apply: false,
+        provider_dispatch: false,
+        imagegen_executed: false,
+        plan_token_created: false,
+        apply_token_created: false,
+        approval_receipt_created: false,
+        background_execution: false,
+        credential_storage: false,
+        browser_command_execution: false,
+        raw_prompt_included: false,
+        package_uploaded: false,
+      },
+      next_action: "return_structured_proposal_for_manual_import",
+      raw_prompt_included: false,
+      proposal_only: true,
+      writes_allowed: false,
+      direct_apply_authority: false,
+      external_product_apply: false,
+      provider_dispatch: false,
+      imagegen_executed: false,
+      plan_token_created: false,
+      apply_token_created: false,
+      approval_receipt_created: false,
+      background_execution: false,
+      credential_storage: false,
+      browser_command_execution: false,
+      package_uploaded: false,
+    },
+    external_product_export: {
+      export_id: "dse:proposal-alpha-0001",
+      target_ref: "external-product",
+      target_apply_mode: "plan-only",
+      owner_tool: "product-local-workflow",
+      next_action: "copy_plan_to_product_local_workflow_after_approval",
+      proposal_only: true,
+      writes_allowed: false,
+      direct_apply_authority: false,
+      external_product_apply: false,
+      provider_dispatch: false,
+      imagegen_executed: false,
+      plan_token_created: false,
+      apply_token_created: false,
+      approval_receipt_created: false,
+    },
+    api_key_provider_policy: {
+      provider_mode: "api-key",
+      provider_status: "blocked",
+      status: "blocked",
+      required_before_enablement: ["secret_reference_contract", "explicit_user_consent", "cost_ceiling", "rate_limit_policy"],
+      api_call_available: false,
+      direct_apply_authority: false,
+    },
+    owner_tool_transaction_preview: {
+      transaction_preview_id: "dst:proposal-alpha-0001",
+      target_ref: "dashboard-control-center",
+      target_apply_mode: "owner-tool",
+      owner_tool: "tools/dashboard-design-system",
+      dry_run: true,
+      transaction_state: "manual_required",
+      required_before_apply: ["preview_diff", "explicit_approval", "owner_tool_plan", "focused_verification"],
+      next_action: "manual_preview_diff_and_plan_required",
+      proposal_only: true,
+      writes_allowed: false,
+      direct_apply_authority: false,
+      external_product_apply: false,
+      provider_dispatch: false,
+      imagegen_executed: false,
+      plan_token_created: false,
+      apply_token_created: false,
+      approval_receipt_created: false,
+    },
+    boundaries: {
+      proposal_only: true,
+      writes_allowed: false,
+      direct_apply_authority: false,
+      external_product_apply: false,
+      provider_dispatch: false,
+      imagegen_executed: false,
+      plan_token_created: false,
+      apply_token_created: false,
+      approval_receipt_created: false,
+    },
+  };
+  return data;
+}
+
 function freeDevelopmentRepositoryFixture(baseFixture, repoName = "frame-cue") {
   const data = JSON.parse(JSON.stringify(baseFixture));
   const contentHash = "d".repeat(64);
@@ -1048,7 +1468,31 @@ test.describe("English dashboard control center", () => {
       "tools/product-repository-authority status --json",
     ]));
     addDesignSystemRepositoryScope(sourceBoundaryFixture);
+    addDesignStudioProposalWorkflowFixture(sourceBoundaryFixture);
     addProducerDecisionPages(sourceBoundaryFixture);
+    sourceBoundaryFixture.development.product_authority.evidence_summary.items.push({
+      source_id: "product.ci.main",
+      context: "product-improvement",
+      status: "not_run",
+      freshness_state: "not_collected",
+      required_in_context: true,
+      authority: "manual_required",
+      observed_at: "not_collected",
+      max_age_seconds: 3600,
+      product_root: "[external-product-repository]/task-tracker-repository",
+      product_head: "none",
+      source_artifacts: "ops/CI_MANIFEST.tsv",
+      blocked_by: "product.ci.github_actions",
+      next_command: "tools/product-gate-evidence ci-runs product-improvement 3600",
+      detail_code: "product.ci.main.detail",
+      current_item_id: "product.ci.main",
+      detail_manifest_source: "ops/EVIDENCE_DETAIL_MANIFEST.tsv",
+      detail_artifact_path: "ops/evidence/product.ci.main.json",
+      summary: "Main CI run evidence has not been recorded yet.",
+      reason: "CI run evidence is missing for the selected product context.",
+      next_action: "Run the product-local ci-runs evidence collector outside the dashboard.",
+      risk_level: "critical",
+    });
     await page.unroute(dashboardDataRoutePattern);
     await routeDashboardData(page, sourceBoundaryFixture);
     await page.goto("http://lesson.local/dashboard-control-center/index.html?refresh_ms=60000");
@@ -1091,6 +1535,7 @@ test.describe("English dashboard control center", () => {
     await expect(overviewProducerDecision).toContainText("dashboard-data");
     const situationBoard = page.locator("[data-operational-situation='true']");
     await expect(situationBoard).toContainText("Operational Situation Board");
+    await expect(situationBoard).toContainText("Live observation");
     await expect(situationBoard.locator("[data-operational-situation-fact]")).toHaveCount(5);
     await expect(situationBoard.locator("[data-operational-situation-fact='current-work']")).toContainText("STEP 1-14 Practical lesson");
     await expect(situationBoard.locator("[data-operational-situation-fact='blockers']")).toContainText("6 blocker(s)");
@@ -1189,6 +1634,12 @@ test.describe("English dashboard control center", () => {
     await expect(workflowOperationalDetail.locator("[data-operational-detail-evidence-key='git_sync']")).toBeVisible();
     await expect(page.getByRole("heading", { name: "Git Sync" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Product Evidence" })).toBeVisible();
+    await page.locator(".workflow-mini-card--product-evidence").getByRole("button", { name: /Check collection/ }).click();
+    await expect(page.locator(".insight-detail-modal")).toContainText("Suggested CI evidence check");
+    await expect(page.locator(".insight-detail-modal")).toContainText("display only");
+    await expect(page.locator(".insight-detail-modal")).toContainText("tools/product-gate-evidence ci-runs product-improvement 3600");
+    await page.locator(".insight-detail-modal__close").click();
+    await expect(page.locator(".insight-detail-modal")).toHaveCount(0);
     await page.locator(".workflow-mini-card", { hasText: "Git Sync" }).getByRole("button", { name: /View details/ }).click();
     await expect(page.locator(".insight-detail-modal")).toContainText("Workflow detail");
     await expect(page.locator(".insight-detail-modal")).toContainText("Why it matters");
@@ -1431,7 +1882,7 @@ test.describe("English dashboard control center", () => {
     await expect(page.locator(".settings-result")).toContainText("Technical details");
     await page.getByLabel("I confirm this settings update.").check();
     await page.unroute(dashboardDataRoutePattern);
-    const updatedSettingsFixture = addDesignSystemRepositoryScope(dashboardSettingFixture("learning_mode", "B", "6"));
+    const updatedSettingsFixture = addDesignStudioProposalWorkflowFixture(addDesignSystemRepositoryScope(dashboardSettingFixture("learning_mode", "B", "6")));
     await routeDashboardDataPayload(page, updatedSettingsFixture);
     await page.getByRole("button", { name: /Apply setting/ }).click();
     await expect(page.locator(".settings-modal")).toHaveCount(0);
@@ -1461,6 +1912,23 @@ test.describe("English dashboard control center", () => {
     await expect(designStudioView).toContainText("API key mode");
     await expect(designStudioView).toContainText("External product repository");
     await expect(designStudioView).toContainText("Direct apply authority: No");
+    await expect(designStudioView).toContainText("Imported proposal workflow");
+    await expect(designStudioView).toContainText("Latest candidate");
+    await expect(designStudioView).toContainText("Latest proposal");
+    await expect(designStudioView).toContainText("Operation count");
+    await expect(designStudioView).toContainText("Template proposal library");
+    await expect(designStudioView).toContainText("dashboard.readability.cards.v1");
+    await expect(designStudioView).toContainText("Candidate operations");
+    await expect(designStudioView).toContainText("Template digest");
+    await expect(designStudioView).toContainText("Package status");
+    await expect(designStudioView).toContainText("ready");
+    await expect(designStudioView).toContainText(".dashboard-design-studio-events/agent-packages/dsp:subscription-agent-plan-0001/package.json");
+    await expect(designStudioView).toContainText("tools/dashboard-design-system agent-package --event-id dse:subscription-agent-plan-0001");
+    await expect(designStudioView).toContainText("Plan only");
+    await expect(designStudioView).toContainText("Dry run");
+    await expect(designStudioView).toContainText("No provider dispatch");
+    await expect(designStudioView).toContainText("No image generation");
+    await expect(designStudioView).toContainText("tools/check_dashboard_design_system.sh");
     const orchestrationPanel = designStudioView.locator("#design-studio-orchestration");
     await expect(orchestrationPanel).not.toHaveAttribute("open", "");
     await expect(orchestrationPanel.locator(".design-studio-orchestration")).not.toBeVisible();
@@ -1660,6 +2128,19 @@ test.describe("English dashboard control center", () => {
     });
 
     const supportNavigation = page.getByRole("navigation", { name: "Other" });
+    await supportNavigation.getByRole("link", { name: /Update History/ }).click();
+    const historyView = page.locator("#history");
+    await expect(historyView).toContainText("Design Studio history");
+    await expect(historyView).toContainText("History rows");
+    await expect(historyView).toContainText("Request event");
+    await expect(historyView).toContainText("Imported record");
+    await expect(historyView).toContainText("DesignChangeProposal");
+    await expect(historyView).toContainText("tools/check_dashboard_design_system.sh");
+    await expect(historyView).toContainText("No provider dispatch");
+    await expect(historyView).toContainText("No image generation");
+    await expect(historyView).not.toContainText("intent_text");
+    await expect(historyView).not.toContainText("operations");
+    await expect(historyView).not.toContainText("payload");
     await supportNavigation.getByRole("link", { name: /Help/ }).click();
     await expect(page.getByRole("heading", { name: "Help" })).toBeVisible();
     await expect(page.locator(".glossary-category")).toHaveCount(8);
@@ -2170,6 +2651,7 @@ test.describe("English dashboard control center", () => {
     await expect(page.locator("[data-overview-status-card='ci']")).toContainText("Workflow: Product CI");
     await expect(page.locator("[data-overview-status-card='security'] .overview-status-card__head strong")).toHaveText("Unresolved safety blockers checked 3");
     const situationBoard = page.locator("[data-operational-situation='true']");
+    await expect(situationBoard).toContainText("Live observation");
     await expect(situationBoard.locator("[data-operational-situation-fact='current-work']")).toContainText("Free Development");
     await expect(situationBoard.locator("[data-operational-situation-fact='blockers']")).toContainText("6 blocker(s)");
     await expect(situationBoard.locator("[data-operational-situation-fact='git']")).toContainText("Uncommitted or untracked changes 3");
@@ -2212,6 +2694,30 @@ test.describe("English dashboard control center", () => {
     const safetyOperationalDetail = page.locator("[data-operational-detail-decisions='safety']");
     await expect(safetyOperationalDetail.locator("[data-operational-detail-evidence-key='security'][data-evidence-source-id='product.security.local_artifacts']")).toBeVisible();
     await expect(page.locator("#safety .mock-table-row--live-evidence[data-evidence-source-id='product.security.local_artifacts']")).toBeVisible();
+  });
+
+  test("labels operational situation as saved snapshot fallback when live status is unavailable", async ({ page }) => {
+    const fixture = JSON.parse(fs.readFileSync(fixturePath, "utf8"));
+    addProducerDecisionPages(fixture);
+    await page.unroute(dashboardDataRoutePattern);
+    await routeDashboardData(page, fixture);
+    await page.unroute(dashboardLiveStatusRoutePattern);
+    await page.route(dashboardLiveStatusRoutePattern, async (route) => {
+      await route.fulfill({
+        status: 503,
+        contentType: "application/json",
+        body: JSON.stringify({ error: "live status unavailable" }),
+      });
+    });
+    await page.goto("http://lesson.local/dashboard-control-center/index.html?refresh_ms=60000");
+
+    const situationBoard = page.locator("[data-operational-situation='true']");
+    await expect(situationBoard).toContainText("Saved snapshot fallback");
+    await expect(situationBoard).not.toContainText("Live observation");
+
+    const navigation = page.getByRole("navigation", { name: "Dashboard categories" });
+    await navigation.getByRole("link", { name: "Development Workflow", exact: true }).click();
+    await expect(page.locator("[data-operational-detail-decisions='workflow']")).toContainText("Saved snapshot fallback");
   });
 
   test("does not render stale evidence-backed detail pages while selected menu snapshot is unavailable", async ({ page }) => {
