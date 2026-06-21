@@ -132,6 +132,51 @@ const foundationPresets = {
   },
 };
 
+const menuTileIconTones = [
+  {
+    selector: ".menu-tile--lesson-soft",
+    iconBg: "#dff4e6",
+    iconColor: "#168444",
+    selectedIconBg: "#168444",
+  },
+  {
+    selector: ".menu-tile--lesson",
+    iconBg: "#e8f0ff",
+    iconColor: "#1559c7",
+    selectedIconBg: "#0b55d9",
+  },
+  {
+    selector: ".menu-tile--advanced",
+    iconBg: "#eee4ff",
+    iconColor: "#7044d6",
+    selectedIconBg: "#7044d6",
+  },
+  {
+    selector: ".menu-tile--code",
+    iconBg: "#d8f3f1",
+    iconColor: "#087b88",
+    selectedIconBg: "#087b88",
+  },
+  {
+    selector: ".menu-tile--improve",
+    iconBg: "#ffedd4",
+    iconColor: "#a25e00",
+    selectedIconBg: "#a25e00",
+  },
+  {
+    selector: ".menu-tile--external",
+    iconBg: "#dff4e6",
+    iconColor: "#168444",
+    selectedIconBg: "#168444",
+  },
+  {
+    selector: ".menu-tile--authoring",
+    iconBg: "#efe4ff",
+    iconColor: "#7044d6",
+    selectedIconBg: "#7044d6",
+  },
+];
+
 function readJson(file) {
   return JSON.parse(fs.readFileSync(file, "utf8"));
 }
@@ -231,6 +276,61 @@ function foundationFromOptions(tokens, options) {
   };
 }
 
+function pushCssRule(cssLines, selectors, declarations) {
+  selectors.forEach((selector, index) => {
+    cssLines.push(`${selector}${index === selectors.length - 1 ? " {" : ","}`);
+  });
+  for (const declaration of declarations) {
+    cssLines.push(`  ${declaration}`);
+  }
+  cssLines.push("}");
+  cssLines.push("");
+}
+
+function appendContextMenuTileCss(cssLines) {
+  const iconSelectors = [
+    ".menu-tile__icon",
+    ...menuTileIconTones.map((tone) => `${tone.selector} .menu-tile__icon`),
+  ];
+  const selectedIconSelectors = [
+    ".menu-tile.is-selected .menu-tile__icon",
+    ...menuTileIconTones.map((tone) => `.menu-tile.is-selected${tone.selector} .menu-tile__icon`),
+  ];
+
+  pushCssRule(cssLines, [".menu-tile"], [
+    "--dcc-menu-tile-icon-bg: var(--dcc-page-soft-fallback);",
+    "--dcc-menu-tile-icon-color: var(--dcc-page-accent-fallback);",
+    "--dcc-menu-tile-selected-icon-bg: var(--dcc-page-accent-fallback);",
+    "--dcc-menu-tile-selected-icon-color: #ffffff;",
+  ]);
+
+  for (const tone of menuTileIconTones) {
+    pushCssRule(cssLines, [tone.selector], [
+      `--dcc-menu-tile-icon-bg: ${tone.iconBg};`,
+      `--dcc-menu-tile-icon-color: ${tone.iconColor};`,
+      `--dcc-menu-tile-selected-icon-bg: ${tone.selectedIconBg};`,
+      "--dcc-menu-tile-selected-icon-color: #ffffff;",
+    ]);
+  }
+
+  pushCssRule(cssLines, [".menu-tile.is-unselectable:not(.is-selected)"], [
+    "--dcc-menu-tile-icon-bg: #e9eef2;",
+    "--dcc-menu-tile-icon-color: #53616b;",
+    "--dcc-menu-tile-selected-icon-bg: #53616b;",
+    "--dcc-menu-tile-selected-icon-color: #ffffff;",
+  ]);
+
+  pushCssRule(cssLines, iconSelectors, [
+    "background: var(--dcc-menu-tile-icon-bg, var(--dcc-page-soft-fallback));",
+    "color: var(--dcc-menu-tile-icon-color, var(--dcc-page-accent-fallback));",
+  ]);
+
+  pushCssRule(cssLines, selectedIconSelectors, [
+    "background: var(--dcc-menu-tile-selected-icon-bg, var(--dcc-page-accent-fallback));",
+    "color: var(--dcc-menu-tile-selected-icon-color, #ffffff);",
+  ]);
+}
+
 function applyTokenValues(tokens, values) {
   const expected = new Set(Object.keys(values));
   const nextTokens = tokens.tokens.map((token) => {
@@ -285,6 +385,7 @@ function generatedCss(tokens, components) {
   const rows = sortedTokenRows(tokens);
   const tooltipCopy = components.components.find((component) => component.id === "tooltip-copy") || {};
   const decisionProgressSummary = components.components.find((component) => component.id === "decision-progress-summary") || null;
+  const contextMenuTile = components.components.find((component) => component.id === "context-menu-tile") || null;
   const tooltipInteraction = tooltipCopy.interaction?.tooltip || {};
   const copyInteraction = tooltipCopy.interaction?.copyFeedback || {};
   const tooltipTrigger = tooltipInteraction.trigger || "hover-only";
@@ -315,6 +416,10 @@ function generatedCss(tokens, components) {
   cssLines.push(`  --dcc-copy-feedback-collision: ${copyInteraction.collision || "shift"};`);
   cssLines.push(`  --dcc-copy-feedback-duration-ms: ${Number(copyInteraction.durationMs) || 1200}ms;`);
   cssLines.push("}");
+  cssLines.push("");
+  if (contextMenuTile) {
+    appendContextMenuTileCss(cssLines);
+  }
   cssLines.push("");
   cssLines.push(".page-title,");
   cssLines.push(".detail-page-header,");
@@ -450,6 +555,7 @@ function generatedCss(tokens, components) {
   cssLines.push("  color: #ffffff;");
   cssLines.push("}");
   cssLines.push("");
+  cssLines.push(".page-title h1,");
   cssLines.push(".page-title h2,");
   cssLines.push(".detail-page-header__title h2 {");
   cssLines.push("  color: var(--dcc-text);");
@@ -1561,10 +1667,16 @@ function checkRuntimeWiring() {
   if (!generatedCss.includes(".design-studio-preview__control-field select") || !generatedCss.includes("--dcc-form-control-height")) {
     fail("Generated interactive-control CSS must apply form control tokens");
   }
+  if (!generatedCss.includes("--dcc-menu-tile-selected-icon-bg") || !generatedCss.includes(".menu-tile.is-selected.menu-tile--lesson .menu-tile__icon")) {
+    fail("Generated context-menu-tile CSS must apply selected and unselected icon states");
+  }
   for (const heading of ["Source-To-Runtime Contract", "Prototype Preview Gate", "Drift Check"]) {
     if (!designSystem.includes(heading)) {
       fail(`DESIGN_SYSTEM.md missing ${heading}`);
     }
+  }
+  if (!designSystem.includes("Context Menu Tiles")) {
+    fail("DESIGN_SYSTEM.md missing Context Menu Tiles");
   }
   for (const phrase of ["Design Studio", "Interaction Editing Contract"]) {
     if (!designSystem.includes(phrase)) {

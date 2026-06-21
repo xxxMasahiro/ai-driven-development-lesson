@@ -181,6 +181,34 @@ export const dashboardControlCenterDesignSystem = Object.freeze({
       "role": "Default square size for icon-only controls such as modal close buttons."
     },
     {
+      "type": "color",
+      "name": "menu-tile-icon-background",
+      "cssVariable": "--dcc-menu-tile-icon-bg",
+      "value": "#e8f0ff",
+      "role": "Default soft background for unselected context menu tile icons."
+    },
+    {
+      "type": "color",
+      "name": "menu-tile-icon-color",
+      "cssVariable": "--dcc-menu-tile-icon-color",
+      "value": "#1559c7",
+      "role": "Default readable icon color for unselected context menu tile icons."
+    },
+    {
+      "type": "color",
+      "name": "menu-tile-selected-icon-background",
+      "cssVariable": "--dcc-menu-tile-selected-icon-bg",
+      "value": "#0b55d9",
+      "role": "Default filled background for selected context menu tile icons."
+    },
+    {
+      "type": "color",
+      "name": "menu-tile-selected-icon-color",
+      "cssVariable": "--dcc-menu-tile-selected-icon-color",
+      "value": "#ffffff",
+      "role": "Default icon color on selected context menu tile icons."
+    },
+    {
       "type": "spacing",
       "name": "metadata-gap",
       "cssVariable": "--dcc-metadata-gap",
@@ -270,6 +298,27 @@ export const dashboardControlCenterDesignSystem = Object.freeze({
       "cssVariable": "--dcc-row-padding",
       "value": "10px 12px",
       "role": "Default padding for repeated table, settings, evidence, and activity rows."
+    },
+    {
+      "type": "color",
+      "name": "safety-accent",
+      "cssVariable": "--dcc-safety-accent",
+      "value": "#067a3f",
+      "role": "Readable green accent for safety actions, labels, and filled safety icons. It must meet normal-text contrast against white surfaces."
+    },
+    {
+      "type": "color",
+      "name": "safety-border",
+      "cssVariable": "--dcc-safety-border",
+      "value": "#b9dfc3",
+      "role": "Soft green border for safety buttons and safety state chips."
+    },
+    {
+      "type": "color",
+      "name": "safety-soft",
+      "cssVariable": "--dcc-safety-soft",
+      "value": "#e8f7ed",
+      "role": "Soft green safety surface for hover states, read-only banners, and subtle safety emphasis."
     },
     {
       "type": "spacing",
@@ -419,6 +468,32 @@ export const dashboardControlCenterDesignSystem = Object.freeze({
         "Shared card padding and internal gaps are generated from the design-system source.",
         "Do not nest decorative cards inside decorative cards.",
         "Keep raw technical values secondary and copyable."
+      ]
+    },
+    {
+      "id": "context-menu-tile",
+      "selectors": [
+        ".menu-tile",
+        ".menu-tile__icon",
+        ".menu-tile__check"
+      ],
+      "tokens": [
+        "--dcc-surface",
+        "--dcc-border",
+        "--dcc-radius",
+        "--dcc-focus",
+        "--dcc-page-accent-fallback",
+        "--dcc-page-soft-fallback",
+        "--dcc-menu-tile-icon-bg",
+        "--dcc-menu-tile-icon-color",
+        "--dcc-menu-tile-selected-icon-bg",
+        "--dcc-menu-tile-selected-icon-color"
+      ],
+      "contract": [
+        "Selected menu icons use a filled category color with a white icon.",
+        "Unselected menu icons use a soft category color with a darker icon from the same category.",
+        "Disabled or unavailable menu options keep readable text and must not look selected.",
+        "Selection state must also be exposed through text, check mark, and aria-pressed."
       ]
     },
     {

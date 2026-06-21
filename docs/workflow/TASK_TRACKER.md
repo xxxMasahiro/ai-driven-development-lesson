@@ -2895,3 +2895,23 @@ Current Status:
 Next Step:
 
 - No remaining implementation action for this sync ID after focused Design Studio, dashboard-data, Dashboard, sync, and repository-development checks passed.
+
+## Dashboard Control Center Agentic Control Tower P0-P10 Work
+
+SYNC-ID: dashboard_control_center_agentic_control_tower_p0_p10
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,tools/lib/control_center_core.mjs,tools/lib/control_center_evidence_store.mjs,tools/lib/control_center_mcp_stdio_adapter.mjs,tools/control-center,tools/control-center-mcp,tools/test_control_center_core.sh,tools/test_control_center_core.mjs,dashboard-control-center/src/App.jsx,dashboard-control-center/src/DecisionSummary.jsx,dashboard-control-center/src/dashboardContext.js,dashboard-control-center/src/dashboardData.js,dashboard-control-center/src/displayDepth.js,dashboard-control-center/src/i18n.js,dashboard-control-center/src/styles.css,tools/dashboard-data,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/test_dashboard_i18n.sh,tools/check_dashboard_bundle_contract.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh,tools/test_dashboard_browser_debug_manifest.sh
+
+Current Status:
+
+- [x] Completed xhigh review synthesis for P0-P10 across display repair, CLI/MCP parity, evidence collection, provider/imagegen/external-product boundaries, and Browser Debug review handoff.
+- [x] Repaired menu-scoped detail rendering and current-work decision presentation.
+- [x] Centralized status translation and removed duplicated mock-status label paths from primary status rendering.
+- [x] Added Control Center shared core, CLI, MCP stdio adapter, capability profiles, and locked evidence receipt store.
+- [x] Added Design Studio AI agent connection layer for manual, subscription-agent, API-key, image/mock, external product, CLI/MCP, and Browser Debug paths.
+- [x] Synced requirements, specification, implementation plan, tracker, and handoff.
+
+Next Step:
+
+- Run the focused verification listed for this sync id, then P10 Browser Debug visual review from the lesson repository without modifying Browser Debug CLI.

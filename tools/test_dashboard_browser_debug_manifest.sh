@@ -28,7 +28,7 @@ function assertCondition(condition, message) {
 
 assertCondition(manifest.schemaVersion === '0.1.0', 'manifest schema version must match Browser Debug CLI target schema');
 assertCondition(manifest.name === 'ai-driven-development-lesson-dashboard-control-center', 'manifest name must identify the lesson-owned target');
-assertCondition(manifest.baseUrl === 'http://127.0.0.1:5173/', 'base URL must be configurable');
+assertCondition(manifest.baseUrl === 'http://127.0.0.1:5173/?menu_id=step_1_14', 'base URL must include the selected menu_id used by the dashboard');
 assertCondition(manifest.localContentUxAdvisory?.enabled === true, 'content UX advisory must be enabled for lesson-owned review manifest');
 assertCondition(manifest.sourceData?.[0]?.id === 'dashboard_context', 'manifest must inline bounded dashboard_context sourceData');
 assertCondition(manifest.sourceData[0].data.selected_context.git_status === 'unknown', 'selected context Git status must remain in lesson sourceData');
@@ -37,7 +37,7 @@ assertCondition(manifest.sourceData[0].data.selected_context.blocker_count === 1
 assertCondition(!JSON.stringify(manifest).includes('TOKEN=abcdefghijklmnop'), 'manifest must not copy raw dashboard warnings or token-like text');
 
 const expectedRoutes = new Set(manifest.expectedRoutes);
-for (const route of ['http://127.0.0.1:5173/#workflow', 'http://127.0.0.1:5173/#repository-info', 'http://127.0.0.1:5173/#settings']) {
+for (const route of ['http://127.0.0.1:5173/?menu_id=step_1_14#workflow', 'http://127.0.0.1:5173/?menu_id=step_1_14#repository-info', 'http://127.0.0.1:5173/?menu_id=step_1_14#settings']) {
   assertCondition(expectedRoutes.has(route), `missing expected route: ${route}`);
 }
 
@@ -55,6 +55,7 @@ const overview = manifest.pages.find((page) => page.role === 'workflow_overview'
 assertCondition(overview, 'overview page must keep lesson workflow role');
 assertCondition(overview.expectations.dataBindings.some((binding) => binding.pointer === '/selected_context/evidence_status'), 'overview must bind selected_context evidence status');
 assertCondition(overview.expectations.dataBindings.some((binding) => binding.pointer === '/selected_context/next_safe_action/risk_level'), 'overview must bind next safe action risk level');
+assertCondition(overview.expectations.dataBindings.every((binding) => binding.selector === '#overview'), 'overview bindings must target the stable overview root');
 NODE
 
 printf 'dashboard browser-debug manifest test passed\n'

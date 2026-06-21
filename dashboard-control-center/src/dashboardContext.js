@@ -12,11 +12,18 @@ export const DASHBOARD_MENU_IDS = [
   "lesson-repository-improvement",
 ];
 
+export const DASHBOARD_LESSON_MENU_IDS = ["step_1_7", "step_1_14", "advanced"];
+
 const dashboardKnownMenuIds = new Set(DASHBOARD_MENU_IDS);
+const dashboardLessonMenuIds = new Set(DASHBOARD_LESSON_MENU_IDS);
 
 export function safeDashboardMenuId(value) {
   const id = displayText(value, "");
   return dashboardKnownMenuIds.has(id) ? id : "";
+}
+
+export function isLessonMenuId(value) {
+  return dashboardLessonMenuIds.has(displayText(value, ""));
 }
 
 export function dashboardMenuIdFromSearch() {
@@ -189,6 +196,8 @@ export function resolveActiveDashboardData(data, activeMenuId) {
   const activeContext = contextDataForMenu(data, resolvedMenuId) || producerContext;
   const activeContextMenuId = displayText(activeContext.menu_id, resolvedMenuId);
   const isProducerContext = activeContextMenuId === producerMenuId;
+  const scopeMatchesSelectedMenu = activeContextMenuId === resolvedMenuId;
+  const detailPagesSafe = isProducerContext && scopeMatchesSelectedMenu;
   const viewData =
     isProducerContext && activeContext === producerContext
       ? data
@@ -203,6 +212,8 @@ export function resolveActiveDashboardData(data, activeMenuId) {
     activeContext,
     producerMenuId,
     isProducerContext,
+    scopeMatchesSelectedMenu,
+    detailPagesSafe,
     requestedMenuId,
   };
 }

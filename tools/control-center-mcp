@@ -1,0 +1,17 @@
+#!/usr/bin/env node
+import readline from "node:readline";
+
+import { createControlCenterMcpStdioAdapter } from "./lib/control_center_mcp_stdio_adapter.mjs";
+
+const adapter = createControlCenterMcpStdioAdapter();
+const reader = readline.createInterface({
+  input: process.stdin,
+  crlfDelay: Infinity,
+});
+
+reader.on("line", (line) => {
+  const response = adapter.handleLine(line);
+  if (response) {
+    process.stdout.write(`${JSON.stringify(response)}\n`);
+  }
+});

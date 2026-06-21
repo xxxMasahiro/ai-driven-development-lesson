@@ -15,12 +15,19 @@ export function displayDepthPolicy(value) {
   const depth = normalizeDashboardDisplayDepth(value);
   const isFriendly = depth === "friendly";
   const isTechnical = depth === "technical";
+  const isStandard = depth === "standard";
   const renderFoldedTechnicalReferences = isFriendly || isTechnical;
+  const audienceMode = isFriendly ? "non_engineer" : isTechnical ? "technical_engineer" : "junior_engineer";
   return {
     depth,
+    audienceMode,
+    audienceLabelKey: `displayDepth.audience.${audienceMode}.label`,
+    audienceDetailKey: `displayDepth.audience.${audienceMode}.detail`,
     isFriendly,
-    isStandard: depth === "standard",
+    isStandard,
     isTechnical,
+    usePlainLanguage: isFriendly,
+    useEngineeringLanguage: isStandard || isTechnical,
     collapseTechnicalDetails: isFriendly,
     renderFoldedTechnicalReferences,
     renderDecisionTechnicalReferenceDisclosure: renderFoldedTechnicalReferences,

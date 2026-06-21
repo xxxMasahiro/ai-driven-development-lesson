@@ -15,6 +15,7 @@ node_modules/
 test-results/
 playwright-report/
 dist/
+.browser-debug/
 .dashboard-control-center/
 
 # The learner's product repository must be a sibling of this lesson repository,

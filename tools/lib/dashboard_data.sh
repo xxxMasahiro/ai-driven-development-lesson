@@ -467,9 +467,17 @@ dashboard_json_decision_page() {
   local must_review_one="${15}"
   local must_review_two="${16}"
   local decision_question
+  local decision_question_key current_judgment_key top_reason_key evidence_confidence_key next_safe_action_key
+  local must_review_one_key must_review_two_key
 
   dashboard_data_validate_state "$status"
   dashboard_data_validate_risk_level "$risk_level"
+
+  decision_question_key="decisionPage.$id.decision_question"
+  current_judgment_key="decisionPage.status.$status.current_judgment"
+  top_reason_key="decisionPage.status.$status.top_reason"
+  evidence_confidence_key="decisionPage.evidenceConfidence.$authority.$freshness_state"
+  next_safe_action_key="decisionPage.$id.next_safe_action"
 
   case "$id" in
     overview)
@@ -504,6 +512,31 @@ dashboard_json_decision_page() {
       ;;
   esac
 
+  case "$must_review_one" in
+    "Top blocker") must_review_one_key="decisionPage.mustReview.topBlocker" ;;
+    "Current step") must_review_one_key="decisionPage.mustReview.currentStep" ;;
+    "Git and CI state") must_review_one_key="decisionPage.mustReview.gitCiState" ;;
+    "Synchronized docs") must_review_one_key="decisionPage.mustReview.synchronizedDocs" ;;
+    "Approvals") must_review_one_key="decisionPage.mustReview.approvals" ;;
+    "Worktree changes") must_review_one_key="decisionPage.mustReview.worktreeChanges" ;;
+    "Audience") must_review_one_key="decisionPage.mustReview.audience" ;;
+    "Current value") must_review_one_key="decisionPage.mustReview.currentValue" ;;
+    "Observed time") must_review_one_key="decisionPage.mustReview.observedTime" ;;
+    *) must_review_one_key="" ;;
+  esac
+  case "$must_review_two" in
+    "Evidence confidence") must_review_two_key="decisionPage.mustReview.evidenceConfidence" ;;
+    "Next learning action") must_review_two_key="decisionPage.mustReview.nextLearningAction" ;;
+    "Approval gates") must_review_two_key="decisionPage.mustReview.approvalGates" ;;
+    "Evidence rows") must_review_two_key="decisionPage.mustReview.evidenceRows" ;;
+    "Dangerous operations") must_review_two_key="decisionPage.mustReview.dangerousOperations" ;;
+    "Ahead/behind state") must_review_two_key="decisionPage.mustReview.aheadBehindState" ;;
+    "Status source") must_review_two_key="decisionPage.mustReview.statusSource" ;;
+    "Consistency") must_review_two_key="decisionPage.mustReview.consistency" ;;
+    "Source identity") must_review_two_key="decisionPage.mustReview.sourceIdentity" ;;
+    *) must_review_two_key="" ;;
+  esac
+
   printf '{"id":'
   dashboard_json_string "$id"
   printf ',"title":'
@@ -516,16 +549,28 @@ dashboard_json_decision_page() {
   dashboard_json_string "$status"
   printf ',"decision_question":'
   dashboard_json_string "$decision_question"
+  printf ',"decision_question_key":'
+  dashboard_json_string "$decision_question_key"
   printf ',"current_judgment":'
   dashboard_json_string "$current_judgment"
+  printf ',"current_judgment_key":'
+  dashboard_json_string "$current_judgment_key"
   printf ',"top_reason":'
   dashboard_json_string "$top_reason"
+  printf ',"top_reason_key":'
+  dashboard_json_string "$top_reason_key"
   printf ',"evidence_confidence":'
   dashboard_json_string "$evidence_confidence"
+  printf ',"evidence_confidence_key":'
+  dashboard_json_string "$evidence_confidence_key"
   printf ',"must_review":'
   dashboard_json_string_array "$must_review_one" "$must_review_two"
+  printf ',"must_review_keys":'
+  dashboard_json_string_array "$must_review_one_key" "$must_review_two_key"
   printf ',"next_safe_action":'
   dashboard_json_string "$next_safe_action"
+  printf ',"next_safe_action_key":'
+  dashboard_json_string "$next_safe_action_key"
   printf ',"detail_page":'
   dashboard_json_string "$detail_page"
   printf ',"owner_source":'

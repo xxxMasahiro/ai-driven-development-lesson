@@ -2644,3 +2644,27 @@ Acceptance requirements:
 Non-scope:
 
 - Do not implement template apply, automatic DesignChangeProposal conversion, dependency installation, network calls, provider execution, image generation, external product writes, Git/CI execution, approval mutation, plan/apply tokens, or browser command execution.
+
+## Dashboard Control Center Agentic Control Tower P0-P10 Requirements
+
+SYNC-ID: dashboard_control_center_agentic_control_tower_p0_p10
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,tools/lib/control_center_core.mjs,tools/lib/control_center_evidence_store.mjs,tools/lib/control_center_mcp_stdio_adapter.mjs,tools/control-center,tools/control-center-mcp,tools/test_control_center_core.sh,tools/test_control_center_core.mjs,dashboard-control-center/src/App.jsx,dashboard-control-center/src/DecisionSummary.jsx,dashboard-control-center/src/dashboardContext.js,dashboard-control-center/src/dashboardData.js,dashboard-control-center/src/displayDepth.js,dashboard-control-center/src/i18n.js,dashboard-control-center/src/styles.css,tools/dashboard-data,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/test_dashboard_i18n.sh,tools/check_dashboard_bundle_contract.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh,tools/test_dashboard_browser_debug_manifest.sh
+
+The Control Center must behave as a real-time, menu-scoped control tower for lesson and product workflows.
+It must help non-engineers understand what is happening now and help junior/intermediate engineers inspect source IDs, commands, Git/worktree, tests/CI, blockers, evidence freshness, and next safe action.
+
+Acceptance requirements:
+
+- P0: Detail pages must not render stale producer-owned data after a menu switch; evidence-backed pages require a snapshot whose producer menu matches the selected menu.
+- P1: User-visible state labels and producer fallback text must be key/code driven so Japanese UI does not leak raw English strings for common dashboard decisions.
+- P2: Display depth must expose an actual audience split: non-engineer view prioritizes plain decision language; junior/intermediate engineer view exposes Git/CI/worktree/source/command references.
+- P3: The current work board must be driven by `operational_decision`, blocker, Git/worktree, tests/CI, and next-safe-action data instead of only menu labels.
+- P4-P7: CLI and MCP must share a Control Center command core, capability profiles, dry-run/execute boundaries, and audit/evidence receipt storage.
+- P6-P9: Manual, subscription-agent, API-key, image/mock artifact, external product export, and owner-tool paths must be visible as proposal-only or blocked pathways with no direct apply authority.
+- P10: Browser Debug CLI integration must remain target-owned from this repository and must not modify Browser Debug CLI; final review artifacts stay under this repository.
+
+Non-scope:
+
+- Do not implement provider API dispatch, automatic apply, image generation, Browser Debug CLI source edits, credential storage, external product writes, dashboard-triggered Git/CI mutations, push, merge, cleanup, or any gate weakening.

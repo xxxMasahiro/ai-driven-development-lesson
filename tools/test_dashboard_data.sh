@@ -633,8 +633,11 @@ for (const page of decisionPages) {
     fail(`duplicate decision page id: ${page.id}`);
   }
   seenDecisionPages.add(page.id);
-  for (const field of ['title', 'scope', 'decision_question', 'current_judgment', 'top_reason', 'evidence_confidence', 'next_safe_action', 'source_id']) {
+  for (const field of ['title', 'scope', 'decision_question', 'decision_question_key', 'current_judgment', 'current_judgment_key', 'top_reason', 'top_reason_key', 'evidence_confidence', 'evidence_confidence_key', 'next_safe_action', 'next_safe_action_key', 'source_id']) {
     requireTextObjectField(page, field, `decision_pages.${page.id}`);
+  }
+  if (!Array.isArray(page.must_review_keys) || page.must_review_keys.length !== page.must_review.length || page.must_review_keys.some((key) => typeof key !== 'string' || key.length === 0)) {
+    fail(`decision page must_review_keys must align with must_review: ${page.id}`);
   }
   requireEvidenceState(page, `decision_pages.${page.id}`);
   if (!riskLevels.has(page.risk_level)) {

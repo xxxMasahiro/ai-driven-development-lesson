@@ -281,11 +281,17 @@ operational	decision_pages[].scope	implemented	string	safe-text	dashboard-data	D
 operational	decision_pages[].audiences[]	implemented	array	non_engineer|junior_engineer	dashboard-data	Decision pages must serve non-engineers and junior engineers.
 operational	decision_pages[].status	implemented	enum	missing|ready|passed|failed|blocked|unknown|approval_required|optional|cached|not_run|stale|manual_required|not_applicable	dashboard-data	Decision page status must use the shared state vocabulary.
 operational	decision_pages[].decision_question	implemented	string	safe-text	dashboard-data	Decision page must state the question answered by the page.
+operational	decision_pages[].decision_question_key	implemented	string	i18n-key	dashboard-data	Decision page question key must let the UI localize producer-owned standard questions while preserving safe-text fallback.
 operational	decision_pages[].current_judgment	implemented	string	safe-text	dashboard-data	Decision page current judgment must explain if work can continue, needs review, is blocked, or requires approval.
+operational	decision_pages[].current_judgment_key	implemented	string	i18n-key	dashboard-data	Decision page judgment key must let the UI localize shared status judgments while preserving safe-text fallback.
 operational	decision_pages[].top_reason	implemented	string	safe-text	dashboard-data	Decision page top reason must give the most important evidence gap or blocker.
+operational	decision_pages[].top_reason_key	implemented	string	i18n-key	dashboard-data	Decision page top-reason key must let the UI localize shared status reasons while preserving safe-text fallback.
 operational	decision_pages[].evidence_confidence	implemented	string	safe-text	dashboard-data	Decision page evidence confidence must expose authority and freshness without UI inference.
+operational	decision_pages[].evidence_confidence_key	implemented	string	i18n-key	dashboard-data	Decision page evidence confidence key must let the UI localize authority/freshness summaries while preserving safe-text fallback.
 operational	decision_pages[].must_review[]	implemented	array	safe-text-list	dashboard-data	Decision page must-review points must identify the first evidence users should inspect.
+operational	decision_pages[].must_review_keys[]	implemented	array	i18n-key-list	dashboard-data	Decision page must-review keys must let the UI localize standard review points while preserving safe-text fallback.
 operational	decision_pages[].next_safe_action	implemented	string	safe-text	dashboard-data	Decision page next action must be display-only and scoped to an existing page or manual command.
+operational	decision_pages[].next_safe_action_key	implemented	string	i18n-key	dashboard-data	Decision page next-action key must let the UI localize standard next actions while preserving safe-text fallback.
 operational	decision_pages[].detail_page	implemented	enum	#overview|#lessons|#workflow|#maintenance|#safety|#repository-info|#documents|#settings|#history	dashboard-data	Decision page detail target must route to an existing Control Center page.
 operational	decision_pages[].owner_source	implemented	enum	dashboard-data|product-authority|git-workflow|repository-development-workflow	dashboard-data	Decision page owner source must not be ui.
 operational	decision_pages[].source_id	implemented	string	source-id	dashboard-data	Decision page source id must link back to the producer source.

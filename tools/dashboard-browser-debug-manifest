@@ -64,8 +64,12 @@ function readDashboardData(source) {
   return JSON.parse(result.stdout);
 }
 
-function normalizeBaseUrl(value) {
+function normalizeBaseUrl(value, data) {
   const url = new URL(value);
+  const selectedMenuId = safeText(data?.selected_context?.menu_id, "");
+  if (selectedMenuId && selectedMenuId !== "unknown" && !url.searchParams.has("menu_id")) {
+    url.searchParams.set("menu_id", selectedMenuId);
+  }
   return url.href;
 }
 
@@ -219,7 +223,7 @@ function projectDashboardData(data) {
 }
 
 function buildManifest({ baseUrl, data }) {
-  const normalizedBaseUrl = normalizeBaseUrl(baseUrl);
+  const normalizedBaseUrl = normalizeBaseUrl(baseUrl, data);
   const sourceData = projectDashboardData(data);
   const routes = [
     ['overview', 'overview', 'workflow_overview', 'Overview'],
@@ -422,47 +426,35 @@ function buildManifest({ baseUrl, data }) {
 function pageExpectations(id) {
   const common = {
     text: [],
-    selectors: [`#${id}`, '.category-nav [aria-current="page"]'],
+    selectors: [`#${id}`],
     dataBindings: [],
     userQuestions: []
   };
   if (id === 'overview') {
-    common.text.push('Overview');
     common.dataBindings.push(
       {
         id: 'overview-evidence-status',
         sourceId: 'dashboard_context',
         pointer: '/selected_context/evidence_status',
         selector: '#overview',
-        target: 'text',
-        match: 'contains',
+        target: 'attribute',
+        attribute: 'data-status',
+        match: 'exact',
         severity: 'medium'
       },
       {
         id: 'overview-risk-level',
         sourceId: 'dashboard_context',
         pointer: '/selected_context/next_safe_action/risk_level',
-        selector: '#overview [data-risk]',
-        target: 'data-risk',
+        selector: '#overview',
+        target: 'attribute',
+        attribute: 'data-risk',
         match: 'exact',
         severity: 'medium',
         required: false
       }
     );
-  } else if (id === 'workflow') {
-    common.text.push('Workflow');
-    common.dataBindings.push({
-      id: 'workflow-current-step',
-      sourceId: 'dashboard_context',
-      pointer: '/selected_context/current_step_label',
-      selector: '#workflow',
-      target: 'text',
-      match: 'contains',
-      severity: 'medium',
-      required: false
-    });
   } else if (id === 'repository-info') {
-    common.text.push('Repository');
     common.dataBindings.push({
       id: 'repository-selected-name',
       sourceId: 'dashboard_context',

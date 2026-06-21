@@ -312,7 +312,15 @@ dashboard_first_relative_artifact() {
 }
 
 dashboard_browser_debug_cli_root() {
-  local repo
+  local repo candidate
+  for candidate in "${DASHBOARD_BROWSER_DEBUG_CLI_ROOT:-}" "$HOME/projects/agent-toolbox/browser-debug-cli"; do
+    [[ -n "$candidate" ]] || continue
+    candidate="$(lesson_expand_path "$candidate")"
+    if [[ -d "$candidate" && -f "$candidate/bin/browser-debug.js" ]]; then
+      printf '%s' "$candidate"
+      return 0
+    fi
+  done
   repo="$(dashboard_target_repository_root "free-development" 2>/dev/null || true)"
   [[ -n "$repo" && -f "$repo/bin/browser-debug.js" ]] || return 1
   printf '%s' "$repo"
@@ -374,8 +382,8 @@ dashboard_browser_debug_status_json() {
     "selected_cli_repository" "$(dashboard_json_string "$cli_repo")" \
     "tool" "$(dashboard_json_raw_object \
       "status" "$(dashboard_json_string "$cli_status")" \
-      "command" "$(dashboard_json_string "node product:bin/browser-debug.js")" \
-      "source" "$(dashboard_json_string "selected_free_development_repository")")" \
+      "command" "$(dashboard_json_string "node browser-debug-cli:bin/browser-debug.js")" \
+      "source" "$(dashboard_json_string "external_read_only_tool")")" \
     "manifest" "$(dashboard_json_raw_object \
       "status" "$(dashboard_json_string "$manifest_status")" \
       "path" "$(dashboard_json_string "tools/dashboard-browser-debug-manifest")" \
@@ -383,19 +391,19 @@ dashboard_browser_debug_status_json() {
     "review" "$(dashboard_json_raw_object \
       "status" "$(dashboard_json_string "$review_status")" \
       "artifact_index_path" "$(dashboard_json_string "${latest_review:-not_collected}")" \
-      "command" "$(dashboard_json_string "node product:bin/browser-debug.js review --target .tmp/dashboard-browser-debug-target.json --json")")" \
+      "command" "$(dashboard_json_string "node browser-debug-cli:bin/browser-debug.js review --target .tmp/dashboard-browser-debug-target.json --json")")" \
     "agent_package" "$(dashboard_json_raw_object \
       "status" "$(dashboard_json_string "$package_status")" \
       "path" "$(dashboard_json_string "${latest_package:-not_collected}")" \
-      "command" "$(dashboard_json_string "node product:bin/browser-debug.js agent package --review-index $review_ref --surface local-subscription-agent --json")")" \
+      "command" "$(dashboard_json_string "node browser-debug-cli:bin/browser-debug.js agent package --review-index $review_ref --surface local-subscription-agent --json")")" \
     "agent_result" "$(dashboard_json_raw_object \
       "status" "$(dashboard_json_string "$result_status")" \
       "path" "$(dashboard_json_string "${latest_result:-not_collected}")" \
-      "command" "$(dashboard_json_string "node product:bin/browser-debug.js agent ingest --package $package_ref --input $result_ref --json")")" \
+      "command" "$(dashboard_json_string "node browser-debug-cli:bin/browser-debug.js agent ingest --package $package_ref --input $result_ref --json")")" \
     "agent_report" "$(dashboard_json_raw_object \
       "status" "$(dashboard_json_string "$report_status")" \
       "path" "$(dashboard_json_string "${latest_report:-not_collected}")" \
-      "command" "$(dashboard_json_string "node product:bin/browser-debug.js agent report --review-index $review_ref --agent-result $result_ref --json")")" \
+      "command" "$(dashboard_json_string "node browser-debug-cli:bin/browser-debug.js agent report --review-index $review_ref --agent-result $result_ref --json")")" \
     "boundary" "$(dashboard_json_raw_object \
       "dashboard_executes_browser_debug" "$(dashboard_json_bool false)" \
       "external_upload" "$(dashboard_json_bool false)" \
