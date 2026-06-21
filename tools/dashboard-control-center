@@ -27,26 +27,56 @@ require_node_tools() {
   fi
 }
 
+snapshot_selected_menu() {
+  local file="$1"
+  [[ -f "$file" ]] || return 1
+  DASHBOARD_CONTROL_CENTER_SNAPSHOT="$file" node <<'NODE'
+const fs = require("node:fs");
+
+let data;
+try {
+  data = JSON.parse(fs.readFileSync(process.env.DASHBOARD_CONTROL_CENTER_SNAPSHOT, "utf8"));
+} catch (_error) {
+  process.exit(1);
+}
+const menuId = String(data?.selected_context?.menu_id || "");
+if (!/^(step_1_7|step_1_14|advanced|free-development|product-improvement|external-integration|lesson-repository-improvement)$/.test(menuId)) {
+  process.exit(1);
+}
+process.stdout.write(menuId);
+NODE
+}
+
 write_snapshot() {
   local output="$1"
-  local output_dir tmp
+  local output_dir tmp selected_menu
   output_dir="$(dirname "$output")"
   mkdir -p "$output_dir"
   tmp="$(mktemp "$output_dir/.dashboard-data.XXXXXX.tmp")"
-  if "$ROOT/tools/dashboard-data" >"$tmp" && (cd "$ROOT" && node --input-type=module - "$tmp" <<'NODE'
+  selected_menu="${DASHBOARD_SELECTED_MENU_ID:-}"
+  if [[ -z "$selected_menu" ]]; then
+    selected_menu="$(snapshot_selected_menu "$output" 2>/dev/null || true)"
+  fi
+  selected_menu="${selected_menu:-step_1_14}"
+  if DASHBOARD_SELECTED_MENU_ID="$selected_menu" "$ROOT/tools/dashboard-data" >"$tmp" && (cd "$ROOT" && DASHBOARD_EXPECTED_MENU_ID="$selected_menu" node --input-type=module - "$tmp" <<'NODE'
 import fs from "node:fs";
 import { dashboardDataValidationError, validateDashboardData } from "./vite.config.mjs";
 
 const file = process.argv[2];
 const body = fs.readFileSync(file, "utf8");
+let data;
 try {
-  JSON.parse(body);
+  data = JSON.parse(body);
 } catch (error) {
   console.error(`invalid dashboard-data snapshot: ${error.message}`);
   process.exit(1);
 }
 if (!validateDashboardData(body)) {
   console.error(`dashboard-data snapshot failed schema validation: ${dashboardDataValidationError() || "unknown"}`);
+  process.exit(1);
+}
+if (String(data?.selected_context?.menu_id || "") !== process.env.DASHBOARD_EXPECTED_MENU_ID) {
+  console.error(`dashboard-data snapshot selected menu mismatch: expected ${process.env.DASHBOARD_EXPECTED_MENU_ID}`);
   process.exit(1);
 }
 NODE

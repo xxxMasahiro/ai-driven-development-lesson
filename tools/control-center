@@ -1,0 +1,113 @@
+#!/usr/bin/env node
+import {
+  controlCenterCapabilityCatalog,
+  runControlCenterCommand,
+} from "./lib/control_center_core.mjs";
+
+function usage() {
+  return [
+    "Usage:",
+    "  ./tools/control-center catalog [--profile viewer|local-observer|network-observer|proposal-writer|owner-tool-apply]",
+    "  ./tools/control-center run <command-id> [--profile <profile>] [--menu-id <menu>] [--execute] [--dry-run false]",
+    "",
+    "Examples:",
+    "  ./tools/control-center catalog --profile local-observer",
+    "  ./tools/control-center run snapshot.read --menu-id free-development",
+    "  ./tools/control-center run evidence.collect_local --profile local-observer --menu-id free-development --execute",
+  ].join("\n");
+}
+
+function takeValue(args, index, flag) {
+  const value = args[index + 1];
+  if (!value || value.startsWith("--")) {
+    throw new Error(`${flag} requires a value`);
+  }
+  return value;
+}
+
+function parseOptions(args) {
+  const options = { profile: "viewer", commandArgs: {} };
+  for (let index = 0; index < args.length; index += 1) {
+    const token = args[index];
+    if (token === "--profile") {
+      options.profile = takeValue(args, index, token);
+      index += 1;
+    } else if (token === "--menu-id") {
+      options.commandArgs.menu_id = takeValue(args, index, token);
+      index += 1;
+    } else if (token === "--provider-mode") {
+      options.commandArgs.provider_mode = takeValue(args, index, token);
+      index += 1;
+    } else if (token === "--target-ref") {
+      options.commandArgs.target_ref = takeValue(args, index, token);
+      index += 1;
+    } else if (token === "--event-id") {
+      options.commandArgs.event_id = takeValue(args, index, token);
+      index += 1;
+    } else if (token === "--import-id") {
+      options.commandArgs.import_id = takeValue(args, index, token);
+      index += 1;
+    } else if (token === "--input") {
+      options.commandArgs.input = takeValue(args, index, token);
+      index += 1;
+    } else if (token === "--output") {
+      options.commandArgs.output = takeValue(args, index, token);
+      index += 1;
+    } else if (token === "--base-url") {
+      options.commandArgs.base_url = takeValue(args, index, token);
+      index += 1;
+    } else if (token === "--intent-text") {
+      options.commandArgs.intent_text = takeValue(args, index, token);
+      index += 1;
+    } else if (token === "--purpose") {
+      options.commandArgs.purpose = takeValue(args, index, token);
+      index += 1;
+    } else if (token === "--request-kind") {
+      options.commandArgs.request_kind = takeValue(args, index, token);
+      index += 1;
+    } else if (token === "--idempotency-key") {
+      options.commandArgs.idempotency_key = takeValue(args, index, token);
+      index += 1;
+    } else if (token === "--execute") {
+      options.commandArgs.execute = true;
+    } else if (token === "--dry-run") {
+      const value = takeValue(args, index, token);
+      options.commandArgs.dry_run = value !== "false";
+      index += 1;
+    } else {
+      throw new Error(`unknown argument: ${token}`);
+    }
+  }
+  return options;
+}
+
+function main() {
+  try {
+    const [command, maybeId, ...rest] = process.argv.slice(2);
+    if (!command || command === "-h" || command === "--help" || command === "help") {
+      process.stdout.write(`${usage()}\n`);
+      return;
+    }
+    if (command === "catalog") {
+      const { profile } = parseOptions([maybeId, ...rest].filter(Boolean));
+      process.stdout.write(`${JSON.stringify(controlCenterCapabilityCatalog(profile), null, 2)}\n`);
+      return;
+    }
+    if (command === "run") {
+      if (!maybeId) {
+        throw new Error("run requires a command id");
+      }
+      const { profile, commandArgs } = parseOptions(rest);
+      const result = runControlCenterCommand(maybeId, commandArgs, { profileId: profile });
+      process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
+      process.exitCode = result.status === "error" || result.status === "denied" ? 1 : 0;
+      return;
+    }
+    throw new Error(`unknown command: ${command}`);
+  } catch (error) {
+    process.stderr.write(`${error.message}\n\n${usage()}\n`);
+    process.exitCode = 2;
+  }
+}
+
+main();

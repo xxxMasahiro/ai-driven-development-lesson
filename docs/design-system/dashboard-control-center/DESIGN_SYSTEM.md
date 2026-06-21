@@ -10,6 +10,7 @@ It exists so future work can improve non-engineer comprehension without weakenin
 - Keep status, risk, approval, source, command preview, and copy affordances visually consistent.
 - Make external product workflow screens reusable without adding product-stack-specific branches.
 - Preserve read-only and display-only boundaries outside Settings.
+- Keep safety accents readable on white operational surfaces; `--dcc-safety-accent` is the green source token for safety buttons, labels, and filled safety icons.
 
 ## Scope
 
@@ -341,6 +342,18 @@ The generated design-system layer owns badge shape and readability:
 - icon alignment.
 
 Page CSS may keep semantic state colors, but it must not redefine the base badge box model one page at a time.
+
+### Context Menu Tiles
+
+Context menu tiles use design-system generated icon state variables:
+
+- selected menu icons use the category filled color and a white icon;
+- unselected menu icons use the category soft color and a darker icon from the same category;
+- unavailable menu options keep readable text and muted icons so they do not look selected;
+- the selected state is visible through icon fill, border, check mark, text, and `aria-pressed`.
+
+Page CSS may keep the grid layout, tile sizing, and responsive stacking.
+It must not redefine selected and unselected menu icon colors one page at a time.
 
 ### Interactive Controls
 

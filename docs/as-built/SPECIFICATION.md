@@ -3001,3 +3001,30 @@ TESTS: tools/test_dashboard_design_studio_events.sh,tools/check_dashboard_design
 `tools/dashboard-design-system template-preview --template-id ... --target-ref ...` returns a TemplateProposal preview with compatibility, candidate operations, manual decisions, check plan, and proposal-only boundaries.
 `proposal-status` exposes template library summary and latest preview metadata from the owner tool.
 The browser renders template library status as read-only dashboard data and must not execute, apply, dispatch, upload, or mutate anything from a template preview.
+
+## Dashboard Control Center Agentic Control Tower P0-P10 Specification
+
+SYNC-ID: dashboard_control_center_agentic_control_tower_p0_p10
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,tools/lib/control_center_core.mjs,tools/lib/control_center_evidence_store.mjs,tools/lib/control_center_mcp_stdio_adapter.mjs,tools/control-center,tools/control-center-mcp,tools/test_control_center_core.sh,tools/test_control_center_core.mjs,dashboard-control-center/src/App.jsx,dashboard-control-center/src/DecisionSummary.jsx,dashboard-control-center/src/dashboardContext.js,dashboard-control-center/src/dashboardData.js,dashboard-control-center/src/displayDepth.js,dashboard-control-center/src/i18n.js,dashboard-control-center/src/styles.css,tools/dashboard-data,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/test_dashboard_i18n.sh,tools/check_dashboard_bundle_contract.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh,tools/test_dashboard_browser_debug_manifest.sh
+
+`dashboardContext.js` exposes `detailPagesSafe` and related scope metadata.
+Evidence-backed pages render only when the active selected menu is backed by the producer-owned snapshot; overview may still show the selector and menu context while a matching snapshot is refreshed.
+
+`dashboardData.js` owns `stateLabelKey()` so status labels render through `state.*` translation keys.
+`App.jsx` and `DecisionSummary.jsx` use that shared mapping and no longer duplicate mock-status label tables for primary status chips.
+
+The operational situation board uses `operational_decision.audience_briefs`, `why_blocked`, `next_safe_action`, Git/worktree state, tests/CI state, and live-status rows to summarize current work, blocker, repository, tests/CI, and next safe check.
+Display-depth policy provides `audienceMode` and badge metadata so non-engineer and junior/intermediate engineer views are visible and testable.
+
+`tools/lib/control_center_core.mjs` defines the shared command registry and profiles used by both `tools/control-center` and `tools/control-center-mcp`.
+Read-only commands can execute from viewer profile; evidence collection requires local/network observer profiles; proposal writing requires proposal-writer; owner-tool apply remains plan-only; provider dispatch is defined as disabled until future provider gates exist.
+
+`tools/lib/control_center_evidence_store.mjs` writes locked JSONL ledger records and detail receipts under `.control-center/evidence/`.
+Collection and proposal commands can attach audit receipts without writing external product repositories or Browser Debug CLI.
+
+`tools/lib/control_center_mcp_stdio_adapter.mjs` implements stdio MCP `initialize`, `tools/list`, `tools/call`, `resources/list`, and `resources/read` over the same command registry.
+MCP tools use names derived from command ids and return structured JSON envelopes; Browser Debug CLI is only referenced through lesson-owned manifest generation.
+
+The Design Studio page renders an AI agent connection layer that explains manual import, subscription-agent package flow, blocked API-key provider mode, image/mock candidate registration, external product plan-only export, CLI/MCP parity, and Browser Debug review boundaries using existing design-system component classes.

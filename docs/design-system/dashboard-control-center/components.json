@@ -82,6 +82,32 @@
       ]
     },
     {
+      "id": "context-menu-tile",
+      "selectors": [
+        ".menu-tile",
+        ".menu-tile__icon",
+        ".menu-tile__check"
+      ],
+      "tokens": [
+        "--dcc-surface",
+        "--dcc-border",
+        "--dcc-radius",
+        "--dcc-focus",
+        "--dcc-page-accent-fallback",
+        "--dcc-page-soft-fallback",
+        "--dcc-menu-tile-icon-bg",
+        "--dcc-menu-tile-icon-color",
+        "--dcc-menu-tile-selected-icon-bg",
+        "--dcc-menu-tile-selected-icon-color"
+      ],
+      "contract": [
+        "Selected menu icons use a filled category color with a white icon.",
+        "Unselected menu icons use a soft category color with a darker icon from the same category.",
+        "Disabled or unavailable menu options keep readable text and must not look selected.",
+        "Selection state must also be exposed through text, check mark, and aria-pressed."
+      ]
+    },
+    {
       "id": "decision-progress-summary",
       "selectors": [
         ".decision-progress-summary",

@@ -452,6 +452,10 @@ function dashboardSnapshotMenuId(body) {
   }
 }
 
+function dashboardDataMatchesRequestedMenu(body, menuId) {
+  return !menuId || dashboardSnapshotMenuId(body) === menuId;
+}
+
 function readCachedDashboardDataForMenu(menuId) {
   const dataFile = dashboardRuntimeDataFile();
   try {
@@ -459,7 +463,7 @@ function readCachedDashboardDataForMenu(menuId) {
     if (!validateDashboardData(body)) {
       return null;
     }
-    if (menuId && dashboardSnapshotMenuId(body) !== menuId) {
+    if (!dashboardDataMatchesRequestedMenu(body, menuId)) {
       return null;
     }
     return { body, dataFile };
@@ -676,7 +680,7 @@ function generateDashboardDataForMenu(menuId, response, method) {
   }
   if (cached) {
     generation.then(({ error, stdout }) => {
-      if (!error && validateDashboardData(stdout)) {
+      if (!error && validateDashboardData(stdout) && dashboardDataMatchesRequestedMenu(stdout, menuId)) {
         writeDashboardDataCache(stdout);
       }
     });
@@ -694,6 +698,12 @@ function generateDashboardDataForMenu(menuId, response, method) {
       response.statusCode = 422;
       response.setHeader("content-type", "application/json; charset=utf-8");
       response.end(JSON.stringify({ error: "dashboard data failed validation" }));
+      return;
+    }
+    if (!dashboardDataMatchesRequestedMenu(stdout, menuId)) {
+      response.statusCode = 422;
+      response.setHeader("content-type", "application/json; charset=utf-8");
+      response.end(JSON.stringify({ error: "dashboard data selected menu mismatch" }));
       return;
     }
     writeDashboardDataCache(stdout);

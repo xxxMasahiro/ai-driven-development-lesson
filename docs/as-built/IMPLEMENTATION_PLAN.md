@@ -5087,3 +5087,23 @@ Implemented order:
 6. Promote this sync ID to implemented after focused Design Studio, schema, dashboard-data, Dashboard, sync, and repository-development checks pass.
 
 Stop and ask before template apply, automatic DesignChangeProposal conversion, dependency installation, network calls, provider dispatch, imagegen, external product writes, Git/CI execution, approval mutation, plan/apply token creation, browser command execution, or existing-feature tradeoffs.
+
+## Dashboard Control Center Agentic Control Tower P0-P10 Implementation Plan
+
+SYNC-ID: dashboard_control_center_agentic_control_tower_p0_p10
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,tools/lib/control_center_core.mjs,tools/lib/control_center_evidence_store.mjs,tools/lib/control_center_mcp_stdio_adapter.mjs,tools/control-center,tools/control-center-mcp,tools/test_control_center_core.sh,tools/test_control_center_core.mjs,dashboard-control-center/src/App.jsx,dashboard-control-center/src/DecisionSummary.jsx,dashboard-control-center/src/dashboardContext.js,dashboard-control-center/src/dashboardData.js,dashboard-control-center/src/displayDepth.js,dashboard-control-center/src/i18n.js,dashboard-control-center/src/styles.css,tools/dashboard-data,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/test_dashboard_i18n.sh,tools/check_dashboard_bundle_contract.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh,tools/test_dashboard_browser_debug_manifest.sh
+
+Implemented order:
+
+1. Reviewed AGENTS invariants, repository-development-workflow guidance, synchronized docs, and xhigh subagent findings for P0-P10.
+2. Repaired selected-menu scope handling so stale producer-owned detail data is blocked until a matching snapshot is available.
+3. Centralized status label translation through `stateLabelKey()` and added Japanese translations for producer default decision text.
+4. Made the operational situation board decision-led with `operational_decision`, audience briefs, Git/worktree, tests/CI, blocker, and next safe action summaries.
+5. Added shared Control Center core, CLI entrypoint, stdio MCP adapter, command registry, capability profiles, dry-run/execute boundaries, and locked evidence receipts.
+6. Added a Design Studio AI agent connection layer for manual import, subscription-agent, API-key provider, image/mock candidate, external product handoff, CLI/MCP parity, and Browser Debug review paths.
+7. Kept Browser Debug CLI read-only from this repository and exposed only target-owned manifest/review handoff commands.
+8. Added focused core/MCP tests and kept broader dashboard verification to changed owner layers.
+
+Stop and ask before provider dispatch, credentials, automatic apply, image generation, external product writes, Browser Debug CLI edits, dashboard-triggered Git/CI mutations, push, merge, cleanup, or gate weakening.

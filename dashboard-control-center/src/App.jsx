@@ -75,6 +75,7 @@ import {
   pickFirst,
   planDashboardSettingChange,
   planDashboardDesignSystemChange,
+  stateLabelKey,
 } from "./dashboardData.js";
 import {
   availableContexts,
@@ -82,6 +83,7 @@ import {
   contextDataForMenu,
   initialDashboardMenuId,
   isAvailableContextSelectable,
+  isLessonMenuId,
   isMenuSelectable,
   persistDashboardMenuId,
   producerMenuIdForData,
@@ -203,7 +205,18 @@ function StatusPill({ value, t, label, className = "" }) {
   return (
     <span className={`status status--${state} ${compactClass} ${className}`.trim()} data-state={state}>
       <Icon aria-hidden="true" size={14} />
-      {label || t(`state.${state}`, displayText(state))}
+      {label || t(stateLabelKey(state), displayText(state))}
+    </span>
+  );
+}
+
+function AudienceModeBadge({ displayPolicy, t }) {
+  if (!displayPolicy) {
+    return null;
+  }
+  return (
+    <span className={`mode-pill mode-pill--${displayPolicy.isTechnical ? "manual" : displayPolicy.isFriendly ? "allowed" : "gated"}`} title={t(displayPolicy.audienceDetailKey)}>
+      {t(displayPolicy.audienceLabelKey)}
     </span>
   );
 }
@@ -333,7 +346,7 @@ function workflowRunTarget(row, context, t) {
 
 function securityScopeLabel(context, t) {
   const workflowContext = displayText(context.workflow_context, "unknown");
-  if (workflowContext === "lesson" && displayText(context.target_repository?.path_state, "") === "configured") {
+  if (isLessonWorkflowContext(context) && displayText(context.target_repository?.path_state, "") === "configured") {
     return t("mock.context.securityScopeLessonProduct");
   }
   return workflowContextLabel(workflowContext, t);
@@ -374,7 +387,7 @@ function PageTitleHeader({ viewId, Icon, title, subtitle, data, locale, t, actio
           <Icon aria-hidden="true" size={34} />
         </span>
         <div>
-          <h2 id={headingId}>{title}</h2>
+          <h1 id={headingId}>{title}</h1>
           {subtitle ? <p>{subtitle}</p> : null}
         </div>
       </div>
@@ -742,6 +755,21 @@ function overviewLiveLocalizedText(value, t) {
     "Git synchronization evidence is older than the configured freshness window or product HEAD.": "overview.liveText.gitSyncStale",
     "Structure evidence is older than the configured freshness window or product HEAD.": "overview.liveText.structureStale",
     "Local test evidence is older than the configured freshness window or product HEAD.": "overview.liveText.localTestsStale",
+    "No blocking item is currently reported by the dashboard producer.": "overview.operationalText.noBlocker",
+    "One or more workflow actions remain behind an approval boundary.": "overview.operationalText.approvalBoundary",
+    "A required repository, document, or evidence source is missing.": "overview.operationalText.requiredSourceMissing",
+    "At least one evidence source is older than the current repository state.": "overview.operationalText.staleEvidence",
+    "Manual evidence review is required before this state can be considered complete.": "overview.operationalText.manualEvidenceReview",
+    "A blocking status is present in the current producer-owned evidence.": "overview.operationalText.blockingEvidence",
+    "The dashboard producer cannot prove readiness for the current context.": "overview.operationalText.readinessUnknown",
+    "Open the relevant detail page only if you need supporting evidence.": "overview.operationalText.openDetailIfNeeded",
+    "Review approval boundaries before running any Git, CI, merge, or cleanup operation.": "overview.operationalText.reviewApprovalBoundaries",
+    "Open Repository Info or Documents to identify the missing source before proceeding.": "overview.operationalText.openRepositoryInfoOrDocuments",
+    "Refresh or recollect the stale evidence before using it for a current decision.": "overview.operationalText.refreshStaleEvidence",
+    "Open Workflow and Maintenance details, then run the displayed command manually if needed.": "overview.operationalText.openWorkflowMaintenance",
+    "Repair the top blocker first, then regenerate Dashboard data.": "overview.operationalText.repairTopBlocker",
+    "Review Workflow, Safety, and Maintenance details before continuing.": "overview.operationalText.reviewWorkflowSafetyMaintenance",
+    "Inspect the source ID, freshness, authority, and required command before treating this state as complete.": "overview.operationalText.inspectEngineeringEvidence",
   };
   return map[text] ? t(map[text], text) : text;
 }
@@ -1052,8 +1080,7 @@ function overviewLiveSecurityDetail(liveStatus, context, check, t) {
 }
 
 function overviewPrimaryStatusCard(data, context, lessonMetric, t, liveStatus = null) {
-  const workflowContext = displayText(context.workflow_context, "unknown");
-  if (workflowContext === "lesson") {
+  if (isLessonWorkflowContext(context)) {
     const selectedLessonProgress = contextProgress(context, lessonMetric);
     return {
       id: "lessons",
@@ -1600,19 +1627,32 @@ function situationBlockerSummary(data, context, activeLiveStatus, t) {
 }
 
 function situationCurrentWorkSummary(data, context, activeLiveStatus, t) {
+  const decision = data.operational_decision && typeof data.operational_decision === "object" ? data.operational_decision : {};
+  const displayPolicy = displayDepthPolicyForData(data);
+  const audience = displayPolicy.isFriendly ? "non_engineer" : "junior_engineer";
+  const audienceBrief = overviewLiveLocalizedText(decision.audience_briefs?.[audience], t);
+  const reason = overviewLiveLocalizedText(decision.why_blocked, t);
+  const nextSafeAction = overviewLiveLocalizedText(decision.next_safe_action, t);
   const repository = repositoryDisplayName(activeLiveStatus?.target_repository?.name || context.target_repository?.name, t);
   const menu = contextLabel(context.menu_id, t);
   const workflow = workflowContextLabel(context.workflow_context, t);
   const step = currentStepTextDisplay(context, t);
+  const operationalDetail = [
+    menu,
+    nextSafeAction ? `${t("overview.situation.nextSafeTitle")}: ${nextSafeAction}` : "",
+    !displayPolicy.isFriendly ? `${t("overview.fact.workflow")}: ${workflow}` : "",
+    !displayPolicy.isFriendly && step ? step : "",
+    repository ? `${t("overview.fact.target")}: ${repository}` : "",
+  ].filter(Boolean);
   return {
     id: "current-work",
     Icon: Compass,
     title: t("overview.situation.currentWorkTitle"),
-    status: context.evidence_status || "manual_required",
-    value: menu,
-    detail: [repository, workflow, step].filter(Boolean).join(" / "),
-    source: displayText(context.current_step_id || context.menu_id, ""),
-    command: "",
+    status: decision.status || context.evidence_status || "manual_required",
+    value: audienceBrief || reason || menu,
+    detail: operationalDetail.join(" / ") || [menu, workflow, step].filter(Boolean).join(" / "),
+    source: displayText(decision.source_id || decision.primary_blocker_source_id || context.current_step_id || context.menu_id, ""),
+    command: situationFirstCommand(decision.next_safe_action_command, decision.required_command),
   };
 }
 
@@ -1697,7 +1737,10 @@ function OperationalSituationBoard({ data, context, liveStatus, t }) {
           <h2 id="operational-situation-heading">{t("overview.situation.title")}</h2>
           <p>{t("overview.situation.subtitle")}</p>
         </div>
-        <StatusPill value={overallStatus} t={t} label={statusLabelForChip(overallStatus, t)} />
+        <div className="operational-situation__header-actions">
+          <AudienceModeBadge displayPolicy={displayPolicy} t={t} />
+          <StatusPill value={overallStatus} t={t} label={statusLabelForChip(overallStatus, t)} />
+        </div>
       </div>
       <div className="operational-situation__meta" aria-label={t("overview.situation.meta")}>
         <span>{t("overview.fact.target")}: <strong>{repository}</strong></span>
@@ -1851,7 +1894,10 @@ function OperationalDetailDecisionPanel({ data, context, liveStatus, t, tone = "
           <h2 id={headingId}>{t("detail.operational.title")}</h2>
           <p>{t("detail.operational.subtitle")}</p>
         </div>
-        <StatusPill value={overallStatus} t={t} label={statusLabelForChip(overallStatus, t)} />
+        <div className="operational-detail-panel__header-actions">
+          <AudienceModeBadge displayPolicy={displayPolicy} t={t} />
+          <StatusPill value={overallStatus} t={t} label={statusLabelForChip(overallStatus, t)} />
+        </div>
       </div>
       <div className="operational-detail-panel__meta" aria-label={t("detail.operational.meta")}>
         <span>{t("overview.fact.target")}: <strong>{repository}</strong></span>
@@ -2989,7 +3035,7 @@ function localizedStepDetail(context, t) {
 }
 
 function isLessonWorkflowContext(context) {
-  return displayText(context.workflow_context, "") === "lesson";
+  return isLessonMenuId(context?.menu_id) && displayText(context?.workflow_context, "") === "lesson";
 }
 
 function currentWorkflowStepLabel(context, t) {
@@ -3065,21 +3111,7 @@ function nextActionShort(context, data, t) {
 
 function statusLabelForChip(value, t) {
   const state = normalizeState(value);
-  const mockLabels = {
-    ready: "mock.status.ready",
-    passed: "mock.status.passed",
-    failed: "mock.status.failed",
-    blocked: "mock.status.blocked",
-    unknown: "mock.status.unknown",
-    optional: "mock.status.optional",
-    cached: "mock.status.cached",
-    not_run: "mock.status.notRun",
-    stale: "mock.status.stale",
-    approval_required: "mock.status.approvalRequired",
-    manual_required: "mock.status.manualRequired",
-    not_applicable: "mock.status.notApplicable",
-  };
-  return t(mockLabels[state] || `state.${state}`, displayText(state));
+  return t(stateLabelKey(state), displayText(state));
 }
 
 function workflowStatusLabel(value, t) {
@@ -3491,7 +3523,35 @@ function selectedLessonObject(data, context) {
   if (menuId === "advanced") {
     return data.lessons?.advanced || {};
   }
-  return data.lessons?.step_1_14 || {};
+  if (menuId === "step_1_14") {
+    return data.lessons?.step_1_14 || {};
+  }
+  return {};
+}
+
+function lessonViewContext(data) {
+  const currentContext = selectedContextData(data);
+  if (isLessonWorkflowContext(currentContext)) {
+    return currentContext;
+  }
+  for (const menuId of ["step_1_14", "step_1_7", "advanced"]) {
+    const context = contextDataForMenu(data, menuId);
+    if (isLessonWorkflowContext(context)) {
+      return context;
+    }
+  }
+  return currentContext;
+}
+
+function lessonViewData(data) {
+  const context = lessonViewContext(data);
+  if (context === selectedContextData(data)) {
+    return data;
+  }
+  return {
+    ...data,
+    selected_context: context,
+  };
 }
 
 function aggregateLessonSettingsStatus(lesson) {
@@ -4136,9 +4196,11 @@ function OverviewSection({ data, t, locale, activeMenuId, pendingMenuId, onActiv
   const securityStatusCard = overviewSecurityCard(data, context, t, liveStatus);
   const selectedMenuId = displayText(activeMenuId || context.menu_id, context.menu_id);
   const repositorySelection = repositorySelectionForMenu(data, selectedMenuId);
+  const overviewEvidenceStatus = normalizeState(context.evidence_status || summary.evidence_status);
+  const overviewRiskLevel = normalizeRisk(context.next_safe_action?.risk_level || summary.primary_action?.risk_level);
 
   return (
-    <section className="view-surface" id="overview" aria-labelledby="overview-heading">
+    <section className="view-surface" id="overview" aria-labelledby="overview-heading" data-status={overviewEvidenceStatus} data-risk={overviewRiskLevel}>
       <PageTitleHeader viewId="overview" Icon={Home} title={t("nav.overview")} subtitle={t("overview.subtitle")} data={data} locale={locale} t={t} actionLabel={t("detail.refreshDisplayOnly")} headingId="overview-heading" />
       <MenuTileStrip data={data} t={t} activeMenuId={activeMenuId} pendingMenuId={pendingMenuId} onActiveMenuChange={onActiveMenuChange} />
       <ContextSnapshotStrip data={data} t={t} locale={locale} />
@@ -4626,32 +4688,34 @@ function LessonLiveStatusTable({ data, t }) {
 }
 
 function LessonSection({ lessons, data, locale, t }) {
-  const context = selectedContextData(data);
-  if (displayText(context.workflow_context, "") !== "lesson") {
+  const activeContext = selectedContextData(data);
+  const isActiveLessonWorkflow = isLessonWorkflowContext(activeContext);
+  const viewData = isActiveLessonWorkflow ? lessonViewData(data) : data;
+  const context = selectedContextData(viewData);
+  if (!isActiveLessonWorkflow) {
     return (
       <section className="view-surface view-surface--lessons" id="lessons" aria-labelledby="lesson-heading">
-        <PageTitleHeader viewId="lessons" Icon={BookOpen} title={t("lessons.title")} subtitle={t("lessons.description")} data={data} locale={locale} t={t} actionLabel={t("lesson.snapshotButton")} headingId="lesson-heading" />
-        <ContextSnapshotStrip data={data} t={t} locale={locale} variant="workflow" />
-        <ProducerDecisionSummary data={data} pageId="lessons" tone="lessons" t={t} />
-        <SidebarPageCard
-          Icon={WorkflowCategoryIcon}
-          title={t("lessons.notLessonTitle")}
-          detail={`${t("lessons.notLessonDetail")} ${contextLabel(context.menu_id, t)} / ${repositoryDisplayName(context.target_repository?.name, t)}`}
-          status="not_applicable"
-          t={t}
-        />
+        <PageTitleHeader viewId="lessons" Icon={BookOpen} title={t("lessons.title")} subtitle={t("lessons.description")} data={viewData} locale={locale} t={t} actionLabel={t("lesson.snapshotButton")} headingId="lesson-heading" />
+        <ContextSnapshotStrip data={viewData} t={t} locale={locale} variant="lessons" />
+        <div className="mock-notice mock-notice--lessons-warning lesson-health-notice">
+          <BookOpen aria-hidden="true" size={22} />
+          <div>
+            <strong>{t("lessons.notLessonTitle")}</strong>
+            <span>{t("lessons.notLessonDetail")} {contextLabel(activeContext.menu_id, t)}</span>
+          </div>
+        </div>
       </section>
     );
   }
-  const metric = data.summary?.category_metrics?.lessons || {};
+  const metric = viewData.summary?.category_metrics?.lessons || {};
   const progress = contextProgress(context, metric);
   const isComplete = progress.total > 0 && progress.completed >= progress.total;
-  const lessonCards = resolveLessonCards(lessons, data, t);
+  const lessonCards = resolveLessonCards(lessons, viewData, t);
   return (
     <section className="view-surface view-surface--lessons" id="lessons" aria-labelledby="lesson-heading">
-      <PageTitleHeader viewId="lessons" Icon={BookOpen} title={t("lessons.title")} subtitle={t("lessons.description")} data={data} locale={locale} t={t} actionLabel={t("lesson.snapshotButton")} headingId="lesson-heading" />
-      <ContextSnapshotStrip data={data} t={t} locale={locale} variant="lessons" />
-      <ProducerDecisionSummary data={data} pageId="lessons" tone="lessons" t={t} />
+      <PageTitleHeader viewId="lessons" Icon={BookOpen} title={t("lessons.title")} subtitle={t("lessons.description")} data={viewData} locale={locale} t={t} actionLabel={t("lesson.snapshotButton")} headingId="lesson-heading" />
+      <ContextSnapshotStrip data={viewData} t={t} locale={locale} variant="lessons" />
+      <ProducerDecisionSummary data={viewData} pageId="lessons" tone="lessons" t={t} />
       <DetailDecisionSummary
         tone="lessons"
         t={t}
@@ -4664,10 +4728,10 @@ function LessonSection({ lessons, data, locale, t }) {
       />
       <div className="lesson-grid">
         {lessonCards.map((card) => (
-          <LessonProgressCard card={card} data={data} key={card.id} t={t} />
+          <LessonProgressCard card={card} data={viewData} key={card.id} t={t} />
         ))}
       </div>
-      <LessonLiveStatusTable data={data} t={t} />
+      <LessonLiveStatusTable data={viewData} t={t} />
       <LessonHealthNotice t={t} />
     </section>
   );
@@ -7072,6 +7136,110 @@ function DesignStudioWorkflowMetric({ label, value }) {
   );
 }
 
+function DesignStudioAgentConnectionPanel({ data, t }) {
+  const workflow = designStudioWorkflowState(data);
+  const displayPolicy = displayDepthPolicyForData(data);
+  const browserDebug = data?.browser_debug && typeof data.browser_debug === "object" ? data.browser_debug : {};
+  const providerPolicy = workflow.providerPolicy || {};
+  const handoff = workflow.handoff || {};
+  const exportPlan = workflow.exportPlan || {};
+  const rows = [
+    {
+      id: "manual",
+      Icon: UserCheck,
+      status: "ready",
+      title: t("designStudio.agentConnection.manualTitle"),
+      detail: t("designStudio.agentConnection.manualDetail"),
+      commands: ["tools/dashboard-design-system import-candidate", "tools/dashboard-design-system import-proposal"],
+    },
+    {
+      id: "subscription",
+      Icon: Brain,
+      status: handoff.event_id ? "manual_required" : "ready",
+      title: t("designStudio.agentConnection.subscriptionTitle"),
+      detail: handoff.event_id ? displayText(handoff.next_action, t("designStudio.agentConnection.subscriptionDetail")) : t("designStudio.agentConnection.subscriptionWaiting"),
+      commands: [handoff.package_command, ...asArray(handoff.import_commands)].filter(Boolean),
+    },
+    {
+      id: "api-key",
+      Icon: KeyRound,
+      status: providerPolicy.status || "blocked",
+      title: t("designStudio.agentConnection.apiKeyTitle"),
+      detail: t("designStudio.agentConnection.apiKeyDetail"),
+      commands: ["tools/dashboard-design-system provider-policy --provider-mode api-key"],
+    },
+    {
+      id: "imagegen",
+      Icon: Eye,
+      status: workflow.boundaries.imagegen_executed === false ? "ready" : "blocked",
+      title: t("designStudio.agentConnection.imagegenTitle"),
+      detail: t("designStudio.agentConnection.imagegenDetail"),
+      commands: ["tools/control-center run imagegen.mock_register --profile proposal-writer"],
+    },
+    {
+      id: "external-product",
+      Icon: ExternalLink,
+      status: exportPlan.target_apply_mode === "plan-only" ? "manual_required" : "ready",
+      title: t("designStudio.agentConnection.externalProductTitle"),
+      detail: displayText(exportPlan.next_action, t("designStudio.agentConnection.externalProductDetail")),
+      commands: ["tools/dashboard-design-system export-proposal --target-ref external-product"],
+    },
+    {
+      id: "cli-mcp",
+      Icon: TerminalSquare,
+      status: "ready",
+      title: t("designStudio.agentConnection.cliMcpTitle"),
+      detail: t("designStudio.agentConnection.cliMcpDetail"),
+      commands: ["tools/control-center catalog", "tools/control-center-mcp"],
+    },
+    {
+      id: "browser-debug",
+      Icon: FileSearch,
+      status: browserDebug.tool?.status || "unknown",
+      title: t("designStudio.agentConnection.browserDebugTitle"),
+      detail: t("designStudio.agentConnection.browserDebugDetail"),
+      commands: ["tools/dashboard-browser-debug-manifest --output .tmp/dashboard-browser-debug-target.json"],
+    },
+  ];
+  const boundaryRows = [
+    ["direct_apply_authority", t("designStudio.agentConnection.noDirectApply")],
+    ["provider_dispatch", t("designStudio.agentConnection.noProviderDispatch")],
+    ["imagegen_executed", t("designStudio.agentConnection.noImagegenExecution")],
+    ["external_product_apply", t("designStudio.agentConnection.noProductWrite")],
+  ];
+  return (
+    <DetailSection id="design-studio-agent-connection" title={t("designStudio.agentConnection.title")} Icon={Brain}>
+      <div className="design-studio-orchestration__intro">
+        <AudienceModeBadge displayPolicy={displayPolicy} t={t} />
+        <p>{t("designStudio.agentConnection.detail")}</p>
+        <small>{t("designStudio.agentConnection.profileSummary")}</small>
+      </div>
+      <div className="design-studio-orchestration__cards design-studio-orchestration__cards--compact">
+        {rows.map(({ id, Icon, status, title, detail, commands }) => (
+          <article className="design-studio-orchestration__card" key={id} data-agent-connection={id}>
+            <div className="design-studio-orchestration__card-head">
+              <Icon aria-hidden="true" size={18} />
+              <h3>{title}</h3>
+            </div>
+            <StatusPill value={status} t={t} label={statusLabelForChip(status, t)} />
+            <p>{detail}</p>
+            {!displayPolicy.isFriendly && commands.length ? (
+              <SourceBoundaryChips values={commands} t={t} limit={3} variant="commands" labelKey="maintenance.sourceCommandItem" tooltipKey="maintenance.sourceCommandTooltip" />
+            ) : null}
+          </article>
+        ))}
+      </div>
+      <div className="design-studio-orchestration__flow" aria-label={t("designStudio.agentConnection.boundaryTitle")}>
+        {boundaryRows.map(([key, label]) => (
+          <div className="design-studio-orchestration__flow-step" key={key}>
+            <StatusPill value={workflow.boundaries[key] === false ? "ready" : "blocked"} t={t} label={workflow.boundaries[key] === false ? label : statusLabelForChip("blocked", t)} />
+          </div>
+        ))}
+      </div>
+    </DetailSection>
+  );
+}
+
 function DesignStudioProposalWorkflowPanel({ data, t }) {
   const workflow = designStudioWorkflowState(data);
   const summaryItems = [
@@ -7427,6 +7595,7 @@ function DesignStudioPage({ data, locale, t }) {
       </DetailSection>
       <DesignStudioOrchestrationPanel t={t} />
       <DesignStudioProposalWorkflowPanel data={data} t={t} />
+      <DesignStudioAgentConnectionPanel data={data} t={t} />
       <DetailSection id="design-studio-interactions" title={t("designStudio.interactionsTitle")} Icon={Wrench}>
         <div className="design-studio-grid">
           <article className="design-studio-editor">
@@ -9301,7 +9470,7 @@ function ContextSwitchProgressPopup({ pendingMenuId, activeMenuId, data, t, prog
   );
 }
 
-function ContextSwitchHoldingPage({ pendingMenuId, t }) {
+function ContextSwitchHoldingPage({ pendingMenuId, t, switching = false }) {
   const pending = displayText(pendingMenuId, "");
   return (
     <section className="view-surface context-switch-holding" aria-live="polite" aria-label={t("context.menuAvailability.waitTitle")}>
@@ -9309,8 +9478,8 @@ function ContextSwitchHoldingPage({ pendingMenuId, t }) {
         <RefreshCw aria-hidden="true" size={28} />
       </div>
       <div>
-        <h2>{t("context.menuAvailability.waitTitle")}</h2>
-        <p>{t("context.menuAvailability.waitDetail")} {contextLabel(pending, t)}</p>
+        <h2>{switching ? t("context.menuAvailability.waitTitle") : t("context.menuAvailability.scopedSnapshotTitle")}</h2>
+        <p>{switching ? t("context.menuAvailability.waitDetail") : t("context.menuAvailability.scopedSnapshotDetail")} {contextLabel(pending, t)}</p>
       </div>
     </section>
   );
@@ -9498,12 +9667,16 @@ export default function App() {
     activeMenuIdRef.current = nextMenuId;
     setActiveMenuId(nextMenuId);
     setContextSwitchFailure(null);
-    setContextSwitchProgress({
-      menuId: nextMenuId,
-      snapshotReady: !options.fallbackApplied,
-      viewApplied: true,
-      fallbackApplied: Boolean(options.fallbackApplied),
-    });
+    if (options.silent) {
+      setContextSwitchProgress(null);
+    } else {
+      setContextSwitchProgress({
+        menuId: nextMenuId,
+        snapshotReady: !options.fallbackApplied,
+        viewApplied: true,
+        fallbackApplied: Boolean(options.fallbackApplied),
+      });
+    }
     persistDashboardMenuId(nextMenuId);
     return true;
   }, []);
@@ -9563,7 +9736,10 @@ export default function App() {
   const activeDashboard = useMemo(() => resolveActiveDashboardData(rawData, activeMenuId), [rawData, activeMenuId]);
   const data = loaded ? activeDashboard.data : rawData;
   const isContextSwitching = Boolean(displayText(pendingMenuId, ""));
-  const evidenceViewNeedsCurrentSnapshot = loaded && evidenceBackedViews.has(activeView) && !activeDashboard.isProducerContext;
+  const evidenceViewNeedsCurrentSnapshot =
+    loaded &&
+    evidenceBackedViews.has(activeView) &&
+    !activeDashboard.detailPagesSafe;
 
   useEffect(() => {
     function handleHashChange() {
@@ -9589,54 +9765,21 @@ export default function App() {
       }
       inFlight = true;
       try {
-        const menuId = displayText(activeMenuIdRef.current, "");
         const firstSnapshotLoad = !firstSnapshotLoadedRef.current;
+        const requestedMenuId = displayText(activeMenuIdRef.current, "");
         const snapshot = await fetchDashboardDataSnapshot({});
         if (!active) {
           return;
         }
         firstSnapshotLoadedRef.current = true;
-        if (pendingMenuIdRef.current || displayText(activeMenuIdRef.current, "") !== menuId) {
+        if (pendingMenuIdRef.current || displayText(activeMenuIdRef.current, "") !== requestedMenuId) {
           if (!firstSnapshotLoad) {
             return;
           }
         }
         publishSnapshot(snapshot);
-        if (firstSnapshotLoad && menuId) {
-          const selectedMenuNeedsLiveRefresh = menuId !== producerMenuIdForData(snapshot.data);
-          const appliedFromSnapshot = applyMenuFromSnapshotData(snapshot.data, menuId, { fallbackApplied: selectedMenuNeedsLiveRefresh });
-          if (!selectedMenuNeedsLiveRefresh) {
-            return;
-          }
-          if (!appliedFromSnapshot) {
-            return;
-          }
-          backgroundRefreshMenuIdRef.current = menuId;
-          void fetchDashboardDataSnapshot({ menuId })
-            .then((selectedSnapshot) => {
-              if (!active) {
-                return;
-              }
-              if (!snapshotMatchesActiveMenu(selectedSnapshot, menuId)) {
-                throw new Error(`dashboard data menu mismatch: requested ${menuId}, received ${producerMenuIdForData(selectedSnapshot?.data || {})}`);
-              }
-              applyMenuFromSnapshotData(selectedSnapshot.data, menuId);
-              publishSnapshot(selectedSnapshot);
-            })
-            .catch((error) => {
-              if (!active) {
-                return;
-              }
-              if (displayText(activeMenuIdRef.current, "") !== menuId) {
-                publishSnapshotError(error);
-                setContextSwitchFailure({ menuId, message: displayText(error?.message, "") });
-              }
-            })
-            .finally(() => {
-              if (backgroundRefreshMenuIdRef.current === menuId) {
-                backgroundRefreshMenuIdRef.current = "";
-              }
-            });
+        if (firstSnapshotLoad && requestedMenuId) {
+          applyMenuFromSnapshotData(snapshot.data, requestedMenuId, { silent: true });
         }
       } catch (error) {
         if (!active) {
@@ -9685,7 +9828,7 @@ export default function App() {
         <SyncBanner error={loaded ? state.refreshError : null} t={t} />
 
         {state.status === "loading" ? (
-          <section className="view-surface" aria-label="Loading">
+          <section className="view-surface" id={activeView} aria-label="Loading">
             <p>{t("app.loading")}</p>
           </section>
         ) : null}
@@ -9704,7 +9847,7 @@ export default function App() {
 
         {loaded && activeView === "overview" ? <OverviewSection data={data} t={t} locale={locale} activeMenuId={activeDashboard.activeMenuId} pendingMenuId={pendingMenuId} onActiveMenuChange={handleActiveMenuChange} liveStatus={liveStatus} /> : null}
         {loaded && activeView === "lessons" ? <LessonSection lessons={data.lessons || {}} data={data} locale={locale} t={t} /> : null}
-        {loaded && evidenceViewNeedsCurrentSnapshot ? <ContextSwitchHoldingPage pendingMenuId={activeDashboard.activeMenuId} t={t} /> : null}
+        {loaded && evidenceViewNeedsCurrentSnapshot ? <ContextSwitchHoldingPage pendingMenuId={activeDashboard.activeMenuId} t={t} switching={isContextSwitching && !contextSwitchProgress?.fallbackApplied} /> : null}
         {loaded && !evidenceViewNeedsCurrentSnapshot && activeView === "workflow" ? <WorkflowSection development={data.development || {}} gitWorkflow={data.git_workflow || {}} data={data} locale={locale} t={t} liveStatus={liveStatus} /> : null}
         {loaded && !evidenceViewNeedsCurrentSnapshot && activeView === "maintenance" ? <MaintenanceSection maintenance={data.maintenance || {}} data={data} locale={locale} t={t} liveStatus={liveStatus} /> : null}
         {loaded && !evidenceViewNeedsCurrentSnapshot && activeView === "safety" ? <SafetySection security={data.security || {}} actions={data.actions || {}} partialFailures={data.partial_failures || []} data={data} locale={locale} t={t} liveStatus={liveStatus} /> : null}

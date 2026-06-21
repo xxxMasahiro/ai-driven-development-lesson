@@ -212,6 +212,10 @@ export function normalizeState(value) {
   return ALLOWED_STATES.has(state) ? state : "unknown";
 }
 
+export function stateLabelKey(value) {
+  return `state.${normalizeState(value)}`;
+}
+
 export function normalizeRisk(value) {
   const risk = displayText(value, "low");
   return RISK_LEVELS.has(risk) ? risk : "low";
@@ -1100,11 +1104,17 @@ function validateDecisionPages(data) {
         "audiences",
         "status",
         "decision_question",
+        "decision_question_key",
         "current_judgment",
+        "current_judgment_key",
         "top_reason",
+        "top_reason_key",
         "evidence_confidence",
+        "evidence_confidence_key",
         "must_review",
+        "must_review_keys",
         "next_safe_action",
+        "next_safe_action_key",
         "detail_page",
         "owner_source",
         "source_id",
@@ -1127,6 +1137,11 @@ function validateDecisionPages(data) {
       if (!displayText(page[key], "")) {
         throw new Error(`dashboard decision page ${pageId}.${key} is missing`);
       }
+    }
+    const mustReview = asArray(page.must_review);
+    const mustReviewKeys = page.must_review_keys === undefined ? [] : asArray(page.must_review_keys);
+    if (mustReviewKeys.length && (mustReviewKeys.length !== mustReview.length || mustReviewKeys.some((key) => !displayText(key, "")))) {
+      throw new Error(`dashboard decision page ${pageId}.must_review_keys is invalid`);
     }
     validateEvidenceSourceFields(page, `dashboard decision page ${pageId}`);
     if (!RISK_LEVELS.has(displayText(page.risk_level, ""))) {
@@ -1154,7 +1169,6 @@ function validateDecisionPages(data) {
         throw new Error(`dashboard decision page ${pageId} is missing audience: ${requiredAudience}`);
       }
     }
-    const mustReview = asArray(page.must_review);
     if (!mustReview.length || mustReview.some((item) => !displayText(item, ""))) {
       throw new Error(`dashboard decision page ${pageId} must_review is invalid`);
     }

@@ -3202,7 +3202,7 @@ test.describe("English dashboard control center", () => {
     });
 
     await expect(page.locator("[data-overview-status-card='lessons']")).toContainText(/11\s*\/\s*14/);
-    await expect(page.locator("[data-overview-status-card='security']")).toContainText("Ready");
+    await expect(page.locator("[data-overview-status-card='security']")).toContainText("ready to continue");
     await expect(page.locator(".common-status-card--security")).toContainText("None");
     await expect(page.locator(".explore-card", { hasText: "Lessons" })).toContainText("Open");
     await expect.poll(() => page.evaluate(() => window.__dashboardReloadMarker)).toBe("kept");
@@ -3220,7 +3220,7 @@ test.describe("English dashboard control center", () => {
     await page.goto("http://lesson.local/dashboard-control-center/index.html?refresh_ms=100");
     await expect(page.locator("[data-overview-status-card='lessons']")).toContainText(/11\s*\/\s*14/);
     await expect(page.locator("[data-overview-status-card='lessons']")).toContainText(/11\s*\/\s*14/);
-    await expect(page.locator("[data-overview-status-card='security']")).toContainText("Ready");
+    await expect(page.locator("[data-overview-status-card='security']")).toContainText("ready to continue");
     expect(methods.every((method) => method === "GET")).toBe(true);
     expect(methods.length).toBeGreaterThanOrEqual(4);
   });

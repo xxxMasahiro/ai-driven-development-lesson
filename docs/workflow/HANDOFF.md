@@ -3019,3 +3019,23 @@ Restart context:
 Next safe action:
 
 - No remaining implementation action for this sync ID after focused verification.
+
+## Dashboard Control Center Agentic Control Tower P0-P10 Handoff
+
+SYNC-ID: dashboard_control_center_agentic_control_tower_p0_p10
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,tools/lib/control_center_core.mjs,tools/lib/control_center_evidence_store.mjs,tools/lib/control_center_mcp_stdio_adapter.mjs,tools/control-center,tools/control-center-mcp,tools/test_control_center_core.sh,tools/test_control_center_core.mjs,dashboard-control-center/src/App.jsx,dashboard-control-center/src/DecisionSummary.jsx,dashboard-control-center/src/dashboardContext.js,dashboard-control-center/src/dashboardData.js,dashboard-control-center/src/displayDepth.js,dashboard-control-center/src/i18n.js,dashboard-control-center/src/styles.css,tools/dashboard-data,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/test_dashboard_i18n.sh,tools/check_dashboard_bundle_contract.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh,tools/test_dashboard_browser_debug_manifest.sh
+
+Restart context:
+
+- Evidence-backed detail pages now require a producer-owned snapshot for the selected menu. Overview remains usable during refresh, but stale Workflow/Maintenance/Safety/Repository/Documents/Design Studio/History detail data is not mixed across menus.
+- Status labels use shared `state.*` translation keys through `stateLabelKey()`. Operational default text has Japanese translations for common producer messages.
+- The current work card now uses `operational_decision` audience briefs and next-safe-action text, with source/command references visible outside friendly mode.
+- `tools/control-center` and `tools/control-center-mcp` share `tools/lib/control_center_core.mjs` profiles and command ids. Provider dispatch remains disabled; owner apply remains plan-only.
+- Evidence collection receipts are written under `.control-center/evidence/` with a locked ledger. This directory is local runtime evidence and should not be treated as source-of-truth documentation.
+- Browser Debug CLI remains external and read-only; this repository owns only manifest generation and local review artifacts.
+
+Next safe action:
+
+- Run focused verification and P10 Browser Debug review. Do not edit `/home/masahiro/projects/agent-toolbox/browser-debug-cli`, call provider APIs, generate images, auto-apply proposals, mutate external products, run dashboard-triggered Git/CI operations, push, merge, or cleanup from the dashboard.
