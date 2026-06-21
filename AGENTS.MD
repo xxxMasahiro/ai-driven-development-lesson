@@ -36,6 +36,8 @@ STEP 1-14: 実践レッスン: index-14-days.md
 2. 既存機能とのトレードオフは一切禁止する。
    STEP 1-7、STEP 1-14、既存CI、既存チェック、既存ドキュメント導線を壊して新機能を入れることはできません。追加は既存機能と両立する形にします。
 
+- Implementations must always account for changeability: do not hard-code product names, repository names, URLs, file paths, or fixed values, and keep them configurable so they can be changed at any time.
+
 3. 実装とテストは、リファクタリング性、エコシステム性、再利用性、汎用性を満たす。
    固定値や場当たり的な分岐を増やさず、既存の設定ファイル、共通ライブラリ、検査コマンド、repo-local skills と接続できる設計にします。新しい検査は単体でも集約テストからでも使えるようにし、特定の成果物スタックだけに依存させません。
 

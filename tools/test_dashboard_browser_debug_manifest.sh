@@ -6,11 +6,18 @@ TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$TMP_DIR"' EXIT
 
 manifest="$TMP_DIR/dashboard-browser-debug-target.json"
+renamed_manifest="$TMP_DIR/dashboard-review-target-renamed.json"
 
 "$ROOT/tools/dashboard-browser-debug-manifest" \
   --source tests/fixtures/dashboard-control-center.json \
   --base-url http://127.0.0.1:5173/ \
   --output "$manifest"
+
+DASHBOARD_REVIEW_TARGET_ID="renamed-control-center" \
+DASHBOARD_CONTROL_CENTER_BASE_URL="http://127.0.0.1:6199/" \
+  "$ROOT/tools/dashboard-browser-debug-manifest" \
+    --source tests/fixtures/dashboard-control-center.json \
+    --output "$renamed_manifest"
 
 MANIFEST="$manifest" node <<'NODE'
 const fs = require('node:fs');
@@ -26,7 +33,7 @@ function assertCondition(condition, message) {
   if (!condition) fail(message);
 }
 
-assertCondition(manifest.schemaVersion === '0.1.0', 'manifest schema version must match Browser Debug CLI target schema');
+assertCondition(manifest.schemaVersion === '0.1.0', 'manifest schema version must match review CLI target schema');
 assertCondition(manifest.name === 'ai-driven-development-lesson-dashboard-control-center', 'manifest name must identify the lesson-owned target');
 assertCondition(manifest.baseUrl === 'http://127.0.0.1:5173/?menu_id=step_1_14', 'base URL must include the selected menu_id used by the dashboard');
 assertCondition(manifest.localContentUxAdvisory?.enabled === true, 'content UX advisory must be enabled for lesson-owned review manifest');
@@ -58,4 +65,23 @@ assertCondition(overview.expectations.dataBindings.some((binding) => binding.poi
 assertCondition(overview.expectations.dataBindings.every((binding) => binding.selector === '#overview'), 'overview bindings must target the stable overview root');
 NODE
 
-printf 'dashboard browser-debug manifest test passed\n'
+MANIFEST="$renamed_manifest" node <<'NODE'
+const fs = require('node:fs');
+
+const manifest = JSON.parse(fs.readFileSync(process.env.MANIFEST, 'utf8'));
+
+function fail(message) {
+  console.error(message);
+  process.exit(1);
+}
+
+function assertCondition(condition, message) {
+  if (!condition) fail(message);
+}
+
+assertCondition(manifest.name === 'renamed-control-center', 'manifest target id must be configurable');
+assertCondition(manifest.baseUrl === 'http://127.0.0.1:6199/?menu_id=step_1_14', 'manifest base URL must be configurable from environment');
+assertCondition(manifest.appHints?.reviewGoal === 'renamed_control_center_review', 'review goal id must derive from the configured target id');
+NODE
+
+printf 'dashboard review manifest test passed\n'

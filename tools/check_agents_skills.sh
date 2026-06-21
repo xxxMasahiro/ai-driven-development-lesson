@@ -71,6 +71,7 @@ require_pattern "AGENTS.MD" 'エージェントは、ユーザーに `index\.md`
 require_pattern "AGENTS.MD" '^1\. 学習用リポジトリと成果物リポジトリは、2つのUbuntu/WSL CLI画面で分けて扱う。$' "two-cli immutable rule"
 require_pattern "AGENTS.MD" '成果物リポジトリの開発に入る前には、必ず学習者へ別画面でUbuntu/WSL CLIを起動' "product CLI prompt immutable detail"
 require_pattern "AGENTS.MD" '^2\. 既存機能とのトレードオフは一切禁止する。$' "no-tradeoff immutable rule"
+require_pattern "AGENTS.MD" '^- Implementations must always account for changeability: do not hard-code product names, repository names, URLs, file paths, or fixed values, and keep them configurable so they can be changed at any time\.$' "implementation-changeability immutable rule"
 require_pattern "AGENTS.MD" '^3\. 実装とテストは、リファクタリング性、エコシステム性、再利用性、汎用性を満たす。$' "implementation-quality immutable rule"
 require_pattern "AGENTS.MD" 'AGENTS\.MD.*AGENT\.md' "AGENTS versus AGENT distinction"
 require_pattern "AGENTS.MD" 'STEP 1-7: 基礎レッスン: index\.md' "STEP 1-7 default entry"
