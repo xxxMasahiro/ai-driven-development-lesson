@@ -186,9 +186,9 @@ export const CONTROL_CENTER_COMMAND_DEFINITIONS = Object.freeze([
   }),
   commandDefinition({
     id: "browser_debug.manifest",
-    title: "Build Browser Debug manifest",
-    category: "browser-debug",
-    summary: "Build the target-owned Browser Debug CLI review manifest without changing Browser Debug CLI.",
+    title: "Build review CLI manifest",
+    category: "review-cli",
+    summary: "Build the target-owned review CLI manifest without changing the external review tool.",
     runMode: "execute",
     inputSchema: {
       type: "object",
@@ -200,7 +200,7 @@ export const CONTROL_CENTER_COMMAND_DEFINITIONS = Object.freeze([
     },
     writesArtifacts: true,
     auditRequired: true,
-    cli: { command: "tools/dashboard-browser-debug-manifest", args: [] },
+    cli: { command: "tools/dashboard-review-manifest", args: [] },
   }),
   commandDefinition({
     id: "design.proposal_status",
@@ -598,16 +598,16 @@ export function runControlCenterCommand(commandId, args = {}, options = {}) {
     const toolArgs = [];
     if (args.base_url) toolArgs.push("--base-url", String(args.base_url));
     if (args.output) toolArgs.push("--output", String(args.output));
-    const spawned = spawnDashboardTool("tools/dashboard-browser-debug-manifest", toolArgs);
+    const spawned = spawnDashboardTool("tools/dashboard-review-manifest", toolArgs);
     if (spawned.status !== 0 || !args.output) {
-      result = parseJsonOutput(spawned, "tools/dashboard-browser-debug-manifest");
+      result = parseJsonOutput(spawned, "tools/dashboard-review-manifest");
     } else {
       const outputPath = path.resolve(ROOT, String(args.output));
       result = parseJsonOutput({
         status: 0,
         stdout: awaitlessReadFile(outputPath),
         stderr: "",
-      }, "tools/dashboard-browser-debug-manifest");
+      }, "tools/dashboard-review-manifest");
     }
   } else if (commandId === "design.proposal_status") {
     result = parseJsonOutput(spawnDashboardTool("tools/dashboard-design-system", ["proposal-status"]), "tools/dashboard-design-system proposal-status");

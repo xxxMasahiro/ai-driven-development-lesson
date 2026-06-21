@@ -236,6 +236,7 @@ source_files=(
   "docs/workflow/PRODUCT_REPOSITORY_REGISTRY_SCHEMA.tsv"
   "learning/PRODUCT_REPOSITORY_REGISTRY.tsv"
   "learning/PRODUCT_REPOSITORY_SELECTION.tsv"
+  "tools/dashboard-review-manifest"
   "tools/dashboard-browser-debug-manifest"
   "learning/context/WORKFLOW_CONTEXT_MAP.tsv"
   "learning/GIT_WORKFLOW_SETTINGS.tsv"
@@ -309,6 +310,65 @@ dashboard_first_relative_artifact() {
     fi
   )
   return 1
+}
+
+dashboard_review_safe_relative_path() {
+  local rel_path="$1"
+  rel_path="${rel_path#./}"
+  case "$rel_path" in
+    ""|/*|*"/../"*|*"../"*|*".."|*".//"*|*[[:space:]]*|*[\;\&\|\`\$\<\>\\]*)
+      return 1
+      ;;
+  esac
+  printf '%s' "$rel_path"
+}
+
+dashboard_review_manifest_tool() {
+  if [[ -x "$ROOT/tools/dashboard-review-manifest" ]]; then
+    printf 'tools/dashboard-review-manifest'
+    return 0
+  fi
+  if [[ -x "$ROOT/tools/dashboard-browser-debug-manifest" ]]; then
+    printf 'tools/dashboard-browser-debug-manifest'
+    return 0
+  fi
+  printf 'tools/dashboard-review-manifest'
+}
+
+dashboard_review_target_path() {
+  local candidate
+  for candidate in "${DASHBOARD_REVIEW_TARGET_PATH:-}" "${DASHBOARD_BROWSER_DEBUG_TARGET_PATH:-}"; do
+    [[ -n "$candidate" ]] || continue
+    dashboard_review_safe_relative_path "$candidate" && return 0
+  done
+  printf '.tmp/dashboard-review-target.json'
+}
+
+dashboard_review_artifact_root() {
+  local candidate
+  for candidate in \
+    "${DASHBOARD_REVIEW_ARTIFACT_ROOT:-}" \
+    "${TRACE_CUE_ARTIFACT_ROOT:-}" \
+    "${DASHBOARD_BROWSER_DEBUG_ARTIFACT_ROOT:-}"; do
+    [[ -n "$candidate" ]] || continue
+    dashboard_review_safe_relative_path "$candidate" && return 0
+  done
+  if [[ -d "$ROOT/.dashboard-review" ]]; then
+    printf '.dashboard-review'
+    return 0
+  fi
+  if [[ -d "$ROOT/.browser-debug" ]]; then
+    printf '.browser-debug'
+    return 0
+  fi
+  printf '.dashboard-review'
+}
+
+dashboard_review_artifact_path() {
+  local suffix="$1"
+  local root
+  root="$(dashboard_review_artifact_root)"
+  printf '%s/%s' "$root" "$suffix"
 }
 
 dashboard_review_cli_safe_entrypoint() {
@@ -460,9 +520,13 @@ dashboard_artifact_status() {
 dashboard_browser_debug_status_json() {
   local cli_root cli_status cli_repo manifest_status latest_review latest_package latest_result latest_report
   local review_status package_status result_status report_status overall_status review_ref package_ref result_ref command_prefix
+  local manifest_tool target_path artifact_root
 
   cli_root="$(dashboard_review_cli_root 2>/dev/null || true)"
   command_prefix="$(dashboard_review_cli_command_prefix 2>/dev/null || printf 'node product:configured-review-cli')"
+  manifest_tool="$(dashboard_review_manifest_tool)"
+  target_path="$(dashboard_review_target_path)"
+  artifact_root="$(dashboard_review_artifact_root)"
   if [[ -n "$cli_root" ]]; then
     cli_status="ready"
     cli_repo="$(dashboard_review_cli_repository_id "$cli_root")"
@@ -471,16 +535,16 @@ dashboard_browser_debug_status_json() {
     cli_repo="not_selected"
   fi
 
-  if [[ -f "$ROOT/tools/dashboard-browser-debug-manifest" ]]; then
+  if [[ -f "$ROOT/$manifest_tool" ]]; then
     manifest_status="ready"
   else
     manifest_status="missing"
   fi
 
-  latest_review="$(dashboard_first_relative_artifact ".browser-debug/review-artifacts" "*.json" 2>/dev/null || true)"
-  latest_package="$(dashboard_first_relative_artifact ".browser-debug/agent-packages" "packet.json" 2>/dev/null || true)"
-  latest_result="$(dashboard_first_relative_artifact ".browser-debug/agent-results" "*.json" 2>/dev/null || true)"
-  latest_report="$(dashboard_first_relative_artifact ".browser-debug/reports" "*.md" 2>/dev/null || true)"
+  latest_review="$(dashboard_first_relative_artifact "$(dashboard_review_artifact_path "review-artifacts")" "*.json" 2>/dev/null || true)"
+  latest_package="$(dashboard_first_relative_artifact "$(dashboard_review_artifact_path "agent-packages")" "packet.json" 2>/dev/null || true)"
+  latest_result="$(dashboard_first_relative_artifact "$(dashboard_review_artifact_path "agent-results")" "*.json" 2>/dev/null || true)"
+  latest_report="$(dashboard_first_relative_artifact "$(dashboard_review_artifact_path "reports")" "*.md" 2>/dev/null || true)"
   review_status="$(dashboard_artifact_status "$latest_review")"
   package_status="$(dashboard_artifact_status "$latest_package")"
   result_status="$(dashboard_artifact_status "$latest_result")"
@@ -498,9 +562,9 @@ dashboard_browser_debug_status_json() {
     overall_status="manual_required"
   fi
 
-  review_ref="${latest_review:-.browser-debug/review-artifacts/review-index.json}"
-  package_ref="${latest_package:-.browser-debug/agent-packages/packet.json}"
-  result_ref="${latest_result:-.browser-debug/agent-results/agent-advisory-result.json}"
+  review_ref="${latest_review:-$artifact_root/review-artifacts/review-index.json}"
+  package_ref="${latest_package:-$artifact_root/agent-packages/packet.json}"
+  result_ref="${latest_result:-$artifact_root/agent-results/agent-advisory-result.json}"
 
   dashboard_json_raw_object \
     "schema_version" "$(dashboard_json_string "0.1.0")" \
@@ -513,12 +577,12 @@ dashboard_browser_debug_status_json() {
       "source" "$(dashboard_json_string "configured_or_selected_external_tool")")" \
     "manifest" "$(dashboard_json_raw_object \
       "status" "$(dashboard_json_string "$manifest_status")" \
-      "path" "$(dashboard_json_string "tools/dashboard-browser-debug-manifest")" \
-      "command" "$(dashboard_json_string "tools/dashboard-browser-debug-manifest --output .tmp/dashboard-browser-debug-target.json")")" \
+      "path" "$(dashboard_json_string "$manifest_tool")" \
+      "command" "$(dashboard_json_string "$manifest_tool --output $target_path")")" \
     "review" "$(dashboard_json_raw_object \
       "status" "$(dashboard_json_string "$review_status")" \
       "artifact_index_path" "$(dashboard_json_string "${latest_review:-not_collected}")" \
-      "command" "$(dashboard_json_string "$command_prefix review --target .tmp/dashboard-browser-debug-target.json --json")")" \
+      "command" "$(dashboard_json_string "$command_prefix review --target $target_path --json")")" \
     "agent_package" "$(dashboard_json_raw_object \
       "status" "$(dashboard_json_string "$package_status")" \
       "path" "$(dashboard_json_string "${latest_package:-not_collected}")" \
@@ -5235,6 +5299,12 @@ decision_page_rows=(
   "$(dashboard_json_decision_page "history" "History" "$latest_sync_id" "$operational_decision_status" "$(dashboard_status_judgment_text "$operational_decision_status")" "History shows when evidence was observed and which source owns it." "$(dashboard_status_authority "$operational_decision_status") / $(dashboard_status_freshness_state "$operational_decision_status")" "Use history to confirm whether the evidence is current enough for the decision." "#history" "dashboard-data" "workflow_evidence_events" "$(dashboard_status_authority "$operational_decision_status")" "$(dashboard_status_freshness_state "$operational_decision_status")" "$(dashboard_status_risk_level "$operational_decision_status")" "Observed time" "Source identity")"
 )
 
+review_manifest_tool="$(dashboard_review_manifest_tool)"
+review_target_path="$(dashboard_review_target_path)"
+review_artifact_root="$(dashboard_review_artifact_root)"
+review_artifact_refs="$review_manifest_tool;$review_artifact_root/review-artifacts;$review_artifact_root/agent-packages;$review_artifact_root/agent-results;$review_artifact_root/reports"
+review_manifest_command="$review_manifest_tool --output $review_target_path"
+
 maintenance_evidence_rows=(
   "$(dashboard_json_evidence_row "dashboard_data_schema" "Dashboard data schema" "required" "$as_built_sync_status" "docs/workflow/DASHBOARD_DATA_SCHEMA.tsv" "Dashboard JSON contract" "Confirms that UI fields are backed by the dashboard data schema and as-built sync contract." "./tools/test_dashboard_schema.sh" "schema" "$generated_at" "" "" "medium" "docs/workflow/DASHBOARD_DATA_SCHEMA.tsv;docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv" "0")"
   "$(dashboard_json_evidence_row "product_authority_evidence" "Product authority evidence" "required" "$product_authority_status" "$product_authority_evidence_artifacts" "$selected_target_repository_name" "Confirms the selected menu target repository, product manifest, and product gate evidence." "$product_authority_followup_command" "product_authority" "$generated_at" "" "" "high" "$product_authority_evidence_artifacts" "$product_authority_blocker_count")"
@@ -5242,7 +5312,7 @@ maintenance_evidence_rows=(
   "$(dashboard_json_evidence_row "security_policy" "Security policy" "required" "$security_policy_status" "docs/workflow/PRODUCT_SECURITY_POLICY.tsv;product:ops/SECURITY_MANIFEST.tsv;product:docs/workflow/SECURITY.md" "Security policy and guardrails" "Confirms command, approval, and dangerous-operation policy before risky work." "./tools/product-security status --context $PRODUCT_AUTHORITY_CONTEXT" "policy" "$generated_at" "" "" "high" "docs/workflow/PRODUCT_SECURITY_POLICY.tsv;product:ops/SECURITY_MANIFEST.tsv;product:docs/workflow/SECURITY.md" "0")"
   "$(dashboard_json_evidence_row "developer_memory" "Developer memory" "required" "$developer_memory_status" "docs/memory/DEVELOPER_MEMORY.md" "Development decision memory" "Confirms implementation decisions and unresolved UI concerns are recorded." "./tools/check_developer_memory_requirements.sh" "memory" "$generated_at" "" "" "medium" "docs/memory/DEVELOPER_MEMORY.md" "0")"
   "$(dashboard_json_evidence_row "workflow_pair" "Workflow pair" "required" "$workflow_pair_status" "docs/workflow/TASK_TRACKER.md;docs/workflow/HANDOFF.md" "Task tracker and handoff pair" "Confirms progress and restart notes stay synchronized for handoff." "./tools/check_workflow_pair_sync.sh" "workflow_pair" "$generated_at" "" "" "medium" "docs/workflow/TASK_TRACKER.md;docs/workflow/HANDOFF.md" "0")"
-  "$(dashboard_json_evidence_row "browser_debug_agent_handoff" "Browser Debug agent handoff" "optional" "$browser_debug_status" "tools/dashboard-browser-debug-manifest;.browser-debug/review-artifacts;.browser-debug/agent-packages;.browser-debug/agent-results;.browser-debug/reports" "Dashboard Control Center review handoff" "Confirms Browser Debug CLI review package, agent ingest, and report handoff state without executing provider APIs from the dashboard." "tools/dashboard-browser-debug-manifest --output .tmp/dashboard-browser-debug-target.json" "browser_debug" "$generated_at" "" "" "medium" "tools/dashboard-browser-debug-manifest;.browser-debug/review-artifacts;.browser-debug/agent-packages;.browser-debug/agent-results;.browser-debug/reports" "0")"
+  "$(dashboard_json_evidence_row "browser_debug_agent_handoff" "Review CLI agent handoff" "optional" "$browser_debug_status" "$review_artifact_refs" "Dashboard Control Center review handoff" "Confirms configured review CLI package, agent ingest, and report handoff state without executing provider APIs from the dashboard." "$review_manifest_command" "browser_debug" "$generated_at" "" "" "medium" "$review_artifact_refs" "0")"
   "$(dashboard_json_evidence_row "design_studio_proposal_workflow" "Design Studio proposal workflow" "required" "$design_studio_status" "tools/dashboard-design-system;docs/design-system/dashboard-control-center/orchestration.json" "Design Studio imported proposal workflow" "Confirms Design Studio candidate imports, proposal previews, API-key provider policy, external product export, and owner-tool transaction preview remain proposal-only." "tools/dashboard-design-system proposal-status" "design_studio" "$generated_at" "" "" "medium" "tools/dashboard-design-system;docs/design-system/dashboard-control-center/orchestration.json" "0")"
 )
 

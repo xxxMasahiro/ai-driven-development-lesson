@@ -2095,7 +2095,7 @@ function validateBrowserDebug(data) {
     throw new Error("dashboard browser_debug tool source is missing");
   }
   validateBrowserDebugStage(browserDebug.manifest, "dashboard browser_debug manifest");
-  if (safeRelativePath(browserDebug.manifest.path) !== "tools/dashboard-browser-debug-manifest") {
+  if (!["tools/dashboard-review-manifest", "tools/dashboard-browser-debug-manifest"].includes(safeRelativePath(browserDebug.manifest.path))) {
     throw new Error("dashboard browser_debug manifest path is invalid");
   }
   validateBrowserDebugStage(browserDebug.review, "dashboard browser_debug review", "artifact_index_path");

@@ -7198,7 +7198,7 @@ function DesignStudioAgentConnectionPanel({ data, t }) {
       status: browserDebug.tool?.status || "unknown",
       title: t("designStudio.agentConnection.browserDebugTitle"),
       detail: t("designStudio.agentConnection.browserDebugDetail"),
-      commands: ["tools/dashboard-browser-debug-manifest --output .tmp/dashboard-browser-debug-target.json"],
+      commands: ["tools/dashboard-review-manifest --output .tmp/dashboard-review-target.json"],
     },
   ];
   const boundaryRows = [

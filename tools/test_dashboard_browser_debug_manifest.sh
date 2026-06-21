@@ -7,15 +7,21 @@ trap 'rm -rf "$TMP_DIR"' EXIT
 
 manifest="$TMP_DIR/dashboard-browser-debug-target.json"
 renamed_manifest="$TMP_DIR/dashboard-review-target-renamed.json"
+compat_manifest="$TMP_DIR/dashboard-browser-debug-compat-target.json"
 
-"$ROOT/tools/dashboard-browser-debug-manifest" \
+"$ROOT/tools/dashboard-review-manifest" \
   --source tests/fixtures/dashboard-control-center.json \
   --base-url http://127.0.0.1:5173/ \
   --output "$manifest"
 
+"$ROOT/tools/dashboard-browser-debug-manifest" \
+  --source tests/fixtures/dashboard-control-center.json \
+  --base-url http://127.0.0.1:5173/ \
+  --output "$compat_manifest"
+
 DASHBOARD_REVIEW_TARGET_ID="renamed-control-center" \
 DASHBOARD_CONTROL_CENTER_BASE_URL="http://127.0.0.1:6199/" \
-  "$ROOT/tools/dashboard-browser-debug-manifest" \
+  "$ROOT/tools/dashboard-review-manifest" \
     --source tests/fixtures/dashboard-control-center.json \
     --output "$renamed_manifest"
 
@@ -82,6 +88,16 @@ function assertCondition(condition, message) {
 assertCondition(manifest.name === 'renamed-control-center', 'manifest target id must be configurable');
 assertCondition(manifest.baseUrl === 'http://127.0.0.1:6199/?menu_id=step_1_14', 'manifest base URL must be configurable from environment');
 assertCondition(manifest.appHints?.reviewGoal === 'renamed_control_center_review', 'review goal id must derive from the configured target id');
+NODE
+
+MANIFEST="$compat_manifest" node <<'NODE'
+const fs = require('node:fs');
+
+const manifest = JSON.parse(fs.readFileSync(process.env.MANIFEST, 'utf8'));
+if (manifest.schemaVersion !== '0.1.0') {
+  console.error('compat wrapper must generate the review manifest schema');
+  process.exit(1);
+}
 NODE
 
 printf 'dashboard review manifest test passed\n'
