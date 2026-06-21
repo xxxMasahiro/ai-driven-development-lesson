@@ -226,8 +226,8 @@ if (!data.source_files.includes('docs/workflow/MENU_PRODUCT_PROFILE_POLICY.tsv')
 if (!data.source_files.includes('docs/workflow/PRODUCT_GATE_EVIDENCE_SCHEMA.tsv')) {
   fail('source_files does not include product gate evidence schema');
 }
-if (!data.source_files.includes('tools/dashboard-browser-debug-manifest')) {
-  fail('source_files does not include dashboard Browser Debug manifest generator');
+if (!data.source_files.includes('tools/dashboard-review-manifest')) {
+  fail('source_files does not include dashboard review manifest generator');
 }
 if (!data.source_files.includes('tools/dashboard-design-system')) {
   fail('source_files does not include dashboard Design Studio generator');
@@ -896,7 +896,7 @@ if (browserDebug.tool.status !== 'manual_required') {
   fail(`browser_debug tool must require explicit configuration when no review CLI is selected, got ${browserDebug.tool.status}`);
 }
 if (producerRaw.includes('$HOME/projects/agent-toolbox/browser-debug-cli') || producerRaw.includes('agent-toolbox/browser-debug-cli')) {
-  fail('dashboard-data must not contain a built-in Browser Debug CLI repository URI');
+  fail('dashboard-data must not contain a built-in legacy review CLI repository URI');
 }
 function requireSafeDisplayCommand(command, label) {
   if (typeof command !== 'string' || command.length === 0) {
@@ -940,7 +940,7 @@ for (const [stageName, fields] of browserDebugStages) {
     fail(`browser_debug.${stageName} command must not hard-code the old repository id: ${stage.command}`);
   }
 }
-if (browserDebug.manifest.path !== 'tools/dashboard-browser-debug-manifest') {
+if (browserDebug.manifest.path !== 'tools/dashboard-review-manifest') {
   fail(`browser_debug manifest path must identify the lesson-owned generator: ${browserDebug.manifest.path}`);
 }
 requireSafeRelativeArtifact(browserDebug.review.artifact_index_path, 'browser_debug.review.artifact_index_path');

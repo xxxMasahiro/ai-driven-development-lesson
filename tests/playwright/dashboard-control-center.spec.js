@@ -1276,28 +1276,28 @@ function freeDevelopmentRepositoryFixture(baseFixture, repoName = "frame-cue") {
       },
       manifest: {
         status: "ready",
-        path: "tools/dashboard-browser-debug-manifest",
-        command: "tools/dashboard-browser-debug-manifest --output .tmp/dashboard-browser-debug-target.json",
+        path: "tools/dashboard-review-manifest",
+        command: "tools/dashboard-review-manifest --output .tmp/dashboard-review-target.json",
       },
       review: {
         status: "passed",
-        artifact_index_path: ".browser-debug/review-artifacts/dashboard-review-index.json",
-        command: "node product:bin/browser-debug.js review --target .tmp/dashboard-browser-debug-target.json --json",
+        artifact_index_path: ".dashboard-review/review-artifacts/dashboard-review-index.json",
+        command: "node product:bin/browser-debug.js review --target .tmp/dashboard-review-target.json --json",
       },
       agent_package: {
         status: "passed",
-        path: ".browser-debug/agent-packages/dashboard-review/packet.json",
-        command: "node product:bin/browser-debug.js agent package --review-index .browser-debug/review-artifacts/dashboard-review-index.json --surface local-subscription-agent --json",
+        path: ".dashboard-review/agent-packages/dashboard-review/packet.json",
+        command: "node product:bin/browser-debug.js agent package --review-index .dashboard-review/review-artifacts/dashboard-review-index.json --surface local-subscription-agent --json",
       },
       agent_result: {
         status: "manual_required",
         path: "not_collected",
-        command: "node product:bin/browser-debug.js agent ingest --package .browser-debug/agent-packages/dashboard-review/packet.json --input .browser-debug/agent-results/agent-advisory-result.json --json",
+        command: "node product:bin/browser-debug.js agent ingest --package .dashboard-review/agent-packages/dashboard-review/packet.json --input .dashboard-review/agent-results/agent-advisory-result.json --json",
       },
       agent_report: {
         status: "not_run",
         path: "not_collected",
-        command: "node product:bin/browser-debug.js agent report --review-index .browser-debug/review-artifacts/dashboard-review-index.json --agent-result .browser-debug/agent-results/agent-advisory-result.json --json",
+        command: "node product:bin/browser-debug.js agent report --review-index .dashboard-review/review-artifacts/dashboard-review-index.json --agent-result .dashboard-review/agent-results/agent-advisory-result.json --json",
       },
       boundary: {
         dashboard_executes_browser_debug: false,
@@ -1311,19 +1311,19 @@ function freeDevelopmentRepositoryFixture(baseFixture, repoName = "frame-cue") {
       ...data.maintenance.evidence_rows,
       {
         id: "browser_debug_agent_handoff",
-        label: "Browser Debug agent handoff",
+        label: "Review CLI agent handoff",
         importance: "optional",
         status: "manual_required",
-        reference: "tools/dashboard-browser-debug-manifest;.browser-debug/agent-packages;.browser-debug/agent-results",
+        reference: "tools/dashboard-review-manifest;.dashboard-review/agent-packages;.dashboard-review/agent-results",
         target: "Dashboard Control Center review handoff",
-        detail: "Confirms Browser Debug CLI review package, agent ingest, and report handoff state without executing provider APIs from the dashboard.",
-        required_command: "tools/dashboard-browser-debug-manifest --output .tmp/dashboard-browser-debug-target.json",
+        detail: "Confirms configured review CLI package, agent ingest, and report handoff state without executing provider APIs from the dashboard.",
+        required_command: "tools/dashboard-review-manifest --output .tmp/dashboard-review-target.json",
         source_role: "browser_debug",
         observed_at: "2026-06-05T00:02:30Z",
         impact: "",
         completion_condition: "",
         priority: "medium",
-        source_artifacts: "tools/dashboard-browser-debug-manifest;.browser-debug/review-artifacts;.browser-debug/agent-packages;.browser-debug/agent-results;.browser-debug/reports",
+        source_artifacts: "tools/dashboard-review-manifest;.dashboard-review/review-artifacts;.dashboard-review/agent-packages;.dashboard-review/agent-results;.dashboard-review/reports",
         unresolved_count: 0,
       },
     ];
@@ -2517,7 +2517,7 @@ test.describe("English dashboard control center", () => {
     await page.getByRole("navigation", { name: "Dashboard categories" }).getByRole("link", { name: "Maintenance Sync", exact: true }).click();
     const browserDebugPanel = page.locator("[data-browser-debug-handoff='true']");
     await expect(browserDebugPanel).toBeVisible();
-    await expect(browserDebugPanel).toContainText("Browser Debug agent handoff");
+    await expect(browserDebugPanel).toContainText("Review CLI agent handoff");
     await expect(browserDebugPanel).toContainText("Agent package");
     await expect(browserDebugPanel).toContainText("Command preview");
     await expect(browserDebugPanel).toContainText("node product:bin/browser-debug.js agent package");
