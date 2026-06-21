@@ -8,6 +8,7 @@ trap 'rm -rf "$TMP_DIR"' EXIT
 project_root="$TMP_DIR/projects"
 frame_repo="$project_root/frame-cue"
 browser_repo="$project_root/browser-debug-cli"
+trace_repo="$project_root/trace-cue"
 config="$TMP_DIR/LESSON_CONFIG.tsv"
 registry="$TMP_DIR/PRODUCT_REPOSITORY_REGISTRY.tsv"
 selection="$TMP_DIR/PRODUCT_REPOSITORY_SELECTION.tsv"
@@ -20,9 +21,20 @@ git -C "$browser_repo" init -q
 mkdir -p "$browser_repo/docs/product" "$browser_repo/docs/workflow" "$browser_repo/docs/memory" "$browser_repo/docs/design-system"
 mkdir -p "$browser_repo/ops" "$browser_repo/src" "$browser_repo/tests" "$browser_repo/skills/product-development-workflow"
 mkdir -p "$browser_repo/skills/product-doc-sync" "$browser_repo/skills/product-security" "$browser_repo/skills/product-test" "$browser_repo/skills/product-design-system"
-mkdir -p "$browser_repo/tools/lib" "$browser_repo/.github/workflows"
+mkdir -p "$browser_repo/bin" "$browser_repo/tools/lib" "$browser_repo/.github/workflows"
 printf '# Browser Debug CLI Agents\n' >"$browser_repo/AGENTS.MD"
 printf '# Browser Debug CLI\n' >"$browser_repo/README.md"
+printf '#!/usr/bin/env node\n' >"$browser_repo/bin/browser-debug.js"
+cat >"$browser_repo/package.json" <<'DOC'
+{
+  "name": "review-cli-fixture",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "review-cli-fixture": "./bin/browser-debug.js"
+  }
+}
+DOC
 cat >"$browser_repo/.gitignore" <<'DOC'
 .env
 .env.*
@@ -151,6 +163,18 @@ product_repo_root() {
 }
 DOC
 "$ROOT/tools/product-gate-evidence-bootstrap" install --repo "$browser_repo" --confirm >/dev/null
+/bin/cp -a "$browser_repo" "$trace_repo"
+printf '#!/usr/bin/env node\n' >"$trace_repo/bin/trace-cue.js"
+cat >"$trace_repo/package.json" <<'DOC'
+{
+  "name": "trace-cue-fixture",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "trace-cue-fixture": "./bin/trace-cue.js"
+  }
+}
+DOC
 
 mutation_registry="$TMP_DIR/PRODUCT_REPOSITORY_REGISTRY_MUTATION.tsv"
 mutation_selection="$TMP_DIR/PRODUCT_REPOSITORY_SELECTION_MUTATION.tsv"
@@ -324,6 +348,64 @@ for (const option of selection.options) {
 }
 if (JSON.stringify(selection).includes('/projects/') || JSON.stringify(selection).includes('task-tracker-repository')) {
   fail('repository_selection must not leak raw paths or legacy fallback repository names');
+}
+const browserDebug = data.browser_debug;
+if (!browserDebug || browserDebug.selected_cli_repository !== 'browser-debug-cli') {
+  fail(`browser_debug handoff must come from the explicitly selected repository id: ${JSON.stringify(browserDebug)}`);
+}
+if (browserDebug.tool.status !== 'ready') {
+  fail(`browser_debug tool must be ready for a selected CLI repository, got ${browserDebug.tool.status}`);
+}
+for (const stage of ['tool', 'review', 'agent_package', 'agent_result', 'agent_report']) {
+  const command = String(browserDebug[stage]?.command || '');
+  if (!command.startsWith('node product:bin/browser-debug.js')) {
+    fail(`browser_debug ${stage} command must use a product-scoped command preview: ${command}`);
+  }
+  if (command.includes('browser-debug-cli:') || command.includes('/projects/')) {
+    fail(`browser_debug ${stage} command must not hard-code a repository id or local path: ${command}`);
+  }
+}
+NODE
+
+trace_registry="$TMP_DIR/PRODUCT_REPOSITORY_REGISTRY_TRACE.tsv"
+trace_selection="$TMP_DIR/PRODUCT_REPOSITORY_SELECTION_TRACE.tsv"
+trace_json="$TMP_DIR/dashboard-data-trace-cue.json"
+cat >"$trace_registry" <<DOC
+# repo_id	primary_menu_id	allowed_contexts	display_name	repository_path	product_type	source
+trace-cue	free-development	free-development	Trace Cue	$trace_repo	cli	test
+DOC
+cat >"$trace_selection" <<'DOC'
+# menu_id	repo_id	selected_at	selection_source
+free-development	trace-cue	2026-06-17T00:00:00Z	test
+DOC
+DASHBOARD_DATA_GENERATED_AT="2026-06-17T00:00:00Z" \
+  DASHBOARD_LIVE_STATUS=0 \
+  DASHBOARD_SELECTED_MENU_ID="free-development" \
+  DASHBOARD_LESSON14_CONFIG="$config" \
+  PRODUCT_REPOSITORY_REGISTRY_FILE="$trace_registry" \
+  PRODUCT_REPOSITORY_SELECTION_FILE="$trace_selection" \
+  PRODUCT_REPOSITORY_AUTHORITY_NOW="2026-06-17T00:30:00Z" \
+  "$ROOT/tools/dashboard-data" >"$trace_json"
+node - "$trace_json" <<'NODE'
+const fs = require('fs');
+const data = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
+function fail(message) {
+  console.error(message);
+  process.exit(1);
+}
+const browserDebug = data.browser_debug;
+if (!browserDebug || browserDebug.selected_cli_repository !== 'trace-cue') {
+  fail(`browser_debug must support renamed review CLI repository ids, got ${JSON.stringify(browserDebug)}`);
+}
+if (browserDebug.tool.status !== 'ready') {
+  fail(`renamed review CLI repository must be ready, got ${browserDebug.tool.status}`);
+}
+const serialized = JSON.stringify(browserDebug);
+if (!serialized.includes('node product:bin/trace-cue.js')) {
+  fail(`renamed review CLI handoff must use the renamed package bin entrypoint: ${serialized}`);
+}
+if (serialized.includes('browser-debug-cli:') || serialized.includes('/projects/agent-toolbox/browser-debug-cli')) {
+  fail('renamed review CLI handoff must not rely on the old repository id or URI');
 }
 NODE
 

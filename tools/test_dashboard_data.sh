@@ -80,6 +80,12 @@ export GIT_WORKFLOW_SETTINGS_FILE="$TEST_GIT_SETTINGS"
 export PRODUCT_REPOSITORY_REGISTRY_FILE="$TEST_PRODUCT_REGISTRY"
 export PRODUCT_REPOSITORY_SELECTION_FILE="$TEST_PRODUCT_SELECTION"
 export DASHBOARD_LIVE_STATUS=0
+unset DASHBOARD_REVIEW_CLI_ROOT
+unset TRACE_CUE_ROOT
+unset DASHBOARD_BROWSER_DEBUG_CLI_ROOT
+unset DASHBOARD_REVIEW_CLI_ENTRYPOINT
+unset TRACE_CUE_CLI_ENTRYPOINT
+unset DASHBOARD_BROWSER_DEBUG_CLI_ENTRYPOINT
 unset LESSON_CONFIG
 
 JSON_FILE="$TMP_DIR/dashboard-data.json"
@@ -880,8 +886,17 @@ if (!allowedStates.has(browserDebug.status)) {
 if (browserDebug.target !== 'Dashboard Control Center') {
   fail(`browser_debug target must be Dashboard Control Center, got ${browserDebug.target}`);
 }
-if (!['browser-debug-cli', 'not_selected'].includes(browserDebug.selected_cli_repository)) {
+if (!/^(not_selected|[A-Za-z0-9._-]{1,120})$/.test(String(browserDebug.selected_cli_repository || ''))) {
   fail(`browser_debug selected CLI repository is invalid: ${browserDebug.selected_cli_repository}`);
+}
+if (browserDebug.selected_cli_repository !== 'not_selected') {
+  fail(`browser_debug must not discover an unconfigured review CLI from a built-in path: ${browserDebug.selected_cli_repository}`);
+}
+if (browserDebug.tool.status !== 'manual_required') {
+  fail(`browser_debug tool must require explicit configuration when no review CLI is selected, got ${browserDebug.tool.status}`);
+}
+if (producerRaw.includes('$HOME/projects/agent-toolbox/browser-debug-cli') || producerRaw.includes('agent-toolbox/browser-debug-cli')) {
+  fail('dashboard-data must not contain a built-in Browser Debug CLI repository URI');
 }
 function requireSafeDisplayCommand(command, label) {
   if (typeof command !== 'string' || command.length === 0) {
@@ -921,6 +936,9 @@ for (const [stageName, fields] of browserDebugStages) {
     fail(`invalid browser_debug.${stageName}.status: ${stage.status}`);
   }
   requireSafeDisplayCommand(stage.command, `browser_debug.${stageName}`);
+  if (String(stage.command).includes('browser-debug-cli:')) {
+    fail(`browser_debug.${stageName} command must not hard-code the old repository id: ${stage.command}`);
+  }
 }
 if (browserDebug.manifest.path !== 'tools/dashboard-browser-debug-manifest') {
   fail(`browser_debug manifest path must identify the lesson-owned generator: ${browserDebug.manifest.path}`);

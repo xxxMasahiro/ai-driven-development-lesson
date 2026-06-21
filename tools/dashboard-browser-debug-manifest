@@ -1,11 +1,10 @@
 #!/usr/bin/env node
 import { spawnSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { basename, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const DEFAULT_BASE_URL = 'http://127.0.0.1:5173/';
 const SCHEMA_VERSION = '0.1.0';
 
 function usage() {
@@ -13,14 +12,15 @@ function usage() {
     'Usage:',
     '  ./tools/dashboard-browser-debug-manifest [--base-url <url>] [--source <json-file>] [--output <json-file>]',
     '',
-    'Build a Browser Debug CLI target manifest for Dashboard Control Center content UX review.',
-    'The generated manifest keeps lesson-specific Control Center semantics in this repository and passes bounded inline sourceData to Browser Debug CLI.'
+    'Build a review-CLI target manifest for Dashboard Control Center content UX review.',
+    'The generated manifest keeps lesson-specific Control Center semantics in this repository and passes bounded inline sourceData to the configured review CLI.',
+    'The base URL can be supplied with --base-url or DASHBOARD_CONTROL_CENTER_BASE_URL.'
   ].join('\n');
 }
 
 function parseArgs(argv) {
   const options = {
-    baseUrl: DEFAULT_BASE_URL,
+    baseUrl: defaultBaseUrl(),
     source: null,
     output: null
   };
@@ -39,6 +39,34 @@ function parseArgs(argv) {
     }
   }
   return options;
+}
+
+function defaultBaseUrl() {
+  return process.env.DASHBOARD_CONTROL_CENTER_BASE_URL
+    || process.env.DASHBOARD_REVIEW_BASE_URL
+    || process.env.VITE_DEV_SERVER_URL
+    || 'http://127.0.0.1:5173/';
+}
+
+function safeIdentifier(value, fallback = 'dashboard-control-center') {
+  const text = safeText(value, fallback, 160)
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  return text || fallback;
+}
+
+function manifestTargetName() {
+  return safeIdentifier(
+    process.env.DASHBOARD_REVIEW_TARGET_ID || `${basename(ROOT)}-dashboard-control-center`
+  );
+}
+
+function reviewGoalId() {
+  return safeIdentifier(
+    process.env.DASHBOARD_REVIEW_GOAL_ID || `${manifestTargetName()}-review`,
+    'dashboard-control-center-review'
+  ).replace(/[-.]/g, '_');
 }
 
 function requireValue(argv, index, flag) {
@@ -241,7 +269,7 @@ function buildManifest({ baseUrl, data }) {
 
   return {
     schemaVersion: SCHEMA_VERSION,
-    name: 'ai-driven-development-lesson-dashboard-control-center',
+    name: manifestTargetName(),
     baseUrl: normalizedBaseUrl,
     scope: {
       sameOrigin: true,
@@ -413,11 +441,11 @@ function buildManifest({ baseUrl, data }) {
     masks: [],
     regions: [],
     appHints: {
-      reviewGoal: 'ai_driven_development_lesson_control_center_review',
+      reviewGoal: reviewGoalId(),
       notes: [
-        'This manifest is owned by ai-driven-development-lesson, not Browser Debug CLI core.',
+        'This manifest is owned by the current lesson repository, not by the external review CLI core.',
         'Dashboard-specific workflow, Git, CI, blocker, repository-selection, and next-safe-action semantics are intentionally declared here as target-owned sourceData and rubric.',
-        'Browser Debug CLI should consume this as a generic target manifest without adding runtime branches for this repository.'
+        'The configured review CLI should consume this as a generic target manifest without adding runtime branches for this repository.'
       ]
     }
   };

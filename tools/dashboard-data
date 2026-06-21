@@ -311,19 +311,145 @@ dashboard_first_relative_artifact() {
   return 1
 }
 
-dashboard_browser_debug_cli_root() {
+dashboard_review_cli_safe_entrypoint() {
+  local entry="$1"
+  entry="${entry#./}"
+  case "$entry" in
+    ""|/*|*"/../"*|*"../"*|*".."|*".//"*|*[[:space:]]*|*[\;\&\|\`\$\<\>\\]*)
+      return 1
+      ;;
+  esac
+  printf '%s' "$entry"
+}
+
+dashboard_review_cli_env_entrypoint() {
+  local entry
+  for entry in \
+    "${DASHBOARD_REVIEW_CLI_ENTRYPOINT:-}" \
+    "${TRACE_CUE_CLI_ENTRYPOINT:-}" \
+    "${DASHBOARD_BROWSER_DEBUG_CLI_ENTRYPOINT:-}"; do
+    [[ -n "$entry" ]] || continue
+    dashboard_review_cli_safe_entrypoint "$entry" && return 0
+  done
+  return 1
+}
+
+dashboard_review_cli_package_entrypoint() {
+  local cli_root="$1"
+  [[ -f "$cli_root/package.json" ]] || return 1
+  DASHBOARD_REVIEW_CLI_PACKAGE_JSON="$cli_root/package.json" \
+  DASHBOARD_REVIEW_CLI_BIN_NAMES="${DASHBOARD_REVIEW_CLI_BIN:-${TRACE_CUE_BIN:-${DASHBOARD_BROWSER_DEBUG_CLI_BIN:-}}}" \
+    node <<'NODE'
+const fs = require("node:fs");
+
+const file = process.env.DASHBOARD_REVIEW_CLI_PACKAGE_JSON || "";
+const requested = String(process.env.DASHBOARD_REVIEW_CLI_BIN_NAMES || "")
+  .split(/[,\s|]+/)
+  .map((item) => item.trim())
+  .filter(Boolean);
+
+let data;
+try {
+  data = JSON.parse(fs.readFileSync(file, "utf8"));
+} catch {
+  process.exit(1);
+}
+
+const bin = data && data.bin;
+if (typeof bin === "string") {
+  console.log(bin);
+  process.exit(0);
+}
+if (!bin || typeof bin !== "object" || Array.isArray(bin)) {
+  process.exit(1);
+}
+
+const candidates = [];
+for (const item of requested) {
+  candidates.push(item);
+}
+if (typeof data.name === "string" && data.name.trim()) {
+  candidates.push(data.name.trim());
+}
+for (const item of Object.keys(bin)) {
+  candidates.push(item);
+}
+
+for (const item of candidates) {
+  if (typeof bin[item] === "string" && bin[item].trim()) {
+    console.log(bin[item]);
+    process.exit(0);
+  }
+}
+process.exit(1);
+NODE
+}
+
+dashboard_review_cli_entrypoint_for_root() {
+  local cli_root="$1"
+  local entry
+  entry="$(dashboard_review_cli_env_entrypoint 2>/dev/null || true)"
+  if [[ -n "$entry" && -f "$cli_root/$entry" ]]; then
+    printf '%s' "$entry"
+    return 0
+  fi
+  entry="$(dashboard_review_cli_package_entrypoint "$cli_root" 2>/dev/null || true)"
+  entry="$(dashboard_review_cli_safe_entrypoint "$entry" 2>/dev/null || true)"
+  if [[ -n "$entry" && -f "$cli_root/$entry" ]]; then
+    printf '%s' "$entry"
+    return 0
+  fi
+  return 1
+}
+
+dashboard_review_cli_root() {
   local repo candidate
-  for candidate in "${DASHBOARD_BROWSER_DEBUG_CLI_ROOT:-}" "$HOME/projects/agent-toolbox/browser-debug-cli"; do
+  for candidate in \
+    "${DASHBOARD_REVIEW_CLI_ROOT:-}" \
+    "${TRACE_CUE_ROOT:-}" \
+    "${DASHBOARD_BROWSER_DEBUG_CLI_ROOT:-}"; do
     [[ -n "$candidate" ]] || continue
     candidate="$(lesson_expand_path "$candidate")"
-    if [[ -d "$candidate" && -f "$candidate/bin/browser-debug.js" ]]; then
+    if [[ -d "$candidate" ]] && dashboard_review_cli_entrypoint_for_root "$candidate" >/dev/null; then
       printf '%s' "$candidate"
       return 0
     fi
   done
   repo="$(dashboard_target_repository_root "free-development" 2>/dev/null || true)"
-  [[ -n "$repo" && -f "$repo/bin/browser-debug.js" ]] || return 1
+  [[ -n "$repo" ]] || return 1
+  dashboard_review_cli_entrypoint_for_root "$repo" >/dev/null || return 1
   printf '%s' "$repo"
+}
+
+dashboard_review_cli_repository_id() {
+  local cli_root="$1"
+  local selected_id selected_root fallback_id
+  [[ -n "$cli_root" ]] || {
+    printf 'not_selected'
+    return 0
+  }
+  selected_id="$(product_repository_registry_id_for_menu "free-development" 2>/dev/null || true)"
+  if [[ -n "$selected_id" ]]; then
+    selected_root="$(product_repository_registry_root_for_id "$selected_id" 2>/dev/null || true)"
+    if [[ "$selected_root" == "$cli_root" ]]; then
+      printf '%s' "$selected_id"
+      return 0
+    fi
+  fi
+  fallback_id="$(basename "$cli_root" | tr -c 'A-Za-z0-9._-' '-' | sed 's/^-*//; s/-*$//')"
+  printf '%s' "${fallback_id:-configured-review-cli}"
+}
+
+dashboard_review_cli_command_prefix() {
+  local cli_root entry
+  cli_root="$(dashboard_review_cli_root 2>/dev/null || true)"
+  if [[ -n "$cli_root" ]]; then
+    entry="$(dashboard_review_cli_entrypoint_for_root "$cli_root" 2>/dev/null || true)"
+  else
+    entry="$(dashboard_review_cli_env_entrypoint 2>/dev/null || true)"
+  fi
+  entry="${entry:-configured-review-cli}"
+  printf 'node product:%s' "$entry"
 }
 
 dashboard_artifact_status() {
@@ -333,12 +459,13 @@ dashboard_artifact_status() {
 
 dashboard_browser_debug_status_json() {
   local cli_root cli_status cli_repo manifest_status latest_review latest_package latest_result latest_report
-  local review_status package_status result_status report_status overall_status review_ref package_ref result_ref
+  local review_status package_status result_status report_status overall_status review_ref package_ref result_ref command_prefix
 
-  cli_root="$(dashboard_browser_debug_cli_root 2>/dev/null || true)"
+  cli_root="$(dashboard_review_cli_root 2>/dev/null || true)"
+  command_prefix="$(dashboard_review_cli_command_prefix 2>/dev/null || printf 'node product:configured-review-cli')"
   if [[ -n "$cli_root" ]]; then
     cli_status="ready"
-    cli_repo="browser-debug-cli"
+    cli_repo="$(dashboard_review_cli_repository_id "$cli_root")"
   else
     cli_status="manual_required"
     cli_repo="not_selected"
@@ -382,8 +509,8 @@ dashboard_browser_debug_status_json() {
     "selected_cli_repository" "$(dashboard_json_string "$cli_repo")" \
     "tool" "$(dashboard_json_raw_object \
       "status" "$(dashboard_json_string "$cli_status")" \
-      "command" "$(dashboard_json_string "node browser-debug-cli:bin/browser-debug.js")" \
-      "source" "$(dashboard_json_string "external_read_only_tool")")" \
+      "command" "$(dashboard_json_string "$command_prefix")" \
+      "source" "$(dashboard_json_string "configured_or_selected_external_tool")")" \
     "manifest" "$(dashboard_json_raw_object \
       "status" "$(dashboard_json_string "$manifest_status")" \
       "path" "$(dashboard_json_string "tools/dashboard-browser-debug-manifest")" \
@@ -391,19 +518,19 @@ dashboard_browser_debug_status_json() {
     "review" "$(dashboard_json_raw_object \
       "status" "$(dashboard_json_string "$review_status")" \
       "artifact_index_path" "$(dashboard_json_string "${latest_review:-not_collected}")" \
-      "command" "$(dashboard_json_string "node browser-debug-cli:bin/browser-debug.js review --target .tmp/dashboard-browser-debug-target.json --json")")" \
+      "command" "$(dashboard_json_string "$command_prefix review --target .tmp/dashboard-browser-debug-target.json --json")")" \
     "agent_package" "$(dashboard_json_raw_object \
       "status" "$(dashboard_json_string "$package_status")" \
       "path" "$(dashboard_json_string "${latest_package:-not_collected}")" \
-      "command" "$(dashboard_json_string "node browser-debug-cli:bin/browser-debug.js agent package --review-index $review_ref --surface local-subscription-agent --json")")" \
+      "command" "$(dashboard_json_string "$command_prefix agent package --review-index $review_ref --surface local-subscription-agent --json")")" \
     "agent_result" "$(dashboard_json_raw_object \
       "status" "$(dashboard_json_string "$result_status")" \
       "path" "$(dashboard_json_string "${latest_result:-not_collected}")" \
-      "command" "$(dashboard_json_string "node browser-debug-cli:bin/browser-debug.js agent ingest --package $package_ref --input $result_ref --json")")" \
+      "command" "$(dashboard_json_string "$command_prefix agent ingest --package $package_ref --input $result_ref --json")")" \
     "agent_report" "$(dashboard_json_raw_object \
       "status" "$(dashboard_json_string "$report_status")" \
       "path" "$(dashboard_json_string "${latest_report:-not_collected}")" \
-      "command" "$(dashboard_json_string "node browser-debug-cli:bin/browser-debug.js agent report --review-index $review_ref --agent-result $result_ref --json")")" \
+      "command" "$(dashboard_json_string "$command_prefix agent report --review-index $review_ref --agent-result $result_ref --json")")" \
     "boundary" "$(dashboard_json_raw_object \
       "dashboard_executes_browser_debug" "$(dashboard_json_bool false)" \
       "external_upload" "$(dashboard_json_bool false)" \
