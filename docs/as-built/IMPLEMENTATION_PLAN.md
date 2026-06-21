@@ -5107,3 +5107,34 @@ Implemented order:
 8. Added focused core/MCP tests and kept broader dashboard verification to changed owner layers.
 
 Stop and ask before provider dispatch, credentials, automatic apply, image generation, external product writes, Browser Debug CLI edits, dashboard-triggered Git/CI mutations, push, merge, cleanup, or gate weakening.
+
+## Dashboard Control Center Contextual Repair Implementation Plan
+
+SYNC-ID: dashboard_control_center_contextual_repair
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/DASHBOARD_DATA_SCHEMA.tsv,docs/design-system/dashboard-control-center/DESIGN_SYSTEM.md,docs/design-system/dashboard-control-center/tokens.json,docs/design-system/dashboard-control-center/components.json,tools/dashboard-design-system,tools/dashboard-data,vite.config.mjs,dashboard-control-center/src/App.jsx,dashboard-control-center/src/dashboardContext.js,dashboard-control-center/src/dashboardData.js,dashboard-control-center/src/displayDepth.js,dashboard-control-center/src/i18n.js,dashboard-control-center/src/styles.css,dashboard-control-center/src/design-system.generated.css,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_schema.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/test_dashboard_data_product_repository_selection.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/check_dashboard_design_system.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+Planned order:
+
+1. Use xhigh sub-agent findings plus AGENTS and repository-development-workflow guidance to confirm scope, dirty worktree ownership, and non-scope boundaries.
+2. Repair context scoping first: initial menu fetch, selected-menu snapshot matching, evidence-backed page gating, and stale detail prevention.
+3. Repair repository selection around stable `repo_id`, current selection, and multiple configured product repositories.
+4. Repair document brief and schema scoping so task tracker, handoff, requirements, specification, and implementation plan summaries belong to the selected menu/repository role.
+5. Add or normalize AI-agent assignment and operation-event fields as safe observation metadata for dashboard display and CLI/MCP parity.
+6. Convert raw status codes into localized meaning, cause, and next safe action for non-engineer and junior/intermediate engineer views.
+7. Redesign the current work board data binding so Git/worktree, tests, CI, blockers, and task/handoff progress change with live evidence.
+8. Clean page-level decision summaries to remove duplicated generic headings and keep evidence-specific pages useful.
+9. Reapply menu icon color and spacing consistency through the design system source and generated runtime artifacts.
+10. Update focused schema, dashboard-data, i18n, and Playwright contracts for the repaired behavior.
+11. Run a read-only Browser Debug CLI or TraceCue final review against the dashboard without editing external review tool repositories.
+
+Verification plan:
+
+- Start with schema/data/i18n checks for producer and live-status contracts.
+- Run focused Dashboard Control Center browser tests after UI changes.
+- Run design-system check when design tokens/components or generated assets change.
+- Run as-built, workflow-pair, and repository-development workflow checks before promoting this sync ID to implemented.
+- Use Browser Debug CLI or TraceCue only for read-only final visual/content review artifacts.
+
+Stop and ask before provider dispatch, credentials, automatic apply, image generation, external product writes, Browser Debug CLI or TraceCue source edits, dashboard-triggered Git/CI mutations, dependency changes, push, merge, cleanup, or gate weakening.

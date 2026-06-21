@@ -2668,3 +2668,30 @@ Acceptance requirements:
 Non-scope:
 
 - Do not implement provider API dispatch, automatic apply, image generation, Browser Debug CLI source edits, credential storage, external product writes, dashboard-triggered Git/CI mutations, push, merge, cleanup, or any gate weakening.
+
+## Dashboard Control Center Contextual Repair Requirements
+
+SYNC-ID: dashboard_control_center_contextual_repair
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/DASHBOARD_DATA_SCHEMA.tsv,docs/design-system/dashboard-control-center/DESIGN_SYSTEM.md,docs/design-system/dashboard-control-center/tokens.json,docs/design-system/dashboard-control-center/components.json,tools/dashboard-design-system,tools/dashboard-data,vite.config.mjs,dashboard-control-center/src/App.jsx,dashboard-control-center/src/dashboardContext.js,dashboard-control-center/src/dashboardData.js,dashboard-control-center/src/displayDepth.js,dashboard-control-center/src/i18n.js,dashboard-control-center/src/styles.css,dashboard-control-center/src/design-system.generated.css,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_schema.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/test_dashboard_data_product_repository_selection.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/check_dashboard_design_system.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+The Control Center must recover from the observed regression where menu pages, repository selection, document briefs, live Git/test/CI status, and audience-specific summaries can show stale or wrong-context information.
+It must be useful as a control tower without hard-coded product names, repository names, URLs, file paths, thresholds, or tool identities.
+
+Acceptance requirements:
+
+- Initial URL, stored menu selection, and menu switching must request a producer-owned snapshot for the selected menu before evidence-backed pages render.
+- Detail pages must not reuse task-tracker, lesson, or another product repository evidence when a different menu or repository is selected.
+- Free Development and other product workflows must expose all configured candidate repositories and keep the current selection keyed by stable repository id.
+- Document briefs must be scoped by menu and repository role so task tracker, handoff, requirements, specification, and implementation plan summaries come from the selected context.
+- The Overview must prioritize current work, blockers, Git/worktree, local tests, CI, and next safe action using live evidence and task/handoff context instead of generic readiness labels.
+- Non-engineer and junior/intermediate engineer display modes must show different wording and detail density while sharing one underlying evidence model.
+- Status codes such as `manual_required`, `not_collected`, `optional`, and `unknown` must be translated into useful meaning, cause, and next action before they reach user-facing cards.
+- Dashboard menu icon color and card spacing changes must use the design system source of truth and generated runtime artifacts.
+- CLI and MCP evidence fields must remain safe and near-equivalent for observation, proposal, and review handoff while preserving explicit blocked boundaries for provider dispatch, image generation, automatic apply, external product writes, and dashboard-triggered Git/CI mutations.
+- Browser Debug CLI or TraceCue review is read-only from this repository; external review tool source files are not edited.
+
+Non-scope:
+
+- Do not implement provider API dispatch, automatic apply, image generation, external product writes, Browser Debug CLI or TraceCue source edits, credential storage, dependency changes, dashboard-triggered Git/CI mutation, push, merge, cleanup, or gate weakening.

@@ -92,7 +92,7 @@ import {
   selectedContextData,
   unavailableContextNotice,
 } from "./dashboardContext.js";
-import { DetailDecisionSummary, ProducerDecisionSummary } from "./DecisionSummary.jsx";
+import { DetailDecisionSummary } from "./DecisionSummary.jsx";
 import { dashboardControlCenterDesignSystem } from "./design-system.generated.js";
 import { displayDepthPolicyForData } from "./displayDepth.js";
 import { createTranslator, formatDateTime, formatRelativeAge, getDashboardIntlLocale, getDashboardLocaleDirection, resolveLocale } from "./i18n.js";
@@ -156,7 +156,7 @@ const supportNavigation = [
 ];
 
 const allNavigation = [...navigation, ...repositoryNavigation, ...supportNavigation];
-const evidenceBackedViews = new Set(["workflow", "maintenance", "safety", "repository-info", "documents", "design-studio", "help", "history"]);
+const evidenceBackedViews = new Set(["workflow", "maintenance", "safety", "repository-info", "documents", "settings", "design-studio", "help", "history"]);
 const SETTINGS_APPLY_FEEDBACK_DELAY_MS = 350;
 const SETTINGS_APPLY_FEEDBACK_AUTO_CLOSE_MS = 1200;
 const SETTINGS_APPLY_FEEDBACK_TIMEOUT_MS = 8000;
@@ -701,9 +701,14 @@ function liveStatusForContext(liveStatus, context) {
   if (!contextMenuId || liveMenuId !== contextMenuId) {
     return null;
   }
+  const contextRepositoryId = displayText(context.target_repository?.repo_id, "");
+  const liveRepositoryId = displayText(liveStatus.target_repository?.repo_id, "");
+  if (contextRepositoryId && liveRepositoryId && contextRepositoryId !== liveRepositoryId) {
+    return null;
+  }
   const contextRepository = selectedContextRepositoryName(context);
   const liveRepository = displayText(liveStatus.target_repository?.name, "");
-  if (contextRepository && liveRepository && contextRepository !== liveRepository) {
+  if (!contextRepositoryId && !liveRepositoryId && contextRepository && liveRepository && contextRepository !== liveRepository) {
     return null;
   }
   return liveStatus;
@@ -743,14 +748,37 @@ function overviewLiveLocalizedText(value, t) {
   }
   const map = {
     "No remote branch is configured for synchronization.": "overview.liveText.gitNoRemoteBranch",
+    "No upstream branch is configured for remote sync.": "overview.liveText.gitNoRemoteBranch",
     "Open workflow details to inspect commit, push, upstream, and local/remote sync state.": "overview.liveText.gitOpenWorkflowAction",
     "No local file changes are waiting for commit.": "overview.liveText.gitNoLocalChanges",
+    "Commit readiness has not been confirmed.": "overview.liveText.gitCommitReadinessUnknown",
     "Remote branch setup is not required for this mode.": "overview.liveText.gitRemoteNotRequired",
+    "Remote upstream is not required for this mode.": "overview.liveText.gitRemoteNotRequired",
+    "Remote branch setup is configured.": "overview.liveText.gitRemoteConfigured",
+    "Upstream branch is configured.": "overview.liveText.gitRemoteConfigured",
+    "Remote branch setup has not been confirmed.": "overview.liveText.gitRemoteUnknown",
     "Local/remote sync is not required for this mode.": "overview.liveText.gitLocalRemoteNotRequired",
+    "Remote synchronization is not required for this mode.": "overview.liveText.gitLocalRemoteNotRequired",
+    "Local/remote sync has not been confirmed.": "overview.liveText.gitLocalRemoteUnknown",
+    "Local and remote commit counts are aligned.": "overview.liveText.gitLocalRemoteSynced",
     "Git sync passed": "overview.liveText.gitSyncPassed",
+    "Git state not collected": "overview.liveText.gitStateNotCollected",
     "Inspect details when a workflow decision needs supporting evidence.": "overview.liveText.inspectDetailsWhenNeeded",
     "CI blocked": "overview.liveText.ciBlocked",
+    "CI needs manual review": "overview.liveText.ciNeedsReview",
+    "CI not run": "overview.liveText.ciNotRun",
+    "CI not collected": "overview.liveText.ciNotCollected",
     "No current CI run could be associated with the selected repository.": "overview.liveText.ciRunNotAssociated",
+    "Open workflow details to inspect the CI run, branch, and collection reason.": "overview.liveText.ciOpenWorkflowAction",
+    "Open workflow details to inspect local test and structure evidence.": "overview.liveText.localTestsOpenWorkflowAction",
+    "Local tests not collected": "overview.liveText.localTestsNotCollected",
+    "No local test evidence is available for the selected repository.": "overview.liveText.localTestsNoEvidence",
+    "Local test evidence is current for the selected repository.": "overview.liveText.localTestsCurrent",
+    "At least one local test or structure check needs review for the selected repository.": "overview.liveText.localTestsNeedsReview",
+    "Security evidence not collected": "overview.liveText.securityNotCollected",
+    "Safety evidence is current for the selected repository.": "overview.liveText.securityCurrent",
+    "Safety evidence has not been collected for the selected repository.": "overview.liveText.securityNoEvidence",
+    "Open safety details to inspect blockers, approvals, and dangerous-operation guards.": "overview.liveText.securityOpenSafetyAction",
     "Worktree evidence is older than the configured freshness window or product HEAD.": "overview.liveText.gitWorktreeStale",
     "Git synchronization evidence is older than the configured freshness window or product HEAD.": "overview.liveText.gitSyncStale",
     "Structure evidence is older than the configured freshness window or product HEAD.": "overview.liveText.structureStale",
@@ -770,6 +798,10 @@ function overviewLiveLocalizedText(value, t) {
     "Repair the top blocker first, then regenerate Dashboard data.": "overview.operationalText.repairTopBlocker",
     "Review Workflow, Safety, and Maintenance details before continuing.": "overview.operationalText.reviewWorkflowSafetyMaintenance",
     "Inspect the source ID, freshness, authority, and required command before treating this state as complete.": "overview.operationalText.inspectEngineeringEvidence",
+    "Choose the product stack, write the core documents, and record security assumptions before implementation.": "overview.operationalText.chooseProductStack",
+    "Current workflow state is understood before operational action.": "overview.operationalText.workflowStateUnderstood",
+    "Review the producer-owned context before acting.": "overview.operationalText.reviewProducerContext",
+    "Review current context status, evidence, blockers, and manual follow-ups before acting.": "overview.operationalText.reviewContextEvidence",
   };
   return map[text] ? t(map[text], text) : text;
 }
@@ -784,7 +816,7 @@ function overviewLiveCheckPoint(item, t) {
   return [
     summary,
     status,
-    sourceId ? `${sourcePresentationKey(sourceId, t)}: ${sourceId}` : "",
+    sourceId ? sourcePresentationKey(sourceId, t) : "",
     detailArtifactPath,
     nextCommand && nextCommand !== "not_applicable" ? nextCommand : "",
     observedAt ? `${t("overview.fact.lastChecked")}: ${observedAt}` : "",
@@ -803,8 +835,8 @@ function overviewLiveCheckModalDetail(id, title, liveStatus, context, check, t) 
     .filter(Boolean)
     .slice(0, 6);
   const sourceParts = [
-    sourceId ? `${sourcePresentationKey(sourceId, t)}: ${sourceId}` : "",
-    currentItemId && currentItemId !== sourceId ? currentItemId : "",
+    sourceId ? sourcePresentationKey(sourceId, t) : "",
+    currentItemId && currentItemId !== sourceId ? sourcePresentationKey(currentItemId, t) : "",
     detailArtifactPath,
     requiredCommand && requiredCommand !== "not_applicable" ? requiredCommand : "",
     `${t("overview.fact.lastChecked")}: ${observedAt}`,
@@ -950,6 +982,19 @@ function overviewLiveLocalTestCurrent(check, t) {
   return t("overview.current.localTestsMissing");
 }
 
+function overviewProgressEvidenceCard(data) {
+  return operationalProgressBriefCard(data, ["handoff", "handOff", "hand-off"])
+    || operationalProgressBriefCard(data, ["taskTracker", "task-tracker", "task_tracker"]);
+}
+
+function overviewProgressEvidenceDetail(data, t) {
+  const card = overviewProgressEvidenceCard(data);
+  if (!card) {
+    return "";
+  }
+  return documentBriefSummary(card, t, operationalProgressLocale(data));
+}
+
 function overviewLiveLocalTestDetail(liveStatus, context, check, t) {
   const observedAt = liveStatusObservedTime(check?.observed_at);
   if (observedAt) {
@@ -958,15 +1003,39 @@ function overviewLiveLocalTestDetail(liveStatus, context, check, t) {
   return `${overviewLiveTargetDetail(liveStatus, context, t)} / ${t("overview.fact.missing")}: ${t("overview.fact.localTestEvidence")}`;
 }
 
+function overviewLiveGitWorkingState(liveStatus, check = {}) {
+  const repositoryState = liveStatus?.repository_state || {};
+  const dirtyCount = Number(check?.dirty_count ?? repositoryState.dirty_count ?? 0);
+  const untrackedCount = Number(check?.untracked_count ?? repositoryState.untracked_count ?? 0);
+  const ahead = Number(check?.ahead ?? repositoryState.ahead ?? 0);
+  const behind = Number(check?.behind ?? repositoryState.behind ?? 0);
+  return {
+    dirtyCount: Number.isFinite(dirtyCount) && dirtyCount > 0 ? dirtyCount : 0,
+    untrackedCount: Number.isFinite(untrackedCount) && untrackedCount > 0 ? untrackedCount : 0,
+    ahead: Number.isFinite(ahead) && ahead > 0 ? ahead : 0,
+    behind: Number.isFinite(behind) && behind > 0 ? behind : 0,
+  };
+}
+
+function overviewLiveGitHasWork(working) {
+  return Boolean(working.dirtyCount || working.untrackedCount || working.ahead || working.behind);
+}
+
 function overviewLiveGitCurrent(liveStatus, check, t) {
   const detailCode = displayText(check?.detail_code, "");
   const sourceId = displayText(check?.source_id || check?.current_item_id, "");
   const status = normalizeState(check?.status || "unknown");
-  const dirtyCount = Number(check?.dirty_count || liveStatus?.repository_state?.dirty_count || 0);
-  const untrackedCount = Number(check?.untracked_count || liveStatus?.repository_state?.untracked_count || 0);
-  const ahead = Number(check?.ahead || liveStatus?.repository_state?.ahead || 0);
-  const behind = Number(check?.behind || liveStatus?.repository_state?.behind || 0);
-  const localChangeCount = dirtyCount + untrackedCount;
+  const working = overviewLiveGitWorkingState(liveStatus, check);
+  const localChangeCount = working.dirtyCount + working.untrackedCount;
+  if (localChangeCount > 0) {
+    return `${t("overview.situation.gitWorkingChanges")} ${localChangeCount}`;
+  }
+  if (working.behind > 0) {
+    return `${t("overview.current.gitRemotePending")} ${working.behind}`;
+  }
+  if (working.ahead > 0) {
+    return `${t("overview.current.gitPushPending")} ${working.ahead}`;
+  }
   if (sourceId === "product.git.worktree" || detailCode === "git_uncommitted_changes" || detailCode.includes("worktree")) {
     if (localChangeCount > 0 || ["failed", "blocked"].includes(status)) {
       return localChangeCount > 0 ? `${t("overview.current.gitUncommitted")} ${localChangeCount}` : t("overview.current.gitUncommitted");
@@ -976,11 +1045,11 @@ function overviewLiveGitCurrent(liveStatus, check, t) {
     }
   }
   if (sourceId === "product.git.local_remote_sync" || detailCode === "git_push_pending" || detailCode === "git_remote_changes_pending" || detailCode.includes("local_remote")) {
-    if (behind > 0) {
-      return `${t("overview.current.gitRemotePending")} ${behind}`;
+    if (working.behind > 0) {
+      return `${t("overview.current.gitRemotePending")} ${working.behind}`;
     }
-    if (ahead > 0 || status === "manual_required") {
-      return ahead > 0 ? `${t("overview.current.gitPushPending")} ${ahead}` : t("overview.current.gitPushPending");
+    if (working.ahead > 0 || status === "manual_required") {
+      return working.ahead > 0 ? `${t("overview.current.gitPushPending")} ${working.ahead}` : t("overview.current.gitPushPending");
     }
     if (["passed", "ready"].includes(status)) {
       return t("overview.current.gitSynced");
@@ -1013,9 +1082,26 @@ function overviewLiveGitCurrent(liveStatus, check, t) {
 
 function overviewLiveGitDetail(liveStatus, context, check, t) {
   const branch = displayText(check?.branch || liveStatus?.repository_state?.branch, "");
+  const head = shortRevision(liveStatus?.repository_state?.head || check?.repository_head || "");
+  const working = overviewLiveGitWorkingState(liveStatus, check);
   const parts = [overviewLiveTargetDetail(liveStatus, context, t)];
   if (branch) {
     parts.push(`${t("overview.fact.branch")}: ${branch}`);
+  }
+  if (head) {
+    parts.push(`${t("overview.situation.head")}: ${head}`);
+  }
+  if (working.dirtyCount) {
+    parts.push(`${t("overview.situation.modified")}: ${working.dirtyCount}`);
+  }
+  if (working.untrackedCount) {
+    parts.push(`${t("overview.situation.untracked")}: ${working.untrackedCount}`);
+  }
+  if (working.ahead) {
+    parts.push(`${t("overview.situation.ahead")}: ${working.ahead}`);
+  }
+  if (working.behind) {
+    parts.push(`${t("overview.situation.behind")}: ${working.behind}`);
   }
   parts.push(`${t("overview.fact.lastChecked")}: ${liveStatusObservedTime(check?.observed_at || liveStatus?.generated_at) || t("overview.fact.noEvidence")}`);
   return parts.join(" / ");
@@ -1060,6 +1146,9 @@ function overviewLiveSecurityCurrent(check, t) {
   if (blockerCount > 0) {
     return `${t("overview.current.securityBlocked")} ${blockerCount}`;
   }
+  if (["unknown", "not_run", "not_collected"].includes(status)) {
+    return t("overview.current.securityNoVisibleBlockers");
+  }
   if (["ready", "passed", "cached"].includes(status)) {
     return t("overview.current.securityReady");
   }
@@ -1095,16 +1184,26 @@ function overviewPrimaryStatusCard(data, context, lessonMetric, t, liveStatus = 
   const activeLiveStatus = liveStatusForContext(liveStatus, context);
   const liveLocalTests = liveCheck(activeLiveStatus, "local_tests");
   if (liveLocalTests) {
-    const status = normalizeState(liveLocalTests.status || "not_run");
+    const runningChecks = runtimeOperationsForCategories(activeLiveStatus, ["test", "check", "build"]);
+    const progressEvidence = overviewProgressEvidenceCard(data);
+    const liveStatusValue = normalizeState(liveLocalTests.status || "not_run");
+    const status = runningChecks.length ? "manual_required" : progressEvidence && ["not_run", "unknown", "not_collected"].includes(liveStatusValue) ? "optional" : liveStatusValue;
+    const progressDetail = overviewProgressEvidenceDetail(data, t);
     return {
       id: "workflow",
       title: t("overview.status.localTests"),
       status,
-      value: overviewLiveLocalTestCurrent(liveLocalTests, t),
-      detail: overviewLiveLocalTestDetail(activeLiveStatus, context, liveLocalTests, t),
+      value: runningChecks.length
+        ? operationalPageOperationSummary(runningChecks, t)
+        : progressEvidence
+          ? t("overview.current.localTestsProgressRecord")
+          : overviewLiveLocalTestCurrent(liveLocalTests, t),
+      detail: runningChecks.length
+        ? `${overviewLiveTargetDetail(activeLiveStatus, context, t)} / ${t("overview.situation.runningCount")}: ${runningChecks.length} / ${t("overview.fact.lastChecked")}: ${liveStatusObservedTime(activeLiveStatus?.generated_at) || t("overview.fact.noEvidence")}`
+        : progressDetail || overviewLiveLocalTestDetail(activeLiveStatus, context, liveLocalTests, t),
       detailInfo: overviewLiveCheckModalDetail("local_tests", t("overview.status.localTests"), activeLiveStatus, context, liveLocalTests, t),
       detailHref: displayText(liveLocalTests.detail_page, "#workflow"),
-      chipLabel: statusLabelForChip(status, t),
+      chipLabel: runningChecks.length ? t("overview.progress.runningChip") : progressEvidence ? t("overview.progress.recordedChip") : statusLabelForChip(status, t),
     };
   }
   const productAuthority = data.development?.product_authority || {};
@@ -1154,7 +1253,9 @@ function overviewGitCard(data, context, t, liveStatus = null) {
   const activeLiveStatus = liveStatusForContext(liveStatus, context);
   const liveGit = liveCheck(activeLiveStatus, "git_sync");
   if (liveGit) {
-    const status = normalizeState(liveGit.status || context.git_status || "unknown");
+    const working = overviewLiveGitWorkingState(activeLiveStatus, liveGit);
+    const hasWork = overviewLiveGitHasWork(working);
+    const status = hasWork ? "optional" : normalizeState(liveGit.status || context.git_status || "unknown");
     return {
       id: "git",
       title: t("overview.status.git"),
@@ -1163,7 +1264,7 @@ function overviewGitCard(data, context, t, liveStatus = null) {
       detail: overviewLiveGitDetail(activeLiveStatus, context, liveGit, t),
       detailInfo: overviewLiveCheckModalDetail("git_sync", t("overview.status.git"), activeLiveStatus, context, liveGit, t),
       detailHref: displayText(liveGit.detail_page, "#workflow"),
-      chipLabel: statusLabelForChip(status, t),
+      chipLabel: hasWork ? t("overview.progress.workingChip") : statusLabelForChip(status, t),
     };
   }
   const facts = overviewGitFacts(data, t);
@@ -1363,7 +1464,9 @@ function overviewSecurityCard(data, context, t, liveStatus = null) {
   const activeLiveStatus = liveStatusForContext(liveStatus, context);
   const liveSecurity = liveCheck(activeLiveStatus, "security");
   if (liveSecurity) {
-    const status = normalizeState(liveSecurity.status || context.security_status || "unknown");
+    const blockerCount = Number(liveSecurity.blocker_count || 0);
+    const rawStatus = normalizeState(liveSecurity.status || context.security_status || "unknown");
+    const status = blockerCount === 0 && ["unknown", "not_run", "not_collected"].includes(rawStatus) ? "optional" : rawStatus;
     return {
       id: "security",
       title: t("overview.status.security"),
@@ -1372,7 +1475,7 @@ function overviewSecurityCard(data, context, t, liveStatus = null) {
       detail: overviewLiveSecurityDetail(activeLiveStatus, context, liveSecurity, t),
       detailInfo: overviewLiveCheckModalDetail("security", t("overview.status.security"), activeLiveStatus, context, liveSecurity, t),
       detailHref: displayText(liveSecurity.detail_page, "#safety"),
-      chipLabel: statusLabelForChip(status, t),
+      chipLabel: blockerCount === 0 ? t("overview.progress.noBlockerChip") : statusLabelForChip(status, t),
     };
   }
   const approvals = asArray(data.security?.approvals);
@@ -1445,9 +1548,14 @@ function situationLiveStatusForContext(liveStatus, context) {
   if (contextMenuId && liveMenuId && liveMenuId !== contextMenuId) {
     return null;
   }
+  const contextRepositoryId = displayText(context.target_repository?.repo_id, "");
+  const liveRepositoryId = displayText(liveStatus.target_repository?.repo_id, "");
+  if (contextRepositoryId && liveRepositoryId && liveRepositoryId !== contextRepositoryId) {
+    return null;
+  }
   const contextRepository = selectedContextRepositoryName(context);
   const liveRepository = displayText(liveStatus.target_repository?.name, "");
-  if (contextRepository && liveRepository && contextRepository !== liveRepository) {
+  if (!contextRepositoryId && !liveRepositoryId && contextRepository && liveRepository && contextRepository !== liveRepository) {
     return null;
   }
   return liveStatus;
@@ -1499,24 +1607,140 @@ function situationWorstStatus(statuses, fallback = "ready") {
 
 function situationRepositoryState(data, context, activeLiveStatus) {
   const liveRepositoryState = activeLiveStatus?.repository_state || {};
+  const gitActivity = situationLiveGitActivity(activeLiveStatus);
   const repositoryChanges = data.repository_changes || {};
   const repositoryScope = data.repository_scope || {};
   const targetRepository = activeLiveStatus?.target_repository || context.target_repository || {};
   return {
-    branch: displayText(liveRepositoryState.branch || repositoryChanges.branch || repositoryScope.branch, ""),
-    head: displayText(liveRepositoryState.head || repositoryChanges.head || repositoryScope.head || repositoryScope.git_head, ""),
-    upstream: displayText(liveRepositoryState.upstream || repositoryChanges.upstream, ""),
-    dirtyCount: situationNumber(liveRepositoryState.dirty_count ?? repositoryChanges.dirty_count ?? repositoryChanges.unstaged_count),
-    untrackedCount: situationNumber(liveRepositoryState.untracked_count ?? repositoryChanges.untracked_count),
-    ahead: situationNumber(liveRepositoryState.ahead ?? repositoryChanges.ahead),
-    behind: situationNumber(liveRepositoryState.behind ?? repositoryChanges.behind),
+    branch: displayText(gitActivity.current_branch || gitActivity.branches?.current || liveRepositoryState.branch || repositoryChanges.branch || repositoryScope.branch, ""),
+    head: displayText(gitActivity.head || liveRepositoryState.head || repositoryChanges.head || repositoryScope.head || repositoryScope.git_head, ""),
+    upstream: displayText(gitActivity.upstream || liveRepositoryState.upstream || repositoryChanges.upstream, ""),
+    stagedCount: situationNumber(gitActivity.staged_count ?? repositoryChanges.staged_count),
+    unstagedCount: situationNumber(gitActivity.unstaged_count ?? repositoryChanges.unstaged_count),
+    dirtyCount: situationNumber(gitActivity.dirty_count ?? liveRepositoryState.dirty_count ?? repositoryChanges.dirty_count ?? repositoryChanges.unstaged_count),
+    untrackedCount: situationNumber(gitActivity.untracked_count ?? liveRepositoryState.untracked_count ?? repositoryChanges.untracked_count),
+    ahead: situationNumber(gitActivity.ahead ?? liveRepositoryState.ahead ?? repositoryChanges.ahead),
+    behind: situationNumber(gitActivity.behind ?? liveRepositoryState.behind ?? repositoryChanges.behind),
     pathState: displayText(targetRepository.path_state || repositoryScope.path_state || context.target_repository?.path_state, ""),
     gitState: displayText(targetRepository.git_state || repositoryScope.git_state, ""),
+    operationCount: asArray(gitActivity.operations).length,
+    worktreeCount: situationNumber(gitActivity.worktrees?.count ?? repositoryChanges.worktree_count),
+    unusedBranchCount: situationNumber(gitActivity.branches?.unused_count),
+  };
+}
+
+function situationLiveObject(value) {
+  return value && typeof value === "object" && !Array.isArray(value) ? value : {};
+}
+
+function situationLiveGitActivity(activeLiveStatus) {
+  return situationLiveObject(activeLiveStatus?.git_activity);
+}
+
+function situationLiveTestActivity(activeLiveStatus) {
+  return situationLiveObject(activeLiveStatus?.test_activity);
+}
+
+function situationOperationNeedsAttention(operation) {
+  return !["ready", "passed", "not_applicable"].includes(normalizeState(operation?.status));
+}
+
+function situationPrimaryGitOperation(gitActivity) {
+  const operations = asArray(gitActivity?.operations);
+  return (
+    operations.find((operation) => ["failed", "blocked", "missing", "stale", "manual_required"].includes(normalizeState(operation?.status))) ||
+    operations.find((operation) => normalizeState(operation?.status) === "optional") ||
+    operations.find((operation) => ["ready", "passed"].includes(normalizeState(operation?.status))) ||
+    null
+  );
+}
+
+function situationGitOperationLabel(operation, t) {
+  const id = displayText(operation?.id, "git");
+  return t(`overview.situation.gitOperation.${id}`, displayKey(id));
+}
+
+function situationGitOperationDetail(operation, t) {
+  if (!operation) {
+    return "";
+  }
+  const parts = [
+    displayText(operation.detail_code, "") ? `${t("overview.situation.detailCode")}: ${displayKey(operation.detail_code)}` : "",
+    situationNumber(operation.changed_count) ? `${t("overview.situation.gitWorkingChanges")}: ${situationNumber(operation.changed_count)}` : "",
+    situationNumber(operation.ahead) ? `${t("overview.situation.ahead")}: ${situationNumber(operation.ahead)}` : "",
+    situationNumber(operation.behind) ? `${t("overview.situation.behind")}: ${situationNumber(operation.behind)}` : "",
+    situationNumber(operation.count) ? `${t("overview.situation.evidenceItems")}: ${situationNumber(operation.count)}` : "",
+  ];
+  return uniqueDisplayParts(...parts).join(" / ");
+}
+
+function situationTestRowCategoryLabel(category, t) {
+  const id = displayText(category, "check");
+  return t(`overview.situation.testCategory.${id}`, displayKey(id));
+}
+
+function situationLatestTestRow(testActivity) {
+  const latest = testActivity?.latest_completed;
+  if (latest && typeof latest === "object" && !Array.isArray(latest)) {
+    return latest;
+  }
+  return asArray(testActivity?.recent)[0] || null;
+}
+
+function situationAgentWorkSummary(activeLiveStatus, t) {
+  const assignments = asArray(activeLiveStatus?.agent_assignments).filter((item) => normalizeState(item?.status || "ready") !== "not_applicable");
+  const sessions = asArray(activeLiveStatus?.agent_sessions).filter((item) => !["ready", "passed", "not_applicable"].includes(normalizeState(item?.status || "unknown")));
+  const toolCalls = asArray(activeLiveStatus?.tool_calls).filter((item) => !["ready", "passed", "not_applicable"].includes(normalizeState(item?.status || "unknown")));
+  const liveOperations = operationalPageLiveOperations(activeLiveStatus).filter((operation) => ["ai_agent", "browser_review", "git", "ci", "test", "build", "check"].includes(displayText(operation?.category, "")));
+  const count = assignments.length + sessions.length + toolCalls.length + liveOperations.length;
+  if (!count) {
+    return null;
+  }
+  const labels = uniqueDisplayParts(
+    ...assignments.map((item) => displayText(item.title || item.objective || item.assignment_id, "")),
+    ...sessions.map((item) => displayText(item.agent_label || item.agent_id || item.session_id, "")),
+    ...toolCalls.map((item) => displayText(item.tool_name || item.tool_call_id, "")),
+    ...liveOperations.map((item) => operationalPageOperationLabel(item, t)),
+  ).slice(0, 4);
+  return {
+    value: `${t("overview.situation.agentWork")}: ${count}`,
+    detail: labels.join(" / "),
   };
 }
 
 function situationFirstCommand(...values) {
   return values.map((value) => displayText(value, "")).find((value) => value && value !== "not_applicable") || "";
+}
+
+function contextPrimaryBlocker(context) {
+  return asArray(context?.blockers).find((blocker) => displayText(blocker?.reason || blocker?.source || blocker?.required_command, "")) || null;
+}
+
+function contextNextSafeActionText(context, t) {
+  const action = context?.next_safe_action || {};
+  return overviewLiveLocalizedText(action.description || action.title, t) || nextActionShort(context || {}, {}, t);
+}
+
+function uniqueDisplayParts(...parts) {
+  const seen = new Set();
+  return parts.map((part) => displayText(part, "")).filter((part) => {
+    if (!part || seen.has(part)) {
+      return false;
+    }
+    seen.add(part);
+    return true;
+  });
+}
+
+function contextCurrentWorkValue(context, displayPolicy, t) {
+  const menu = contextLabel(context?.menu_id, t);
+  const workflow = workflowContextLabel(context?.workflow_context, t);
+  const step = currentStepTextDisplay(context || {}, t);
+  const nextSafeAction = contextNextSafeActionText(context, t);
+  if (displayPolicy.isFriendly) {
+    return nextSafeAction || step || menu;
+  }
+  return uniqueDisplayParts(menu, workflow, step).join(" / ");
 }
 
 function situationCheck(activeLiveStatus, key) {
@@ -1561,20 +1785,39 @@ function situationStatusDetail(label, status, t) {
 }
 
 function situationRepositorySummary(data, context, activeLiveStatus, t) {
+  const gitActivity = situationLiveGitActivity(activeLiveStatus);
   const repo = situationRepositoryState(data, context, activeLiveStatus);
-  const localChanges = repo.dirtyCount + repo.untrackedCount;
+  const localChanges = Math.max(repo.stagedCount + repo.unstagedCount, repo.dirtyCount) + repo.untrackedCount;
   const liveGit = situationCheck(activeLiveStatus, "git_sync");
-  const status = normalizeState(liveGit?.status || context.git_status || "unknown");
-  const cleanText = localChanges > 0 ? `${t("overview.situation.gitDirty")} ${localChanges}` : t("overview.current.gitClean");
+  const primaryOperation = situationPrimaryGitOperation(gitActivity);
+  const operationStatus = primaryOperation ? normalizeState(primaryOperation.status) : "";
+  const rawStatus = normalizeState(gitActivity.status || liveGit?.status || context.git_status || "unknown");
+  const status = operationStatus || rawStatus;
+  const cleanText = localChanges > 0
+    ? `${t("overview.situation.gitWorkingChanges")} ${localChanges}`
+    : repo.behind > 0
+      ? `${t("overview.current.gitRemotePending")} ${repo.behind}`
+      : repo.ahead > 0
+        ? `${t("overview.current.gitPushPending")} ${repo.ahead}`
+        : primaryOperation && situationOperationNeedsAttention(primaryOperation)
+          ? `${situationGitOperationLabel(primaryOperation, t)}: ${statusLabelForChip(primaryOperation.status, t)}`
+          : t("overview.current.gitClean");
   const syncParts = [
+    repo.stagedCount ? `${t("overview.situation.staged")}: ${repo.stagedCount}` : "",
+    repo.unstagedCount ? `${t("overview.situation.unstaged")}: ${repo.unstagedCount}` : "",
+    repo.dirtyCount ? `${t("overview.situation.modified")}: ${repo.dirtyCount}` : "",
+    repo.untrackedCount ? `${t("overview.situation.untracked")}: ${repo.untrackedCount}` : "",
     repo.ahead ? `${t("overview.situation.ahead")}: ${repo.ahead}` : "",
     repo.behind ? `${t("overview.situation.behind")}: ${repo.behind}` : "",
-    repo.untrackedCount ? `${t("overview.situation.untracked")}: ${repo.untrackedCount}` : "",
+    repo.worktreeCount ? `${t("overview.situation.worktrees")}: ${repo.worktreeCount}` : "",
+    repo.unusedBranchCount ? `${t("overview.situation.unusedBranches")}: ${repo.unusedBranchCount}` : "",
+    situationGitOperationDetail(primaryOperation, t),
   ].filter(Boolean);
   const branchParts = [
     repo.branch ? `${t("overview.fact.branch")}: ${repo.branch}` : "",
     repo.upstream ? `${t("overview.situation.upstream")}: ${repo.upstream}` : "",
     repo.head ? `${t("overview.situation.head")}: ${shortRevision(repo.head)}` : "",
+    gitActivity.observed_at || activeLiveStatus?.generated_at ? `${t("overview.situation.liveUpdated")}: ${situationObservedAt(gitActivity.observed_at, activeLiveStatus?.generated_at)}` : "",
   ].filter(Boolean);
   return {
     id: "git",
@@ -1585,28 +1828,69 @@ function situationRepositorySummary(data, context, activeLiveStatus, t) {
     detail: [...branchParts, ...syncParts].join(" / ") || t("overview.fact.noEvidence"),
     source: displayText(liveGit?.source_id || liveGit?.current_item_id || repo.gitState || repo.pathState, ""),
     command: situationFirstCommand(liveGit?.required_command, liveGit?.items?.[0]?.next_command),
+    chipLabel: primaryOperation && situationOperationNeedsAttention(primaryOperation) ? situationGitOperationLabel(primaryOperation, t) : statusLabelForChip(status, t),
   };
 }
 
-function situationTestsCiSummary(data, context, activeLiveStatus, t) {
+function situationTestsSummary(data, context, activeLiveStatus, t) {
+  const testActivity = situationLiveTestActivity(activeLiveStatus);
   const localTests = situationCheck(activeLiveStatus, "local_tests");
-  const ci = situationCheck(activeLiveStatus, "ci");
-  const localStatus = normalizeState(localTests?.status || overviewLocalTestStatus(data.development?.product_authority || {}, context));
-  const ciStatus = normalizeState(ci?.status || context.ci_status || data.development?.ci_status || "unknown");
-  const status = situationWorstStatus([localStatus, ciStatus], "unknown");
-  const observed = [
-    situationObservedAt(localTests?.observed_at, activeLiveStatus?.generated_at),
-    situationObservedAt(ci?.observed_at, activeLiveStatus?.generated_at),
-  ].filter(Boolean)[0];
+  const runningTests = runtimeOperationsForCategories(activeLiveStatus, ["test", "check", "build"]);
+  const runningCount = situationNumber(testActivity.running_count) + runningTests.length;
+  const latestCompleted = situationLatestTestRow(testActivity);
+  const activityStatus = normalizeState(testActivity.status || "");
+  const localStatus = normalizeState(activityStatus || localTests?.status || overviewLocalTestStatus(data.development?.product_authority || {}, context));
+  const observed = situationObservedAt(testActivity.observed_at || localTests?.observed_at, activeLiveStatus?.generated_at);
+  const itemCount = Math.max(asArray(localTests?.items).length, situationNumber(testActivity.completed_count));
+  const source = displayText(localTests?.source_id || localTests?.current_item_id || "", "");
+  const runningSummary = operationalPageOperationSummary(runningTests, t);
+  const latestSummary = latestCompleted
+    ? `${situationTestRowCategoryLabel(latestCompleted.category, t)}: ${statusLabelForChip(latestCompleted.status, t)}`
+    : "";
+  const value = runningCount
+    ? `${t("overview.situation.runningNow")}: ${runningCount}`
+    : latestSummary || overviewLiveLocalizedText(localTests?.summary, t) || t("overview.situation.testNoRecords");
+  const detailParts = uniqueDisplayParts(
+    runningCount ? `${t("overview.situation.runningCount")}: ${runningCount}` : "",
+    latestCompleted?.command ? `${t("overview.situation.latestTest")}: ${latestCompleted.command}` : "",
+    observed ? `${t("overview.fact.lastChecked")}: ${observed}` : "",
+    itemCount ? `${t("overview.situation.completedCount")}: ${itemCount}` : "",
+    situationNumber(testActivity.failed_count) ? `${t("overview.situation.failedCount")}: ${situationNumber(testActivity.failed_count)}` : "",
+    localTests?.detail_code ? `${t("overview.situation.detailCode")}: ${localTests.detail_code}` : "",
+  );
   return {
-    id: "tests-ci",
+    id: "tests",
     Icon: CheckCircle2,
-    title: t("overview.situation.testsCiTitle"),
-    status,
-    value: `${situationStatusDetail(t("overview.situation.localTests"), localStatus, t)} / ${situationStatusDetail(t("overview.situation.ci"), ciStatus, t)}`,
-    detail: observed ? `${t("overview.fact.lastChecked")}: ${observed}` : t("overview.fact.noEvidence"),
-    source: displayText(localTests?.source_id || ci?.source_id || "", ""),
-    command: situationFirstCommand(localTests?.required_command, ci?.required_command, localTests?.items?.[0]?.next_command, ci?.items?.[0]?.next_command),
+    title: t("overview.situation.testsTitle"),
+    status: runningCount ? "cached" : localStatus,
+    value: runningSummary || value,
+    detail: detailParts.join(" / ") || t("overview.situation.testNoRecords"),
+    source,
+    command: situationFirstCommand(localTests?.required_command, localTests?.items?.[0]?.next_command),
+    chipLabel: runningCount ? t("overview.situation.runningNow") : statusLabelForChip(localStatus, t),
+  };
+}
+
+function situationCiSummary(data, context, activeLiveStatus, t) {
+  const ci = situationCheck(activeLiveStatus, "ci");
+  const ciStatus = normalizeState(ci?.status || context.ci_status || data.development?.ci_status || "unknown");
+  const observed = situationObservedAt(ci?.observed_at, activeLiveStatus?.generated_at);
+  const workflowName = displayText(ci?.workflow_name, "");
+  const runStatus = displayText(ci?.run_status || ci?.conclusion, "");
+  return {
+    id: "ci",
+    Icon: GitPullRequest,
+    title: t("overview.situation.ciTitle"),
+    status: ciStatus,
+    value: overviewLiveLocalizedText(ci?.summary, t) || statusLabelForChip(ciStatus, t),
+    detail: uniqueDisplayParts(
+      workflowName ? `${t("overview.situation.workflowName")}: ${workflowName}` : "",
+      runStatus ? `${t("overview.situation.runStatus")}: ${runStatus}` : "",
+      observed ? `${t("overview.fact.lastChecked")}: ${observed}` : "",
+      ci?.head_match_status ? `${t("overview.situation.headMatch")}: ${ci.head_match_status}` : "",
+    ).join(" / ") || t("overview.fact.noEvidence"),
+    source: displayText(ci?.source_id || ci?.current_item_id || "", ""),
+    command: situationFirstCommand(ci?.required_command, ci?.items?.[0]?.next_command),
   };
 }
 
@@ -1629,30 +1913,37 @@ function situationBlockerSummary(data, context, activeLiveStatus, t) {
 function situationCurrentWorkSummary(data, context, activeLiveStatus, t) {
   const decision = data.operational_decision && typeof data.operational_decision === "object" ? data.operational_decision : {};
   const displayPolicy = displayDepthPolicyForData(data);
+  const agentWork = situationAgentWorkSummary(activeLiveStatus, t);
   const audience = displayPolicy.isFriendly ? "non_engineer" : "junior_engineer";
   const audienceBrief = overviewLiveLocalizedText(decision.audience_briefs?.[audience], t);
   const reason = overviewLiveLocalizedText(decision.why_blocked, t);
   const nextSafeAction = overviewLiveLocalizedText(decision.next_safe_action, t);
+  const contextAction = context?.next_safe_action || {};
+  const contextBlocker = contextPrimaryBlocker(context);
   const repository = repositoryDisplayName(activeLiveStatus?.target_repository?.name || context.target_repository?.name, t);
   const menu = contextLabel(context.menu_id, t);
   const workflow = workflowContextLabel(context.workflow_context, t);
   const step = currentStepTextDisplay(context, t);
-  const operationalDetail = [
+  const contextValue = contextCurrentWorkValue(context, displayPolicy, t);
+  const contextNextSafeAction = contextNextSafeActionText(context, t);
+  const operationalDetail = uniqueDisplayParts(
     menu,
-    nextSafeAction ? `${t("overview.situation.nextSafeTitle")}: ${nextSafeAction}` : "",
+    agentWork?.detail,
+    contextNextSafeAction ? `${t("overview.situation.nextSafeTitle")}: ${contextNextSafeAction}` : nextSafeAction ? `${t("overview.situation.nextSafeTitle")}: ${nextSafeAction}` : "",
     !displayPolicy.isFriendly ? `${t("overview.fact.workflow")}: ${workflow}` : "",
     !displayPolicy.isFriendly && step ? step : "",
     repository ? `${t("overview.fact.target")}: ${repository}` : "",
-  ].filter(Boolean);
+  );
   return {
     id: "current-work",
     Icon: Compass,
     title: t("overview.situation.currentWorkTitle"),
-    status: decision.status || context.evidence_status || "manual_required",
-    value: audienceBrief || reason || menu,
+    status: agentWork ? "cached" : context.evidence_status || contextAction.status || decision.status || "manual_required",
+    value: agentWork?.value || contextValue || audienceBrief || reason || menu,
     detail: operationalDetail.join(" / ") || [menu, workflow, step].filter(Boolean).join(" / "),
-    source: displayText(decision.source_id || decision.primary_blocker_source_id || context.current_step_id || context.menu_id, ""),
-    command: situationFirstCommand(decision.next_safe_action_command, decision.required_command),
+    source: displayText(contextAction.source || contextBlocker?.source || context.current_step_id || decision.source_id || decision.primary_blocker_source_id || context.menu_id, ""),
+    command: situationFirstCommand(contextBlocker?.required_command, contextAction.required_command, decision.next_safe_action_command, decision.required_command),
+    chipLabel: agentWork ? t("overview.situation.workingNow") : "",
   };
 }
 
@@ -1662,13 +1953,14 @@ function situationNextSafeSummary(data, context, activeLiveStatus, facts, t) {
   const liveCommands = objectEntries(activeLiveStatus?.checks || {}).map(([, check]) => check?.required_command);
   const command = situationFirstCommand(blockerCommand, ...liveCommands, asArray(data.actions?.command_previews)[0]?.command_text);
   const status = normalizeState(nextAction.status || data.summary?.primary_action?.status || "manual_required");
+  const detail = overviewLiveLocalizedText(nextAction.expected_result || nextAction.description, t);
   return {
     id: "next-safe",
     Icon: ArrowRightCircle,
     title: t("overview.situation.nextSafeTitle"),
     status,
     value: nextActionShort(context, data, t) || t("detail.nextSafeCheck"),
-    detail: displayText(nextAction.expected_result || nextAction.description, t("overview.situation.nextSafeDetail")),
+    detail: detail || t("overview.situation.nextSafeDetail"),
     source: displayText(nextAction.source || nextAction.target || "", ""),
     command,
   };
@@ -1679,9 +1971,332 @@ function situationFacts(data, context, activeLiveStatus, t) {
     situationCurrentWorkSummary(data, context, activeLiveStatus, t),
     situationBlockerSummary(data, context, activeLiveStatus, t),
     situationRepositorySummary(data, context, activeLiveStatus, t),
-    situationTestsCiSummary(data, context, activeLiveStatus, t),
+    situationTestsSummary(data, context, activeLiveStatus, t),
+    situationCiSummary(data, context, activeLiveStatus, t),
   ];
   return [...baseFacts, situationNextSafeSummary(data, context, activeLiveStatus, baseFacts, t)];
+}
+
+function operationalPageEvidenceKeys(pageId) {
+  const keysByPage = {
+    overview: ["local_tests", "git_sync", "ci", "security"],
+    lessons: ["local_tests", "git_sync", "ci"],
+    workflow: ["local_tests", "git_sync", "ci"],
+    maintenance: ["local_tests", "git_sync", "ci", "security"],
+    safety: ["security", "git_sync", "ci", "local_tests"],
+    "repository-info": ["git_sync", "local_tests", "ci", "security"],
+    documents: ["local_tests", "git_sync", "ci", "security"],
+    settings: ["local_tests", "git_sync", "ci", "security"],
+    "design-studio": ["local_tests", "git_sync", "ci", "security"],
+    help: ["local_tests", "git_sync", "ci", "security"],
+    history: ["local_tests", "git_sync", "ci", "security"],
+  };
+  return keysByPage[displayText(pageId, "")] || ["local_tests", "git_sync", "ci", "security"];
+}
+
+function operationalPageLabel(pageId, t) {
+  const labels = {
+    overview: "nav.overview",
+    lessons: "nav.lessons",
+    workflow: "nav.workflow",
+    maintenance: "nav.maintenance",
+    safety: "nav.safety",
+    "repository-info": "nav.repositoryInfo",
+    documents: "nav.documents",
+    settings: "nav.settings",
+    "design-studio": "nav.designStudio",
+    help: "nav.help",
+    history: "nav.history",
+  };
+  return t(labels[displayText(pageId, "")] || "nav.overview");
+}
+
+function operationalPageIssueRows(rows) {
+  return rows
+    .filter((row) => !["ready", "passed", "not_applicable"].includes(normalizeState(row.status)))
+    .sort((left, right) => (statePriority[normalizeState(left.status)] ?? 99) - (statePriority[normalizeState(right.status)] ?? 99));
+}
+
+function operationalPageLiveOperations(activeLiveStatus) {
+  const items = asArray(activeLiveStatus?.active_operations?.items).length
+    ? asArray(activeLiveStatus?.active_operations?.items)
+    : asArray(activeLiveStatus?.runtime_activity?.processes);
+  return items
+    .filter((item) => normalizeState(item?.status || "manual_required") !== "not_applicable")
+    .filter((item) => !["control_center", "data_refresh"].includes(displayText(item?.category, "")))
+    .slice(0, 5);
+}
+
+function runtimeOperationsForCategories(activeLiveStatus, categories) {
+  const wanted = new Set(categories);
+  return operationalPageLiveOperations(activeLiveStatus).filter((operation) => wanted.has(displayText(operation?.category, "")));
+}
+
+function operationalPageOperationLabel(operation, t) {
+  const category = displayText(operation?.category, "");
+  const labels = {
+    ai_agent: "detail.operational.operation.aiAgent",
+    browser_review: "detail.operational.operation.browserReview",
+    control_center: "detail.operational.operation.controlCenter",
+    data_refresh: "detail.operational.operation.dataRefresh",
+    git: "detail.operational.operation.git",
+    ci: "detail.operational.operation.ci",
+    test: "detail.operational.operation.test",
+    build: "detail.operational.operation.build",
+    check: "detail.operational.operation.check",
+  };
+  return t(labels[category] || "detail.operational.operation.other");
+}
+
+function operationalPageOperationSummary(operations, t) {
+  if (!operations.length) {
+    return "";
+  }
+  const labels = operations.map((operation) => operationalPageOperationLabel(operation, t));
+  const uniqueLabels = uniqueDisplayParts(...labels).slice(0, 3);
+  return `${t("detail.operational.runningCli")}: ${uniqueLabels.join(" / ")}${operations.length > uniqueLabels.length ? ` +${operations.length - uniqueLabels.length}` : ""}`;
+}
+
+function operationalPageSourceReferences(rows, operations, context, activeLiveStatus) {
+  return uniqueDisplayParts(
+    displayText(context?.menu_id, ""),
+    displayText(context?.workflow_context, ""),
+    displayText(activeLiveStatus?.menu_id, ""),
+    ...rows.map((row) => row.sourceId),
+    ...operations.map((operation) => operation.source_id),
+  );
+}
+
+function operationalPageJudgmentValue({ issueRows, operations, facts, activeLiveStatus, context, t }) {
+  const operationSummary = operationalPageOperationSummary(operations, t);
+  if (operationSummary) {
+    return operationSummary;
+  }
+  const gitIssue = issueRows.find((row) => row.key === "git_sync");
+  if (gitIssue) {
+    return gitIssue.summary || gitIssue.action || t("detail.operational.gitNeedsReview");
+  }
+  const ciIssue = issueRows.find((row) => row.key === "ci");
+  if (ciIssue) {
+    return ciIssue.summary || ciIssue.action || t("detail.operational.ciNeedsReview");
+  }
+  const testIssue = issueRows.find((row) => row.key === "local_tests");
+  if (testIssue) {
+    return testIssue.summary || testIssue.action || t("detail.operational.testsNeedReview");
+  }
+  const securityIssue = issueRows.find((row) => row.key === "security");
+  if (securityIssue) {
+    return securityIssue.summary || securityIssue.action || t("detail.operational.securityNeedsReview");
+  }
+  const currentWork = facts.find((fact) => fact.id === "current-work");
+  return currentWork?.value || contextCurrentWorkValue(context, displayDepthPolicyForData({ selected_context: context }), t) || (activeLiveStatus ? t("detail.operational.liveReady") : t("detail.operational.snapshotOnly"));
+}
+
+function operationalPageMustReviewPoints({ issueRows, operations, facts, displayPolicy, t }) {
+  if (operations.length) {
+    return operations.map((operation) => operationalPageOperationLabel(operation, t)).slice(0, 3);
+  }
+  if (issueRows.length) {
+    return issueRows.slice(0, 3).map((row) => {
+      const status = statusLabelForChip(row.status, t);
+      const summary = displayPolicy.isFriendly ? row.summary || row.action || row.title : `${row.title}: ${status}${row.sourceId ? ` / ${sourcePresentationKey(row.sourceId, t)}` : ""}`;
+      return summary || `${row.title}: ${status}`;
+    });
+  }
+  const nextSafe = facts.find((fact) => fact.id === "next-safe");
+  return [nextSafe?.value || t("detail.operational.noUrgentAction")];
+}
+
+function operationalProgressBriefCard(data, ids, context) {
+  const wanted = new Set(ids);
+  return operationalProgressBriefCardsForContext(data, context).find((card) => wanted.has(displayText(card.id, ""))) || null;
+}
+
+function operationalProgressBriefCardsForContext(data, context) {
+  const contextMenuId = displayText(context?.menu_id, "");
+  const contextWorkflow = displayText(context?.workflow_context, "");
+  const contextRepositoryId = displayText(context?.target_repository?.repo_id, "");
+  return asArray(data?.documents?.brief_cards)
+    .slice()
+    .sort((left, right) => (Number(left.order) || 0) - (Number(right.order) || 0))
+    .filter((card) => {
+      const cardMenuId = displayText(card.menu_id, "");
+      const cardWorkflow = displayText(card.workflow_context, "");
+      const cardRepositoryId = displayText(card.repo_id, "");
+      if (cardMenuId && contextMenuId && cardMenuId !== contextMenuId) {
+        return false;
+      }
+      if (cardWorkflow && contextWorkflow && cardWorkflow !== contextWorkflow) {
+        return false;
+      }
+      if (cardRepositoryId && contextRepositoryId && cardRepositoryId !== contextRepositoryId) {
+        return false;
+      }
+      return true;
+    });
+}
+
+function operationalProgressLocale(data) {
+  return displayText(data?.summary?.ui_locale || data?.summary?.display_locale || data?.summary?.workflow_language, "en");
+}
+
+function operationalProgressBriefFact({ id, Icon, card, fallbackTitle, fallbackValue, fallbackDetail, t, locale }) {
+  if (!card) {
+    return {
+      id,
+      Icon,
+      title: fallbackTitle,
+      status: "unknown",
+      value: fallbackValue,
+      detail: fallbackDetail,
+      source: "",
+      command: "",
+    };
+  }
+  return {
+    id,
+    Icon,
+    title: fallbackTitle,
+    status: card.status || card.freshness_state || "unknown",
+    value: documentBriefTitle(card, t, locale),
+    detail: documentBriefSummary(card, t, locale),
+    source: asArray(card.source_paths).join(" / "),
+    command: "",
+  };
+}
+
+function operationalProgressFacts(data, context, activeLiveStatus, t) {
+  const displayPolicy = displayDepthPolicyForData(data);
+  const locale = operationalProgressLocale(data);
+  const taskTrackerCard = operationalProgressBriefCard(data, ["taskTracker", "task-tracker", "task_tracker"], context);
+  const handoffCard = operationalProgressBriefCard(data, ["handoff", "handOff", "hand-off"], context);
+  const currentWork = situationCurrentWorkSummary(data, context, activeLiveStatus, t);
+  const git = situationRepositorySummary(data, context, activeLiveStatus, t);
+  const tests = situationTestsSummary(data, context, activeLiveStatus, t);
+  const ci = situationCiSummary(data, context, activeLiveStatus, t);
+  const checksStatus = situationWorstStatus([tests.status, ci.status], "unknown");
+  return [
+    {
+      ...currentWork,
+      title: t("overview.progress.currentWorkTitle"),
+      value: contextCurrentWorkValue(context, displayPolicy, t) || currentWork.value,
+    },
+    operationalProgressBriefFact({
+      id: "task-tracker",
+      Icon: ListChecks,
+      card: taskTrackerCard,
+      fallbackTitle: t("overview.progress.taskTrackerTitle"),
+      fallbackValue: t("overview.progress.taskTrackerMissing"),
+      fallbackDetail: t("overview.progress.taskTrackerMissingDetail"),
+      t,
+      locale,
+    }),
+    operationalProgressBriefFact({
+      id: "handoff",
+      Icon: ClipboardCheck,
+      card: handoffCard,
+      fallbackTitle: t("overview.progress.handoffTitle"),
+      fallbackValue: t("overview.progress.handoffMissing"),
+      fallbackDetail: t("overview.progress.handoffMissingDetail"),
+      t,
+      locale,
+    }),
+    {
+      ...git,
+      title: t("overview.progress.gitTitle"),
+    },
+    {
+      id: "checks",
+      Icon: CheckCircle2,
+      title: t("overview.progress.checksTitle"),
+      status: checksStatus,
+      value: `${tests.title}: ${tests.value}`,
+      detail: `${ci.title}: ${ci.value}${ci.detail ? ` / ${ci.detail}` : ""}`,
+      source: uniqueDisplayParts(tests.source, ci.source).join(" / "),
+      command: situationFirstCommand(tests.command, ci.command),
+    },
+  ];
+}
+
+function OperationalPageDecisionSummary({ data, context, liveStatus, t, tone = "sidebar", pageId = "overview", keys = null }) {
+  const displayPolicy = displayDepthPolicyForData(data);
+  const activeLiveStatus = situationLiveStatusForContext(liveStatus, context);
+  const evidenceKeys = Array.isArray(keys) && keys.length ? keys : operationalPageEvidenceKeys(pageId);
+  const rows = liveEvidenceRows(activeLiveStatus, evidenceKeys, t);
+  const progressFacts = operationalProgressFacts(data, context, activeLiveStatus, t);
+  const overallStatus = situationWorstStatus([context?.evidence_status, ...rows.map((row) => row.status), ...progressFacts.map((fact) => fact.status)], "ready");
+  const repository = repositoryDisplayName(activeLiveStatus?.target_repository?.name || context?.target_repository?.name, t);
+  const freshness = situationFreshnessMeta(data, activeLiveStatus, t);
+  return (
+    <section className={`operational-situation operational-situation--progress operational-situation--${tone}`} aria-labelledby={`${pageId}-progress-summary-heading`} data-operational-progress-summary={pageId} data-dashboard-display-depth={displayPolicy.depth}>
+      <div className="operational-situation__header">
+        <span className="operational-situation__icon">
+          <ClipboardCheck aria-hidden="true" size={24} />
+        </span>
+        <div>
+          <h2 id={`${pageId}-progress-summary-heading`}>{t("overview.progress.title")}</h2>
+          <p>{t("overview.progress.subtitle")}</p>
+        </div>
+        <div className="operational-situation__header-actions">
+          <AudienceModeBadge displayPolicy={displayPolicy} t={t} />
+          <StatusPill value={overallStatus} t={t} label={statusLabelForChip(overallStatus, t)} />
+        </div>
+      </div>
+      <div className="operational-situation__meta" aria-label={t("overview.progress.meta")}>
+        <span>{t("overview.fact.target")}: <strong>{repository}</strong></span>
+        <span>{t("overview.fact.workflow")}: <strong>{workflowContextLabel(context?.workflow_context, t)}</strong></span>
+        <span>{t("overview.progress.updated")}: <strong>{freshness.time}</strong></span>
+      </div>
+      <div className="operational-situation__grid">
+        {progressFacts.map((fact) => (
+          <SituationFactCard key={fact.id} fact={fact} t={t} displayPolicy={displayPolicy} />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function OperationalPageSummaryStack({ data, context, liveStatus, t, tone = "sidebar", pageId = "overview", keys = null }) {
+  return (
+    <>
+      <ProducerDecisionSummaryCompat data={data} pageId={pageId} tone={tone} t={t} />
+      <OperationalPageDecisionSummary data={data} context={context} liveStatus={liveStatus} pageId={pageId} tone={tone} keys={keys} t={t} />
+    </>
+  );
+}
+
+function ProducerDecisionSummaryCompat({ data, pageId, tone = "sidebar", t }) {
+  const decision = asArray(data?.decision_pages).find((page) => displayText(page?.id, "") === pageId);
+  if (!decision) {
+    return null;
+  }
+  const policy = displayDepthPolicyForData(data);
+  const source = displayText(decision.source_id, "");
+  const owner = displayText(decision.owner_source, "");
+  const detailPage = displayText(decision.detail_page, "");
+  const technicalReferences = [source, displayText(decision.primary_blocker_source_id, ""), owner, detailPage, displayText(decision.authority, ""), displayText(decision.freshness_state, "")].filter(Boolean);
+  return (
+    <DetailDecisionSummary
+      tone={tone}
+      t={t}
+      displayPolicy={policy}
+      items={[
+        { Icon: Target, label: t("detail.checks"), value: overviewLiveLocalizedText(decision.decision_question, t), detail: displayText(decision.scope, "") },
+        { Icon: Eye, label: t("detail.nextSafeCheck"), value: overviewLiveLocalizedText(decision.next_safe_action, t), detail: [source, owner, detailPage].filter(Boolean).join(" / "), technicalReferences },
+      ]}
+    />
+  );
+}
+
+function decisionToneForOperationalStatus(status) {
+  const state = normalizeState(status);
+  if (state === "ready" || state === "passed" || state === "not_applicable") {
+    return "ready";
+  }
+  if (state === "blocked" || state === "failed" || state === "missing") {
+    return "danger";
+  }
+  return "warning";
 }
 
 function SituationFactCard({ fact, t, displayPolicy }) {
@@ -1689,6 +2304,8 @@ function SituationFactCard({ fact, t, displayPolicy }) {
   const source = displayText(fact.source, "");
   const command = displayText(fact.command, "");
   const showSource = source && !displayPolicy.isFriendly;
+  const chipLabel = displayText(fact.chipLabel, "") || statusLabelForChip(fact.status, t);
+  const sourceLabel = source.split(/\s*\/\s*/).map((item) => sourcePresentationKey(item, t)).filter(Boolean).join(" / ");
   return (
     <article className={`operational-situation__fact operational-situation__fact--${fact.id}`} data-operational-situation-fact={fact.id}>
       <div className="operational-situation__fact-head">
@@ -1697,7 +2314,7 @@ function SituationFactCard({ fact, t, displayPolicy }) {
         </span>
         <div>
           <h3>{fact.title}</h3>
-          <StatusPill value={fact.status} t={t} label={statusLabelForChip(fact.status, t)} />
+          <StatusPill value={fact.status} t={t} label={chipLabel} />
         </div>
       </div>
       <strong>{fact.value}</strong>
@@ -1706,7 +2323,7 @@ function SituationFactCard({ fact, t, displayPolicy }) {
         <div className="operational-situation__evidence">
           {showSource ? (
             <span>
-              {t("overview.situation.source")}: {technicalChip(source)}
+              {t("overview.situation.source")}: {technicalChip(sourceLabel || source)}
             </span>
           ) : null}
           {command ? (
@@ -1758,7 +2375,7 @@ function OperationalSituationBoard({ data, context, liveStatus, t }) {
 
 function operationalDetailFacts(data, context, activeLiveStatus, t) {
   const factsById = new Map(situationFacts(data, context, activeLiveStatus, t).map((fact) => [fact.id, fact]));
-  return ["blockers", "git", "tests-ci", "next-safe"].map((id) => factsById.get(id)).filter(Boolean);
+  return ["blockers", "git", "tests", "ci", "next-safe"].map((id) => factsById.get(id)).filter(Boolean);
 }
 
 function operationalDetailEvidenceRows(activeLiveStatus, keys, t, limit = 6) {
@@ -1777,11 +2394,58 @@ function operationalDetailEvidenceRows(activeLiveStatus, keys, t, limit = 6) {
   return selected;
 }
 
+function snapshotEvidenceStatusForKey(context, key) {
+  if (key === "git_sync") {
+    return context?.git_status || "unknown";
+  }
+  if (key === "ci") {
+    return context?.ci_status || "unknown";
+  }
+  if (key === "security") {
+    return context?.security_status || "unknown";
+  }
+  if (key === "local_tests") {
+    return context?.evidence_status || "manual_required";
+  }
+  return context?.evidence_status || "unknown";
+}
+
+function snapshotEvidenceRowsForContext(context, keys, t) {
+  const menuId = displayText(context?.menu_id, "selected-context");
+  const repository = repositoryDisplayName(context?.target_repository?.name, t);
+  const observedAt = liveStatusObservedTime(context?.updated_at);
+  const blocker = contextPrimaryBlocker(context);
+  const nextAction = context?.next_safe_action || {};
+  const branch = displayText(context?.target_repository?.branch, "");
+  return keys.map((key) => {
+    const status = snapshotEvidenceStatusForKey(context, key);
+    const sourceId = `contexts_by_menu.${menuId}.${key}`;
+    return {
+      id: `snapshot-${menuId}-${key}`,
+      key,
+      sourceId,
+      currentItemId: displayText(context?.current_step_id || sourceId, sourceId),
+      title: liveEvidenceCheckTitle(key, t),
+      target: repository,
+      branch,
+      status,
+      summary: `${workflowContextLabel(context?.workflow_context, t)} / ${statusLabelForChip(status, t)}`,
+      reason: overviewLiveLocalizedText(blocker?.reason || nextAction.description || nextAction.title, t),
+      action: overviewLiveLocalizedText(nextAction.description || nextAction.title, t),
+      observedAt,
+      detailArtifactPath: "",
+      command: situationFirstCommand(blocker?.required_command, nextAction.required_command),
+    };
+  });
+}
+
 function OperationalDetailDecisionCard({ fact, t, displayPolicy }) {
   const Icon = fact.Icon;
   const source = displayText(fact.source, "");
   const command = displayText(fact.command, "");
   const showSource = source && displayPolicy.isTechnical;
+  const chipLabel = displayText(fact.chipLabel, "") || statusLabelForChip(fact.status, t);
+  const sourceLabel = source.split(/\s*\/\s*/).map((item) => sourcePresentationKey(item, t)).filter(Boolean).join(" / ");
   return (
     <article className={`operational-detail-card operational-detail-card--${fact.id}`} data-operational-detail-fact={fact.id}>
       <div className="operational-detail-card__head">
@@ -1790,7 +2454,7 @@ function OperationalDetailDecisionCard({ fact, t, displayPolicy }) {
         </span>
         <div>
           <h3>{fact.title}</h3>
-          <StatusPill value={fact.status} t={t} label={statusLabelForChip(fact.status, t)} />
+          <StatusPill value={fact.status} t={t} label={chipLabel} />
         </div>
       </div>
       <strong>{fact.value}</strong>
@@ -1799,7 +2463,7 @@ function OperationalDetailDecisionCard({ fact, t, displayPolicy }) {
         <div className="operational-detail-card__evidence">
           {showSource ? (
             <span>
-              {t("overview.situation.source")}: {technicalChip(source)}
+              {t("overview.situation.source")}: {technicalChip(sourceLabel || source)}
             </span>
           ) : null}
           {command ? (
@@ -1813,8 +2477,10 @@ function OperationalDetailDecisionCard({ fact, t, displayPolicy }) {
   );
 }
 
-function OperationalDetailEvidenceQueue({ activeLiveStatus, keys, t, tone, displayPolicy }) {
+function OperationalDetailEvidenceQueue({ activeLiveStatus, context, keys, t, tone, displayPolicy }) {
   const rows = operationalDetailEvidenceRows(activeLiveStatus, keys, t);
+  const fallbackRows = rows.length ? rows : snapshotEvidenceRowsForContext(context, keys, t);
+  const visibleRows = fallbackRows.slice(0, 6);
   const showTechnicalSource = displayPolicy.isTechnical;
   return (
     <div className="operational-detail-evidence" data-operational-detail-evidence="true">
@@ -1823,7 +2489,7 @@ function OperationalDetailEvidenceQueue({ activeLiveStatus, keys, t, tone, displ
         <p>{t("detail.operational.evidenceDetail")}</p>
       </div>
       <div className="operational-detail-evidence__list">
-        {rows.length ? rows.map((row) => {
+        {visibleRows.length ? visibleRows.map((row) => {
           const command = displayText(row.command, "");
           const usableCommand = command && command !== "not_applicable" ? command : "";
           return (
@@ -1909,7 +2575,7 @@ function OperationalDetailDecisionPanel({ data, context, liveStatus, t, tone = "
           <OperationalDetailDecisionCard key={fact.id} fact={fact} t={t} displayPolicy={displayPolicy} />
         ))}
       </div>
-      <OperationalDetailEvidenceQueue activeLiveStatus={activeLiveStatus} keys={keys} t={t} tone={tone} displayPolicy={displayPolicy} />
+      <OperationalDetailEvidenceQueue activeLiveStatus={activeLiveStatus} context={context} keys={keys} t={t} tone={tone} displayPolicy={displayPolicy} />
     </section>
   );
 }
@@ -2239,8 +2905,8 @@ function workflowCardSource(id, context, data, t) {
 }
 
 function WorkflowRecentTable({ rows: recentRows, data, t }) {
-  const rows = asArray(recentRows).slice(0, 5);
   const context = selectedContextData(data);
+  const rows = workflowRowsForContext(recentRows, data);
   if (!rows.length) {
     return null;
   }
@@ -3237,6 +3903,93 @@ function workflowRunReferenceLabel(value, t) {
   return map[key] ? t(map[key]) : displayText(value, t("summary.viewDetails"));
 }
 
+function workflowRecentRowMatchesContext(row, context) {
+  const menuId = displayText(context?.menu_id, "");
+  const workflowContext = displayText(context?.workflow_context, "");
+  const targetRepository = selectedContextRepositoryName(context);
+  const rowScope = displayText(row?.scope, "");
+  const rowTarget = displayText(row?.target, "");
+  return (
+    (menuId && rowScope === menuId) ||
+    (workflowContext && rowScope === workflowContext) ||
+    (targetRepository && rowTarget === targetRepository)
+  );
+}
+
+function fallbackWorkflowRowsForContext(context, data) {
+  const menuId = displayText(context?.menu_id, "selected-context");
+  const target = selectedContextRepositoryName(context) || displayText(context?.workflow_context, menuId);
+  const time = displayText(context?.updated_at || data.generated_at, "");
+  const nextAction = context?.next_safe_action || {};
+  const blocker = contextPrimaryBlocker(context);
+  return [
+    {
+      id: `${menuId}-selected-context`,
+      time,
+      type: "Selected context",
+      target,
+      detail: displayText(context?.current_step_label || context?.current_step_id || nextAction.description || nextAction.title, ""),
+      status: context?.evidence_status || nextAction.status || "unknown",
+      reference: "Selected context",
+      source_role: displayText(nextAction.source || blocker?.source || "contexts_by_menu", "contexts_by_menu"),
+      required_command: situationFirstCommand(blocker?.required_command, nextAction.required_command),
+      scope: menuId,
+      observed_at: time,
+    },
+    {
+      id: `${menuId}-git-sync`,
+      time,
+      type: "Git sync",
+      target,
+      detail: "Selected context Git synchronization evidence",
+      status: context?.git_status || "unknown",
+      reference: "Git sync evidence",
+      source_role: `contexts_by_menu.${menuId}.git_status`,
+      required_command: situationFirstCommand(blocker?.required_command),
+      scope: menuId,
+      observed_at: time,
+    },
+    {
+      id: `${menuId}-ci`,
+      time,
+      type: "CI run",
+      target,
+      detail: "Selected context CI evidence",
+      status: context?.ci_status || "unknown",
+      reference: "CI evidence",
+      source_role: `contexts_by_menu.${menuId}.ci_status`,
+      required_command: situationFirstCommand(blocker?.required_command),
+      scope: menuId,
+      observed_at: time,
+    },
+    {
+      id: `${menuId}-security`,
+      time,
+      type: "Security gate",
+      target,
+      detail: "Selected context security gate snapshot",
+      status: context?.security_status || "unknown",
+      reference: "Security gate",
+      source_role: `contexts_by_menu.${menuId}.security_status`,
+      required_command: situationFirstCommand(blocker?.required_command),
+      scope: menuId,
+      observed_at: time,
+    },
+  ].filter((row) => displayText(row.detail || row.status, ""));
+}
+
+function workflowRowsForContext(recentRows, data) {
+  const context = selectedContextData(data);
+  const producerMenuId = producerMenuIdForData(data);
+  const contextMenuId = displayText(context.menu_id, "");
+  const rows = asArray(recentRows);
+  if (!contextMenuId || contextMenuId === producerMenuId) {
+    return rows.slice(0, 5);
+  }
+  const scopedRows = rows.filter((row) => workflowRecentRowMatchesContext(row, context));
+  return (scopedRows.length ? scopedRows : fallbackWorkflowRowsForContext(context, data)).slice(0, 5);
+}
+
 function liveEvidenceCheckTitle(key, t) {
   const map = {
     local_tests: "overview.status.localTests",
@@ -3289,8 +4042,8 @@ function liveEvidenceRows(activeLiveStatus, keys, t) {
 
 function liveEvidenceRowInsight(row, t) {
   const sourceParts = [
-    row.sourceId ? `${sourcePresentationKey(row.sourceId, t)}: ${row.sourceId}` : "",
-    row.currentItemId && row.currentItemId !== row.sourceId ? row.currentItemId : "",
+    row.sourceId ? sourcePresentationKey(row.sourceId, t) : "",
+    row.currentItemId && row.currentItemId !== row.sourceId ? sourcePresentationKey(row.currentItemId, t) : "",
     row.detailArtifactPath,
     row.command && row.command !== "not_applicable" ? row.command : "",
     row.observedAt ? `${t("overview.fact.lastChecked")}: ${row.observedAt}` : "",
@@ -4204,7 +4957,7 @@ function OverviewSection({ data, t, locale, activeMenuId, pendingMenuId, onActiv
       <PageTitleHeader viewId="overview" Icon={Home} title={t("nav.overview")} subtitle={t("overview.subtitle")} data={data} locale={locale} t={t} actionLabel={t("detail.refreshDisplayOnly")} headingId="overview-heading" />
       <MenuTileStrip data={data} t={t} activeMenuId={activeMenuId} pendingMenuId={pendingMenuId} onActiveMenuChange={onActiveMenuChange} />
       <ContextSnapshotStrip data={data} t={t} locale={locale} />
-      <ProducerDecisionSummary data={data} pageId="overview" tone="sidebar" t={t} />
+      <OperationalPageSummaryStack data={data} context={context} liveStatus={liveStatus} pageId="overview" tone="sidebar" t={t} />
       <OperationalSituationBoard data={data} context={context} liveStatus={liveStatus} t={t} />
       <RepositorySelectionPanel selection={repositorySelection} t={t} />
       <section className="overview-status-grid" aria-label={t("overview.currentStatus")}>
@@ -4687,7 +5440,7 @@ function LessonLiveStatusTable({ data, t }) {
   );
 }
 
-function LessonSection({ lessons, data, locale, t }) {
+function LessonSection({ lessons, data, locale, t, liveStatus }) {
   const activeContext = selectedContextData(data);
   const isActiveLessonWorkflow = isLessonWorkflowContext(activeContext);
   const viewData = isActiveLessonWorkflow ? lessonViewData(data) : data;
@@ -4697,6 +5450,7 @@ function LessonSection({ lessons, data, locale, t }) {
       <section className="view-surface view-surface--lessons" id="lessons" aria-labelledby="lesson-heading">
         <PageTitleHeader viewId="lessons" Icon={BookOpen} title={t("lessons.title")} subtitle={t("lessons.description")} data={viewData} locale={locale} t={t} actionLabel={t("lesson.snapshotButton")} headingId="lesson-heading" />
         <ContextSnapshotStrip data={viewData} t={t} locale={locale} variant="lessons" />
+        <OperationalPageSummaryStack data={viewData} context={activeContext} liveStatus={liveStatus} pageId="lessons" tone="lessons" keys={["local_tests", "git_sync", "ci"]} t={t} />
         <div className="mock-notice mock-notice--lessons-warning lesson-health-notice">
           <BookOpen aria-hidden="true" size={22} />
           <div>
@@ -4715,7 +5469,7 @@ function LessonSection({ lessons, data, locale, t }) {
     <section className="view-surface view-surface--lessons" id="lessons" aria-labelledby="lesson-heading">
       <PageTitleHeader viewId="lessons" Icon={BookOpen} title={t("lessons.title")} subtitle={t("lessons.description")} data={viewData} locale={locale} t={t} actionLabel={t("lesson.snapshotButton")} headingId="lesson-heading" />
       <ContextSnapshotStrip data={viewData} t={t} locale={locale} variant="lessons" />
-      <ProducerDecisionSummary data={viewData} pageId="lessons" tone="lessons" t={t} />
+      <OperationalPageSummaryStack data={viewData} context={context} liveStatus={liveStatus} pageId="lessons" tone="lessons" keys={["local_tests", "git_sync", "ci"]} t={t} />
       <DetailDecisionSummary
         tone="lessons"
         t={t}
@@ -4765,7 +5519,7 @@ function WorkflowSection({ development, gitWorkflow, data, locale, t, liveStatus
     <section className="view-surface view-surface--workflow" id="workflow" aria-labelledby="workflow-heading">
       <PageTitleHeader viewId="workflow" Icon={WorkflowCategoryIcon} title={t("workflow.title")} subtitle={t("workflow.description")} data={data} locale={locale} t={t} actionLabel={t("detail.refreshDisplayOnly")} headingId="workflow-heading" />
       <ContextSnapshotStrip data={data} t={t} locale={locale} variant="workflow" />
-      <ProducerDecisionSummary data={data} pageId="workflow" tone="workflow" t={t} />
+      <OperationalPageSummaryStack data={data} context={context} liveStatus={liveStatus} pageId="workflow" tone="workflow" keys={["local_tests", "git_sync", "ci"]} t={t} />
       <DetailDecisionSummary
         tone="workflow"
         t={t}
@@ -5074,7 +5828,7 @@ function MaintenanceSection({ maintenance, data, locale, t, liveStatus }) {
     <section className="view-surface view-surface--maintenance" id="maintenance" aria-labelledby="maintenance-heading">
       <PageTitleHeader viewId="maintenance" Icon={RefreshCw} title={t("maintenance.title")} subtitle={t("maintenance.description")} data={data} locale={locale} t={t} actionLabel={t("detail.refreshMaintenance")} headingId="maintenance-heading" />
       <ContextSnapshotStrip data={data} t={t} locale={locale} variant="maintenance" />
-      <ProducerDecisionSummary data={data} pageId="maintenance" tone="maintenance" t={t} />
+      <OperationalPageSummaryStack data={data} context={context} liveStatus={liveStatus} pageId="maintenance" tone="maintenance" keys={["local_tests", "git_sync", "ci", "security"]} t={t} />
       <DetailDecisionSummary
         tone="maintenance"
         t={t}
@@ -5266,7 +6020,7 @@ function SecuritySection({ security, partialFailures, data, locale, t, liveStatu
     <div className="safety-primary">
       <PageTitleHeader viewId="safety" Icon={ShieldCheck} title={t("security.title")} subtitle={t("security.description")} data={data} locale={locale} t={t} actionLabel={t("detail.refreshDisplayOnly")} headingId="security-heading" />
       <ContextSnapshotStrip data={data} t={t} locale={locale} variant="safety" />
-      <ProducerDecisionSummary data={data} pageId="safety" tone="safety" t={t} />
+      <OperationalPageSummaryStack data={data} context={context} liveStatus={liveStatus} pageId="safety" tone="safety" keys={["security", "git_sync", "ci", "local_tests"]} t={t} />
       <DetailDecisionSummary
         tone="safety"
         t={t}
@@ -6493,7 +7247,7 @@ function RepositoryInfoPage({ data, locale, t, liveStatus }) {
   return (
     <section className="view-surface view-surface--repository-info sidebar-page" id="repository-info" aria-labelledby="repository-info-heading">
       <DetailPageHeader tone="repository-info" Icon={Info} title={t("repositoryInfo.title")} subtitle={t("repositoryInfo.description")} data={data} locale={locale} t={t} actionLabel={t("detail.refreshDisplayOnly")} headingId="repository-info-heading" />
-      <ProducerDecisionSummary data={data} pageId="repository-info" tone="sidebar" t={t} />
+      <OperationalPageSummaryStack data={data} context={context} liveStatus={liveStatus} pageId="repository-info" tone="sidebar" keys={["git_sync", "local_tests", "ci", "security"]} t={t} />
       <DetailDecisionSummary
         tone="sidebar"
         t={t}
@@ -6531,13 +7285,13 @@ function RepositoryInfoPage({ data, locale, t, liveStatus }) {
   );
 }
 
-function DocumentsPage({ data, locale, t }) {
+function DocumentsPage({ data, locale, t, liveStatus }) {
   const [selectedBriefId, setSelectedBriefId] = useState("");
   const context = selectedContextData(data);
   const authority = data.development?.product_authority || {};
   const documents = data.documents || {};
   const catalog = asArray(documents.catalog).slice().sort((left, right) => (Number(left.order) || 0) - (Number(right.order) || 0));
-  const briefCards = asArray(documents.brief_cards).slice().sort((left, right) => (Number(left.order) || 0) - (Number(right.order) || 0));
+  const briefCards = operationalProgressBriefCardsForContext(data, context);
   const nextActions = asArray(documents.next_actions).slice().sort((left, right) => (Number(left.order) || 0) - (Number(right.order) || 0));
   const relatedPages = Array.from(new Set(catalog.map((item) => displayText(item.related_page, "")).filter((href) => href && href !== "#documents")));
   const selectedBrief = briefCards.find((card) => displayText(card.id, "") === selectedBriefId) || null;
@@ -6550,7 +7304,7 @@ function DocumentsPage({ data, locale, t }) {
   return (
     <section className="view-surface view-surface--documents sidebar-page" id="documents" aria-labelledby="documents-heading">
       <DetailPageHeader tone="documents" Icon={FileText} title={t("documentsPage.title")} subtitle={t("documentsPage.description")} data={data} locale={locale} t={t} actionLabel={t("detail.refreshDisplayOnly")} headingId="documents-heading" />
-      <ProducerDecisionSummary data={data} pageId="documents" tone="sidebar" t={t} />
+      <OperationalPageSummaryStack data={data} context={context} liveStatus={liveStatus} pageId="documents" tone="sidebar" keys={["local_tests", "git_sync", "ci", "security"]} t={t} />
       <DetailDecisionSummary
         tone="sidebar"
         t={t}
@@ -7450,7 +8204,7 @@ function DesignStudioHistorySection({ data, t }) {
   );
 }
 
-function DesignStudioPage({ data, locale, t }) {
+function DesignStudioPage({ data, locale, t, liveStatus }) {
   const tooltipComponent = designStudioComponentById("tooltip-copy");
   const sourceInteraction = useMemo(() => designStudioInteraction(tooltipComponent), [tooltipComponent]);
   const [draftInteraction, setDraftInteraction] = useState(sourceInteraction);
@@ -7560,6 +8314,7 @@ function DesignStudioPage({ data, locale, t }) {
   return (
     <section className="view-surface view-surface--design-studio sidebar-page" id="design-studio" aria-labelledby="design-studio-heading">
       <DetailPageHeader tone="design-studio" Icon={Wrench} title={t("designStudio.title")} subtitle={t("designStudio.description")} data={data} locale={locale} t={t} actionLabel={t("detail.refreshDisplayOnly")} headingId="design-studio-heading" />
+      <OperationalPageSummaryStack data={data} context={context} liveStatus={liveStatus} pageId="design-studio" tone="sidebar" keys={["local_tests", "git_sync", "ci", "security"]} t={t} />
       <DetailDecisionSummary
         tone="sidebar"
         t={t}
@@ -8222,7 +8977,7 @@ function DesignStudioPage({ data, locale, t }) {
   );
 }
 
-function SettingsPage({ data, locale, t, onRefreshSnapshot }) {
+function SettingsPage({ data, locale, t, onRefreshSnapshot, liveStatus }) {
   const [selectedSettingId, setSelectedSettingId] = useState("");
   const [draftValue, setDraftValue] = useState("");
   const [confirmed, setConfirmed] = useState(false);
@@ -8512,7 +9267,7 @@ function SettingsPage({ data, locale, t, onRefreshSnapshot }) {
   return (
     <section className="view-surface view-surface--settings sidebar-page" id="settings" aria-labelledby="settings-heading" data-dashboard-display-depth={displayDepth}>
       <DetailPageHeader tone="settings" Icon={Settings} title={t("settingsPage.title")} subtitle={t("settingsPage.description")} data={data} locale={locale} t={t} actionLabel={t("detail.refreshDisplayOnly")} headingId="settings-heading" />
-      <ProducerDecisionSummary data={data} pageId="settings" tone="sidebar" t={t} />
+      <OperationalPageSummaryStack data={data} context={context} liveStatus={liveStatus} pageId="settings" tone="sidebar" keys={["local_tests", "git_sync", "ci", "security"]} t={t} />
       <DetailDecisionSummary
         tone="sidebar"
         t={t}
@@ -8908,7 +9663,7 @@ function glossaryTermDetail(categoryId, term, t, data) {
   };
 }
 
-function HelpPage({ data, locale, t }) {
+function HelpPage({ data, locale, t, liveStatus }) {
   const [query, setQuery] = useState("");
   const contextSummary = helpCurrentContextSummary(data, t);
   const normalizedQuery = query.trim().toLowerCase();
@@ -8935,6 +9690,7 @@ function HelpPage({ data, locale, t }) {
   return (
     <section className="view-surface view-surface--help sidebar-page" id="help" aria-labelledby="help-heading">
       <DetailPageHeader tone="help" Icon={CircleHelp} title={t("helpPage.title")} subtitle={t("helpPage.description")} data={data} locale={locale} t={t} actionLabel={t("detail.refreshDisplayOnly")} headingId="help-heading" />
+      <OperationalPageSummaryStack data={data} context={contextSummary.context} liveStatus={liveStatus} pageId="help" tone="sidebar" keys={["local_tests", "git_sync", "ci", "security"]} t={t} />
       <DetailDecisionSummary
         tone="sidebar"
         t={t}
@@ -9112,7 +9868,7 @@ function HistoryIssueList({ warnings, failures, t }) {
   );
 }
 
-function HistoryPage({ data, locale, t }) {
+function HistoryPage({ data, locale, t, liveStatus }) {
   const context = selectedContextData(data);
   const scope = historyRepositoryScope(data);
   const targetRepository = repositoryDisplayName(context.target_repository?.name || scope.repository_name, t);
@@ -9127,7 +9883,7 @@ function HistoryPage({ data, locale, t }) {
   return (
     <section className="view-surface view-surface--history sidebar-page" id="history" aria-labelledby="history-heading">
       <DetailPageHeader tone="history" Icon={Clock} title={t("historyPage.title")} subtitle={t("historyPage.description")} data={data} locale={locale} t={t} actionLabel={t("detail.refreshDisplayOnly")} headingId="history-heading" />
-      <ProducerDecisionSummary data={data} pageId="history" tone="sidebar" t={t} />
+      <OperationalPageSummaryStack data={data} context={context} liveStatus={liveStatus} pageId="history" tone="sidebar" keys={["local_tests", "git_sync", "ci", "security"]} t={t} />
       <DetailDecisionSummary
         tone="sidebar"
         t={t}
@@ -9334,15 +10090,22 @@ function BrandMark() {
   );
 }
 
-function resolveRefreshIntervalMs() {
-  const defaultRefreshMs = 3000;
+function refreshIntervalFromSearch(paramName, defaultRefreshMs) {
   const params = new URLSearchParams(window.location.search);
   // Test-only override for deterministic Playwright refresh assertions.
-  const requested = Number(params.get("refresh_ms"));
+  const requested = Number(params.get(paramName) || params.get("refresh_ms"));
   if (Number.isFinite(requested) && requested >= 100) {
     return Math.min(requested, 60000);
   }
   return defaultRefreshMs;
+}
+
+function resolveLiveRefreshIntervalMs() {
+  return refreshIntervalFromSearch("live_refresh_ms", 3000);
+}
+
+function resolveSnapshotRefreshIntervalMs() {
+  return refreshIntervalFromSearch("snapshot_refresh_ms", 30000);
 }
 
 function resolveContextSwitchFallbackMs() {
@@ -9519,7 +10282,8 @@ export default function App() {
   const t = useMemo(() => createTranslator(locale), [locale]);
   const htmlLang = useMemo(() => getDashboardIntlLocale(locale), [locale]);
   const htmlDirection = useMemo(() => getDashboardLocaleDirection(locale), [locale]);
-  const refreshIntervalMs = useMemo(() => resolveRefreshIntervalMs(), []);
+  const liveRefreshIntervalMs = useMemo(() => resolveLiveRefreshIntervalMs(), []);
+  const snapshotRefreshIntervalMs = useMemo(() => resolveSnapshotRefreshIntervalMs(), []);
   const contextSwitchFallbackMs = useMemo(() => resolveContextSwitchFallbackMs(), []);
   useEffect(() => {
     document.documentElement.lang = htmlLang;
@@ -9567,7 +10331,7 @@ export default function App() {
     }
     try {
       const savedSnapshotOnly = Boolean(options.savedSnapshotOnly);
-      const requestedMenuId = savedSnapshotOnly ? "" : displayText(options.menuId || activeMenuIdRef.current, "");
+      const requestedMenuId = savedSnapshotOnly ? "" : displayText(options.menuId || "", "");
       const snapshot = await fetchDashboardDataSnapshot(requestedMenuId ? { menuId: requestedMenuId } : {});
       if (!savedSnapshotOnly && !snapshotMatchesActiveMenu(snapshot, requestedMenuId)) {
         throw new Error(`dashboard data menu mismatch: requested ${requestedMenuId || "current"}, received ${producerMenuIdForData(snapshot?.data || {})}`);
@@ -9640,12 +10404,12 @@ export default function App() {
     }
 
     loadLiveStatus();
-    timerId = window.setInterval(loadLiveStatus, refreshIntervalMs);
+    timerId = window.setInterval(loadLiveStatus, liveRefreshIntervalMs);
     return () => {
       active = false;
       window.clearInterval(timerId);
     };
-  }, [loaded, refreshIntervalMs, activeMenuId]);
+  }, [loaded, liveRefreshIntervalMs, activeMenuId]);
 
   const clearContextSwitchPending = useCallback((menuId, delayMs = 0) => {
     window.setTimeout(() => {
@@ -9766,20 +10530,24 @@ export default function App() {
       inFlight = true;
       try {
         const firstSnapshotLoad = !firstSnapshotLoadedRef.current;
-        const requestedMenuId = displayText(activeMenuIdRef.current, "");
+        const requestedMenuId = "";
         const snapshot = await fetchDashboardDataSnapshot({});
         if (!active) {
           return;
         }
+        if (requestedMenuId && !snapshotMatchesActiveMenu(snapshot, requestedMenuId)) {
+          throw new Error(`dashboard data menu mismatch: requested ${requestedMenuId}, received ${producerMenuIdForData(snapshot?.data || {})}`);
+        }
         firstSnapshotLoadedRef.current = true;
-        if (pendingMenuIdRef.current || displayText(activeMenuIdRef.current, "") !== requestedMenuId) {
+        if (pendingMenuIdRef.current) {
           if (!firstSnapshotLoad) {
             return;
           }
         }
         publishSnapshot(snapshot);
-        if (firstSnapshotLoad && requestedMenuId) {
-          applyMenuFromSnapshotData(snapshot.data, requestedMenuId, { silent: true });
+        const requestedActiveMenuId = displayText(activeMenuIdRef.current, "");
+        if (firstSnapshotLoad && requestedActiveMenuId) {
+          applyMenuFromSnapshotData(snapshot.data, requestedActiveMenuId, { silent: true });
         }
       } catch (error) {
         if (!active) {
@@ -9798,12 +10566,12 @@ export default function App() {
     }
 
     loadSnapshot();
-    timerId = window.setInterval(loadSnapshot, refreshIntervalMs);
+    timerId = window.setInterval(loadSnapshot, snapshotRefreshIntervalMs);
     return () => {
       active = false;
       window.clearInterval(timerId);
     };
-  }, [applyMenuFromSnapshotData, clearContextSwitchPending, publishSnapshot, publishSnapshotError, refreshIntervalMs, snapshotMatchesActiveMenu]);
+  }, [applyMenuFromSnapshotData, clearContextSwitchPending, publishSnapshot, publishSnapshotError, snapshotRefreshIntervalMs, snapshotMatchesActiveMenu]);
 
   useEffect(() => {
     function handleManualSnapshotRefresh() {
@@ -9846,17 +10614,17 @@ export default function App() {
         ) : null}
 
         {loaded && activeView === "overview" ? <OverviewSection data={data} t={t} locale={locale} activeMenuId={activeDashboard.activeMenuId} pendingMenuId={pendingMenuId} onActiveMenuChange={handleActiveMenuChange} liveStatus={liveStatus} /> : null}
-        {loaded && activeView === "lessons" ? <LessonSection lessons={data.lessons || {}} data={data} locale={locale} t={t} /> : null}
+        {loaded && activeView === "lessons" ? <LessonSection lessons={data.lessons || {}} data={data} locale={locale} t={t} liveStatus={liveStatus} /> : null}
         {loaded && evidenceViewNeedsCurrentSnapshot ? <ContextSwitchHoldingPage pendingMenuId={activeDashboard.activeMenuId} t={t} switching={isContextSwitching && !contextSwitchProgress?.fallbackApplied} /> : null}
         {loaded && !evidenceViewNeedsCurrentSnapshot && activeView === "workflow" ? <WorkflowSection development={data.development || {}} gitWorkflow={data.git_workflow || {}} data={data} locale={locale} t={t} liveStatus={liveStatus} /> : null}
         {loaded && !evidenceViewNeedsCurrentSnapshot && activeView === "maintenance" ? <MaintenanceSection maintenance={data.maintenance || {}} data={data} locale={locale} t={t} liveStatus={liveStatus} /> : null}
         {loaded && !evidenceViewNeedsCurrentSnapshot && activeView === "safety" ? <SafetySection security={data.security || {}} actions={data.actions || {}} partialFailures={data.partial_failures || []} data={data} locale={locale} t={t} liveStatus={liveStatus} /> : null}
         {loaded && !evidenceViewNeedsCurrentSnapshot && activeView === "repository-info" ? <RepositoryInfoPage data={data} locale={locale} t={t} liveStatus={liveStatus} /> : null}
-        {loaded && !evidenceViewNeedsCurrentSnapshot && activeView === "documents" ? <DocumentsPage data={data} locale={locale} t={t} /> : null}
-        {loaded && activeView === "settings" ? <SettingsPage data={data} locale={locale} t={t} onRefreshSnapshot={refreshSnapshotNow} /> : null}
-        {loaded && !evidenceViewNeedsCurrentSnapshot && activeView === "design-studio" ? <DesignStudioPage data={data} locale={locale} t={t} /> : null}
-        {loaded && !evidenceViewNeedsCurrentSnapshot && activeView === "help" ? <HelpPage data={data} locale={locale} t={t} /> : null}
-        {loaded && !evidenceViewNeedsCurrentSnapshot && activeView === "history" ? <HistoryPage data={data} locale={locale} t={t} /> : null}
+        {loaded && !evidenceViewNeedsCurrentSnapshot && activeView === "documents" ? <DocumentsPage data={data} locale={locale} t={t} liveStatus={liveStatus} /> : null}
+        {loaded && activeView === "settings" ? <SettingsPage data={data} locale={locale} t={t} onRefreshSnapshot={refreshSnapshotNow} liveStatus={liveStatus} /> : null}
+        {loaded && !evidenceViewNeedsCurrentSnapshot && activeView === "design-studio" ? <DesignStudioPage data={data} locale={locale} t={t} liveStatus={liveStatus} /> : null}
+        {loaded && !evidenceViewNeedsCurrentSnapshot && activeView === "help" ? <HelpPage data={data} locale={locale} t={t} liveStatus={liveStatus} /> : null}
+        {loaded && !evidenceViewNeedsCurrentSnapshot && activeView === "history" ? <HistoryPage data={data} locale={locale} t={t} liveStatus={liveStatus} /> : null}
       </section>
     </main>
   );

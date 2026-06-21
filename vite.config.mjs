@@ -26,11 +26,17 @@ const dashboardUiLocales = new Set(DASHBOARD_LOCALE_CODES);
 const dashboardUiDirections = new Set(["ltr", "rtl"]);
 const dashboardMenuIds = new Set(["step_1_7", "step_1_14", "advanced", "free-development", "product-improvement", "external-integration", "lesson-repository-improvement"]);
 const repositoryPathStates = new Set(["configured", "missing", "not_applicable", "unknown"]);
+const repositorySelectionStates = new Set(["none", "explicit", "fallback", "request", "not_applicable"]);
 const evidenceFreshnessStates = new Set(["current", "stale", "not_collected", "unknown"]);
 const evidenceAuthorities = new Set(["authoritative", "manual_required", "advisory", "not_collected"]);
 const liveCheckKeys = ["local_tests", "git_sync", "ci", "security"];
 const liveDetailPages = new Set(["#workflow", "#maintenance", "#safety", "#repository-info", "#documents", "#history", "#help"]);
 const ciHeadMatchStates = new Set(["matched", "different", "unknown"]);
+const runtimeActivityCategories = new Set(["ai_agent", "browser_review", "control_center", "data_refresh", "git", "ci", "test", "build", "check", "other"]);
+const runtimeActivityStates = new Set(["running", "exited", "unknown"]);
+const runtimeActivityCwdRoles = new Set(["lesson_repository", "product_repository", "unknown"]);
+const runtimeRedactionStates = new Set(["redacted"]);
+const secretLikePattern = /(SECRET|TOKEN|API_KEY|PASSWORD|PRIVATE_KEY)\s*[:=]\s*[^\s#]{8,}|gh[pousr]_[A-Za-z0-9_]{20,}|sk-[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16}|BEGIN (RSA |OPENSSH |EC |DSA )?PRIVATE KEY/i;
 const languageCodePattern = /^[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8})?$|^custom$/;
 const designSystemPlanTokenTtlMs = 10 * 60 * 1000;
 const settingsPlanTokenTtlMs = designSystemPlanTokenTtlMs;
@@ -76,6 +82,17 @@ function safeScopedRelativePath(value) {
     return false;
   }
   return value.startsWith("product:") ? safeRelativePath(value.slice("product:".length)) : safeRelativePath(value);
+}
+
+function safeRuntimePreview(value) {
+  if (typeof value !== "string") {
+    return false;
+  }
+  const normalized = value.replace(/[\u0000-\u001f]/g, "").replace(/\s+/g, " ").trim();
+  if (!normalized || normalized.length > 160 || secretLikePattern.test(normalized)) {
+    return false;
+  }
+  return !/(^|\s)(\/|[A-Za-z]:[\\/]|\\\\)/.test(normalized);
 }
 
 function validateSettingsCatalog(settings) {
@@ -392,6 +409,51 @@ function validateDashboardLiveCheckPayload(check, key) {
   return check.items.every((item) => validateDashboardLiveCheckItemPayload(item, key));
 }
 
+function validateDashboardRuntimeActivityItemPayload(item, label) {
+  if (!isObject(item)) {
+    return validationFailure(`invalid_${label}_item`);
+  }
+  if (!nonEmptyString(item.command_id) || !nonEmptyString(item.pid_hash) || !/^[a-f0-9]{8,32}$/.test(String(item.pid_hash))) {
+    return validationFailure(`invalid_${label}_item_identity`);
+  }
+  if (!runtimeActivityCategories.has(String(item.category || ""))) {
+    return validationFailure(`invalid_${label}_item_category`);
+  }
+  if (!runtimeActivityStates.has(String(item.state || ""))) {
+    return validationFailure(`invalid_${label}_item_state`);
+  }
+  if (!validNonNegativeNumber(item.elapsed_ms)) {
+    return validationFailure(`invalid_${label}_item_elapsed`);
+  }
+  if (!runtimeActivityCwdRoles.has(String(item.cwd_role || ""))) {
+    return validationFailure(`invalid_${label}_item_cwd_role`);
+  }
+  if (!safeRuntimePreview(item.argv_preview)) {
+    return validationFailure(`invalid_${label}_item_argv_preview`);
+  }
+  if (!runtimeRedactionStates.has(String(item.redaction_status || ""))) {
+    return validationFailure(`invalid_${label}_item_redaction`);
+  }
+  return true;
+}
+
+function validateDashboardRuntimeActivityPayload(activity, label) {
+  if (activity === undefined || activity === null) {
+    return true;
+  }
+  if (!isObject(activity) || !nonEmptyString(activity.observed_at) || !validNonNegativeNumber(activity.process_count)) {
+    return validationFailure(`invalid_${label}`);
+  }
+  if (!runtimeRedactionStates.has(String(activity.redaction_status || ""))) {
+    return validationFailure(`invalid_${label}_redaction`);
+  }
+  const items = Array.isArray(activity.items) ? activity.items : Array.isArray(activity.processes) ? activity.processes : null;
+  if (!Array.isArray(items)) {
+    return validationFailure(`invalid_${label}_items`);
+  }
+  return items.every((item) => validateDashboardRuntimeActivityItemPayload(item, label));
+}
+
 export function validateDashboardLiveStatus(body) {
   let data;
   try {
@@ -408,16 +470,24 @@ export function validateDashboardLiveStatus(body) {
   const targetRepository = data.target_repository;
   if (
     !isObject(targetRepository) ||
+    (targetRepository.repo_id !== undefined && !nonEmptyString(targetRepository.repo_id)) ||
     !nonEmptyString(targetRepository.name) ||
     !repositoryPathStates.has(String(targetRepository.path_state || "")) ||
     !repositoryPathStates.has(String(targetRepository.git_state || "")) ||
-    !nonEmptyString(targetRepository.git_usage_mode)
+    !nonEmptyString(targetRepository.git_usage_mode) ||
+    (targetRepository.selection_state !== undefined && !repositorySelectionStates.has(String(targetRepository.selection_state || "")))
   ) {
     return validationFailure("invalid_live_status_repository");
   }
   const repositoryState = data.repository_state;
   if (!isObject(repositoryState) || !["dirty_count", "untracked_count", "ahead", "behind"].every((key) => validNonNegativeNumber(repositoryState[key]))) {
     return validationFailure("invalid_live_status_repository_state");
+  }
+  if (!validateDashboardRuntimeActivityPayload(data.runtime_activity, "live_status_runtime_activity")) {
+    return false;
+  }
+  if (!validateDashboardRuntimeActivityPayload(data.active_operations, "live_status_active_operations")) {
+    return false;
   }
   const checks = data.checks;
   if (!isObject(checks)) {
@@ -1402,6 +1472,16 @@ export default defineConfig({
               name: "dashboard-i18n",
               test: /dashboard-control-center[\\/]src[\\/]i18n\.js$/,
               priority: 23,
+            },
+            {
+              name: "dashboard-decision-summary",
+              test: /dashboard-control-center[\\/]src[\\/]DecisionSummary\.jsx$/,
+              priority: 22,
+            },
+            {
+              name: "dashboard-context-runtime",
+              test: /dashboard-control-center[\\/]src[\\/](dashboardContext|displayDepth)\.js$/,
+              priority: 21,
             },
             {
               name: "dashboard-design-system",

@@ -191,6 +191,36 @@ dashboard_target_repository_root() {
   printf '%s' "$root"
 }
 
+dashboard_selected_repository_id_for_menu() {
+  local menu_id="${1:-$SELECTED_MENU_ID}"
+  if product_repository_registry_context_supported "$menu_id"; then
+    product_repository_registry_id_for_menu "$menu_id" 2>/dev/null || printf 'not_selected'
+    return
+  fi
+  case "$menu_id" in
+    step_1_7|step_1_14|advanced)
+      printf 'lesson_product_repository'
+      ;;
+    lesson-repository-improvement)
+      printf 'lesson_repository'
+      ;;
+    *)
+      printf 'not_applicable'
+      ;;
+  esac
+}
+
+dashboard_selected_repository_selection_state_for_menu() {
+  local menu_id="${1:-$SELECTED_MENU_ID}"
+  local selected_id
+  if product_repository_registry_context_supported "$menu_id"; then
+    selected_id="$(product_repository_registry_id_for_menu "$menu_id" 2>/dev/null || true)"
+    dashboard_repository_selection_state_for_menu "$menu_id" "$selected_id"
+    return
+  fi
+  printf 'not_applicable'
+}
+
 dashboard_selected_product_root() {
   local menu_id="${1:-$SELECTED_MENU_ID}"
   dashboard_target_repository_root "$menu_id" 2>/dev/null || return 1
@@ -1477,7 +1507,10 @@ dashboard_json_document_brief_card() {
   local order="${10}"
   local menu_id="${11:-$SELECTED_MENU_ID}"
   local title_json detail_json summary_json action_json source_paths current_source_hash stored_source_hash updated_at freshness_state
+  local workflow_context repo_id
   local -a source_path_array=()
+  workflow_context="$(dashboard_selected_workflow_context "$menu_id")"
+  repo_id="$(dashboard_selected_repository_id_for_menu "$menu_id")"
   source_paths="$(dashboard_document_decision_brief_source_paths "$id" "$menu_id")"
   IFS=';' read -r -a source_path_array <<<"$source_paths"
   current_source_hash="$(dashboard_document_decision_brief_current_hash "$id" "$menu_id" 2>/dev/null || printf '')"
@@ -1490,6 +1523,14 @@ dashboard_json_document_brief_card() {
   action_json="$(dashboard_json_document_brief_text_for_state "$id" action "$action_key" "$freshness_state")"
   status="$(dashboard_document_decision_brief_status "$id" "$status" "$menu_id")"
   printf '{"id":'
+  dashboard_json_string "$id"
+  printf ',"menu_id":'
+  dashboard_json_string "$menu_id"
+  printf ',"workflow_context":'
+  dashboard_json_string "$workflow_context"
+  printf ',"repo_id":'
+  dashboard_json_string "$repo_id"
+  printf ',"document_role":'
   dashboard_json_string "$id"
   printf ',"source_label_key":'
   dashboard_json_string "$(dashboard_document_decision_brief_source_label_key "$id")"
@@ -2079,15 +2120,22 @@ dashboard_json_selected_context() {
   local ci_requirement="${16}"
   local next_safe_action_json="${17}"
   local blockers_json="${18}"
+  local repo_id selection_state
 
+  repo_id="$(dashboard_selected_repository_id_for_menu "$menu_id")"
+  selection_state="$(dashboard_selected_repository_selection_state_for_menu "$menu_id")"
   printf '{"menu_id":'
   dashboard_json_string "$menu_id"
   printf ',"workflow_context":'
   dashboard_json_string "$workflow_context"
-  printf ',"target_repository":{"name":'
+  printf ',"target_repository":{"repo_id":'
+  dashboard_json_string "$repo_id"
+  printf ',"name":'
   dashboard_json_string "$target_name"
   printf ',"path_state":'
   dashboard_json_string "$path_state"
+  printf ',"selection_state":'
+  dashboard_json_string "$selection_state"
   printf '},"product_type":'
   dashboard_json_string "$(dashboard_product_type_for_menu "$menu_id")"
   printf ',"git_usage_mode":'
@@ -3779,16 +3827,546 @@ process.stdout.write(JSON.stringify({
 NODE
 }
 
+dashboard_live_git_activity_json() {
+  local repo="$1"
+  local path_state="$2"
+  local git_state="$3"
+  local mode="$4"
+  local repository_state_json="$5"
+  local ci_summary_json="$6"
+  local generated_at="$7"
+  local remote_required="$8"
+  local git_required="$9"
+  DASHBOARD_LIVE_GIT_ACTIVITY_REPO="$repo" \
+  DASHBOARD_LIVE_GIT_ACTIVITY_PATH_STATE="$path_state" \
+  DASHBOARD_LIVE_GIT_ACTIVITY_GIT_STATE="$git_state" \
+  DASHBOARD_LIVE_GIT_ACTIVITY_MODE="$mode" \
+  DASHBOARD_LIVE_GIT_ACTIVITY_REPOSITORY_STATE_JSON="$repository_state_json" \
+  DASHBOARD_LIVE_GIT_ACTIVITY_CI_SUMMARY_JSON="$ci_summary_json" \
+  DASHBOARD_LIVE_GIT_ACTIVITY_GENERATED_AT="$generated_at" \
+  DASHBOARD_LIVE_GIT_ACTIVITY_REMOTE_REQUIRED="$remote_required" \
+  DASHBOARD_LIVE_GIT_ACTIVITY_GIT_REQUIRED="$git_required" \
+  DASHBOARD_LIVE_GIT_ACTIVITY_ROOT="$ROOT" \
+  node <<'NODE'
+const childProcess = require("node:child_process");
+const fs = require("node:fs");
+
+function parseJson(value, fallback) {
+  try {
+    return JSON.parse(value || "");
+  } catch {
+    return fallback;
+  }
+}
+function text(value, fallback = "") {
+  if (value === null || value === undefined) return fallback;
+  const normalized = String(value).replace(/[\u0000-\u001f]/g, "").replace(/\s+/g, " ").trim();
+  return normalized || fallback;
+}
+function safeNumber(value, fallback = 0) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed >= 0 ? Math.floor(parsed) : fallback;
+}
+function realPath(value) {
+  try {
+    return fs.realpathSync(value);
+  } catch {
+    return "";
+  }
+}
+function bool(value) {
+  return ["1", "true", "yes", "on"].includes(String(value || "").toLowerCase());
+}
+function git(args, fallback = "") {
+  try {
+    return childProcess.execFileSync("git", ["-C", repo, ...args], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+      timeout: 1000,
+    }).trim();
+  } catch {
+    return fallback;
+  }
+}
+function safeBranch(value) {
+  return text(value).replace(/^refs\/heads\//, "").slice(0, 160);
+}
+function shortHead(value) {
+  const normalized = text(value);
+  return normalized.length > 12 ? normalized.slice(0, 12) : normalized;
+}
+function statusFromCi(ciSummary) {
+  const value = text(ciSummary.status, "unknown");
+  return allowedStates.has(value) ? value : "unknown";
+}
+function operation(id, status, detailCode, extra = {}) {
+  const normalized = allowedStates.has(status) ? status : "unknown";
+  return {
+    id,
+    status: normalized,
+    detail_code: detailCode,
+    observed_at: generatedAt,
+    ...extra,
+  };
+}
+
+const allowedStates = new Set(["missing", "ready", "passed", "failed", "blocked", "unknown", "optional", "cached", "not_run", "stale", "approval_required", "manual_required", "not_applicable"]);
+const repo = realPath(process.env.DASHBOARD_LIVE_GIT_ACTIVITY_REPO || "");
+const root = realPath(process.env.DASHBOARD_LIVE_GIT_ACTIVITY_ROOT || "");
+const pathState = text(process.env.DASHBOARD_LIVE_GIT_ACTIVITY_PATH_STATE, "unknown");
+const gitState = text(process.env.DASHBOARD_LIVE_GIT_ACTIVITY_GIT_STATE, "unknown");
+const mode = text(process.env.DASHBOARD_LIVE_GIT_ACTIVITY_MODE, "unknown");
+const generatedAt = text(process.env.DASHBOARD_LIVE_GIT_ACTIVITY_GENERATED_AT, new Date().toISOString().replace(/\.\d{3}Z$/, "Z"));
+const repositoryState = parseJson(process.env.DASHBOARD_LIVE_GIT_ACTIVITY_REPOSITORY_STATE_JSON, {});
+const ciSummary = parseJson(process.env.DASHBOARD_LIVE_GIT_ACTIVITY_CI_SUMMARY_JSON, {});
+const remoteRequired = bool(process.env.DASHBOARD_LIVE_GIT_ACTIVITY_REMOTE_REQUIRED);
+const gitRequired = bool(process.env.DASHBOARD_LIVE_GIT_ACTIVITY_GIT_REQUIRED);
+const branchLimit = Math.max(1, Math.min(20, safeNumber(process.env.DASHBOARD_LIVE_GIT_BRANCH_SAMPLE_LIMIT, 8)));
+const worktreeLimit = Math.max(1, Math.min(20, safeNumber(process.env.DASHBOARD_LIVE_GIT_WORKTREE_SAMPLE_LIMIT, 8)));
+const unusedBranchDays = Math.max(1, Math.min(3650, safeNumber(process.env.DASHBOARD_LIVE_GIT_UNUSED_BRANCH_DAYS, 30)));
+const unavailable = pathState !== "configured" || gitState !== "configured" || !repo;
+
+if (unavailable) {
+  process.stdout.write(JSON.stringify({
+    observed_at: generatedAt,
+    status: pathState === "missing" || gitState === "missing" ? "missing" : pathState === "not_applicable" || gitState === "not_applicable" ? "not_applicable" : "unknown",
+    mode,
+    repository_role: root && repo && (repo === root || repo.startsWith(`${root}/`)) ? "lesson_repository" : "selected_repository",
+    operations: [],
+    branches: { current: "", total_count: 0, unused_count: 0, unused_candidates: [] },
+    worktrees: { count: 0, items: [] },
+  }));
+  process.exit(0);
+}
+
+const statusLines = git(["status", "--porcelain=v1"]).split(/\r?\n/).filter(Boolean);
+let stagedCount = 0;
+let unstagedCount = 0;
+let untrackedCount = 0;
+for (const line of statusLines) {
+  if (line.startsWith("??")) {
+    untrackedCount += 1;
+    continue;
+  }
+  if (line[0] && line[0] !== " ") stagedCount += 1;
+  if (line[1] && line[1] !== " ") unstagedCount += 1;
+}
+const currentBranch = safeBranch(git(["branch", "--show-current"]));
+const head = shortHead(git(["rev-parse", "--short=12", "HEAD"]));
+const upstream = text(git(["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"]));
+let ahead = safeNumber(repositoryState.ahead);
+let behind = safeNumber(repositoryState.behind);
+if (upstream) {
+  const counts = git(["rev-list", "--left-right", "--count", "HEAD...@{u}"]).split(/\s+/);
+  ahead = safeNumber(counts[0]);
+  behind = safeNumber(counts[1]);
+}
+
+const worktreeRecords = [];
+let currentWorktree = null;
+for (const line of git(["worktree", "list", "--porcelain"]).split(/\r?\n/)) {
+  if (line.startsWith("worktree ")) {
+    if (currentWorktree) worktreeRecords.push(currentWorktree);
+    const path = realPath(line.slice("worktree ".length));
+    currentWorktree = {
+      path_role: path && path === repo ? "selected_repository" : path && root && (path === root || path.startsWith(`${root}/`)) ? "lesson_repository" : "other_worktree",
+      branch: "",
+      head: "",
+      detached: false,
+    };
+  } else if (currentWorktree && line.startsWith("HEAD ")) {
+    currentWorktree.head = shortHead(line.slice("HEAD ".length));
+  } else if (currentWorktree && line.startsWith("branch ")) {
+    currentWorktree.branch = safeBranch(line.slice("branch ".length));
+  } else if (currentWorktree && line === "detached") {
+    currentWorktree.detached = true;
+  }
+}
+if (currentWorktree) worktreeRecords.push(currentWorktree);
+const checkedOutBranches = new Set(worktreeRecords.map((item) => item.branch).filter(Boolean));
+
+const nowSeconds = Math.floor(Date.now() / 1000);
+const branchRows = git(["for-each-ref", "--format=%(refname:short)%09%(committerdate:unix)%09%(upstream:short)", "refs/heads"])
+  .split(/\r?\n/)
+  .filter(Boolean)
+  .map((line) => {
+    const [name, unix, upstreamName] = line.split("\t");
+    const lastCommitAgeDays = Math.max(0, Math.floor((nowSeconds - safeNumber(unix, nowSeconds)) / 86400));
+    const branch = safeBranch(name);
+    return {
+      branch,
+      upstream: text(upstreamName),
+      last_commit_age_days: lastCommitAgeDays,
+      checked_out: checkedOutBranches.has(branch),
+      current: branch && branch === currentBranch,
+    };
+  });
+const unusedCandidates = branchRows
+  .filter((row) => !row.current && !row.checked_out && row.last_commit_age_days >= unusedBranchDays)
+  .sort((left, right) => right.last_commit_age_days - left.last_commit_age_days || left.branch.localeCompare(right.branch))
+  .slice(0, branchLimit);
+
+const changedCount = stagedCount + unstagedCount + untrackedCount;
+const ciRequired = mode === "ci";
+const ciStatus = statusFromCi(ciSummary);
+const operations = [
+  operation("commit", changedCount > 0 ? "manual_required" : "ready", changedCount > 0 ? "commit_changes_present" : "commit_clean", { changed_count: changedCount, staged_count: stagedCount, unstaged_count: unstagedCount, untracked_count: untrackedCount }),
+  operation("push", ahead > 0 ? "manual_required" : upstream ? "ready" : remoteRequired ? "missing" : "not_applicable", ahead > 0 ? "push_pending" : upstream ? "push_not_needed" : remoteRequired ? "upstream_missing" : "push_not_required", { ahead, upstream }),
+  operation("pull", behind > 0 ? "stale" : upstream ? "ready" : remoteRequired ? "missing" : "not_applicable", behind > 0 ? "pull_pending" : upstream ? "pull_not_needed" : remoteRequired ? "upstream_missing" : "pull_not_required", { behind, upstream }),
+  operation("local_remote_sync", behind > 0 ? "stale" : ahead > 0 ? "manual_required" : upstream ? "ready" : remoteRequired ? "missing" : "not_applicable", behind > 0 ? "behind_upstream" : ahead > 0 ? "ahead_of_upstream" : upstream ? "synced" : remoteRequired ? "upstream_missing" : "sync_not_required", { ahead, behind, upstream }),
+  operation("pr_ci", ciRequired ? ciStatus : "not_applicable", ciRequired ? text(ciSummary.detail_code, "ci_status_unknown") : "pr_ci_not_required", { run_status: text(ciSummary.run_status), conclusion: text(ciSummary.conclusion), head_match_status: text(ciSummary.head_match_status, "unknown") }),
+  operation("main_ci", ciRequired ? (currentBranch === "main" ? ciStatus : "manual_required") : "not_applicable", ciRequired ? (currentBranch === "main" ? text(ciSummary.detail_code, "ci_status_unknown") : "main_ci_after_merge") : "main_ci_not_required", { run_status: text(ciSummary.run_status), conclusion: text(ciSummary.conclusion), head_match_status: text(ciSummary.head_match_status, "unknown") }),
+  operation("worktrees", worktreeRecords.length > 1 ? "optional" : "ready", worktreeRecords.length > 1 ? "multiple_worktrees" : "single_worktree", { count: worktreeRecords.length }),
+  operation("unused_branches", unusedCandidates.length ? "optional" : "ready", unusedCandidates.length ? "unused_branch_candidates" : "no_unused_branch_candidates", { count: unusedCandidates.length, threshold_days: unusedBranchDays }),
+];
+let status = "ready";
+if (operations.some((item) => ["failed", "blocked", "missing", "stale", "manual_required"].includes(item.status))) {
+  status = operations.find((item) => ["failed", "blocked", "missing", "stale", "manual_required"].includes(item.status)).status;
+} else if (!gitRequired) {
+  status = changedCount > 0 ? "optional" : "not_applicable";
+}
+
+process.stdout.write(JSON.stringify({
+  observed_at: generatedAt,
+  status,
+  mode,
+  repository_role: root && repo && (repo === root || repo.startsWith(`${root}/`)) ? "lesson_repository" : "selected_repository",
+  current_branch: currentBranch,
+  head,
+  upstream,
+  staged_count: stagedCount,
+  unstaged_count: unstagedCount,
+  untracked_count: untrackedCount,
+  dirty_count: stagedCount + unstagedCount,
+  ahead,
+  behind,
+  operations,
+  branches: {
+    current: currentBranch,
+    total_count: branchRows.length,
+    unused_count: unusedCandidates.length,
+    unused_threshold_days: unusedBranchDays,
+    unused_candidates: unusedCandidates,
+  },
+  worktrees: {
+    count: worktreeRecords.length,
+    items: worktreeRecords.slice(0, worktreeLimit),
+  },
+}));
+NODE
+}
+
+dashboard_live_test_activity_json() {
+  local generated_at="$1"
+  DASHBOARD_LIVE_TEST_ACTIVITY_GENERATED_AT="$generated_at" \
+  DASHBOARD_LIVE_TEST_ACTIVITY_ROOT="$ROOT" \
+  node <<'NODE'
+const fs = require("node:fs");
+const path = require("node:path");
+const childProcess = require("node:child_process");
+
+function text(value, fallback = "") {
+  if (value === null || value === undefined) return fallback;
+  const normalized = String(value).replace(/[\u0000-\u001f]/g, "").replace(/\s+/g, " ").trim();
+  return normalized || fallback;
+}
+function safeNumber(value, fallback = 0) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed >= 0 ? Math.floor(parsed) : fallback;
+}
+function classifyCommand(command) {
+  const value = text(command);
+  if (!value) return "check";
+  if (/\b(playwright|test:e2e|e2e)\b/.test(value)) return "e2e";
+  if (/\b(npm test|cargo test|test_.*\.sh|test)\b/.test(value)) return "test";
+  if (/\b(build|vite build)\b/.test(value)) return "build";
+  if (/\b(check|lint|tsc)\b/.test(value)) return "check";
+  return "check";
+}
+function statusFromExit(exitStatus, result) {
+  const normalizedResult = text(result).toLowerCase();
+  if (normalizedResult === "pass" || String(exitStatus) === "0") return "passed";
+  if (normalizedResult === "fail" || (String(exitStatus) && String(exitStatus) !== "0")) return "failed";
+  return "unknown";
+}
+function safeCommand(command) {
+  const value = text(command).replace(/(["'])(?:(?=(\\?))\2.)*?\1/g, "[arg]");
+  return value.slice(0, 220);
+}
+function readRunnerRows(root) {
+  const file = path.join(root, ".repository-development-runs", "records.tsv");
+  let raw = "";
+  try {
+    raw = fs.readFileSync(file, "utf8");
+  } catch {
+    return [];
+  }
+  const lines = raw.split(/\r?\n/).filter(Boolean);
+  const header = lines.shift();
+  if (!header) return [];
+  const columns = header.split("\t");
+  return lines.map((line) => {
+    const values = line.split("\t");
+    const row = {};
+    columns.forEach((column, index) => {
+      row[column] = values[index] || "";
+    });
+    return row;
+  });
+}
+function readRunning(root) {
+  let output = "";
+  try {
+    output = childProcess.execFileSync("ps", ["-eo", "pid=", "-o", "etimes=", "-o", "args="], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+      timeout: 1000,
+    });
+  } catch {
+    return [];
+  }
+  return output.split(/\r?\n/)
+    .map((line) => {
+      const match = String(line).trim().match(/^(\d+)\s+(\d+)\s+(.+)$/);
+      if (!match) return null;
+      const [, pid, elapsedSeconds, args] = match;
+      const command = text(args);
+      if (!/\b(npm test|cargo test|playwright|tools\/test_|tools\/check_|dashboard:build|vite\s+build)\b/.test(command)) return null;
+      if (command.includes("ps -eo")) return null;
+      return {
+        id: `running-${pid}`,
+        status: "manual_required",
+        state: "running",
+        category: classifyCommand(command),
+        command: safeCommand(command),
+        elapsed_ms: safeNumber(elapsedSeconds) * 1000,
+        observed_at: generatedAt,
+      };
+    })
+    .filter(Boolean)
+    .slice(0, 8);
+}
+
+const root = process.env.DASHBOARD_LIVE_TEST_ACTIVITY_ROOT || "";
+const generatedAt = text(process.env.DASHBOARD_LIVE_TEST_ACTIVITY_GENERATED_AT, new Date().toISOString().replace(/\.\d{3}Z$/, "Z"));
+const runnerRows = readRunnerRows(root)
+  .filter((row) => /\b(test|check|build|lint|playwright|e2e)\b/i.test(`${row.check_id} ${row.command}`))
+  .slice(-20)
+  .reverse()
+  .map((row) => ({
+    id: text(row.check_id, "check"),
+    status: statusFromExit(row.exit_status, row.result),
+    state: "completed",
+    category: classifyCommand(row.command || row.check_id),
+    command: safeCommand(row.command || row.check_id),
+    started_at: text(row.started_at),
+    finished_at: text(row.finished_at),
+    phase_id: text(row.phase_id),
+    head: text(row.head).slice(0, 12),
+  }));
+const running = readRunning(root);
+const latestCompleted = runnerRows[0] || null;
+const failedCount = runnerRows.filter((row) => row.status === "failed").length;
+let status = "not_run";
+if (running.length) status = "manual_required";
+else if (latestCompleted) status = latestCompleted.status;
+process.stdout.write(JSON.stringify({
+  observed_at: generatedAt,
+  status,
+  running_count: running.length,
+  completed_count: runnerRows.length,
+  failed_count: failedCount,
+  latest_completed: latestCompleted,
+  running,
+  recent: runnerRows.slice(0, 8),
+}));
+NODE
+}
+
+dashboard_cached_product_authority_json_for_menu() {
+  local menu_id="$1"
+  local snapshot_file="${DASHBOARD_CONTROL_CENTER_DATA_FILE:-$ROOT/.dashboard-control-center/dashboard-data.json}"
+  [[ -f "$snapshot_file" ]] || return 1
+  DASHBOARD_LIVE_AUTHORITY_SNAPSHOT="$snapshot_file" DASHBOARD_LIVE_AUTHORITY_MENU_ID="$menu_id" node <<'NODE'
+const fs = require("node:fs");
+
+const file = process.env.DASHBOARD_LIVE_AUTHORITY_SNAPSHOT || "";
+const menuId = process.env.DASHBOARD_LIVE_AUTHORITY_MENU_ID || "";
+let data;
+try {
+  data = JSON.parse(fs.readFileSync(file, "utf8"));
+} catch (_error) {
+  process.exit(1);
+}
+if (String(data?.selected_context?.menu_id || "") !== menuId) {
+  process.exit(1);
+}
+const authority = data?.development?.product_authority;
+if (!authority || typeof authority !== "object" || Array.isArray(authority)) {
+  process.exit(1);
+}
+process.stdout.write(JSON.stringify(authority));
+NODE
+}
+
+dashboard_live_product_authority_json_for_menu() {
+  local menu_id="$1"
+  local context_override="$2"
+  case "${DASHBOARD_LIVE_STATUS_EAGER_AUTHORITY:-0}" in
+    1|true|yes|on)
+      dashboard_product_authority_json_for_menu "$menu_id" "$context_override"
+      return
+      ;;
+  esac
+  dashboard_cached_product_authority_json_for_menu "$menu_id" 2>/dev/null && return
+  dashboard_deferred_product_authority_json_for_menu "$menu_id"
+}
+
+dashboard_runtime_activity_json() {
+  local generated_at="$1"
+  local target_repo="${2:-}"
+  DASHBOARD_RUNTIME_ACTIVITY_GENERATED_AT="$generated_at" \
+  DASHBOARD_RUNTIME_ACTIVITY_ROOT="$ROOT" \
+  DASHBOARD_RUNTIME_ACTIVITY_TARGET_REPO="$target_repo" \
+  node <<'NODE'
+const crypto = require("node:crypto");
+const fs = require("node:fs");
+const childProcess = require("node:child_process");
+
+function text(value, fallback = "") {
+  if (value === null || value === undefined) return fallback;
+  const normalized = String(value).replace(/[\u0000-\u001f]/g, "").replace(/\s+/g, " ").trim();
+  return normalized || fallback;
+}
+
+function safeNumber(value, fallback = 0) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed >= 0 ? Math.floor(parsed) : fallback;
+}
+
+function hash(value) {
+  return crypto.createHash("sha256").update(String(value)).digest("hex").slice(0, 16);
+}
+
+function realPath(value) {
+  try {
+    return fs.realpathSync(value);
+  } catch {
+    return "";
+  }
+}
+
+const root = realPath(process.env.DASHBOARD_RUNTIME_ACTIVITY_ROOT || "");
+const targetRepo = realPath(process.env.DASHBOARD_RUNTIME_ACTIVITY_TARGET_REPO || "");
+const generatedAt = text(process.env.DASHBOARD_RUNTIME_ACTIVITY_GENERATED_AT, new Date().toISOString().replace(/\.\d{3}Z$/, "Z"));
+const limit = Math.max(1, Math.min(20, safeNumber(process.env.DASHBOARD_RUNTIME_ACTIVITY_LIMIT, 8)));
+
+function cwdRole(pid) {
+  const cwd = realPath(`/proc/${pid}/cwd`);
+  if (!cwd) return "unknown";
+  if (root && (cwd === root || cwd.startsWith(`${root}/`))) return "lesson_repository";
+  if (targetRepo && (cwd === targetRepo || cwd.startsWith(`${targetRepo}/`))) return "product_repository";
+  return "unknown";
+}
+
+function classify(args) {
+  const value = text(args);
+  if (!value || value.includes("ps -eo pid=")) return null;
+  if (value.includes("tools/dashboard-control-center")) {
+    return { command_id: "dashboard-control-center.open", category: "control_center", argv_preview: "tools/dashboard-control-center open" };
+  }
+  if (value.includes("tools/dashboard-data live-status")) {
+    return { command_id: "dashboard-data.live-status", category: "data_refresh", argv_preview: "tools/dashboard-data live-status" };
+  }
+  if (value.includes("tools/dashboard-data")) {
+    return { command_id: "dashboard-data.snapshot", category: "data_refresh", argv_preview: "tools/dashboard-data snapshot" };
+  }
+  if (value.includes("node_modules/.bin/vite") || /\bvite\b.*--host\s+127\.0\.0\.1/.test(value)) {
+    return { command_id: "dashboard-control-center.server", category: "control_center", argv_preview: "vite dashboard server" };
+  }
+  if (value.includes("node_modules/.bin/playwright") || /\bplaywright\b/.test(value)) {
+    return { command_id: "browser-review.playwright", category: "browser_review", argv_preview: "playwright browser review" };
+  }
+  if (value.includes("npm run dashboard:build") || /\bvite\b.*build/.test(value)) {
+    return { command_id: "dashboard.build", category: "build", argv_preview: "npm run dashboard:build" };
+  }
+  if (/\btools\/test_/.test(value) || /\btools\/check_/.test(value)) {
+    return { command_id: "repository.check", category: "check", argv_preview: "tools/check or tools/test" };
+  }
+  if (/\bnpm test\b/.test(value) || /\bcargo test\b/.test(value)) {
+    return { command_id: "repository.tests", category: "test", argv_preview: "test command" };
+  }
+  if (/\bgh\b.*\b(api|run|pr)\b/.test(value)) {
+    return { command_id: "ci.github", category: "ci", argv_preview: "gh CI lookup" };
+  }
+  if (/\bgit\b\s+(-C\s+\S+\s+)?(status|rev-parse|rev-list|branch|fetch|push|merge)\b/.test(value)) {
+    return { command_id: "git.operation", category: "git", argv_preview: "git status/sync operation" };
+  }
+  if (/\bcodex\b/.test(value)) {
+    return { command_id: "ai-agent.session", category: "ai_agent", argv_preview: "AI agent session" };
+  }
+  return null;
+}
+
+let lines = [];
+try {
+  const output = childProcess.execFileSync("ps", ["-eo", "pid=,etimes=,args="], {
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "ignore"],
+    timeout: 1000,
+  });
+  lines = output.split(/\r?\n/);
+} catch {
+  lines = [];
+}
+
+const items = [];
+const seen = new Set();
+for (const line of lines) {
+  const match = String(line).trim().match(/^(\d+)\s+(\d+)\s+(.+)$/);
+  if (!match) continue;
+  const [, pid, elapsedSeconds, args] = match;
+  if (pid === String(process.pid)) continue;
+  const classified = classify(args);
+  if (!classified) continue;
+  const identity = `${classified.command_id}:${pid}`;
+  if (seen.has(identity)) continue;
+  seen.add(identity);
+  items.push({
+    ...classified,
+    pid_hash: hash(pid),
+    state: "running",
+    elapsed_ms: safeNumber(elapsedSeconds) * 1000,
+    cwd_role: cwdRole(pid),
+    redaction_status: "redacted",
+    observed_at: generatedAt,
+  });
+}
+
+items.sort((left, right) => right.elapsed_ms - left.elapsed_ms || left.command_id.localeCompare(right.command_id));
+const limited = items.slice(0, limit);
+process.stdout.write(JSON.stringify({
+  observed_at: generatedAt,
+  process_count: limited.length,
+  redaction_status: "redacted",
+  items: limited,
+  processes: limited,
+}));
+NODE
+}
+
 dashboard_live_status_json() {
   local generated_at="$1"
   local menu_id="$SELECTED_MENU_ID"
   local workflow_context="$SELECTED_WORKFLOW_CONTEXT"
-  local repo path_state git_state target_name mode security_policy live_product_types authority_json repository_state_json ci_summary_json
+  local repo path_state git_state target_name target_repo_id target_selection_state mode security_policy live_product_types authority_json repository_state_json ci_summary_json git_activity_json test_activity_json runtime_activity_json
   local remote_required="false" git_required="false"
   repo="$(dashboard_target_repository_root "$menu_id" 2>/dev/null || true)"
   path_state="$(dashboard_target_repository_path_state "$menu_id")"
   git_state="$(dashboard_target_repository_git_state "$menu_id")"
   target_name="$(dashboard_target_repository_name "$menu_id")"
+  target_repo_id="$(dashboard_selected_repository_id_for_menu "$menu_id")"
+  target_selection_state="$(dashboard_selected_repository_selection_state_for_menu "$menu_id")"
   mode="$(dashboard_product_git_usage_mode_for_menu "$menu_id")"
   product_workflow_git_usage_requires_remote_sync "$mode" && remote_required="true"
   product_workflow_git_usage_requires_git_worktree "$mode" && git_required="true"
@@ -3796,18 +4374,23 @@ dashboard_live_status_json() {
   if [[ -n "$repo" ]]; then
     live_product_types="$(dashboard_product_types_from_manifest "$repo")"
     dashboard_product_types_valid "$live_product_types" || live_product_types="unknown"
-    authority_json="$(dashboard_product_authority_json_for_menu "$menu_id" "$PRODUCT_AUTHORITY_CONTEXT")"
+    authority_json="$(dashboard_live_product_authority_json_for_menu "$menu_id" "$PRODUCT_AUTHORITY_CONTEXT")"
   else
     live_product_types="unknown"
     authority_json="$(dashboard_missing_product_authority_json_for_menu "$menu_id")"
   fi
   repository_state_json="$(dashboard_live_repository_state_json "$repo" "$path_state" "$git_state")"
   ci_summary_json="$(dashboard_live_ci_summary_json "$repo" "$mode" "$path_state" "$git_state" "$(dashboard_json_get_field "$repository_state_json" branch 2>/dev/null || true)" "$(dashboard_json_get_field "$repository_state_json" head 2>/dev/null || true)")"
+  git_activity_json="$(dashboard_live_git_activity_json "$repo" "$path_state" "$git_state" "$mode" "$repository_state_json" "$ci_summary_json" "$generated_at" "$remote_required" "$git_required")"
+  test_activity_json="$(dashboard_live_test_activity_json "$generated_at")"
+  runtime_activity_json="$(dashboard_runtime_activity_json "$generated_at" "$repo")"
 
   DASHBOARD_LIVE_GENERATED_AT="$generated_at" \
   DASHBOARD_LIVE_MENU_ID="$menu_id" \
   DASHBOARD_LIVE_WORKFLOW_CONTEXT="$workflow_context" \
   DASHBOARD_LIVE_TARGET_NAME="$target_name" \
+  DASHBOARD_LIVE_TARGET_REPO_ID="$target_repo_id" \
+  DASHBOARD_LIVE_TARGET_SELECTION_STATE="$target_selection_state" \
   DASHBOARD_LIVE_PATH_STATE="$path_state" \
   DASHBOARD_LIVE_GIT_STATE="$git_state" \
   DASHBOARD_LIVE_GIT_USAGE_MODE="$mode" \
@@ -3817,6 +4400,9 @@ dashboard_live_status_json() {
   DASHBOARD_LIVE_AUTHORITY_JSON="$authority_json" \
   DASHBOARD_LIVE_REPOSITORY_STATE_JSON="$repository_state_json" \
   DASHBOARD_LIVE_CI_SUMMARY_JSON="$ci_summary_json" \
+  DASHBOARD_LIVE_GIT_ACTIVITY_JSON="$git_activity_json" \
+  DASHBOARD_LIVE_TEST_ACTIVITY_JSON="$test_activity_json" \
+  DASHBOARD_LIVE_RUNTIME_ACTIVITY_JSON="$runtime_activity_json" \
   node <<'NODE'
 function parseJson(value, fallback) {
   try {
@@ -4194,6 +4780,9 @@ const generatedAt = text(process.env.DASHBOARD_LIVE_GENERATED_AT);
 const authority = parseJson(process.env.DASHBOARD_LIVE_AUTHORITY_JSON, {});
 const repositoryState = parseJson(process.env.DASHBOARD_LIVE_REPOSITORY_STATE_JSON, {});
 const ciSummary = parseJson(process.env.DASHBOARD_LIVE_CI_SUMMARY_JSON, {});
+const gitActivity = parseJson(process.env.DASHBOARD_LIVE_GIT_ACTIVITY_JSON, {});
+const testActivity = parseJson(process.env.DASHBOARD_LIVE_TEST_ACTIVITY_JSON, {});
+const runtimeActivity = parseJson(process.env.DASHBOARD_LIVE_RUNTIME_ACTIVITY_JSON, { observed_at: generatedAt, process_count: 0, redaction_status: "redacted", items: [], processes: [] });
 const evidenceItems = Array.isArray(authority.evidence_summary?.items) ? authority.evidence_summary.items : [];
 const blockers = Array.isArray(authority.product_operation_blockers) ? authority.product_operation_blockers : [];
 const localEvidenceItems = evidenceItems.filter((item) => localCheckCategory(item));
@@ -4207,6 +4796,105 @@ const securityPolicyStatus = state(process.env.DASHBOARD_LIVE_SECURITY_POLICY_ST
 const securityItems = evidenceItems.filter((item) => sourceId(item).startsWith("product.security."));
 const securityBlockers = blockers.filter((item) => sourceId(item).startsWith("product.security."));
 const securityStatus = securityPolicyStatus !== "ready" ? securityPolicyStatus : aggregateStatus(securityItems, securityBlockers.length ? state(securityBlockers[0].status) : "unknown");
+function safeId(value, fallback = "unknown") {
+  const normalized = text(value, fallback).toLowerCase().replace(/[^a-z0-9_.:-]+/g, "-").replace(/^-+|-+$/g, "");
+  return normalized || fallback;
+}
+function runtimeItems() {
+  return Array.isArray(runtimeActivity.items) ? runtimeActivity.items : Array.isArray(runtimeActivity.processes) ? runtimeActivity.processes : [];
+}
+function buildAgentSessions(menuId, repoId) {
+  return runtimeItems()
+    .filter((item) => text(item.category) === "ai_agent")
+    .map((item) => ({
+      session_id: safeId(`agent-${item.pid_hash}`),
+      agent_kind: "cli_agent",
+      surface: "cli",
+      status: text(item.state) === "running" ? "manual_required" : "unknown",
+      started_at: "not_collected",
+      last_seen_at: text(item.observed_at, generatedAt),
+      cwd_role: text(item.cwd_role, "unknown"),
+      menu_id: menuId,
+      repo_id: repoId,
+      authority_profile: "viewer",
+      redaction_status: "redacted",
+      source_artifacts: "runtime_activity",
+    }));
+}
+function buildAgentAssignments(agentSessions, menuId, repoId) {
+  return agentSessions.map((session) => ({
+    assignment_id: safeId(`assignment-${session.session_id}-${menuId}-${repoId}`),
+    session_id: session.session_id,
+    role_id: "workflow_observer",
+    work_item_id: menuId,
+    repo_id: repoId,
+    status: session.status,
+    priority: "normal",
+    required_capabilities: ["viewer"],
+    forbidden_capabilities: ["provider-dispatch", "external-product-write", "auto-apply", "imagegen"],
+    next_safe_action: "Review live evidence before acting.",
+    evidence_refs: ["runtime_activity"],
+  }));
+}
+function buildToolCalls(agentSessions, menuId, repoId) {
+  const sessionByPidHash = new Map(agentSessions.map((session) => [session.session_id.replace(/^agent-/, ""), session]));
+  return runtimeItems().filter((item) => !["control_center", "data_refresh"].includes(text(item.category))).map((item) => {
+    const session = sessionByPidHash.get(text(item.pid_hash)) || null;
+    return {
+      tool_call_id: safeId(`tool-${item.pid_hash}-${item.command_id}`),
+      session_id: session ? session.session_id : "not_applicable",
+      assignment_id: session ? safeId(`assignment-${session.session_id}-${menuId}-${repoId}`) : "not_applicable",
+      command_id: safeId(item.command_id),
+      surface: "cli",
+      profile_id: "viewer",
+      run_mode: "observation",
+      status: text(item.state) === "running" ? "manual_required" : "unknown",
+      dry_run: true,
+      boundary: "observation_only",
+      receipt_id: "not_collected",
+      result_summary: text(item.argv_preview, "redacted activity observed"),
+      error_code: "not_collected",
+      redacted_args_digest: text(item.pid_hash, "redacted"),
+    };
+  });
+}
+function buildOperationEvents(agentSessions, toolCalls, menuId, repoId) {
+  const events = toolCalls.map((call) => ({
+    event_id: safeId(`event-${call.tool_call_id}`),
+    event_type: "tool_observed",
+    occurred_at: generatedAt,
+    source: call.command_id,
+    session_id: call.session_id,
+    assignment_id: call.assignment_id,
+    tool_call_id: call.tool_call_id,
+    scope: menuId,
+    repo_id: repoId,
+    status: call.status,
+    authority: "advisory",
+    freshness: "current",
+    risk_level: "low",
+    payload_digest: call.redacted_args_digest,
+    redaction_status: "redacted",
+  }));
+  if (events.length) return events;
+  return [{
+    event_id: safeId(`event-live-status-${menuId}-${repoId}`),
+    event_type: "live_status_observed",
+    occurred_at: generatedAt,
+    source: "dashboard-data.live-status",
+    session_id: agentSessions[0]?.session_id || "not_applicable",
+    assignment_id: "not_applicable",
+    tool_call_id: "not_applicable",
+    scope: menuId,
+    repo_id: repoId,
+    status: "ready",
+    authority: "advisory",
+    freshness: "current",
+    risk_level: "low",
+    payload_digest: "redacted",
+    redaction_status: "redacted",
+  }];
+}
 const dirtyCount = number(repositoryState.dirty_count);
 const ahead = number(repositoryState.ahead);
 const behind = number(repositoryState.behind);
@@ -4224,7 +4912,7 @@ if (gitRequired) {
     gitStatus = "missing";
     gitDetailCode = "git_metadata_missing";
   } else if (dirtyCount > 0) {
-    gitStatus = "failed";
+    gitStatus = "manual_required";
     gitDetailCode = "git_uncommitted_changes";
   } else if (remoteRequired && !text(repositoryState.upstream)) {
     gitStatus = "manual_required";
@@ -4275,11 +4963,18 @@ if (gitRows.length) {
   gitStatus = computedGitStatus;
   gitDetailCode = computedGitDetailCode;
 } else if (gitRequired) {
-  gitItems.push(gitCheckItem("product.git.worktree", "worktree", dirtyCount > 0 || number(repositoryState.untracked_count) > 0 ? "failed" : "passed", dirtyCount > 0 || number(repositoryState.untracked_count) > 0 ? `${dirtyCount + number(repositoryState.untracked_count)} local file change(s) are not committed.` : "No local file changes are waiting for commit.", "not_applicable", dirtyCount > 0 || number(repositoryState.untracked_count) > 0 ? 1 : 0));
+  gitItems.push(gitCheckItem("product.git.worktree", "worktree", dirtyCount > 0 || number(repositoryState.untracked_count) > 0 ? "manual_required" : "passed", dirtyCount > 0 || number(repositoryState.untracked_count) > 0 ? `${dirtyCount + number(repositoryState.untracked_count)} local file change(s) are not committed.` : "No local file changes are waiting for commit.", "not_applicable", 0));
   gitItems.push(gitCheckItem("product.git.upstream", "upstream", remoteRequired && !text(repositoryState.upstream) ? "manual_required" : remoteRequired ? "passed" : "not_applicable", remoteRequired && !text(repositoryState.upstream) ? "No upstream branch is configured for remote sync." : remoteRequired ? "Upstream branch is configured." : "Remote upstream is not required for this mode.", "not_applicable", remoteRequired && !text(repositoryState.upstream) ? 1 : 0));
   gitItems.push(gitCheckItem("product.git.local_remote_sync", "local_remote_sync", behind > 0 ? "stale" : ahead > 0 ? "manual_required" : remoteRequired ? "passed" : "not_applicable", behind > 0 ? `${behind} remote commit(s) are not reflected locally.` : ahead > 0 ? `${ahead} local commit(s) are not pushed.` : remoteRequired ? "Local and remote commit counts are aligned." : "Remote synchronization is not required for this mode.", "not_applicable", behind > 0 || ahead > 0 ? 1 : 0));
 } else {
-  gitItems.push(gitCheckItem("product.git.not_applicable", "policy", "not_applicable", "Git operations are not required for the selected mode."));
+  if ((dirtyCount + number(repositoryState.untracked_count) + ahead + behind) > 0) {
+    gitItems.push(gitCheckItem("product.git.worktree", "worktree", "manual_required", `${dirtyCount + number(repositoryState.untracked_count)} local file change(s) are not committed.`, "not_applicable", 0));
+    gitItems.push(gitCheckItem("product.git.local_remote_sync", "local_remote_sync", behind > 0 ? "stale" : ahead > 0 ? "manual_required" : "not_applicable", behind > 0 ? `${behind} remote commit(s) are not reflected locally.` : ahead > 0 ? `${ahead} local commit(s) are not pushed.` : "Remote synchronization is not required for this mode.", "not_applicable", 0));
+    gitStatus = "manual_required";
+    gitDetailCode = "git_worktree_observed";
+  } else {
+    gitItems.push(gitCheckItem("product.git.not_applicable", "policy", "not_applicable", "Git operations are not required for the selected mode."));
+  }
 }
 const gitCurrent = gitRows.length && gitRequired ? mergeComputedGitWithEvidence(computedGitCurrent, gitItems) : currentItem(gitItems, fallbackCheckItem("product_git_sync_live", "git", "sync", gitStatus, generatedAt, "Git state not collected", "not_applicable", 0));
 const ciEvidenceItems = evidenceItems.filter((item) => sourceId(item).startsWith("product.ci."));
@@ -4305,16 +5000,24 @@ const securityRows = [...securityItems, ...securityBlockers.filter((item) => !se
 const securityCheckItems = securityRows.map((item) => securityCheckItem(item, securityBlockers.some((blocker) => sourceId(blocker) === sourceId(item))));
 const securityCurrent = currentItem(securityCheckItems, fallbackCheckItem(sourceId(securityItems[0] || securityBlockers[0]) || "product.security", "security", "gate", securityStatus, observedAt(securityItems[0]), "Security evidence not collected", "not_applicable", securityBlockers.length));
 const securityObservedAt = latestObservedAt(securityCheckItems);
+const liveMenuId = text(process.env.DASHBOARD_LIVE_MENU_ID, "unknown");
+const liveRepoId = text(process.env.DASHBOARD_LIVE_TARGET_REPO_ID, "not_applicable");
+const agentSessions = buildAgentSessions(liveMenuId, liveRepoId);
+const agentAssignments = buildAgentAssignments(agentSessions, liveMenuId, liveRepoId);
+const toolCalls = buildToolCalls(agentSessions, liveMenuId, liveRepoId);
+const operationEvents = buildOperationEvents(agentSessions, toolCalls, liveMenuId, liveRepoId);
 const payload = {
   schema_version: "0.1.0",
   generated_at: generatedAt,
-  menu_id: text(process.env.DASHBOARD_LIVE_MENU_ID, "unknown"),
+  menu_id: liveMenuId,
   workflow_context: text(process.env.DASHBOARD_LIVE_WORKFLOW_CONTEXT, "unknown"),
   target_repository: {
+    repo_id: text(process.env.DASHBOARD_LIVE_TARGET_REPO_ID, "not_applicable"),
     name: text(process.env.DASHBOARD_LIVE_TARGET_NAME, "not_selected"),
     path_state: repositoryStateValue(process.env.DASHBOARD_LIVE_PATH_STATE, "unknown"),
     git_state: repositoryStateValue(process.env.DASHBOARD_LIVE_GIT_STATE, "unknown"),
     git_usage_mode: text(process.env.DASHBOARD_LIVE_GIT_USAGE_MODE, "unknown"),
+    selection_state: text(process.env.DASHBOARD_LIVE_TARGET_SELECTION_STATE, "not_applicable"),
   },
   repository_state: {
     branch: text(repositoryState.branch),
@@ -4325,6 +5028,19 @@ const payload = {
     ahead,
     behind,
   },
+  git_activity: gitActivity && typeof gitActivity === "object" && !Array.isArray(gitActivity) ? gitActivity : {},
+  test_activity: testActivity && typeof testActivity === "object" && !Array.isArray(testActivity) ? testActivity : {},
+  runtime_activity: runtimeActivity,
+  active_operations: {
+    observed_at: text(runtimeActivity.observed_at, generatedAt),
+    process_count: number(runtimeActivity.process_count),
+    redaction_status: text(runtimeActivity.redaction_status, "redacted"),
+    items: Array.isArray(runtimeActivity.items) ? runtimeActivity.items : [],
+  },
+  agent_sessions: agentSessions,
+  agent_assignments: agentAssignments,
+  tool_calls: toolCalls,
+  operation_events: operationEvents,
   checks: {
     local_tests: {
       status: localTestStatus,

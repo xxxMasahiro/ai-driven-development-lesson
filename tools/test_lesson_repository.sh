@@ -108,6 +108,7 @@ WORKFLOW_PAIR_SINGLE_FILE_REASON="aggregate test may run while remediation docum
 ./tools/dashboard-data >/dev/null
 ./tools/test_dashboard_schema.sh
 ./tools/test_dashboard_data.sh
+./tools/test_dashboard_data_product_repository_selection.sh
 ./tools/test_control_center_core.sh
 ./tools/test_dashboard_browser_debug_manifest.sh
 ./tools/test_dashboard_settings.sh

@@ -59,6 +59,13 @@ const PRODUCT_HEAD_PATTERN = /^(none|[a-f0-9]{40}|[a-f0-9]{64})$/;
 const LIVE_CHECK_KEYS = ["local_tests", "git_sync", "ci", "security"];
 const LIVE_DETAIL_PAGES = new Set(["#workflow", "#maintenance", "#safety", "#repository-info", "#documents", "#history", "#help"]);
 const CI_HEAD_MATCH_STATES = new Set(["matched", "different", "unknown"]);
+const RUNTIME_ACTIVITY_CATEGORIES = new Set(["ai_agent", "browser_review", "control_center", "data_refresh", "git", "ci", "test", "build", "check", "other"]);
+const RUNTIME_ACTIVITY_STATES = new Set(["running", "exited", "unknown"]);
+const RUNTIME_ACTIVITY_CWD_ROLES = new Set(["lesson_repository", "product_repository", "unknown"]);
+const RUNTIME_REDACTION_STATES = new Set(["redacted"]);
+const AGENT_OBSERVATION_REDACTION_STATES = new Set(["redacted"]);
+const AGENT_OBSERVATION_AUTHORITY = new Set(["authoritative", "manual_required", "advisory", "not_collected"]);
+const AGENT_OBSERVATION_FRESHNESS = new Set(["current", "stale", "not_collected", "unknown"]);
 const DECISION_PAGE_IDS = new Set(["overview", "lessons", "workflow", "maintenance", "safety", "repository-info", "documents", "settings", "history"]);
 const DECISION_PAGE_TARGETS = new Set(["#overview", "#lessons", "#workflow", "#maintenance", "#safety", "#repository-info", "#documents", "#settings", "#history"]);
 const DECISION_AUDIENCES = new Set(["non_engineer", "junior_engineer"]);
@@ -134,6 +141,20 @@ function safeDisplayCommand(value) {
     return "";
   }
   return /^tools\/[A-Za-z0-9._-]+(?: [A-Za-z0-9._:@/%+=,-]+)*$/.test(normalized) ? normalized : "";
+}
+
+function safeRuntimePreview(value) {
+  if (typeof value !== "string") {
+    return "";
+  }
+  const normalized = value.replace(/[\u0000-\u001f]/g, "").replace(/\s+/g, " ").trim();
+  if (!normalized || normalized.length > 160 || SECRET_PATTERN.test(normalized)) {
+    return "";
+  }
+  if (/(^|\s)(\/|[A-Za-z]:[\\/]|\\\\)/.test(normalized)) {
+    return "";
+  }
+  return normalized;
 }
 
 function safeDesignStudioScopedPath(value) {
@@ -731,12 +752,18 @@ function validateContextObject(contextValue, label) {
     throw new Error(`${label} workflow_context is invalid`);
   }
   const targetRepository = asObject(context.target_repository, `${label} target_repository`);
-  assertAllowedKeys(targetRepository, new Set(["name", "path_state"]), `${label} target_repository`);
+  assertAllowedKeys(targetRepository, new Set(["repo_id", "name", "path_state", "selection_state"]), `${label} target_repository`);
+  if (targetRepository.repo_id !== undefined && !displayText(targetRepository.repo_id, "")) {
+    throw new Error(`${label} target_repository.repo_id is invalid`);
+  }
   if (!displayText(targetRepository.name, "")) {
     throw new Error(`${label} target_repository.name is missing`);
   }
   if (!REPOSITORY_PATH_STATES.has(displayText(targetRepository.path_state, ""))) {
     throw new Error(`${label} target_repository.path_state is invalid`);
+  }
+  if (targetRepository.selection_state !== undefined && !REPOSITORY_SELECTION_STATES.has(displayText(targetRepository.selection_state, ""))) {
+    throw new Error(`${label} target_repository.selection_state is invalid`);
   }
   if (!PRODUCT_TYPES.has(displayText(context.product_type, ""))) {
     throw new Error(`${label} product_type is invalid`);
@@ -1459,7 +1486,7 @@ function validateDocuments(data) {
     if (!card || typeof card !== "object" || Array.isArray(card)) {
       throw new Error("dashboard document brief card must be an object");
     }
-    assertAllowedKeys(card, new Set(["id", "source_label_key", "title", "title_key", "detail", "detail_key", "summary", "summary_key", "action", "action_key", "status", "metric_label_key", "metric_value", "source_paths", "source_hash", "stored_source_hash", "brief_updated_at", "freshness_state", "related_page", "order"]), "dashboard document brief card");
+    assertAllowedKeys(card, new Set(["id", "menu_id", "workflow_context", "repo_id", "document_role", "source_label_key", "title", "title_key", "detail", "detail_key", "summary", "summary_key", "action", "action_key", "status", "metric_label_key", "metric_value", "source_paths", "source_hash", "stored_source_hash", "brief_updated_at", "freshness_state", "related_page", "order"]), "dashboard document brief card");
     for (const key of ["id", "source_label_key", "title_key", "detail_key", "summary_key", "action_key", "metric_label_key", "metric_value"]) {
       if (!displayText(card[key], "")) {
         throw new Error(`dashboard document brief card ${key} is missing`);
@@ -1473,6 +1500,18 @@ function validateDocuments(data) {
       throw new Error("dashboard document brief card id is duplicated");
     }
     briefIds.add(briefId);
+    if (card.menu_id !== undefined && !MENU_IDS.has(displayText(card.menu_id, ""))) {
+      throw new Error("dashboard document brief card menu_id is invalid");
+    }
+    if (card.workflow_context !== undefined && !WORKFLOW_CONTEXTS.has(displayText(card.workflow_context, ""))) {
+      throw new Error("dashboard document brief card workflow_context is invalid");
+    }
+    if (card.repo_id !== undefined && !displayText(card.repo_id, "")) {
+      throw new Error("dashboard document brief card repo_id is invalid");
+    }
+    if (card.document_role !== undefined && !displayText(card.document_role, "")) {
+      throw new Error("dashboard document brief card document_role is invalid");
+    }
     if (!ALLOWED_STATES.has(displayText(card.status, ""))) {
       throw new Error("dashboard document brief card status is invalid");
     }
@@ -2776,6 +2815,190 @@ function validateDashboardLiveCheck(check, key) {
   }
 }
 
+function validateDashboardRuntimeActivityItem(item, label) {
+  const activityItem = asObject(item, `${label} item`);
+  if (!displayText(activityItem.command_id, "") || !displayText(activityItem.pid_hash, "") || !/^[a-f0-9]{8,32}$/.test(displayText(activityItem.pid_hash, ""))) {
+    throw new Error(`${label} item identity is invalid`);
+  }
+  if (!RUNTIME_ACTIVITY_CATEGORIES.has(displayText(activityItem.category, ""))) {
+    throw new Error(`${label} item category is invalid`);
+  }
+  if (!RUNTIME_ACTIVITY_STATES.has(displayText(activityItem.state, ""))) {
+    throw new Error(`${label} item state is invalid`);
+  }
+  validateNonNegativeInteger(Number(activityItem.elapsed_ms), `${label} item elapsed_ms`);
+  if (!RUNTIME_ACTIVITY_CWD_ROLES.has(displayText(activityItem.cwd_role, ""))) {
+    throw new Error(`${label} item cwd_role is invalid`);
+  }
+  if (!safeRuntimePreview(activityItem.argv_preview)) {
+    throw new Error(`${label} item argv_preview is unsafe`);
+  }
+  if (!RUNTIME_REDACTION_STATES.has(displayText(activityItem.redaction_status, ""))) {
+    throw new Error(`${label} item redaction_status is invalid`);
+  }
+}
+
+function validateDashboardRuntimeActivity(activity, label) {
+  if (activity === undefined || activity === null) {
+    return;
+  }
+  const payload = asObject(activity, label);
+  if (!displayText(payload.observed_at, "")) {
+    throw new Error(`${label} observed_at is missing`);
+  }
+  validateNonNegativeInteger(Number(payload.process_count), `${label} process_count`);
+  if (!RUNTIME_REDACTION_STATES.has(displayText(payload.redaction_status, ""))) {
+    throw new Error(`${label} redaction_status is invalid`);
+  }
+  const items = Array.isArray(payload.items) ? payload.items : Array.isArray(payload.processes) ? payload.processes : null;
+  if (!Array.isArray(items)) {
+    throw new Error(`${label} items must be an array`);
+  }
+  for (const item of items) {
+    validateDashboardRuntimeActivityItem(item, label);
+  }
+}
+
+function validateAgentObservationId(value, label) {
+  if (!/^[A-Za-z0-9_.:-]{2,160}$/.test(displayText(value, ""))) {
+    throw new Error(`${label} is invalid`);
+  }
+}
+
+function validateAgentStringList(value, label) {
+  for (const item of asArray(value)) {
+    validateAgentObservationId(item, `${label} item`);
+  }
+}
+
+function validateDashboardAgentSession(row) {
+  const session = asObject(row, "dashboard live agent session");
+  for (const key of ["session_id", "agent_kind", "surface", "cwd_role", "menu_id", "repo_id", "authority_profile", "source_artifacts"]) {
+    validateAgentObservationId(session[key], `dashboard live agent session ${key}`);
+  }
+  if (!ALLOWED_STATES.has(displayText(session.status, ""))) {
+    throw new Error("dashboard live agent session status is invalid");
+  }
+  if (!displayText(session.started_at, "") || !displayText(session.last_seen_at, "")) {
+    throw new Error("dashboard live agent session timing is invalid");
+  }
+  if (!AGENT_OBSERVATION_REDACTION_STATES.has(displayText(session.redaction_status, ""))) {
+    throw new Error("dashboard live agent session redaction status is invalid");
+  }
+}
+
+function validateDashboardAgentAssignment(row) {
+  const assignment = asObject(row, "dashboard live agent assignment");
+  for (const key of ["assignment_id", "session_id", "role_id", "work_item_id", "repo_id", "priority"]) {
+    validateAgentObservationId(assignment[key], `dashboard live agent assignment ${key}`);
+  }
+  if (!ALLOWED_STATES.has(displayText(assignment.status, ""))) {
+    throw new Error("dashboard live agent assignment status is invalid");
+  }
+  validateAgentStringList(assignment.required_capabilities, "dashboard live agent assignment required_capabilities");
+  validateAgentStringList(assignment.forbidden_capabilities, "dashboard live agent assignment forbidden_capabilities");
+  validateAgentStringList(assignment.evidence_refs, "dashboard live agent assignment evidence_refs");
+  if (!safeRuntimePreview(assignment.next_safe_action)) {
+    throw new Error("dashboard live agent assignment next_safe_action is invalid");
+  }
+}
+
+function validateDashboardToolCall(row) {
+  const call = asObject(row, "dashboard live tool call");
+  for (const key of ["tool_call_id", "session_id", "assignment_id", "command_id", "surface", "profile_id", "run_mode", "boundary", "receipt_id", "error_code", "redacted_args_digest"]) {
+    validateAgentObservationId(call[key], `dashboard live tool call ${key}`);
+  }
+  if (!ALLOWED_STATES.has(displayText(call.status, ""))) {
+    throw new Error("dashboard live tool call status is invalid");
+  }
+  if (typeof call.dry_run !== "boolean") {
+    throw new Error("dashboard live tool call dry_run is invalid");
+  }
+  if (!safeRuntimePreview(call.result_summary)) {
+    throw new Error("dashboard live tool call result_summary is invalid");
+  }
+}
+
+function validateDashboardOperationEvent(row) {
+  const event = asObject(row, "dashboard live operation event");
+  for (const key of ["event_id", "event_type", "source", "session_id", "assignment_id", "tool_call_id", "scope", "repo_id", "payload_digest"]) {
+    validateAgentObservationId(event[key], `dashboard live operation event ${key}`);
+  }
+  if (!displayText(event.occurred_at, "")) {
+    throw new Error("dashboard live operation event occurred_at is invalid");
+  }
+  if (!ALLOWED_STATES.has(displayText(event.status, "")) || !AGENT_OBSERVATION_AUTHORITY.has(displayText(event.authority, "")) || !AGENT_OBSERVATION_FRESHNESS.has(displayText(event.freshness, "")) || !RISK_LEVELS.has(displayText(event.risk_level, ""))) {
+    throw new Error("dashboard live operation event state is invalid");
+  }
+  if (!AGENT_OBSERVATION_REDACTION_STATES.has(displayText(event.redaction_status, ""))) {
+    throw new Error("dashboard live operation event redaction status is invalid");
+  }
+}
+
+function validateDashboardLiveGitActivity(activity) {
+  if (activity === undefined || activity === null) {
+    return;
+  }
+  const payload = asObject(activity, "dashboard live git activity");
+  if (!displayText(payload.observed_at, "") || !ALLOWED_STATES.has(displayText(payload.status, ""))) {
+    throw new Error("dashboard live git activity identity is invalid");
+  }
+  for (const key of ["staged_count", "unstaged_count", "untracked_count", "dirty_count", "ahead", "behind"]) {
+    if (payload[key] !== undefined) {
+      validateNonNegativeInteger(Number(payload[key]), `dashboard live git activity ${key}`);
+    }
+  }
+  const operations = asArray(payload.operations);
+  for (const operation of operations) {
+    const row = asObject(operation, "dashboard live git operation");
+    if (!displayText(row.id, "") || !ALLOWED_STATES.has(displayText(row.status, "")) || !displayText(row.detail_code, "")) {
+      throw new Error("dashboard live git operation is invalid");
+    }
+  }
+  const branches = asObject(payload.branches || {}, "dashboard live git branches");
+  for (const key of ["total_count", "unused_count"]) {
+    if (branches[key] !== undefined) {
+      validateNonNegativeInteger(Number(branches[key]), `dashboard live git branches ${key}`);
+    }
+  }
+  for (const branch of asArray(branches.unused_candidates)) {
+    const row = asObject(branch, "dashboard live unused branch");
+    if (!displayText(row.branch, "")) {
+      throw new Error("dashboard live unused branch name is missing");
+    }
+    validateNonNegativeInteger(Number(row.last_commit_age_days || 0), "dashboard live unused branch age");
+  }
+  const worktrees = asObject(payload.worktrees || {}, "dashboard live git worktrees");
+  if (worktrees.count !== undefined) {
+    validateNonNegativeInteger(Number(worktrees.count), "dashboard live git worktree count");
+  }
+  for (const worktree of asArray(worktrees.items)) {
+    const row = asObject(worktree, "dashboard live git worktree");
+    if (!displayText(row.path_role, "")) {
+      throw new Error("dashboard live git worktree path_role is missing");
+    }
+  }
+}
+
+function validateDashboardLiveTestActivity(activity) {
+  if (activity === undefined || activity === null) {
+    return;
+  }
+  const payload = asObject(activity, "dashboard live test activity");
+  if (!displayText(payload.observed_at, "") || !ALLOWED_STATES.has(displayText(payload.status, ""))) {
+    throw new Error("dashboard live test activity identity is invalid");
+  }
+  for (const key of ["running_count", "completed_count", "failed_count"]) {
+    validateNonNegativeInteger(Number(payload[key] || 0), `dashboard live test activity ${key}`);
+  }
+  for (const row of [...asArray(payload.running), ...asArray(payload.recent), ...(payload.latest_completed ? [payload.latest_completed] : [])]) {
+    const item = asObject(row, "dashboard live test activity row");
+    if (!displayText(item.id, "") || !ALLOWED_STATES.has(displayText(item.status, "")) || !displayText(item.category, "")) {
+      throw new Error("dashboard live test activity row is invalid");
+    }
+  }
+}
+
 function validateDashboardLiveStatus(data) {
   const liveStatus = asObject(data, "dashboard live status");
   if (displayText(liveStatus.schema_version, "") !== "0.1.0" || !displayText(liveStatus.generated_at, "")) {
@@ -2788,12 +3011,34 @@ function validateDashboardLiveStatus(data) {
   if (!displayText(targetRepository.name, "") || !REPOSITORY_PATH_STATES.has(displayText(targetRepository.path_state, "")) || !REPOSITORY_PATH_STATES.has(displayText(targetRepository.git_state, ""))) {
     throw new Error("dashboard live status repository is invalid");
   }
+  if (targetRepository.repo_id !== undefined && !displayText(targetRepository.repo_id, "")) {
+    throw new Error("dashboard live status repository repo_id is invalid");
+  }
+  if (targetRepository.selection_state !== undefined && !REPOSITORY_SELECTION_STATES.has(displayText(targetRepository.selection_state, ""))) {
+    throw new Error("dashboard live status repository selection_state is invalid");
+  }
   const repositoryState = asObject(liveStatus.repository_state, "dashboard live repository state");
   for (const key of ["dirty_count", "untracked_count", "ahead", "behind"]) {
     const value = Number(repositoryState[key]);
     if (!Number.isFinite(value) || value < 0) {
       throw new Error(`dashboard live repository state ${key} is invalid`);
     }
+  }
+  validateDashboardLiveGitActivity(liveStatus.git_activity);
+  validateDashboardLiveTestActivity(liveStatus.test_activity);
+  validateDashboardRuntimeActivity(liveStatus.runtime_activity, "dashboard live runtime_activity");
+  validateDashboardRuntimeActivity(liveStatus.active_operations, "dashboard live active_operations");
+  for (const session of asArray(liveStatus.agent_sessions)) {
+    validateDashboardAgentSession(session);
+  }
+  for (const assignment of asArray(liveStatus.agent_assignments)) {
+    validateDashboardAgentAssignment(assignment);
+  }
+  for (const call of asArray(liveStatus.tool_calls)) {
+    validateDashboardToolCall(call);
+  }
+  for (const event of asArray(liveStatus.operation_events)) {
+    validateDashboardOperationEvent(event);
   }
   const checks = asObject(liveStatus.checks, "dashboard live checks");
   for (const key of LIVE_CHECK_KEYS) {

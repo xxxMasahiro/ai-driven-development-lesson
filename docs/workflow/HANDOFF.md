@@ -3039,3 +3039,21 @@ Restart context:
 Next safe action:
 
 - Run focused verification and P10 Browser Debug review. Do not edit `/home/masahiro/projects/agent-toolbox/browser-debug-cli`, call provider APIs, generate images, auto-apply proposals, mutate external products, run dashboard-triggered Git/CI operations, push, merge, or cleanup from the dashboard.
+
+## Dashboard Control Center Contextual Repair Handoff
+
+SYNC-ID: dashboard_control_center_contextual_repair
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/DASHBOARD_DATA_SCHEMA.tsv,docs/design-system/dashboard-control-center/DESIGN_SYSTEM.md,docs/design-system/dashboard-control-center/tokens.json,docs/design-system/dashboard-control-center/components.json,tools/dashboard-design-system,tools/dashboard-data,vite.config.mjs,dashboard-control-center/src/App.jsx,dashboard-control-center/src/dashboardContext.js,dashboard-control-center/src/dashboardData.js,dashboard-control-center/src/displayDepth.js,dashboard-control-center/src/i18n.js,dashboard-control-center/src/styles.css,dashboard-control-center/src/design-system.generated.css,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_schema.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/test_dashboard_data_product_repository_selection.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/check_dashboard_design_system.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+Restart context:
+
+- The user stopped implementation because Control Center pages mixed contexts, showed stale or generic information, and did not make live CLI/MCP evidence useful.
+- The repair must preserve configurability: no hard-coded product names, repository names, URLs, file paths, thresholds, or review-tool identities.
+- The first implementation focus is selected-menu snapshot ownership, stable repository id propagation, scoped document briefs, and live evidence presentation.
+- Browser Debug CLI or TraceCue repositories remain read-only from this task.
+
+Next safe action:
+
+- Continue from `repository-development-workflow` fast-loop implementation, then run focused checks and read-only Browser Debug CLI or TraceCue review before promoting this sync ID to implemented.

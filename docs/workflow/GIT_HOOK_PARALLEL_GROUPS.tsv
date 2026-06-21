@@ -35,6 +35,7 @@ test_ci_evidence	regression	parallel	Same-run evidence regression uses fixtures 
 test_ci_timing	regression	parallel	CI timing regression uses fixtures and can run in parallel.
 test_dashboard_schema	regression	parallel	Dashboard schema regression validates repository-local TSV schema and can run in parallel.
 test_dashboard_data	regression	parallel	Dashboard data regression validates repository-local JSON output and can run in parallel.
+test_dashboard_data_product_repository_selection	regression	parallel	Dashboard product repository selection regression uses temporary local settings and can run in parallel.
 test_control_center_core	regression	parallel	Control Center core regression validates local CLI/MCP contracts and can run in parallel.
 test_dashboard_browser_debug_manifest	regression	parallel	Dashboard Browser Debug manifest regression validates generated target-manifest JSON and can run in parallel.
 test_dashboard_i18n	regression	parallel	Dashboard i18n static regression validates locale policy and dictionaries and can run in parallel.

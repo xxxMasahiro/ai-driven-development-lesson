@@ -34,6 +34,7 @@ test_ci_evidence	full|fast	./tools/test_ci_evidence.sh	Run same-run CI evidence 
 test_ci_timing	full|fast	./tools/test_ci_timing.sh	Run CI timing report and proposal regression tests.
 test_dashboard_schema	full|fast	./tools/test_dashboard_schema.sh	Run dashboard control-center schema regression tests.
 test_dashboard_data	full|fast	./tools/test_dashboard_data.sh	Run dashboard control-center JSON data regression tests.
+test_dashboard_data_product_repository_selection	full|fast	./tools/test_dashboard_data_product_repository_selection.sh	Run dashboard product repository selection regression tests.
 test_control_center_core	full|fast	./tools/test_control_center_core.sh	Run Control Center shared CLI/MCP core regression tests.
 test_dashboard_browser_debug_manifest	full|fast	./tools/test_dashboard_browser_debug_manifest.sh	Run dashboard Browser Debug target-manifest regression tests.
 test_dashboard_settings	full|fast	./tools/test_dashboard_settings.sh	Run dashboard Settings update-tool regression tests.

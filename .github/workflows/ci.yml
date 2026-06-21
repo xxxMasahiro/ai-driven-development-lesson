@@ -71,6 +71,7 @@ jobs:
           bash -n tools/test_ci_timing.sh
           bash -n tools/test_dashboard_schema.sh
           bash -n tools/test_dashboard_data.sh
+          bash -n tools/test_dashboard_data_product_repository_selection.sh
           bash -n tools/test_dashboard_settings.sh
           bash -n tools/test_dashboard_i18n.sh
           bash -n tools/test_dashboard_browser_debug_manifest.sh
@@ -219,6 +220,7 @@ jobs:
           ./tools/test_ci_timing.sh
           ./tools/test_dashboard_schema.sh
           ./tools/test_dashboard_data.sh
+          ./tools/test_dashboard_data_product_repository_selection.sh
           ./tools/test_dashboard_settings.sh
           ./tools/test_dashboard_i18n.sh
           ./tools/check_dashboard_bundle_contract.sh

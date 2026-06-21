@@ -296,6 +296,15 @@ for (const [field, value] of Object.entries(selectedFields)) {
 if (data.selected_context.menu_id !== 'free-development') {
   fail(`expected free-development selected context, got ${data.selected_context.menu_id}`);
 }
+if (data.selected_context.target_repository.repo_id !== 'browser-debug-cli') {
+  fail(`selected context repo_id must be browser-debug-cli, got ${data.selected_context.target_repository.repo_id}`);
+}
+if (data.contexts_by_menu?.['free-development']?.target_repository?.repo_id !== 'browser-debug-cli') {
+  fail(`contexts_by_menu free-development repo_id must be browser-debug-cli, got ${data.contexts_by_menu?.['free-development']?.target_repository?.repo_id}`);
+}
+if (data.selected_context.target_repository.selection_state !== 'explicit') {
+  fail(`selected context selection_state must be explicit, got ${data.selected_context.target_repository.selection_state}`);
+}
 if (data.development.product_authority.repository.configured_name !== 'browser-debug-cli') {
   fail(`authority configured_name must come from selected repo basename, got ${data.development.product_authority.repository.configured_name}`);
 }
@@ -447,6 +456,12 @@ for (const [field, value] of Object.entries({
 }
 if (data.selected_context.target_repository.path_state !== 'missing') {
   fail(`${menuId} selected context target_repository.path_state must be missing without a target, got ${data.selected_context.target_repository.path_state}`);
+}
+if (data.selected_context.target_repository.repo_id !== 'not_selected') {
+  fail(`${menuId} selected context repo_id must be not_selected without a target, got ${data.selected_context.target_repository.repo_id}`);
+}
+if (data.selected_context.target_repository.selection_state !== 'none') {
+  fail(`${menuId} selected context selection_state must be none without a target, got ${data.selected_context.target_repository.selection_state}`);
 }
 if (data.selected_context.evidence_status !== 'missing') {
   fail(`${menuId} selected context evidence_status must be missing without a target, got ${data.selected_context.evidence_status}`);

@@ -2915,3 +2915,25 @@ Current Status:
 Next Step:
 
 - Run the focused verification listed for this sync id, then P10 Browser Debug visual review from the lesson repository without modifying Browser Debug CLI.
+
+## Dashboard Control Center Contextual Repair Work
+
+SYNC-ID: dashboard_control_center_contextual_repair
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/DASHBOARD_DATA_SCHEMA.tsv,docs/design-system/dashboard-control-center/DESIGN_SYSTEM.md,docs/design-system/dashboard-control-center/tokens.json,docs/design-system/dashboard-control-center/components.json,tools/dashboard-design-system,tools/dashboard-data,vite.config.mjs,dashboard-control-center/src/App.jsx,dashboard-control-center/src/dashboardContext.js,dashboard-control-center/src/dashboardData.js,dashboard-control-center/src/displayDepth.js,dashboard-control-center/src/i18n.js,dashboard-control-center/src/styles.css,dashboard-control-center/src/design-system.generated.css,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_schema.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/test_dashboard_data_product_repository_selection.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/check_dashboard_design_system.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+Current Status:
+
+- [x] Synchronized the planned repair across requirements, specification, implementation plan, tracker, handoff, and the sync contract before runtime edits.
+- [ ] Repair selected-menu snapshot ownership and evidence-backed page gating.
+- [ ] Repair stable repository selection and multi-repository display for product workflows.
+- [ ] Repair document brief scoping and schema validation.
+- [ ] Repair live Git/worktree, local test, CI, blocker, task tracker, handoff, and AI-agent operation presentation.
+- [ ] Repair audience-specific wording and technical detail density.
+- [ ] Repair menu icon color and spacing through the design system source.
+- [ ] Update focused tests and promote this sync ID to implemented after verification.
+
+Next Step:
+
+- Implement the contextual repair plan from the active repository-development-workflow fast loop, then run focused Dashboard Control Center checks and read-only Browser Debug CLI or TraceCue review.
