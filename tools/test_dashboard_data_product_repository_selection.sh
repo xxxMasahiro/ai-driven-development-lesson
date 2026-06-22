@@ -418,6 +418,57 @@ if (serialized.includes('browser-debug-cli:') || serialized.includes('/projects/
 }
 NODE
 
+missing_selected_registry="$TMP_DIR/PRODUCT_REPOSITORY_REGISTRY_MISSING_SELECTED.tsv"
+missing_selected_selection="$TMP_DIR/PRODUCT_REPOSITORY_SELECTION_MISSING_SELECTED.tsv"
+missing_selected_json="$TMP_DIR/dashboard-data-missing-selected-ready-alternative.json"
+cat >"$missing_selected_registry" <<DOC
+# repo_id	primary_menu_id	allowed_contexts	display_name	repository_path	product_type	source
+old-review-cli	free-development	free-development	Old Review CLI	$TMP_DIR/missing-review-cli	cli	test
+current-review-cli	free-development	free-development	Current Review CLI	$trace_repo	cli	test
+DOC
+cat >"$missing_selected_selection" <<'DOC'
+# menu_id	repo_id	selected_at	selection_source
+free-development	old-review-cli	2026-06-17T00:00:00Z	test
+DOC
+DASHBOARD_DATA_GENERATED_AT="2026-06-17T00:00:00Z" \
+  DASHBOARD_LIVE_STATUS=0 \
+  DASHBOARD_SELECTED_MENU_ID="free-development" \
+  DASHBOARD_LESSON14_CONFIG="$config" \
+  PRODUCT_REPOSITORY_REGISTRY_FILE="$missing_selected_registry" \
+  PRODUCT_REPOSITORY_SELECTION_FILE="$missing_selected_selection" \
+  PRODUCT_REPOSITORY_AUTHORITY_NOW="2026-06-17T00:30:00Z" \
+  "$ROOT/tools/dashboard-data" >"$missing_selected_json"
+node - "$missing_selected_json" <<'NODE'
+const fs = require('fs');
+const data = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
+function fail(message) {
+  console.error(message);
+  process.exit(1);
+}
+const availableFree = data.available_contexts.find((item) => item.menu_id === 'free-development');
+if (!availableFree || availableFree.selectable !== true) {
+  fail(`free-development must stay selectable when a ready alternative repository exists: ${JSON.stringify(availableFree)}`);
+}
+if (availableFree.disabled_reason_key !== 'context.menuAvailability.selectable') {
+  fail(`selectable free-development must expose the selectable reason key: ${JSON.stringify(availableFree)}`);
+}
+const selection = data.repository_selection;
+if (!selection || selection.menu_id !== 'free-development') {
+  fail('repository_selection must describe the selected free-development menu');
+}
+const selectedMissing = selection.options.find((option) => option.repo_id === 'old-review-cli');
+const readyAlternative = selection.options.find((option) => option.repo_id === 'current-review-cli');
+if (!selectedMissing || selectedMissing.selected !== true || selectedMissing.selectable !== false || selectedMissing.status !== 'missing') {
+  fail(`selected missing repository must remain visible as the selected problem: ${JSON.stringify(selectedMissing)}`);
+}
+if (!readyAlternative || readyAlternative.selected !== false || readyAlternative.selectable !== true || readyAlternative.status !== 'ready') {
+  fail(`ready alternative repository must stay selectable inside the menu: ${JSON.stringify(readyAlternative)}`);
+}
+if (readyAlternative.select_command !== 'tools/product-repository-registry select free-development current-review-cli --confirm') {
+  fail(`ready alternative command must use the guarded registry selector: ${readyAlternative.select_command}`);
+}
+NODE
+
 for no_target_menu in product-improvement external-integration; do
   no_target_json="$TMP_DIR/dashboard-data-$no_target_menu-no-target.json"
   DASHBOARD_DATA_GENERATED_AT="2026-06-17T00:00:00Z" \

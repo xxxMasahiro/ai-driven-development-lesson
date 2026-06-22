@@ -2667,6 +2667,23 @@ dashboard_repository_selection_json() {
   printf '}'
 }
 
+dashboard_repository_selection_has_ready_option() {
+  local menu_id="$1"
+  local git_requirement repo_id primary_menu_id allowed_contexts display_name raw_path product_type source
+  local path_state git_state status
+  product_repository_registry_context_supported "$menu_id" || return 1
+  git_requirement="$(dashboard_product_git_requirement_for_menu "$menu_id")"
+  while IFS=$'\t' read -r repo_id primary_menu_id allowed_contexts display_name raw_path product_type source; do
+    path_state="$(dashboard_repository_candidate_path_state "$raw_path")"
+    git_state="$(dashboard_repository_candidate_git_state "$raw_path" "$git_requirement")"
+    status="$(dashboard_repository_candidate_status "$path_state" "$git_state" "$git_requirement")"
+    if [[ "$status" == "ready" ]]; then
+      return 0
+    fi
+  done < <(product_repository_registry_rows_for_context "$menu_id" 2>/dev/null || true)
+  return 1
+}
+
 dashboard_available_context_selectable() {
   local menu_id="$1"
   local status="$2"
@@ -2674,6 +2691,10 @@ dashboard_available_context_selectable() {
   if [[ "$(dashboard_context_product_repo_required "$menu_id")" == "true" ]]; then
     path_state="$(dashboard_target_repository_path_state "$menu_id")"
     if [[ "$path_state" != "configured" ]]; then
+      if dashboard_repository_selection_has_ready_option "$menu_id"; then
+        printf 'true'
+        return
+      fi
       printf 'false'
       return
     fi
