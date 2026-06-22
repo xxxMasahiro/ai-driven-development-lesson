@@ -131,13 +131,6 @@
   --dcc-menu-tile-selected-icon-color: #ffffff;
 }
 
-.menu-tile.is-unselectable:not(.is-selected) {
-  --dcc-menu-tile-icon-bg: #e9eef2;
-  --dcc-menu-tile-icon-color: #53616b;
-  --dcc-menu-tile-selected-icon-bg: #53616b;
-  --dcc-menu-tile-selected-icon-color: #ffffff;
-}
-
 .menu-tile__icon,
 .menu-tile--lesson-soft .menu-tile__icon,
 .menu-tile--lesson .menu-tile__icon,

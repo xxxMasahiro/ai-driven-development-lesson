@@ -95,7 +95,7 @@ dashboard_data_may_contain_secret_like_data() {
   local lower
   lower="${value,,}"
   case "$lower" in
-    *secret*|*token*|*api_key*|*password*|*private_key*|*ghp_*|*gho_*|*ghu_*|*ghs_*|*ghr_*|*sk-*|*akia*|*begin*private*key*)
+    *secret*|*token*|*api_key*|*password*|*private_key*|*authorization:*|*bearer\ *|*signedurl*|*signed_url*|*x-amz-signature*|*x-goog-signature*|*ghp_*|*gho_*|*ghu_*|*ghs_*|*ghr_*|*sk-*|*akia*|*begin*private*key*)
       return 0
       ;;
   esac
@@ -272,6 +272,93 @@ dashboard_data_validate_risk_level() {
   esac
   printf 'invalid dashboard command risk level: %s\n' "$1" >&2
   return 1
+}
+
+dashboard_data_validate_evidence_freshness_state() {
+  case "$1" in
+    current|stale|not_collected|unknown) return 0 ;;
+  esac
+  printf 'invalid dashboard evidence freshness state: %s\n' "$1" >&2
+  return 1
+}
+
+dashboard_data_validate_evidence_authority() {
+  case "$1" in
+    authoritative|manual_required|advisory|not_collected) return 0 ;;
+  esac
+  printf 'invalid dashboard evidence authority: %s\n' "$1" >&2
+  return 1
+}
+
+dashboard_data_validate_security_boundary_state() {
+  case "$1" in
+    closed|approval_required|unknown) return 0 ;;
+  esac
+  printf 'invalid dashboard security boundary state: %s\n' "$1" >&2
+  return 1
+}
+
+dashboard_data_validate_security_display_state() {
+  case "$1" in
+    do_not_display|redact|safe|recommended|unknown) return 0 ;;
+  esac
+  printf 'invalid dashboard security display policy state: %s\n' "$1" >&2
+  return 1
+}
+
+dashboard_data_validate_security_action_state() {
+  case "$1" in
+    safe|recommended|approval_required|blocked|unknown) return 0 ;;
+  esac
+  printf 'invalid dashboard security action state: %s\n' "$1" >&2
+  return 1
+}
+
+dashboard_data_validate_detail_page() {
+  case "$1" in
+    '#overview'|'#lessons'|'#workflow'|'#maintenance'|'#safety'|'#repository-info'|'#documents'|'#settings'|'#history'|'#help') return 0 ;;
+  esac
+  printf 'invalid dashboard detail page: %s\n' "$1" >&2
+  return 1
+}
+
+dashboard_data_validate_owner_source() {
+  case "$1" in
+    dashboard-data|product-authority|git-workflow|repository-development-workflow) return 0 ;;
+  esac
+  printf 'invalid dashboard owner source: %s\n' "$1" >&2
+  return 1
+}
+
+dashboard_data_validate_scoped_reference_list() {
+  local value="$1"
+  local part
+  local -a parts
+  [[ -n "$value" ]] || {
+    printf 'empty dashboard scoped reference list\n' >&2
+    return 1
+  }
+  IFS=';,' read -r -a parts <<<"$value"
+  for part in "${parts[@]}"; do
+    part="$(printf '%s' "$part" | sed -E 's/^[[:space:]]+//;s/[[:space:]]+$//')"
+    [[ -n "$part" ]] || continue
+    case "$part" in
+      none|not_collected|not_applicable) continue ;;
+      product:*)
+        local scoped="${part#product:}"
+        case "$scoped" in
+          ""|/*|../*|*/../*|*\\*|*:*)
+            printf 'unsafe dashboard scoped reference: %s\n' "$part" >&2
+            return 1
+            ;;
+        esac
+        ;;
+      /*|../*|*/../*|*\\*|*:*)
+        printf 'unsafe dashboard scoped reference: %s\n' "$part" >&2
+        return 1
+        ;;
+    esac
+  done
 }
 
 dashboard_data_validate_execution_mode() {
@@ -467,11 +554,13 @@ dashboard_json_decision_page() {
   local must_review_one="${15}"
   local must_review_two="${16}"
   local decision_question
+  local confidence_level
   local decision_question_key current_judgment_key top_reason_key evidence_confidence_key next_safe_action_key
   local must_review_one_key must_review_two_key
 
   dashboard_data_validate_state "$status"
   dashboard_data_validate_risk_level "$risk_level"
+  confidence_level="$(dashboard_status_confidence_level "$authority" "$freshness_state")"
 
   decision_question_key="decisionPage.$id.decision_question"
   current_judgment_key="decisionPage.status.$status.current_judgment"
@@ -581,6 +670,8 @@ dashboard_json_decision_page() {
   dashboard_json_string "$authority"
   printf ',"freshness_state":'
   dashboard_json_string "$freshness_state"
+  printf ',"confidence_level":'
+  dashboard_json_string "$confidence_level"
   printf ',"risk_level":'
   dashboard_json_string "$risk_level"
   printf ',"command_execution_mode":"preview_only"}'
@@ -735,6 +826,50 @@ dashboard_json_blocking_item() {
   dashboard_json_string "$status"
   printf ',"reason":'
   dashboard_json_string "$reason"
+  printf ',"required_command":'
+  dashboard_json_string "$required_command"
+  printf '}'
+}
+
+dashboard_json_overview_section() {
+  local id="$1"
+  local title_key="$2"
+  local status="$3"
+  local value="$4"
+  local detail="$5"
+  local source_id="$6"
+  local owner_source="$7"
+  local freshness_state="$8"
+  local authority="$9"
+  local detail_page="${10}"
+  local required_command="${11:-not_applicable}"
+
+  dashboard_data_validate_state "$status"
+  dashboard_data_validate_owner_source "$owner_source"
+  dashboard_data_validate_evidence_freshness_state "$freshness_state"
+  dashboard_data_validate_evidence_authority "$authority"
+  dashboard_data_validate_detail_page "$detail_page"
+
+  printf '{"id":'
+  dashboard_json_string "$id"
+  printf ',"title_key":'
+  dashboard_json_string "$title_key"
+  printf ',"status":'
+  dashboard_json_string "$status"
+  printf ',"value":'
+  dashboard_json_string "$value"
+  printf ',"detail":'
+  dashboard_json_string "$detail"
+  printf ',"source_id":'
+  dashboard_json_string "$source_id"
+  printf ',"owner_source":'
+  dashboard_json_string "$owner_source"
+  printf ',"freshness_state":'
+  dashboard_json_string "$freshness_state"
+  printf ',"authority":'
+  dashboard_json_string "$authority"
+  printf ',"detail_page":'
+  dashboard_json_string "$detail_page"
   printf ',"required_command":'
   dashboard_json_string "$required_command"
   printf '}'
@@ -1062,6 +1197,198 @@ dashboard_json_security_item() {
   printf '}'
 }
 
+dashboard_json_security_confirmation_evidence() {
+  local id="$1"
+  local label="$2"
+  local status="$3"
+  local source_id="$4"
+  local freshness_state="$5"
+  local authority="$6"
+  local observed_at="$7"
+  local source_artifacts="$8"
+  local meaning="$9"
+  local next_action="${10}"
+
+  dashboard_data_validate_state "$status"
+  dashboard_data_validate_evidence_freshness_state "$freshness_state"
+  dashboard_data_validate_evidence_authority "$authority"
+  dashboard_data_validate_scoped_reference_list "$source_artifacts"
+
+  printf '{"id":'
+  dashboard_json_string "$id"
+  printf ',"label":'
+  dashboard_json_string "$label"
+  printf ',"status":'
+  dashboard_json_string "$status"
+  printf ',"source_id":'
+  dashboard_json_string "$source_id"
+  printf ',"freshness_state":'
+  dashboard_json_string "$freshness_state"
+  printf ',"authority":'
+  dashboard_json_string "$authority"
+  printf ',"observed_at":'
+  dashboard_json_string "$observed_at"
+  printf ',"source_artifacts":'
+  dashboard_json_string "$source_artifacts"
+  printf ',"meaning":'
+  dashboard_json_string "$meaning"
+  printf ',"next_action":'
+  dashboard_json_string "$next_action"
+  printf '}'
+}
+
+dashboard_json_security_authority_boundary() {
+  local id="$1"
+  local label="$2"
+  local state="$3"
+  local approval_required="$4"
+  local risk_level="$5"
+  local detail="$6"
+
+  dashboard_json_bool "$approval_required" >/dev/null
+  dashboard_data_validate_security_boundary_state "$state"
+  dashboard_data_validate_risk_level "$risk_level"
+
+  printf '{"id":'
+  dashboard_json_string "$id"
+  printf ',"label":'
+  dashboard_json_string "$label"
+  printf ',"state":'
+  dashboard_json_string "$state"
+  printf ',"approval_required":'
+  dashboard_json_bool "$approval_required"
+  printf ',"risk_level":'
+  dashboard_json_string "$risk_level"
+  printf ',"detail":'
+  dashboard_json_string "$detail"
+  printf '}'
+}
+
+dashboard_json_security_display_policy_item() {
+  local id="$1"
+  local label="$2"
+  local state="$3"
+  local detail="$4"
+
+  dashboard_data_validate_security_display_state "$state"
+
+  printf '{"id":'
+  dashboard_json_string "$id"
+  printf ',"label":'
+  dashboard_json_string "$label"
+  printf ',"state":'
+  dashboard_json_string "$state"
+  printf ',"detail":'
+  dashboard_json_string "$detail"
+  printf '}'
+}
+
+dashboard_json_security_confirmation_action() {
+  local id="$1"
+  local label="$2"
+  local state="$3"
+  local detail="$4"
+
+  dashboard_data_validate_security_action_state "$state"
+
+  printf '{"id":'
+  dashboard_json_string "$id"
+  printf ',"label":'
+  dashboard_json_string "$label"
+  printf ',"state":'
+  dashboard_json_string "$state"
+  printf ',"detail":'
+  dashboard_json_string "$detail"
+  printf '}'
+}
+
+dashboard_json_security_confirmation_blocker() {
+  local id="$1"
+  local status="$2"
+  local source_id="$3"
+  local detail="$4"
+  local next_action="$5"
+
+  dashboard_data_validate_state "$status"
+
+  printf '{"id":'
+  dashboard_json_string "$id"
+  printf ',"status":'
+  dashboard_json_string "$status"
+  printf ',"source_id":'
+  dashboard_json_string "$source_id"
+  printf ',"detail":'
+  dashboard_json_string "$detail"
+  printf ',"next_action":'
+  dashboard_json_string "$next_action"
+  printf '}'
+}
+
+dashboard_json_maintenance_sync_row() {
+  local id="$1"
+  local label="$2"
+  local status="$3"
+  local source_id="$4"
+  local freshness_state="$5"
+  local authority="$6"
+  local observed_at="$7"
+  local detail="$8"
+  local next_action="$9"
+  local reference="${10}"
+  local priority="${11:-medium}"
+
+  dashboard_data_validate_state "$status"
+
+  printf '{"id":'
+  dashboard_json_string "$id"
+  printf ',"label":'
+  dashboard_json_string "$label"
+  printf ',"status":'
+  dashboard_json_string "$status"
+  printf ',"source_id":'
+  dashboard_json_string "$source_id"
+  printf ',"freshness_state":'
+  dashboard_json_string "$freshness_state"
+  printf ',"authority":'
+  dashboard_json_string "$authority"
+  printf ',"observed_at":'
+  dashboard_json_string "$observed_at"
+  printf ',"detail":'
+  dashboard_json_string "$detail"
+  printf ',"next_action":'
+  dashboard_json_string "$next_action"
+  printf ',"reference":'
+  dashboard_json_string "$reference"
+  printf ',"priority":'
+  dashboard_json_string "$priority"
+  printf '}'
+}
+
+dashboard_json_maintenance_action() {
+  local id="$1"
+  local label="$2"
+  local status="$3"
+  local action_type="$4"
+  local detail="$5"
+  local source_id="$6"
+
+  dashboard_data_validate_state "$status"
+
+  printf '{"id":'
+  dashboard_json_string "$id"
+  printf ',"label":'
+  dashboard_json_string "$label"
+  printf ',"status":'
+  dashboard_json_string "$status"
+  printf ',"action_type":'
+  dashboard_json_string "$action_type"
+  printf ',"detail":'
+  dashboard_json_string "$detail"
+  printf ',"source_id":'
+  dashboard_json_string "$source_id"
+  printf '}'
+}
+
 dashboard_json_command_preview_group() {
   local id="$1"
   local label="$2"
@@ -1107,6 +1434,17 @@ dashboard_data_add_blocking_item() {
   target_array+=("$(dashboard_json_blocking_item "$@")")
 }
 
+dashboard_status_confidence_level() {
+  local authority="$1"
+  local freshness_state="$2"
+  case "$authority:$freshness_state" in
+    authoritative:current) printf 'high' ;;
+    authoritative:stale|manual_required:current|advisory:current) printf 'medium' ;;
+    not_collected:*|*:not_collected) printf 'low' ;;
+    *) printf 'unknown' ;;
+  esac
+}
+
 dashboard_json_command_preview() {
   local intent="$1"
   local target="$2"
@@ -1117,13 +1455,40 @@ dashboard_json_command_preview() {
   local execution_mode="$7"
   local non_executable="$8"
   shift 8
+  local command_id safe_command_text copy_allowed copy_block_reason argv_redacted
+  local arg safe_arg
+  local -a safe_argv=()
 
   dashboard_data_validate_risk_level "$risk_level"
   dashboard_json_bool "$requires_approval" >/dev/null
   dashboard_data_validate_execution_mode "$execution_mode"
   dashboard_json_bool "$non_executable" >/dev/null
+  command_id="cmd-$(dashboard_data_content_hash "${intent}|${target}|${command_text}" | cut -c1-12)"
+  safe_command_text="$(dashboard_data_safe_text "$command_text")"
+  argv_redacted="false"
+  for arg in "$@"; do
+    safe_arg="$(dashboard_data_safe_text "$arg")"
+    safe_argv+=("$safe_arg")
+    if [[ "$safe_arg" != "$arg" ]]; then
+      argv_redacted="true"
+    fi
+  done
+  copy_allowed="false"
+  copy_block_reason="display_only"
+  if [[ "$risk_level" == "low" && "$requires_approval" == "false" && "$execution_mode" == "preview_only" && "$non_executable" == "true" && "$argv_redacted" == "false" && "$safe_command_text" == "$command_text" ]]; then
+    copy_allowed="true"
+    copy_block_reason="none"
+  elif [[ "$argv_redacted" == "true" || "$safe_command_text" != "$command_text" ]]; then
+    copy_block_reason="redacted_sensitive_or_local_value"
+  elif [[ "$risk_level" != "low" ]]; then
+    copy_block_reason="risk_review_required"
+  elif [[ "$requires_approval" != "false" ]]; then
+    copy_block_reason="approval_required"
+  fi
 
-  printf '{"intent":'
+  printf '{"command_id":'
+  dashboard_json_string "$command_id"
+  printf ',"intent":'
   dashboard_json_string "$intent"
   printf ',"target":'
   dashboard_json_string "$target"
@@ -1134,13 +1499,21 @@ dashboard_json_command_preview() {
   printf ',"approval_gate_id":'
   dashboard_json_string "$approval_gate_id"
   printf ',"argv":'
-  dashboard_json_string_array "$@"
+  dashboard_json_string_array "${safe_argv[@]}"
+  printf ',"safe_argv":'
+  dashboard_json_string_array "${safe_argv[@]}"
+  printf ',"argv_redacted":'
+  dashboard_json_bool "$argv_redacted"
   printf ',"command_text":'
-  dashboard_json_string "$command_text"
+  dashboard_json_string "$safe_command_text"
   printf ',"execution_mode":'
   dashboard_json_string "$execution_mode"
   printf ',"non_executable":'
   dashboard_json_bool "$non_executable"
+  printf ',"copy_allowed":'
+  dashboard_json_bool "$copy_allowed"
+  printf ',"copy_block_reason":'
+  dashboard_json_string "$copy_block_reason"
   printf '}'
 }
 

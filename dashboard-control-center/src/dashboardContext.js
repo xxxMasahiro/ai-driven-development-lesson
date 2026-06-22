@@ -197,7 +197,7 @@ export function resolveActiveDashboardData(data, activeMenuId) {
   const activeContextMenuId = displayText(activeContext.menu_id, resolvedMenuId);
   const isProducerContext = activeContextMenuId === producerMenuId;
   const scopeMatchesSelectedMenu = activeContextMenuId === resolvedMenuId;
-  const detailPagesSafe = isProducerContext && scopeMatchesSelectedMenu;
+  const detailPagesSafe = scopeMatchesSelectedMenu && Boolean(activeContextMenuId);
   const viewData =
     isProducerContext && activeContext === producerContext
       ? data

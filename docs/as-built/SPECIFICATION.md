@@ -3028,3 +3028,33 @@ Collection and proposal commands can attach audit receipts without writing exter
 MCP tools use names derived from command ids and return structured JSON envelopes; Browser Debug CLI is only referenced through lesson-owned manifest generation.
 
 The Design Studio page renders an AI agent connection layer that explains manual import, subscription-agent package flow, blocked API-key provider mode, image/mock candidate registration, external product plan-only export, CLI/MCP parity, and Browser Debug review boundaries using existing design-system component classes.
+
+## Dashboard Control Center Contextual Repair Specification
+
+SYNC-ID: dashboard_control_center_contextual_repair
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/DASHBOARD_DATA_SCHEMA.tsv,docs/design-system/dashboard-control-center/DESIGN_SYSTEM.md,docs/design-system/dashboard-control-center/tokens.json,docs/design-system/dashboard-control-center/components.json,tools/dashboard-design-system,tools/dashboard-data,vite.config.mjs,dashboard-control-center/src/App.jsx,dashboard-control-center/src/dashboardContext.js,dashboard-control-center/src/dashboardData.js,dashboard-control-center/src/displayDepth.js,dashboard-control-center/src/i18n.js,dashboard-control-center/src/styles.css,dashboard-control-center/src/design-system.generated.css,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_schema.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/test_dashboard_data_product_repository_selection.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/check_dashboard_design_system.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+`dashboardContext.js` owns active-menu projection.
+`detailPagesSafe` is true only when the selected menu is backed by the current producer-owned snapshot; selected-context fallback is limited to overview-level context while a matching snapshot is loading.
+
+`App.jsx` owns browser fetch orchestration.
+The first snapshot request must include the initial URL or stored menu id when present.
+Background snapshot polling must not overwrite a menu-specific snapshot with a stale default producer snapshot while the user is viewing a different menu.
+
+`tools/dashboard-data` owns scoped evidence.
+Repository selection, document briefs, product authority, live Git/worktree activity, live local test activity, CI summary, active operations, and runtime activity are emitted for the selected menu and stable repository id.
+React may render these fields but must not infer context by parsing product names, raw paths, or English fallback strings.
+
+`dashboardData.js` validates the live and snapshot contracts.
+Schema validation must accept the generic operational event model while rejecting raw absolute paths, secret-like strings, unsafe command previews, unscoped document briefs, and repository-selection options outside the selected context.
+
+The UI maps raw state codes into user-facing meaning through i18n and shared helpers.
+Friendly mode uses plain decision wording; standard and technical modes expose source ids, commands, Git branch/head, worktree counts, CI/run state, and evidence timestamps.
+
+Design tokens and component definitions under `docs/design-system/dashboard-control-center/` remain the source for menu icon selected/unselected colors, chip colors, and spacing.
+Generated CSS/JS are runtime artifacts produced from that source.
+
+The Browser Debug CLI or TraceCue review step uses only local read-only review commands and repository-owned artifacts.
+No external review tool repository files are modified.

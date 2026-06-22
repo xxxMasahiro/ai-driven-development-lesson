@@ -313,13 +313,6 @@ function appendContextMenuTileCss(cssLines) {
     ]);
   }
 
-  pushCssRule(cssLines, [".menu-tile.is-unselectable:not(.is-selected)"], [
-    "--dcc-menu-tile-icon-bg: #e9eef2;",
-    "--dcc-menu-tile-icon-color: #53616b;",
-    "--dcc-menu-tile-selected-icon-bg: #53616b;",
-    "--dcc-menu-tile-selected-icon-color: #ffffff;",
-  ]);
-
   pushCssRule(cssLines, iconSelectors, [
     "background: var(--dcc-menu-tile-icon-bg, var(--dcc-page-soft-fallback));",
     "color: var(--dcc-menu-tile-icon-color, var(--dcc-page-accent-fallback));",
@@ -1669,6 +1662,9 @@ function checkRuntimeWiring() {
   }
   if (!generatedCss.includes("--dcc-menu-tile-selected-icon-bg") || !generatedCss.includes(".menu-tile.is-selected.menu-tile--lesson .menu-tile__icon")) {
     fail("Generated context-menu-tile CSS must apply selected and unselected icon states");
+  }
+  if (generatedCss.includes(".menu-tile.is-unselectable:not(.is-selected)") && generatedCss.includes("--dcc-menu-tile-icon-bg: #e9eef2")) {
+    fail("Generated context-menu-tile CSS must keep category icon colors for unavailable unselected tiles");
   }
   for (const heading of ["Source-To-Runtime Contract", "Prototype Preview Gate", "Drift Check"]) {
     if (!designSystem.includes(heading)) {

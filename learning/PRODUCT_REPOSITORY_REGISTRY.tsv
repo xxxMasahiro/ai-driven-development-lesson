@@ -1,3 +1,3 @@
 # repo_id	primary_menu_id	allowed_contexts	display_name	repository_path	product_type	source
-frame-cue	free-development	free-development	FrameCue	$HOME/projects/frame-cue	all	explicit
-browser-debug-cli	free-development	free-development	Browser Debug CLI	$HOME/projects/agent-toolbox/browser-debug-cli	cli	explicit
+frame-cue	free-development	free-development|product-improvement|external-integration	FrameCue	$HOME/projects/frame-cue	all	explicit
+trace-cue	free-development	free-development|product-improvement|external-integration	TraceCue	$HOME/projects/agent-toolbox/trace-cue	cli	explicit

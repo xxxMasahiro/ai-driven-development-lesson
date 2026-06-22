@@ -137,6 +137,66 @@ for (const key of ["settingsPage.value.displayDepth.friendly", "settingsPage.val
     fail(`Dashboard dictionaries must include Settings display-depth key ${key}`);
   }
 }
+const japaneseProgressKeys = [
+  "overview.progress.title",
+  "overview.progress.subtitle",
+  "overview.progress.meta",
+  "overview.progress.updated",
+  "overview.progress.currentWorkTitle",
+  "overview.progress.taskTrackerTitle",
+  "overview.progress.taskTrackerMissing",
+  "overview.progress.taskTrackerMissingDetail",
+  "overview.progress.handoffTitle",
+  "overview.progress.handoffMissing",
+  "overview.progress.handoffMissingDetail",
+  "overview.progress.gitTitle",
+  "overview.progress.checksTitle",
+  "overview.progress.runningChip",
+  "overview.progress.recordedChip",
+  "overview.progress.workingChip",
+  "overview.progress.noBlockerChip",
+];
+const japaneseDictionary = dashboardMessagesForLocale("ja");
+for (const key of japaneseProgressKeys) {
+  if (!keys.includes(key)) {
+    fail(`Dashboard dictionaries must include progress key ${key}`);
+  }
+  if (!japaneseDictionary[key] || japaneseDictionary[key].includes("概要 -")) {
+    fail(`Japanese Dashboard progress key ${key} must not use generated fallback text`);
+  }
+}
+for (const key of ["overview.current.localTestsProgressRecord"]) {
+  if (!keys.includes(key)) {
+    fail(`Dashboard dictionaries must include overview runtime key ${key}`);
+  }
+  if (!japaneseDictionary[key] || japaneseDictionary[key].includes("概要 -")) {
+    fail(`Japanese Dashboard overview runtime key ${key} must not use generated fallback text`);
+  }
+}
+
+const displayAndRepositoryControlKeys = [
+  "displayDepth.audience.non_engineer.label",
+  "displayDepth.audience.non_engineer.detail",
+  "displayDepth.audience.junior_engineer.label",
+  "displayDepth.audience.junior_engineer.detail",
+  "displayDepth.audience.technical_engineer.label",
+  "displayDepth.audience.technical_engineer.detail",
+  "overview.displayDepth.title",
+  "overview.displayDepth.selectLabel",
+  "overview.displayDepth.switch",
+  "overview.displayDepth.changeFailed",
+  "context.repositorySelection.title",
+  "context.repositorySelection.detail",
+  "context.repositorySelection.current",
+  "context.repositorySelection.selectLabel",
+  "context.repositorySelection.selectAction",
+  "context.repositorySelection.selectFailed",
+];
+for (const key of displayAndRepositoryControlKeys) {
+  if (!keys.includes(key)) {
+    fail(`Dashboard dictionaries must include display/repository control key ${key}`);
+  }
+}
 
 const englishDictionary = dashboardMessagesForLocale("en");
 const maxAllowedEnglishMatches = Math.ceil(keys.length * 0.15);
@@ -162,6 +222,12 @@ for (const code of expectedCodes) {
     for (const key of consistencyKeys) {
       if (dictionary[key] === englishDictionary[key] || dictionary[key].includes(key)) {
         fail(`Dashboard locale ${code} must translate Settings consistency key ${key}`);
+      }
+    }
+    for (const key of displayAndRepositoryControlKeys) {
+      const value = dictionary[key];
+      if (!value || value === englishDictionary[key] || value.includes(key) || / - (Title|Description|Status|Value|Current|Item|Page)$/.test(value)) {
+        fail(`Dashboard locale ${code} must translate display/repository control key ${key}`);
       }
     }
   }
