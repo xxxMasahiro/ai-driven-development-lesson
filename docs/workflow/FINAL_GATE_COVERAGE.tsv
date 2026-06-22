@@ -33,6 +33,7 @@ as_built_evidence_run_sync_contract_check	hook	check_as_built_sync_contract	Aggr
 ./tools/test_ci_timing.sh	hook	test_ci_timing	Aggregate CI timing coverage is provided by the matching Git hook row.
 ./tools/test_dashboard_schema.sh	hook	test_dashboard_schema	Aggregate dashboard schema coverage is provided by the matching Git hook row.
 ./tools/test_dashboard_data.sh	hook	test_dashboard_data	Aggregate dashboard data coverage is provided by the matching Git hook row.
+./tools/test_dashboard_data_product_repository_selection.sh	hook	test_dashboard_data_product_repository_selection	Aggregate dashboard product repository selection coverage is provided by the matching Git hook row.
 ./tools/test_control_center_core.sh	hook	test_control_center_core	Aggregate Control Center shared CLI/MCP core coverage is provided by the matching Git hook row.
 ./tools/test_dashboard_browser_debug_manifest.sh	hook	test_dashboard_browser_debug_manifest	Aggregate dashboard Browser Debug manifest coverage is provided by the matching Git hook row.
 ./tools/test_dashboard_settings.sh	hook	test_dashboard_settings	Aggregate dashboard Settings update-tool coverage is provided by the matching Git hook row.
