@@ -1,960 +1,1239 @@
 # Developer Memory
 
-## Session Memory: Temporary Two-Repository Verification Condition
+## Dashboard Control Center: Dashboard Page Direction
 
-The following text is recorded as the English source text for the current session memory.
+STATUS: initialized-and-synced
+
+This developer memory has been initialized for the current Control Center redesign work.
+All previous developer-memory entries were intentionally removed by developer instruction.
+
+This entry records the current Dashboard page direction as the English source text.
+The Dashboard page, Development Workflow page, Maintenance Sync page, and Safety Confirmation page directions are synchronized.
 
 ### Original English Text
 
-For upcoming implementation work, verify and test against the following two free-development repositories:
+The Control Center dashboard must not be rebuilt as a larger collection of static cards.
+It must be rebuilt as a producer-owned Decision Snapshot that answers one practical question first:
 
-- `frame-cue`: `/home/masahiro/projects/frame-cue`
-- `browser-debug-cli`: `/home/masahiro/projects/agent-toolbox/browser-debug-cli`
+Can the current workflow safely continue now?
 
-At major implementation milestones, also perform visual testing.
+The top dashboard must show whether the selected workflow can continue, needs confirmation before continuing, or must stop.
+It must also show the reason, the selected target, the latest reliable observation, the primary blocker when one exists, and the next safe action.
 
-Do not proceed to the next step unless these tests pass.
+The browser UI must not calculate readiness from labels, colors, route names, or display depth.
+The producer must calculate the decision.
+The UI must render that producer-owned decision.
 
-However, verification and testing with these two repositories is temporary for the current period only and is not permanent.
-
-Therefore, do not treat this as an absolute workflow requirement. Treat it as a temporary condition for now.
-
-## 最重要: 外部リポジトリ証拠基盤と詳細ページ仕様
-
-このセクションを、開発者メモリ内の最重要項目として扱います。
-後続の既存記載は、この最重要項目より下位の参考、補足、または旧プロトコルとして扱います。
-ただし、AGENTS.MD の不変ルール、既存機能とのトレードオフ禁止、Security-first defensive implementation、Design System 正本ルール、repository-development-workflow のフェーズ運用は常に上位制約として維持します。
-
-以下の「原文」は、開発者に提示済みの内容を原文のまま記録したものです。
-
-### 原文
-
-はい。サブエージェント複数の精査結果も統合すると、方針は「4カードを入口にして、各詳細ページで判断理由・根拠・次の行動まで具体化する」形が妥当です。
-
-**中核仕様**
-
-| 層 | 役割 | 表示する内容 |
-|---|---|---|
-| 4カード | 現在位置を一目で判断 | 直近の重要状態を1行で表示。例: `動作確認 1/1 成功`、`PR CI 実行中`、`未コミット 3件` |
-| カード詳細ポップアップ | 簡易詳細 | 何が確認されたか、なぜその状態か、参照元、次に見るページ |
-| 各詳細ページ | 運用判断の本体 | 全件、時系列、失敗理由、対象ファイル、CI run、Git差分、安全ブロック、次の安全な操作 |
-| 証拠データ層 | 正確性の根拠 | 外部repoの `.git/product-gate-evidence/` に実行結果・Git状態・CI状態・安全確認を個別記録 |
-
-**外部repo側に必要な仕組み**
-
-| 種別 | 記録するもの | 例 |
-|---|---|---|
-| ローカルテスト | 実行したチェック単位の成功/失敗 | `動作確認`, `構成確認`, `ビルド確認`, `ドキュメント確認`, `目視確認` |
-| Git操作と同期 | 作業ツリー、commit、push、PR、merge、local/remote差分 | `未コミットあり`, `push済み`, `PR未作成`, `remoteと一致` |
-| CI実行根拠 | GitHub Actions の run 単位 | workflow名、run URL、実行中/成功/失敗、対象commit一致 |
-| 安全確認 | blocker、承認、危険操作、秘密情報、外部送信 | `危険操作承認なし`, `秘密情報検出なし`, `外部送信なし` |
-
-これはローカルテストだけでなく、Git・CI・安全確認にも必要です。Dashboard側で推測するとまた「見せかけ」になるため、外部repoが実状態を記録し、本体repoのDashboardがそれを読む構成にします。
-
-**詳細ページ仕様**
-
-| ページ | ユーザーが判断したいこと | 具体表示 |
-|---|---|---|
-| 開発ワークフロー | 今どこまで進んでいて、次に何をすべきか | ローカル確認、Git状態、PR、CI、merge、main反映、次の推奨操作 |
-| 保守・同期 | 何が同期され、何が古いか | 最終取得時刻、対象repo HEAD、取得成功/失敗、古い証拠、更新対象 |
-| 安全確認 | 何が危険で、何が止めているか | blocker一覧、承認済み/未承認、危険操作分類、秘密情報/外部送信確認 |
-| リポジトリ情報 | 選択中repoが本当に対象か | repo名、パス、branch、HEAD、構成、主要ファイルの役割 |
-| ドキュメント | どの文書を見れば判断できるか | 文書ごとの役割、更新状況、対象repoとの対応、古い/不足の警告 |
-| 設定 | 現在の運用モードが何を意味するか | 表示言語、Git/CIモード、対象repo選択、安全境界 |
-| デザインスタジオ | 見た目変更がどこに効くか | 項目別プレビュー、正本デザインシステム、適用範囲 |
-| ヘルプ | 今の状態の意味を理解する | 現在の警告や状態に紐づく説明、用語、次に見る場所 |
-| 更新履歴 | いつ何が変わったか | データ更新時刻、取得元、変更された証拠、失敗した取得、直近イベント |
-
-**データ設計案**
-
-既存の `.git/product-gate-evidence/index.tsv` は「現在状態の索引」として維持します。詳細表示には別途、外部repo側へ次のような詳細証拠を置きます。
-
-```text
-.git/product-gate-evidence/
-  index.tsv
-  ledger.jsonl
-  details/
-    product.gates.tests/
-    product.git.sync/
-    product.ci.pr/
-    product.security.blockers/
-```
-
-また、説明文や表示ルールは実行結果に混ぜず、静的な定義として外部repoに持たせます。
-
-```text
-ops/EVIDENCE_DETAIL_MANIFEST.tsv
-```
-
-ここに「このチェックは何を見ているか」「成功/失敗/未実行の意味」「ユーザーに見せる短い説明」「詳細ページでの表示順」「次の行動」を定義します。
-
-**実装順案**
-
-| 段階 | 内容 |
-|---|---|
-| P1 | 証拠詳細仕様を定義。`index.tsv` は維持し、詳細artifactと説明manifestを追加 |
-| P2 | 外部repo生成時に、証拠収集・詳細manifest・標準gateを自動導入 |
-| P3 | 既存外部repo向けに安全な repair/bootstrap を用意 |
-| P4 | ローカルテスト、Git、CI、安全確認を個別 evidence として記録 |
-| P5 | Dashboard data が evidence を読み、4カード・ポップアップ・詳細ページへ同じ根拠で反映 |
-| P6 | Design System経由でUIを整え、Playwrightで各ページの目視確認 |
-| P7 | fixtures・テスト・回帰確認を追加 |
-
-**合格条件**
-
-- 自由開発を選択したら、全ページが `frame-cue` の実状態を表示する。
-- `task-tracker-repository` のような固定fallbackが混ざらない。
-- 4カードの表示と詳細ページの根拠が同じ evidence ID で追跡できる。
-- CIは run URL、対象commit、実行状態、成功/失敗がわかる。
-- Gitは commit / push / PR / merge / local-remote同期を分けて表示する。
-- 安全確認は「何を安全確認したか」「何がブロックか」が読める。
-- 詳細ページには必ず `現在の判断 / なぜ / 根拠 / 次の行動` がある。
-- 非エンジニア向けの短い判断文と、初級・中級エンジニア向けの技術詳細を分けて表示する。
-
-この方針なら、Dashboardは単なる証拠一覧ではなく、選択中の外部repoの実状態から「今どこにいて、次に何をすべきか」を判断できるコントロールセンターになります。
-
-### 実装計画: product-development-workflow 準拠
-
-STATUS: implementation-plan-recorded
-
-この実装計画は、`product-development-workflow` の implementation plan step として記録します。
-対象は Free Development / Product Improvement / External Integration で使う外部成果物リポジトリ証拠基盤です。
-本体リポジトリから外部リポジトリを制御する実装であるため、Dashboard Settings、AGENTS.MD、Security-first defensive implementation、Design System 正本ルール、repository-development-workflow のフェーズ運用を上位制約として扱います。
-
-#### 現在の前提
-
-| 項目 | 現在値 / 方針 |
-|---|---|
-| 選択中メニュー | `free-development` |
-| 対象外部リポジトリ | `/home/masahiro/projects/frame-cue` |
-| 外部repo表示名 | `FrameCue` |
-| 外部repo運用モード | `parent_managed` |
-| product Git usage | `free-development` は明示設定なしのため policy default `ci` |
-| Git workflow action settings | commit/push/PR/CI monitoring は自動寄り設定だが、merge/destructive/OAuth/secrets/external sending は常に承認境界 |
-| 現行 evidence | `.git/product-gate-evidence/index.tsv` の 13列 current index のみ |
-| 不足 | `ledger.jsonl`、`details/`、`ops/EVIDENCE_DETAIL_MANIFEST.tsv`、Git/CI/安全/ローカルテストの詳細証拠 |
-
-`ci` モードで CI が適用対象なのに、外部repo側に `ops/CI_MANIFEST.tsv` や remote/CI 証拠がない場合、Dashboard は `optional` に逃がしません。
-「CI が必要だが未設定 / 未収集 / 手動確認が必要」という判断として表示します。
-
-#### 実装目的
-
-1. 4カードを、選択中外部repoの実状態に基づく現在位置表示にする。
-2. カード、ポップアップ、詳細ページを同じ `source_id` / `current_item_id` で追跡できるようにする。
-3. 外部repoが生成または修復される時点で、証拠収集に必要な仕組みを自動導入する。
-4. Dashboard側は推測表示をやめ、外部repoに保存された実 evidence と manifest を読む。
-5. 詳細ページでは、非エンジニアにも初級・中級エンジニアにも、現在の判断、理由、根拠、次の行動が分かるようにする。
-
-#### 実装対象
-
-| 領域 | 主な対象 |
-|---|---|
-| Evidence contract | `docs/workflow/PRODUCT_GATE_EVIDENCE_SCHEMA.tsv`、`docs/workflow/DASHBOARD_DATA_SCHEMA.tsv` |
-| Product scaffold | `docs/workflow/PRODUCT_REPOSITORY_STRUCTURE.tsv`、`templates/TEMPLATES.md`、`tools/product-scaffold-check` |
-| Product evidence bootstrap | `tools/product-gate-evidence-bootstrap`、生成される `tools/lib/product_gate_evidence.sh`、生成される `tools/product-gate-evidence` |
-| Product authority | `tools/lib/product_repository_authority.sh`、`tools/product-repository-authority` |
-| Dashboard producer | `tools/dashboard-data`、`tools/lib/dashboard_data.sh` |
-| Dashboard validator/UI | `dashboard-control-center/src/dashboardData.js`、`dashboard-control-center/src/App.jsx`、`dashboard-control-center/src/i18n.js` |
-| Design System | `docs/design-system/dashboard-control-center/DESIGN_SYSTEM.md`、`tokens.json`、`components.json`、`tools/dashboard-design-system` |
-| Tests / fixtures | `tools/test_product_scaffold_check.sh`、`tools/test_product_repository_authority.sh`、`tools/test_product_gate_tools.sh`、`tools/test_dashboard_data.sh`、`tools/test_dashboard_schema.sh`、`tests/fixtures/dashboard-control-center*.json`、`tests/playwright/dashboard-control-center.spec.js` |
-
-#### データ設計
-
-既存の `.git/product-gate-evidence/index.tsv` は 13列の現在状態索引として維持します。
-ここへ列を追加して既存 parser を壊しません。
-
-追加する詳細層:
-
-```text
-.git/product-gate-evidence/
-  index.tsv
-  ledger.jsonl
-  details/
-    product.gates.tests/
-    product.gates.structure/
-    product.git.worktree/
-    product.git.local_remote_sync/
-    product.ci.pr/
-    product.ci.main/
-    product.security.blockers/
-```
-
-静的な説明・表示順・判断文は実行結果に混ぜず、外部repo側の manifest に置きます。
-
-```text
-ops/EVIDENCE_DETAIL_MANIFEST.tsv
-```
-
-候補列:
-
-```text
-source_id	required_mode	contexts	card_group	detail_page	label_key	detail_code	audience	what_is_checked	why_it_matters	pass_meaning	fail_meaning	not_run_meaning	stale_meaning	next_action_key	risk_level	approval_required	display_order
-```
-
-詳細 artifact の最小共通フィールド:
-
-```text
-event_id
-source_id
-context
-status
-freshness_state
-authority
-observed_at
-product_root
-product_head
-detail_code
-safe_summary
-reason
-next_action
-source_artifacts
-blocked_by
-artifact_schema_version
-```
-
-#### Evidence source_id 方針
-
-| 分類 | source_id 例 | 役割 |
-|---|---|---|
-| ローカルテスト | `product.gates.tests.*`、`product.gates.structure.*`、`product.gates.build.*`、`product.gates.docs.*`、`product.gates.visual.*` | 実行したチェック単位の成功/失敗と直近結果 |
-| Git | `product.git.worktree`、`product.git.upstream`、`product.git.local_remote_sync`、`product.git.push`、`product.git.pr`、`product.git.merge` | 作業ツリー、branch、ahead/behind、push、PR、merge、同期状態 |
-| CI | `product.ci.pr`、`product.ci.main`、`product.ci.github_actions` | workflow、run、commit一致、実行中/成功/失敗 |
-| Security | `product.security.secrets`、`product.security.local_artifacts`、`product.security.external_sending`、`product.security.blockers` | 秘密情報、ローカル生成物、外部送信、blocker |
-| Approval | `product.approvals.*` | 危険操作、外部連携、merge、credential/OAuth などの承認状態 |
-
-#### 実装順
-
-1. **Evidence 詳細契約を追加する**
-   - `index.tsv` 13列を維持する。
-   - `ledger.jsonl`、`details/`、`ops/EVIDENCE_DETAIL_MANIFEST.tsv` の契約を schema と tests に追加する。
-   - status、freshness、authority、risk、approval の許可値を固定する。
-
-2. **Scaffold / bootstrap / repair を拡張する**
-   - 新規外部repo scaffold に `ops/EVIDENCE_DETAIL_MANIFEST.tsv` を標準搭載する。
-   - `product-gate-evidence-bootstrap` で helper/command と detail manifest 雛形を安全に導入する。
-   - 既存外部repo向けに欠落検出と修復候補を出す。
-   - 既存ファイルは無断上書きせず、`--force` や destructive な移行は承認境界に置く。
-
-3. **Product-local evidence writer を拡張する**
-   - `tools/product-gate-evidence record/run/status` が index、ledger、details を同じ `source_id/context/product_head/event_id` で書く。
-   - stdout 解析に依存せず、構造化 JSON/JSONL を保存する。
-   - secrets、絶対パス、private URL、巨大ログを保存しない。
-   - 詳細 artifact は sanitized summary と必要最小限の技術詳細だけを持つ。
-
-4. **Authority reader を拡張する**
-   - `product_repository_authority` が index + detail manifest + latest details を read-only で読む。
-   - `product_head` 不一致だけでなく、`max_age_seconds` に基づく時間 stale も扱う。
-   - CI mode required なのに manifest/evidence がない場合は `optional` ではなく `not_run` / `manual_required` / blocker として出す。
-   - 欠落、古さ、HEAD 不一致、必須/任意、承認境界を source_id 単位で JSON 化する。
-
-5. **Git / CI / Security evidence を個別化する**
-   - Git は worktree、upstream、ahead/behind、local-remote sync、push、PR、merge を分ける。
-   - CI は provider、workflow、run_id、run_url、run_status、conclusion、head_match_status を持つ。
-   - Security は blocker、approval、dangerous operation、secret scan、external sending を分ける。
-   - Dashboard はコマンド実行面にせず、表示と command preview までに留める。
-
-6. **Dashboard data 契約へ接続する**
-   - `live_status.checks.local_tests/git_sync/ci/security` を4カード正本にする。
-   - 各 check に `status`、`observed_at`、`detail_code`、`source_id`、`summary`、`reason`、`next_action`、`detail_page`、`freshness_state`、`authority`、`risk_level`、`required_command`、`current_item_id`、`items[]` を必須化する。
-   - `development`、`maintenance`、`security`、`repository_info`、`documents`、`history` へ同じ evidence ID を流す。
-
-7. **UIを4カード、ポップアップ、詳細ページへ反映する**
-   - 4カードは直近の有益な1行だけを主表示にする。
-   - ポップアップは簡易版として `現在の判断 / なぜ / 根拠 / 次の行動` を表示する。
-   - 詳細ページは全件、時系列、失敗理由、対象ファイル、CI run、Git差分、安全ブロック、次の安全な操作を表示する。
-   - UI側で判断を推測せず、producerの `summary/reason/next_action/source_id` を表示する。
-   - 見た目の変更は Design System 正本を通す。
-
-8. **Fixtures / Playwright / 実repo確認を追加する**
-   - fixture で detail manifest、ledger、details、stale、HEAD mismatch、CI missing、security blocker を持つケースを用意する。
-   - Playwright で desktop/mobile、ポップアップ、詳細ページ、`source_id` 追跡、横 overflow なしを確認する。
-   - 実 `frame-cue` snapshot で `task-tracker-repository` が混ざらないことを確認する。
-
-#### 詳細ページ設計
-
-| ページ | 表示する判断 | 具体表示 |
-|---|---|---|
-| 開発ワークフロー | 今どこまで進み、次に何をするか | ローカル確認、Git worktree、upstream、ahead/behind、push、PR、CI run、merge承認、main反映 |
-| 保守・同期 | 表示が信頼できるか、何が古いか | index 鮮度、detail artifact 有無、product_head 一致、manifest不足、取得失敗、最後の更新時刻 |
-| 安全確認 | 何が危険で、何が止めているか | blocker、approval、dangerous operation、secret scan、external sending、承認境界 |
-| リポジトリ情報 | 選択中repoが本当に対象か | repo path、profile、operation mode、branch、HEAD、remote有無、主要ファイルの役割 |
-| ドキュメント | どの文書が何の判断根拠か | product docs、workflow docs、security/verification docs、manifest、古い/不足の警告 |
-| ヘルプ | 今の状態の意味を理解する | 現在の warning/blocker/source_id に紐づく用語、意味、次に見る場所 |
-| 更新履歴 | いつ何が変わったか | `ledger.jsonl` 時系列、event_id、source_id、observed_at、結果変化、対象 HEAD |
-
-#### 文書同期方針
-
-1. この計画はまず `docs/memory/DEVELOPER_MEMORY.md` に implementation-plan-recorded として保持する。
-2. runtime 実装前は、as-built 5文書と `AS_BUILT_SYNC_CONTRACT.tsv` を implemented 扱いへ昇格しない。
-3. 実装が完了し、対象検証と目視確認が通った段階で、次の5文書へ同期する。
-   - `docs/as-built/REQUIREMENTS.md`
-   - `docs/as-built/SPECIFICATION.md`
-   - `docs/as-built/IMPLEMENTATION_PLAN.md`
-   - `docs/workflow/TASK_TRACKER.md`
-   - `docs/workflow/HANDOFF.md`
-4. 外部repo `frame-cue` の product docs を変更する場合は、product-local `docs/product/*`、`docs/workflow/TASK_TRACKER.md`、`docs/workflow/HANDOFF.md` の役割に従い、root duplicate を作らない。
-5. Dashboard UI/CSS は Design System 正本を経由し、生成 CSS/JS を直接編集しない。
-
-#### 検証計画
-
-軽量・対象検証:
-
-```bash
-bash -n tools/product-gate-evidence-bootstrap
-./tools/test_product_scaffold_check.sh
-./tools/test_product_repository_authority.sh
-./tools/test_product_gate_tools.sh
-./tools/test_product_git_usage_modes.sh
-./tools/test_dashboard_schema.sh
-./tools/test_dashboard_data.sh
-./tools/check_dashboard_design_system.sh
-```
-
-UI実装後の目視・Playwright:
-
-```bash
-./tools/test_dashboard_control_center.sh
-```
-
-実repo受け入れ条件:
-
-- `DASHBOARD_SELECTED_MENU_ID=free-development ./tools/dashboard-data` が `frame-cue` を対象にする。
-- Overview、Workflow、Maintenance、Safety、Repository Info、Documents、Help、History で `task-tracker-repository` が主表示に混ざらない。
-- 4カード、ポップアップ、詳細ページが同じ `source_id/current_item_id` を表示する。
-- `frame-cue` の dirty worktree、HEAD、CI未設定/未収集、security evidence が実状態として出る。
-- CI mode required なのに CI証拠がない場合、`optional` ではなく未設定/未収集/確認必要として出る。
-
-最終同期前:
-
-```bash
-./tools/check_as_built_sync_contract.sh
-./tools/check_as_built_docs.sh
-./tools/check_workflow_pair_sync.sh
-./tools/check_test_plan_coverage.sh
-```
-
-#### 復旧方針
-
-- `index.tsv` parser に問題が出た場合は、13列 index を正本に戻し、details/ledger 読み込みだけを無効化できるようにする。
-- 詳細 artifact が欠落している既存repoでは、主表示を壊さず「詳細未収集」として理由と次アクションを出す。
-- `product_head` 不一致や時間 stale は、成功扱いにせず stale として表示する。
-- CI/GitHub API が使えない場合は、Dashboard で「認証不足 / remote未設定 / run未収集」を表示し、UIから実行しない。
-- 秘密情報や外部送信に関わる詳細は、値を保存せず category、件数、sanitized file refs のみにする。
-
-#### 承認境界
-
-- Dashboard は read-only / preview-only を維持する。
-- command preview は表示のみで、Dashboardから実行しない。
-- destructive operations、push、PR作成、merge、main CI待機、cleanup、remote deletion、OAuth、credentials、secrets、external-service authority changes は明示承認境界を維持する。
-- 外部repoへの scaffold/repair 書き込みは product workspace boundary と operation mode を確認して行う。
-- 既存外部repoのファイル上書き、旧 `AGENT.md` 削除、remote/CI設定変更は自動で行わない。
-
-#### 完了条件
-
-- 新規外部repo scaffold に evidence detail manifest と product-local evidence writer が標準導入される。
-- 既存外部repoは repair/bootstrap で欠落を検出し、安全に導入候補を出せる。
-- ローカルテスト、Git、CI、安全確認が個別 evidence として記録・表示される。
-- 4カード、ポップアップ、詳細ページが同じ evidence ID で追跡できる。
-- 全詳細ページに `現在の判断 / なぜ / 根拠 / 次の行動` がある。
-- `free-development` + `frame-cue` 選択時に全ページが同じ外部repo実状態を表示し、固定 fallback が混ざらない。
-- 非エンジニア向け短文と、初級・中級エンジニア向け技術詳細が分離される。
-
-## Required baseline memory for lesson checks
-
-Approval checkpoints now have tooling enforcement.
-
-The 7-day lesson command is `tools/lesson 学習モード <A|B|C>`.
-The STEP 1-14 lesson command is `tools/lesson14 学習モード <A|B|C>`.
-Learning mode can be changed at any time during either lesson.
-
-Standard language choices should include `ja`, `en`, `ko`, `zh-CN`, `zh-TW`, `es`, `pt-BR`, `fr`, `de`, `id`, `vi`, `th`, `hi`, and `ar`, while `zh` remains a `zh-CN` alias and custom values remain available.
-
-Implementation must remain refactorable, ecosystem-friendly, reusable, and general.
-Existing functionality must not be traded away.
-Final tests pass only when every improvement or problem recorded in this developer memory is implemented, explicitly deferred, or covered by an accepted follow-up.
-
-Explain MCP Purpose Before MCP Workflows.
-
-## 参考: 旧最優先プロトコル（格下げ済み）
-
-このセクションは、以前の本リポジトリ開発プロトコルを保存した旧記録です。
-現在は、上記の「最重要: 外部リポジトリ証拠基盤と詳細ページ仕様」より下位の参考情報として扱います。
-以下の「原文」は、開発者に提示済みの内容を原文のまま記録したものです。
-
-この旧プロトコルを参照する場合も、必ず repo-local skill の `repository-development-workflow` に準拠します。実装前の context triage、proposal、implementation_plan、fast_loop、mid_tests、release_gate、main_sync_cleanup のフェーズ選択、`./tools/repository-development-workflow guidance --phase <phase_id>`、`./tools/repository-development-workflow gate --phase <phase_id>`、および推奨/必須チェックの選定は同スキルの手順に従います。`repository-development-workflow` は AGENTS.MD を置き換えるものではなく、AGENTS.MD の不変ルールを上位制約として、旧プロトコルを安全に参照するための運用手順として扱います。
-
-後続の「参考文献」セクションは、旧プロトコルの詳細、根拠、補足、調査記録として扱います。参考文献側に個別の優先順位や改善案がある場合でも、当面の実装順は上記の最重要項目を優先します。AGENTS.MD の不変ルール、既存機能とのトレードオフ禁止、リファクタリング性、エコシステム性、再利用性、汎用性は常に上位制約として扱います。
-
-### 原文
-
-表示のみです。開発者メモリは触っていません。
-
-**1. Dashboard 表示文脈の正本化**
-対象フェーズ: `P0 / context foundation`
-
-内容:
-1. メニュー選択をDashboard全体の正本コンテキストにする
-2. `activeMenuId` / `activeContext` を導入し、全ページを選択メニューに従わせる
-3. `step_1_14` 固定 fallback を撤去し、実状態に基づく初期選択にする
-4. 未開始・対象repoなし・設定不足メニューを選択不可にし、理由を通知する
-
-目的: まず「今Dashboardが何の作業を表示しているのか」を全ページで一致させる。
-
-**2. 外部repo実状態判定とデータ分離**
-対象フェーズ: `P0-P1 / context data source`
-
-内容:
-5. 外部リポジトリ状態をユーザー申告ではなく実repo/manifest/evidenceから判定する
-6. 自由開発・成果物改善・外部連携の対象repoを実状態から検出する
-7. `recent_runs`、`maintenance.evidence_rows`、`source_files` を menu/context scope 付きにする
-8. Documents / Repository Info で教材・成果物・本リポジトリ保守情報を混在させない
-9. 選択メニュー外の情報が主表示へ漏れないことを検査する
-
-目的: STEP 1-14、自由開発、未開始メニューなどを実状態から正しく区別する。
-
-**3. Dashboard の判断UI化**
-対象フェーズ: `P1 / decision UI`
-
-内容:
-10. Overviewを「状態一覧」から「次アクション判断ボード」にする
-11. 保守・同期ページを、手動確認事項・証拠の意味・未収集影響が分かる形へ改訂する
-12. Workflow / Safety を技術状態表示ではなく「進めてよいか」の判断UIへ改訂する
-13. 詳細モーダルを、行ごとの原因・影響・復旧手順・関連証拠を出せる構造へ拡張する
-
-目的: 非エンジニアでも「進める / 止める / 確認する」が分かる画面にする。
-
-**4. 外部リポジトリ基盤の標準化**
-対象フェーズ: `P1-P2 / product repository foundation`
-
-内容:
-14. 外部repo初期構成に `skills/`、`tools/`、`docs/product/`、`docs/workflow/`、`docs/design-system/`、`ops/` を標準搭載する
-15. `product-development-workflow` を外部repo側の標準運用スキルとして機能させる
-16. Settings の Git/CI 使用モードを外部repo gate まで一貫反映する
-17. `.git` なし / local Git / remote sync / CIあり の全モードで free-development gate を正しく動かす
-
-目的: 外部repoを本リポジトリの制御基盤から安全に扱える状態にする。
-
-**5. Learner Context の実装**
-対象フェーズ: `P2 / lesson runtime context`
-
-内容:
-18. `learner_context_foundation` を実装状態へ進める
-19. `learner_context_runtime_integration` を実装し、レッスン出力へ安全に接続する
-
-目的: レッスン進行や学習者状態を安全に参照し、教材出力へ反映できるようにする。
-
-**6. Design Studio の中核基盤**
-対象フェーズ: `P2 / design studio core`
-
-内容:
-20. Event Runner を実装する
-21. Request / Proposal Store を永続化する
-22. サブスク型 / APIキー型 / 手動型 AI Agent Connection Layer を実装する
-
-目的: Dashboard上の自然文依頼、AI補助、提案生成、承認フローの土台を作る。
-
-**7. Design Studio の高度機能**
-対象フェーズ: `P3 / mock and design-system workflow`
-
-内容:
-23. imagegen連携によるモック生成をDashboardから扱えるようにする
-24. モックの範囲選択編集、undo/redo、候補管理を実装する
-25. モックからDesign System候補を抽出する
-26. テンプレート保存・再利用・適用フローを実装する
-27. 外部repoのDesign Systemを product-local adapter 経由で編集・計画・承認できるようにする
-
-目的: モック、デザインシステム、外部repoの見た目調整をDashboardから扱えるようにする。
-
-**8. 外部repo証拠・安全・プロファイル強化**
-対象フェーズ: `P3-P4 / evidence and safety`
-
-内容:
-28. `.git` なし外部repo向けの証拠保存・鮮度管理・product_head代替モデル
-29. 成果物名・作業対象名の write path 化
-30. product-security / Security guard の追加強化
-
-目的: Gitなし運用や成果物管理でも証拠・安全性・対象識別を崩さない。
-
-**9. ライブ運用と自動化**
-対象フェーズ: `P4 / live operations`
-
-内容:
-31. live Git/CI/network status、UI-triggered check、command execution
-32. push、PR作成、merge、main CI待機、cleanup実行の自動化拡張
-
-目的: 条件が整った場合に、Dashboardやworkflowから運用操作まで接続できるようにする。
-
-**10. テスト・CI最適化**
-対象フェーズ: `P4 / verification optimization`
-
-内容:
-33. gap-only final gate、単一パス検証、Playwright重複削減などの高速化
-34. changed-only CI を observe-only から権威ある判定へ昇格する
-
-目的: 安全性を落とさず、重い検証と高速ループを分離して開発効率を上げる。
-
-実装手順としては、まず **1-9で表示対象の混在を止める**、次に **10-13でDashboardを判断UIへ改訂する**、その後 **14-17で外部repo基盤を固める**。それが安定してから Learner Context、Design Studio、証拠・安全、自動化、CI高速化へ進む順番です。
-
-## 参考文献: 最優先プロトコルの詳細、根拠、補足
-
-以下は、最優先プロトコルを構成するための調査結果、問題分析、追加前提、詳細ロードマップです。実装時は必要に応じて参照しますが、当面の実装順は上記の「最優先: 当面の開発プロトコル」に従います。
-
-読み取り専用で精査しました。サブエージェント3件はすべて完了し、閉じています。結論として、現状のDashboardは「技術証跡を安全に表示する画面」としては進んでいますが、「非エンジニアが次に何をすべきか判断できる製品UI」としては未達です。
-
-**核心問題**
-今の詳細ボタンやリンクは、かなりの箇所で「押すと何か出る」ことは満たしていますが、「その情報で判断が進む」状態になっていません。原因は主に3つです。
-
-- 共通モーダルが `where / why / next action / technical source` の固定枠だけで、行ごとの失敗原因・影響・復旧手順・関連証拠を十分に表現できない
-- データ契約が `status` や `reference` 中心で、`何を判断するか`、`放置リスク`、`次の完了条件` を必須にしていない
-- テストが「モーダルが開く」「文言がある」を見ており、「有益な判断材料になっているか」までは守っていない
-
-代表箇所は [App.jsx](/home/masahiro/projects/ai-driven-development-lesson/dashboard-control-center/src/App.jsx:1202)、[dashboardData.js](/home/masahiro/projects/ai-driven-development-lesson/dashboard-control-center/src/dashboardData.js:1234)、[dashboard-control-center.spec.js](/home/masahiro/projects/ai-driven-development-lesson/tests/playwright/dashboard-control-center.spec.js:508) です。
-
-**重大な改善対象**
-1. 保守・同期ページで `summary.manual_followups` が実表示されていません。件数計算には使われていますが、ユーザーが確認すべき Git/CI などの手動確認事項が画面に出ません。
-
-2. `#evidence-table-heading` などのページ内リンクが、ルーティング仕様上 `overview` に戻る可能性があります。重要CTAが目的箇所へ連れて行かないなら、信頼を大きく落とします。
-
-3. 詳細ページの「Refresh / Refresh data」が押せそうに見えるのに実ボタンではありません。アクション風UIは実行可能か、そうでないなら表示を変えるべきです。
-
-4. 保守状態カードには詳細ポップアップがありません。「同期済み」「正常」「追記済み」が何を保証するのか説明不足です。
-
-5. 安全確認ページは、承認・危険操作・失敗の意味をまだ技術状態として見せすぎています。ユーザー影響、停止理由、復旧優先度が前面に出るべきです。
-
-6. Overview が司令塔になっていません。`primary_action`、`guidance_items`、`blocking_items`、`manual_followups` という良いデータはあるのに、「今やるべきこと」の判断ボードとして活用しきれていません。
-
-7. Documents ページは比較的良いですが、そこで得られる「何を作るか・どこまで進んだか・次に何を確認するか」の文脈が、Workflow / Maintenance / Safety に波及していません。
-
-**改訂方針**
-Dashboard全体を、技術項目ベースではなく次の順番で再設計すべきです。
-
-| 項目 | 画面で答えるべきこと |
-|---|---|
-| Outcome | このページで何を判断するのか |
-| Decision | 進めてよいか、確認が必要か、止めるべきか |
-| Reason | なぜ重要か |
-| Risk | 放置すると何が危険か |
-| Next Action | 次に1つ何をすればよいか |
-| Evidence | その判断を支える証拠は何か |
-
-**実装前に固めるべき改善テーマ**
-- Overview を「状態一覧」から「次アクション判断ボード」に変える
-- 保守・同期ページに手動確認事項、証拠の必須/任意、未収集時の影響を出す
-- Workflow / Maintenance / Safety のカードを技術名ではなく実務上の質問に言い換える
-- 詳細モーダルを汎用枠から、行ごとの判断材料を持てる構造へ拡張する
-- 押して意味がないリンク/ボタンは削除、または静的チップへ変える
-- Documents の decision brief を全ページの共通文脈として使う
-- Playwright に「詳細が固有情報を持つ」「次アクション・理由・リスクが表示される」検査を追加する
-
-**優先順位**
-1. まず保守・同期ページの手動確認事項、証拠詳細、ページ内リンク破綻を修正対象にする
-2. 次に Overview を司令塔化し、主要リスクと次アクションを前面に出す
-3. 次に Workflow / Safety のカードと詳細を実務判断ベースへ改訂する
-4. その後、データ契約に `decision_summary`、`risk_if_ignored`、`recommended_next_action`、`owner`、`done_condition` などを追加する
-5. 最後にテストを「存在確認」から「判断材料の品質確認」へ強化する
-
-現時点では、文書上は一部「実装済み」扱いになっていますが、実態は「汎用detail shellを追加した段階」です。製品リリース品質にするには、ここを再オープンして本格改訂する必要があります。
-
-読み取り専用で精査しました。サブエージェント3件の報告はすべて戻っています。指示通り、サブエージェントは閉じていません。
-
-**結論**
-現状の「進めるメニューを選択」は、名前に反して **Dashboard全体の表示対象を切り替える機能になっていません**。
-実態は、生成済み snapshot の `selected_context.menu_id` を表示しているだけです。そのため既定の `step_1_14`、つまり実践レッスンが強制的に選ばれやすく、各ページには本リポジトリ保守情報、成果物リポジトリ情報、レッスン情報が混在しています。
-
-**主因**
-| 問題 | 内容 |
-|---|---|
-| 既定値が `step_1_14` | `tools/dashboard-data` が `DASHBOARD_SELECTED_MENU_ID` 未指定時に `step_1_14` を選びます |
-| メニュータイルが表示用 | `MenuTileStrip` は `article` 表示で、クリックして全体 state を変える機能がありません |
-| App全体に `activeMenuId` がない | `Overview / Workflow / Maintenance / Safety / Documents` へ選択メニューが伝播しません |
-| `ContextPanel` が未接続 | select UI はありますが、ページ全体のデータ切替には使われていません |
-| データがトップレベル単一 | `recent_runs`、`maintenance.evidence_rows`、`source_files` がメニュー別ではなくグローバルです |
-| テストが固定前提 | Playwright が `step_1_14` 固定や `menu_id: step_1_14` を期待しています |
-
-代表箇所:
-- [App.jsx](/home/masahiro/projects/ai-driven-development-lesson/dashboard-control-center/src/App.jsx:360)
-- [App.jsx](/home/masahiro/projects/ai-driven-development-lesson/dashboard-control-center/src/App.jsx:1034)
-- [App.jsx](/home/masahiro/projects/ai-driven-development-lesson/dashboard-control-center/src/App.jsx:6223)
-- [tools/dashboard-data](/home/masahiro/projects/ai-driven-development-lesson/tools/dashboard-data:51)
-- [DASHBOARD_DATA_SCHEMA.tsv](/home/masahiro/projects/ai-driven-development-lesson/docs/workflow/DASHBOARD_DATA_SCHEMA.tsv:30)
-
-**ページ別の不整合**
-| ページ | 現状の問題 |
-|---|---|
-| Overview | メニュータイルは表示だけ。選択しても全ページが切り替わらない |
-| Lessons | 非レッスンメニューでも STEP 1-7 / STEP 1-14 / Advanced が固定表示される |
-| Development Workflow | context strip は選択文脈だが、`recent_runs` や `product_authority` はグローバル |
-| Maintenance Sync | 「同期と確認記録」が選択メニューではなくリポジトリ全体の保守証跡を表示 |
-| Safety Actions | レッスン文脈と教材改善文脈が混ざる可能性がある |
-| Documents | 選択メニューの文書ではなく、全体カタログ/成果物 authority が混ざる |
-| Repository Info | 教材改善でも成果物リポジトリ authority が混ざる |
-| History / Source | 「最近のワークフロー実行」が実履歴ではなく合成 snapshot 証拠に近い |
-
-**改善方針**
-最優先は、Dashboardを「選択メニューごとの作業面」に作り直すことです。
-
-1. `App` に `activeMenuId` を持たせる
-2. `MenuTileStrip` を実ボタン化し、クリック/キーボード操作で `activeMenuId` を更新する
-3. `contexts_by_menu[activeMenuId]` を `activeContext` として全ページへ渡す
-4. `viewData = { ...data, selected_context: activeContext }` のような派生データを使い、ページ全体を同じ文脈に揃える
-5. `step_1_14` 固定 fallback をやめる
-6. `recent_runs`、`maintenance.evidence_rows`、`source_files` に `menu_id` または `context_scope` を持たせる
-7. 選択メニュー外の履歴・証跡・情報元は主表示へ出さず、診断/詳細枠へ分離する
-
-**優先順位**
-| 優先 | 対応 |
-|---|---|
-| P0 | メニュー選択を実データ選択にする |
-| P0 | 教材改善メニューで成果物 repo authority が混ざる問題を分離する |
-| P1 | `recent_runs` / `maintenance.evidence_rows` / `source_files` をメニュー別または scope 付きにする |
-| P1 | Documents / Repository Info / Safety をメニュー別情報設計へ再編する |
-| P2 | 「選択メニュー外の情報が主表示へ漏れない」テストを追加する |
-| P3 | 非エンジニア向け文言へ整理し、内部証跡は詳細表示へ退避する |
-
-この問題は、前回の「詳細ボタンが有益でない」問題よりさらに根本にあります。
-まず **メニュー選択がDashboard全体の正本コンテキストになる仕組み** を作らないと、各ページの説明やポップアップを強化しても、表示対象が混ざったままになります。
-
-## 追加前提: 現在アクティブなメニュー文脈
-
-現在、開発者は本リポジトリ側で STEP 1-14 実践レッスンを進めており、隣の CLI では自由開発を進めています。
-
-そのため、Dashboard Control Center の「進めるメニューを選択」が正しく実装された場合、少なくとも次の2つは選択可能な実データ文脈として正確に表示される必要があります。
-
-- STEP 1-14 実践レッスン
-- 自由開発
-
-一方で、応用レッスン、成果物を改善、外部連携、教材そのものを改善などは、対応する開始状態、対象リポジトリ、作業対象、または必要設定が存在しない場合、選択できるように見せるべきではありません。選択不可の場合は、クリックまたはフォーカス時に「このレッスンは開始されていません」「対象となる外部リポジトリが見つかりません」「必要な設定が未完了です」など、ユーザーが次に何をすればよいか分かる短い通知を出す方針とします。
-
-## 追加前提: 外部リポジトリ状態はユーザー申告ではなく実状態から判定する
-
-Dashboard Control Center は、開発者が「隣の CLI で自由開発を進めている」と申告したから自由開発を有効扱いにするのではなく、外部リポジトリの実状態を正確に読み取って有効判定する必要があります。
-
-自由開発、成果物改善、外部連携などの外部リポジトリ系メニューでは、設定済み product workspace、product profile、manifest、evidence、scaffold、Git 使用モード、CI 状態、安全確認、product-local skills/tools/check の有無を producer 側で読み取り、メニューごとに `selectable`、`disabled_reason`、`target_repository`、`evidence_status`、`git_usage_mode`、`required_next_action` を生成する方針とします。
-
-外部リポジトリが存在し、必要な最小構成が読み取れる場合は選択可能にします。外部リポジトリが存在しない、未初期化、必要設定不足、対象作業未開始の場合は選択不可にし、ユーザーへ理由と次の行動を通知します。外部リポジトリは存在するが証拠未収集、不完全、壊れている、または安全確認が不足している場合は、選択可能でも `要確認` として表示します。
-
-STEP 1-14 などのレッスン系メニューも同様に、レッスン状態ファイル、設定ファイル、承認状態、現在ステップを読み取って有効判定します。
-
-この方針では、ユーザーの会話上の申告は一時的な補助情報に留め、Dashboard の正本表示は必ず既存の設定ファイル、外部リポジトリ、manifest、evidence、repo-local/product-local tools の読み取り結果に基づかせます。
-
-本リポジトリ全体の今後の実装プランを、実装優先度の高い順に並べ替えて記録します。
-優先度の基準は、(1) 現在のDashboard表示不整合を解消する前提になるか、(2) 製品リリース判断に直結するか、(3) 外部リポジトリ制御の安全性に直結するか、(4) 後続機能の土台になるか、です。
-
-| 優先 | 領域 | 実装プラン | 現状 |
-|---:|---|---|---|
-| 1 | Dashboard | メニュー選択をDashboard全体の正本コンテキストにする | 後続実装済み |
-| 2 | Dashboard | `activeMenuId` / `activeContext` を導入し、全ページを選択メニューに従わせる | 後続実装済み |
-| 3 | Dashboard | `step_1_14` 固定 fallback を撤去し、実状態に基づく初期選択にする | 後続実装済み |
-| 4 | Dashboard | 未開始・対象repoなし・設定不足メニューを選択不可にし、理由を通知する | 後続実装済み |
-| 5 | Dashboard / 外部repo | 外部リポジトリ状態をユーザー申告ではなく実repo/manifest/evidenceから判定する | 後続実装済み |
-| 6 | Dashboard / 外部repo | 自由開発・成果物改善・外部連携の対象repoを実状態から検出する | 後続実装済み |
-| 7 | Dashboard | `recent_runs`、`maintenance.evidence_rows`、`source_files` を menu/context scope 付きにする | 後続実装済み |
-| 8 | Dashboard | Documents / Repository Info で教材・成果物・本リポジトリ保守情報を混在させない | 後続実装済み |
-| 9 | Dashboard | Playwright等で「選択メニュー外の情報が主表示へ漏れない」ことを検査する | 後続実装済み |
-| 10 | Dashboard | Overviewを「状態一覧」から「次アクション判断ボード」にする | 後続実装済み |
-| 11 | Dashboard | 保守・同期ページを、手動確認事項・証拠の意味・未収集影響が分かる形へ改訂する | 後続実装済み |
-| 12 | Dashboard | Workflow / Safety を技術状態表示ではなく「進めてよいか」の判断UIへ改訂する | 後続実装済み |
-| 13 | Dashboard | 詳細モーダルを、行ごとの原因・影響・復旧手順・関連証拠を出せる構造へ拡張する | 後続実装済み |
-| 14 | 外部repo | 外部repo初期構成に `skills/`、`tools/`、`docs/product/`、`docs/workflow/`、`docs/design-system/`、`ops/` を標準搭載する | 一部実装済み、検証不足 |
-| 15 | 外部repo | `product-development-workflow` を外部repo側の標準運用スキルとして機能させる | 基盤あり、実運用未完 |
-| 16 | 外部repo | Settings の Git/CI 使用モードを外部repo gate まで一貫反映する | 一部実装済み、再検証必要 |
-| 17 | 外部repo | `.git` なし / local Git / remote sync / CIあり の全モードで free-development gate を正しく動かす | 未検証 |
-| 18 | Learner Context | `learner_context_foundation` を実装状態へ進める | `planned` |
-| 19 | Learner Context | `learner_context_runtime_integration` を実装し、レッスン出力へ安全に接続する | `planned` |
-| 20 | Design Studio | Event Runner を実装する | ローカル実行基盤実装済み |
-| 21 | Design Studio | Request / Proposal Store を永続化する | ローカル永続化実装済み |
-| 22 | Design Studio | サブスク型 / APIキー型 / 手動型 AI Agent Connection Layer を実装する | 手動/サブスク境界実装済み、APIキー実呼び出しは将来承認制 |
-| 23 | Design Studio | imagegen連携によるモック生成をDashboardから扱えるようにする | 未実装 |
-| 24 | Design Studio | モックの範囲選択編集、undo/redo、候補管理を実装する | 未実装 |
-| 25 | Design Studio | モックからDesign System候補を抽出する | 未実装 |
-| 26 | Design Studio | テンプレート保存・再利用・適用フローを実装する | 未実装 |
-| 27 | Design Studio | 外部repoのDesign Systemを product-local adapter 経由で編集・計画・承認できるようにする | 未実装 |
-| 28 | Evidence | `.git` なし外部repo向けの証拠保存・鮮度管理・product_head代替モデル | 将来承認制 |
-| 29 | Product Profile | 成果物名・作業対象名の write path 化 | 将来承認制 |
-| 30 | Security | product-security / Security guard の追加強化 | 将来承認制 |
-| 31 | Dashboard Live | live Git/CI/network status、UI-triggered check、command execution | 将来承認制 |
-| 32 | Workflow Automation | push、PR作成、merge、main CI待機、cleanup実行の自動化拡張 | 承認境界あり |
-| 33 | テスト/CI | gap-only final gate、単一パス検証、Playwright重複削減などの高速化 | 将来承認制 |
-| 34 | テスト/CI | changed-only CI を observe-only から権威ある判定へ昇格する | 将来承認制 |
-
-2026-06-20更新: Dashboard 行 1-13 は後続の DCC-A01〜DCC-A15、decision projection、decision page rendering、display depth、operational situation/detail decisions、component module extraction の各同期で実装済みとして整理しました。今後の未完了候補は外部repo運用、Design Studio 拡張、証拠ストア、live status、workflow automation、テスト/CI高速化など、承認境界が重い領域を中心に扱います。
-
-**優先順位の考え方**
-1. まず `activeMenuId / activeContext` と実状態ベースの選択可否を実装し、Dashboard全体の表示混在を止める。
-2. 次に、外部リポジトリの実状態読み取りと menu/context scope 付きデータを整え、STEP 1-14 と自由開発を正しく表示できるようにする。
-3. その後、Overview、保守・同期、Workflow、Safety、詳細モーダルを、判断・理由・リスク・次アクション中心に改訂する。
-4. Dashboardの表示基盤が安定してから、外部repo scaffold、product-development-workflow、Git/CI mode gate の整合性を固める。
-5. その後に learner context、Design Studio、AI/モック連携を進める。
-6. 最後に、証拠ストア、live status、command execution、自動PR/merge、テスト/CI高速化などの承認境界が重い機能へ進む。
-
-現時点で最初に実装すべき中核は、**Dashboardのメニュー選択、実状態ベースの選択可否、外部repo実状態判定、menu/context scope付きデータ** です。ここが直らない限り、どのページ改善も表示対象の混在問題を残します。
-
-## 追加同期: 外部リポジトリ `AGENTS.MD` と運用モードの機械的制御
-
-直近の壁打ちで追加された実装方針として、外部リポジトリを本体管理下でも単独運用でも安全に扱うため、単なるプロトコル記載ではなく scaffold、manifest/authority、CLI、Dashboard Settings、check/gate による機械的制御を導入する方針とします。
-
-この追加方針は、既存の詳細実装プランでは主に次に接続します。
-
-| 接続先 | 追加する観点 |
-|---|---|
-| 14. 外部repo初期構成の標準搭載 | 外部repo専用 `AGENTS.MD`、互換用 `AGENT.md`、manifest/authority、product-local skill/tool/check を標準生成する |
-| 15. `product-development-workflow` の外部repo標準運用 | 外部repo単独運用時は外部repo `AGENTS.MD` を入口にし、本体管理下では本体 `AGENTS.MD` と外部repo `AGENTS.MD` の二層で運用する |
-| 16. Settings の Git/CI 使用モード反映 | Settings へ外部repo運用モードを追加し、本体管理/単独運用/再接続/要修復を正本として扱う |
-| 17. Git有無別 free-development gate | `.git` 有無だけでなく、運用モード、manifest、上位ルール接続、active run 整合を gate で確認する |
-| 28. Gitなし外部repo証拠・鮮度管理 | `workflow_mode`、`managed_by_parent`、`last_parent_sync`、active run の鮮度を証拠として扱う |
-| 30. product-security / Security guard 強化 | 外部repo `AGENTS.MD` 欠落、上位ルール接続欠落、台帳不一致、モード矛盾を安全上の停止条件にする |
-| 31. Dashboard Live | Settings と診断画面で外部repo運用モード、接続状態、修復アクションを表示する |
-| 32. Workflow Automation | attach/detach/reconnect、push/PR/merge/cleanup は運用モードと承認境界に従う |
-
-### 外部repo `AGENTS.MD` の方針
-
-外部repoには `AGENT.md` ではなく、エージェントが標準入口として読みやすい `AGENTS.MD` を必須生成します。`AGENT.md` は既存互換用として残す場合でも、主役にはせず、`AGENTS.MD` へ誘導する薄いファイルにします。
-
-外部repo `AGENTS.MD` は本体リポジトリ `AGENTS.MD` のコピーではなく、外部repo単独運用に必要なローカル憲法として作ります。本体repo固有の不変ルール、STEP 1-7 / STEP 1-14 固有ルール、本体repoのCIやdocs導線の詳細を丸写ししません。
-
-外部repo `AGENTS.MD` に記載する内容は、次を最小必須とします。
-
-| 区分 | 内容 |
-|---|---|
-| Repository Role | このrepoが外部成果物repoであること |
-| Immutable Rules | 既存機能とのトレードオフ禁止、破壊的操作の承認境界、機密情報保護、本体repoとの混在禁止 |
-| Routing Table | 要件、仕様、実装計画、タスク、引き継ぎ、設計、検査、成果物、実行ログの参照先 |
-| Workflow | `skills/product-development-workflow/SKILL.md` を読むこと |
-| Product Docs | `docs/product/REQUIREMENTS.md`、`SPECIFICATION.md`、`IMPLEMENTATION_PLAN.md`、`docs/workflow/TASK_TRACKER.md`、`HANDOFF.md` |
-| Tools | `tools/check-*`、`npm test`、`npm run doctor` など product-local 検査 |
-| Parent Control | 本体repo管理下で動く場合は、本体repo `AGENTS.MD` が上位運用制約になること |
-| Stop Conditions | 仕様衝突、ルール衝突、破壊的操作、権限不足、外部依存不備、親子状態不整合では停止して開発者承認を求めること |
-
-### ルール参照の運用
-
-| 状態 | エージェントが読むルール | 目的 |
-|---|---|---|
-| 本体repoから外部repoを開発・制御中 | 1. 本体 `AGENTS.MD` 2. 外部repo `AGENTS.MD` | 本体側の安全制約を上位に置きつつ、外部repo固有の作業ルールを使う |
-| 外部repoを単独で保守・運用中 | 外部repo `AGENTS.MD` | 外部repoだけで迷わず作業できる |
-| 外部repoが再び本体repo管理下に入る | 1. 本体 `AGENTS.MD` 2. 外部repo `AGENTS.MD` | 本体側のworkflow/gate/Settingsと再接続する |
-
-外部repo `AGENTS.MD` は本体から独立して成立する必要があります。ただし、本体管理下では本体 `AGENTS.MD` と矛盾してはいけません。衝突時は安全側に停止し、開発者承認を求めます。
-
-### 運用モード判定
-
-`cwd` は補助情報に留め、最終判断は manifest/authority、本体管理台帳、active run 状態で機械的に行います。
-
-| 判定材料 | 用途 |
-|---|---|
-| 実行入口 / cwd | 本体repo起動か外部repo起動かの初期推定 |
-| 外部repo manifest/authority | `workflow_mode`、`managed_by_parent`、`parent_repository`、`active_parent_run` を確認 |
-| 本体repo管理台帳 | 対象外部repoが現在本体管理下か確認 |
-| 同期・承認状態 | `last_parent_sync`、handoff、task tracker、gate状態を確認 |
-
-運用モードは次の4状態を正本とします。
-
-| mode | 意味 |
-|---|---|
-| `parent_managed` | 本体repoのDashboard、Settings、workflow、gateから制御する |
-| `standalone` | 外部repo自身の `AGENTS.MD`、skills、toolsで単独運用する |
-| `reconnecting` | 単独運用中の外部repoを本体管理に戻す確認中 |
-| `repair_required` | manifest、`AGENTS.MD`、本体台帳、active run が不整合で修復が必要 |
-
-### 明示コマンドと Settings UI
-
-ユーザーが細かい参照ルールを毎回指示しなくてもよいように、明示コマンドと Dashboard Settings で外部repo運用モードを切り替えられるようにします。
-
-本体repo側 CLI の案:
-
-```bash
-./tools/product-repository-mode status --product /path/to/product
-./tools/product-repository-mode attach --product /path/to/product
-./tools/product-repository-mode detach --product /path/to/product
-./tools/product-repository-mode reconnect --product /path/to/product
-./tools/product-repository-mode check --product /path/to/product
-```
-
-外部repo側 CLI の案:
-
-```bash
-./tools/product-mode status
-./tools/product-mode standalone
-./tools/product-mode parent-managed --parent /path/to/parent
-./tools/product-mode check
-```
-
-Dashboard Settings には「外部リポジトリ運用モード」を追加します。
-
-| 表示 | 意味 |
-|---|---|
-| 本体管理 | 本体repoのDashboard、Settings、workflow、gateから制御する |
-| 単独運用 | 外部repo自身の `AGENTS.MD`、skills、toolsで運用する |
-| 再接続 | 単独運用中の外部repoを本体管理に戻す |
-| 要修復 | manifest、`AGENTS.MD`、本体台帳、active run が不整合 |
-
-モード切替時は確認画面を出し、attach/detach/reconnect の履歴を audit log として保存します。単独運用化、本体再接続、破壊的cleanup、push、merge、main CI待機は承認境界に従います。
-
-### 機械的制御
-
-| 制御 | 内容 |
-|---|---|
-| scaffold | 新規外部repo作成時に外部repo専用 `AGENTS.MD`、互換用 `AGENT.md`、manifest/authority、product-local skill/tool/check を生成する |
-| migration | 既存外部repoに `AGENTS.MD` がない、`AGENT.md` しかない、manifest がない場合は修復候補を提示する |
-| check | `AGENTS.MD` 欠落、上位ルール接続欠落、絶対パス固定、routing table 欠落、mode矛盾を検出する |
-| gate | 欠落や矛盾があれば外部repo workflow を `要修復` または fail にする |
-| Dashboard | 外部repoのルール接続状態、運用モード、修復候補、必要アクションを表示する |
-| tests | scaffold生成、既存repo移行、欠落検出、モード切替、Dashboard表示、親子不整合検出を検査する |
-
-### ユーザー操作の最小ルール
-
-ユーザーが行うべきことは、原則として作業入口を選ぶことと、状態が曖昧なときに確認へ答えることだけにします。
-
-| やりたいこと | ユーザー操作 |
-|---|---|
-| 本体リポジトリを開発する | 本体repoで起動する |
-| 本体から外部repoを作成・制御する | 本体repoで起動し、Dashboard Settings または明示コマンドで本体管理にする |
-| 外部repoを単独で保守する | 外部repoで起動し、単独運用モードで進める |
-| 外部repoを本体管理へ戻す | 本体repoの Dashboard Settings または明示コマンドで再接続する |
-
-`cd /home/masahiro/projects/ai-driven-development-lesson` なら本体管理下、`cd /home/masahiro/projects/frame-cue` なら単独運用、という判断は初期推定としては有効ですが、正本にはしません。最終判断は保存済みの `workflow_mode`、manifest/authority、本体管理台帳、active run 状態で行います。
-
-## 追加記録: Dashboard Control Center セッションメモリ照合チェックリスト
-
-記録日: 2026-06-16
-
-このチェックリストは、セッションメモリに記録済みのDashboard Control Center改善要求と、現行コントロールパネルの実表示・生成データ・実装を照合した結果です。
-後続実装では、各項目を実装・検証した時点で `[ ]` を `[x]` に更新し、未対応項目を残したまま「完了」と扱わないでください。
-
-| ID | 状態 | 照合対象 | 記録済み期待 | 現行不整合 / 未反映内容 | 完了条件 |
-|---|---|---|---|---|---|
-| DCC-A01 | [x] | 全ページ共通コンテキスト | メニュー選択がDashboard全体の正本になり、全ページが同じ対象repo/作業文脈を表示する | `resolveActiveDashboardData` が選択メニューではなく producer の `selected_context` を使うため、ページごとに `task-tracker-repository` と `frame-cue` が混在する | `free-development` 選択時に Overview / Lessons / Workflow / Maintenance / Safety / Repository Info / Documents / Design Studio / Help / History の主表示から選択外repoが消える |
-| DCC-A02 | [x] | メニュー選択 / 初期選択 | STEP 1-14 と自由開発は実状態から選択可能、未開始メニューは理由付きで選択不可 | 実データでは `free-development` の対象repoが `frame-cue` でも `selectable:false` / `not_run` になり押せない。`step_1_14` 初期寄せも残る | 実repoが存在し最小構成が読める外部repoメニューは選択可能かつ `要確認` 表示になり、未開始メニューは押せず理由と次アクションが出る |
-| DCC-A03 | [x] | 外部repo実状態判定 | ユーザー申告ではなく profile / manifest / evidence / scaffold / Git / CI / security / product-local tools から判定する | `frame-cue` 側に `AGENTS.MD`、profile、index、mode があっても、Dashboardのメニュー可否と全ページ表示へ一貫反映されていない | `frame-cue` の実ファイル、運用モード、証拠状態、安全状態がDashboard snapshotに一貫して現れる |
-| DCC-A04 | [x] | Repository Info | 選択中外部repoのファイル構成と各ファイルの役割を表示する | 自由開発文脈でも `task-tracker-repository` 側または未収集表示が残り、`frame-cue` の `AGENTS.MD` / `ops/PRODUCT_PROFILE.json` / `ops/REPOSITORY_INDEX.json` / `docs/product/*` が主表示されない | 選択repoの実ディレクトリ情報と役割説明だけが表示され、教材repoや別外部repoの情報が混ざらない |
-| DCC-A05 | [x] | Documents | 選択メニュー・対象repoの文書だけを混在なく表示する | 文書カードはあるが、選択repoと文書根拠の対応が弱く、lesson/product/maintenance文脈の混在をUI上で判定しにくい | `free-development` では `frame-cue` product-local docs、lessonではlesson docsというように文書スコープが分離される |
-| DCC-A06 | [x] | Lessons | 非レッスン文脈ではレッスン進行や固定STEP表示を出さない | 自由開発切替後もスナップショット未同期時にレッスン表示や `task-tracker-repository` が残る | 自由開発では「レッスンではない」扱いの専用表示になり、レッスン進行 2/3 などの誤表示が出ない |
-| DCC-A07 | [x] | Development Workflow / recent runs | 実際の対象repoに紐づく履歴・実行証跡を表示する | `recent_runs` は固定行に生成時刻を入れており、実行履歴ではなく「時刻だけ更新される表示」に見える | 実測時刻、対象repo、実行/確認コマンド、証拠ファイル、結果、更新時刻を持つ履歴だけを表示する |
-| DCC-A08 | [x] | Maintenance / Evidence | どんな保守・同期が行われ、何が未確認かをページ内で判断できる | `manual_followups` が上部判断材料として見えず、証拠詳細や参照が似た内容に見える。確認を外部コマンドへ逃がしている | 手動確認事項、証拠の必須/任意、未収集影響、行ごとの意味、更新日時を表示し、詳細は行固有にする |
-| DCC-A09 | [x] | Safety | セキュリティゲート、承認、危険操作、失敗/ブロックをユーザー影響と復旧優先度で見せる | 技術状態・英語 producer 文言が残り、何を止めているのか、何が承認済みか、何が危険かが分かりにくい | 停止理由、承認状態、危険操作、復旧優先度、ユーザー影響、表示専用コマンドが分離して見える |
-| DCC-A10 | [x] | Source / Tooltip / Detail | ファイルパスtooltipや詳細は各ファイル・各行の意味を説明する | 既知ファイル以外は汎用説明に落ち、証拠詳細・参照・ファイルパス説明が似た内容になる | ファイルごとの役割、行ごとの原因/影響/復旧/証拠/完了条件を表示し、意味のないリンクや押せないボタンをなくす |
-| DCC-A11 | [x] | Help | 各項目の意味・役割・表示箇所・重要性・関連アクションを詳しく知れる | 用語数は多いが、詳細を開いても似た説明が多く、現在のブロッカーから見るべき項目へ誘導しない | カテゴリ、検索/絞り込み、現在文脈に関係する用語、具体例、関連ページ、次アクションを出す |
-| DCC-A12 | [x] | History | 実態と同期した更新履歴・警告・snapshot情報を表示する | 長いIDや source count が読みにくく、警告がCLI実態と揃わず、合成snapshotのような情報が履歴に見える | 実更新時刻を秒単位で表示し、警告、source count、snapshot identity、対象repo、履歴の意味を明示する |
-| DCC-A13 | [x] | Design Studio | 操作ルール別プレビュー、全体ライブプレビュー、外部repo design source連携を分けて見せる | 工程名やカードに英語混在があり、操作ルール別プレビュー不足。アイコン配置の視覚不整合も残る | 操作項目ごとのプレビュー、全体ライブプレビュー、外部repo design-system source、承認フローが分離される |
-| DCC-A14 | [x] | 多言語表示 | 設定の学習・ワークフロー表示言語に従い、各国語表示で破綻しない | 日本語UI内に英語 producer 文言が残る箇所があり、長文/各国語/モバイルでの検証が薄い | i18n経由で主要文言を表示し、desktop/mobile/日本語/英語相当で折返しと意味を確認する |
-| DCC-A15 | [x] | Playwright / 実表示検証 | 実producer snapshotと全ページ目視で、選択外情報漏れと判断UI品質を確認する | 既存Playwrightはfixture中心で、`frame-cue` 実snapshot、全ページmobile、各detail固有性、screenshot差分が不足 | 実 `tools/dashboard-data` とmockの両方で、全ページ・全メニュー・全detailの漏れ/混在/視認性を検証する |
-
-### DCC-A11 完了記録
-
-- 完了時刻: 2026-06-16
-- 実装範囲: Help ページを現在の選択メニュー、対象リポジトリ、未解消項目、証跡件数、更新時刻に連動。現在文脈に関係する用語、検索、用語詳細の現在対象/選択メニュー/未解消項目を追加。
-- 多言語注意: 日本語 UI で `Product authority` などの英語ラベルが主表示に残らないよう、成果物判定系の表示ラベルを日本語化。
-- 検証: `npm run dashboard:build`、`./node_modules/.bin/playwright test --config=/tmp/dcc-playwright.config.js /tmp/dcc-playwright-tests/dcc-a11-help.spec.js`
-- 目視スクリーンショット: `/tmp/dcc-a11-help.png`、`/tmp/dcc-a11-help-detail.png`
-
-### DCC-A12 完了記録
-
-- 完了時刻: 2026-06-16
-- 実装範囲: History ページを選択中メニュー/対象リポジトリ、repository_scope、repository inventory warning、partial_failures、秒単位の workflow evidence に連動。snapshot ID / content hash / inventory hash は短縮表示とコピー可能な完全値に分離。
-- 警告同期: top-level `warnings` だけでなく `repository_scope.inventory.warnings` を履歴ページへ集約し、`frame-cue` の repository index 未網羅警告を表示。
-- 検証: `npm run dashboard:build`、`./node_modules/.bin/playwright test --config=/tmp/dcc-playwright.config.js /tmp/dcc-playwright-tests/dcc-a12-history.spec.js`
-- 目視スクリーンショット: `/tmp/dcc-a12-history.png`、`/tmp/dcc-a12-history-detail.png`
-
-### DCC-A13 完了記録
-
-- 完了時刻: 2026-06-16
-- 実装範囲: Design Studio に、選択中外部リポジトリ `frame-cue` の design-system source、操作項目ごとの小プレビュー、ページ全体のライブプレビュー、提案オーケストレーションの日本語ラベルを追加。
-- 目視修正: ページ見出しサンプルの左アイコンに汎用 span スタイルが当たらないよう修正し、白色アイコンが背景中央に出ることを確認。
-- 検証: `npm run dashboard:build`、`./node_modules/.bin/playwright test --config=/tmp/dcc-playwright.config.js /tmp/dcc-playwright-tests/dcc-a13-design-studio.spec.js`
-- 目視スクリーンショット: `/tmp/dcc-a13-design-studio.png`
-
-### DCC-A14 完了記録
-
-- 完了時刻: 2026-06-16
-- 実装範囲: 日本語UIに残っていた `Security ゲート`、`product workflow`、`Product Authority` 系の表示を i18n 経由の「安全ゲート」「成果物ワークフロー」「成果物判定」へ整理。`workflow_language` に基づく `html lang/dir` 同期を追加し、RTLロケールでも方向が反映されるようにした。
-- 多言語注意: 英語UIは `en-US`、アラビア語UIは `ar-SA` / `rtl` でHTML属性を確認。その他ロケールは既存の共通語彙fallbackポリシーを維持。
-- 検証: `npm run dashboard:build`、`./node_modules/.bin/playwright test --config=/tmp/dcc-playwright.config.js /tmp/dcc-playwright-tests/dcc-a14-multilingual.spec.js`
-- 目視スクリーンショット: `/tmp/dcc-a14-ja-history.png`、`/tmp/dcc-a14-en-repository-info.png`、`/tmp/dcc-a14-ar-mobile-settings.png`
-
-### DCC-A15 完了記録
-
-- 完了時刻: 2026-06-16
-- 実装範囲: 実 `DASHBOARD_SELECTED_MENU_ID=free-development ./tools/dashboard-data` snapshot を使い、Overview / Lessons / Workflow / Maintenance / Safety / Repository Info / Documents / Settings / Design Studio / Help / History のdesktop/mobile表示を横断確認。
-- 追加修正: Repository Info の旧タスクトラッカー固定説明を成果物汎用説明へ変更。Design Studio の外部 design source チップがモバイルで横幅を押し広げないようCSSを修正。
-- 検証: `npm run dashboard:build`、`./node_modules/.bin/playwright test --config=/tmp/dcc-playwright.config.js /tmp/dcc-playwright-tests/dcc-a15-full-visual.spec.js`
-- 目視スクリーンショット: `/tmp/dcc-a15-desktop-*.png`、`/tmp/dcc-a15-mobile-*.png`、`/tmp/dcc-a15-detail-safety.png`
-- 既存ゲート注意: `./tools/test_dashboard_control_center.sh` は `tools/test_dashboard_settings.sh` 内の `dashboard-settings catalog` が複数メニューで実 `tools/dashboard-data` を起動し続け、4分以上無出力だったため停止。A15の実表示検証はPASS済みだが、既存ゲートの高速化またはcatalog専用軽量経路は後続課題。
-
-## 追加記録: Dashboard Control Center リリース前精査統括報告
-
-記録日: 2026-06-19
-
-以下は、リリース前精査の統括報告原文です。本文は変更しない。
-
-**結論**
-
-リリース前へ進むのはまだ早いです。
-1時間枠を使って xhigh サブエージェントの複数ラウンド、合計26件の報告を全回収し、統括しました。破壊的操作、push、merge、外部repo書き込み、依存追加はしていません。実行した確認は読み取り中心で、`git diff --check` は出力なしでした。
-
-現状は「土台は良いが、`implemented` としてリリースできる証明にはまだ届いていない」です。特に、非エンジニア・初級/中級エンジニアに Control Center が誤解なく状態を伝える、という要求に対して、証跡の信頼度と画面証明が不足しています。
-
-**P0: Release 前に必ず直す**
-
-1. `runner_records_status` が stale 証跡を `current` に見せ得る
-   [tools/dashboard-data](/home/masahiro/projects/ai-driven-development-lesson/tools/dashboard-data:4363) が HEAD + pass だけで判定しています。`repository-development-workflow` の契約どおり、policy/input fingerprint 一致も必要です。
-
-2. authority / freshness が status から一律推定されている
-   advisory や stale な情報が authoritative/current 風に見える危険があります。証跡元の authority/freshness を継承し、不明なら fail-closed にするべきです。
-
-3. `operational_decision` の status と source がずれる
-   status 算出には `repository_changes_status` 等が入る一方、primary source 側がそれらを見ていません。ブロック理由と根拠追跡がずれます。
-
-4. `workflow_evidence_events[].detail_artifact_path` の契約不一致
-   schema は単一 path ですが、producer は `;` 区切り複数 path を流しています。schema を配列へ変えるか、単一 path に統一する必要があります。
-
-5. `ci_evidence[]` の head match が全 role `unknown`
-   PR/main/local/provider の分離は良いですが、current HEAD と一致しない/不明な CI を proof 扱いしない検査が必要です。
-
-6. Playwright/fixture が新 decision layer を証明していない
-   `decision_pages` 入り fixture がなく、追加 UI は実画面で未確認です。一方 docs は targeted Playwright review 済み扱いになっています。
-
-7. browser live-status の GitHub API 境界
-   `/dashboard-live-status.json` 経由で `gh api` に到達する経路があります。通常表示更新で外部API観測を発火しないよう、既定は off / opt-in / 既存 evidence 表示に寄せるべきです。
-
-**P1: 続けて直す**
-
-- Overview / Workflow / Repository Info / Safety に、producer が持つ `repository_changes`、`repository_development`、`ci_evidence`、`workflow_evidence_events` をもっと判断材料として出す。
-- `repository_development` は advisory であり release proof ではないことを UI 文言でも明確にする。
-- `.git` ディレクトリ前提ではなく linked worktree も扱えるよう、Git 判定を `git rev-parse --is-inside-work-tree` 系へ寄せる。
-- secret-like literal を fixture/test source に直書きしない。redaction テストは文字列分割生成にする。
-- `TASK_TRACKER.md` / `HANDOFF.md` の「implemented」「Playwright review 済み」主張を、実際の証跡と一致させる。
-
-**別 Sync ID に送る**
-
-大きな UI 再設計、詳細 evidence ledger viewer、Browser Debug 実行連携、外部repo scaffold/repair、default branch 汎用化の横断対応、producer prose の全面 i18n は今回の release 前必須に混ぜない方が安全です。
-
-**実装前提案**
-
-今回の未コミット差分内で、まず P0 だけを仕上げます。最小ファイル群は以下で足ります。
+The source of truth for this direction is the dashboard data producer and schema:
 
 - `tools/dashboard-data`
-- `dashboard-control-center/src/dashboardData.js`
-- `tools/test_dashboard_data.sh`
-- `tools/test_dashboard_schema.sh`
 - `docs/workflow/DASHBOARD_DATA_SCHEMA.tsv`
-- `tests/fixtures/dashboard-control-center.json`
-- `tests/playwright/dashboard-control-center.spec.js`
-- 5文書と sync contract
 
-`App.jsx` は既存の generic renderer で足りる限り大改修しません。CSS、package、CI workflow、product authority 本体も触らない方針です。
+Existing fields such as `operational_decision`, `decision_pages`, `development.repository_changes`, `development.product_authority`, `documents.brief_cards`, and `live_status.checks` should be strengthened and normalized rather than replaced with an unrelated second source of truth.
 
-実装後の focused 検証はこれです。
+If a new normalized view is added, it should be named generically, such as `repository_status_snapshot`, and should remain additive and backward-compatible while the existing dashboard contract is preserved.
 
-```bash
-bash -n tools/dashboard-data tools/lib/dashboard_data.sh tools/test_dashboard_data.sh tools/test_dashboard_schema.sh tools/test_dashboard_control_center.sh
-./tools/test_dashboard_schema.sh
-./tools/test_dashboard_data.sh
-./tools/test_dashboard_control_center.sh
-./tools/check_as_built_sync_contract.sh
-./tools/check_as_built_docs.sh
-./tools/check_workflow_pair_sync.sh
-./tools/check_repository_development_workflow.sh
-./tools/test_repository_development_workflow.sh
-git diff --check
+### Required Dashboard Role
+
+The top dashboard is the control tower.
+It is not the place for raw evidence dumps.
+It is not the place for generic missing-evidence labels.
+It is not the place for repeated "not collected", "manual confirmation", or "optional check" text unless those states are directly relevant to the decision.
+
+The top dashboard must show:
+
+- whether work can safely continue;
+- what is currently selected;
+- what was most recently completed or observed;
+- what remains or what must be decided next;
+- whether Git, PR, CI, tests, documents, and safety boundaries support the decision;
+- whether any blocker prevents safe continuation;
+- where to open the detailed evidence.
+
+Detailed pages remain the place for full evidence, history, source IDs, artifacts, run IDs, command previews, and technical diagnostics.
+
+### Dashboard Sections
+
+The top dashboard should be organized around these generic sections:
+
+| Section | Purpose |
+| --- | --- |
+| Primary Decision | Show continue, confirm first, or stop, with the main reason and next safe action. |
+| Current Work | Show the latest completed task, current resume target, remaining work, and restart readiness. |
+| Docs and Worklog | Show whether requirements, specification, implementation plan, task tracker, and handoff are aligned. |
+| Git, PR, and CI | Show branch, HEAD, worktree state, local/remote sync, PR state, and CI result when available. |
+| Tests | Show the latest local, product, build, E2E, or focused checks, plus skipped-test reasons. |
+| Safety | Show dangerous-operation boundaries, external send boundaries, credentials, approvals, and provider or MCP expansion state. |
+| Blockers | Show stop conditions, unblock conditions, and the detail page that explains them. |
+| Observations | Show supporting notes such as build warnings, CI annotations, chunk warnings, or known limitations. |
+
+The top dashboard should not show every available detail at equal weight.
+It should show one primary decision, then the most important supporting facets.
+
+### Generic Data Model Direction
+
+The normalized snapshot should be generic and must not contain fixed product names, repository names, paths, URLs, task IDs, PR numbers, thresholds, or product-specific branches.
+All such values must come from selected context, repository registry, product profile, manifests, documents, Git observation, CI evidence, or structured evidence.
+
+A generic normalized snapshot should contain these concepts:
+
+```json
+{
+  "snapshot_id": "...",
+  "generated_at": "...",
+  "scope": {
+    "menu_id": "...",
+    "workflow_context": "...",
+    "repo_id": "...",
+    "repository_role": "lesson_repository|product_repository|selected_repository",
+    "repository_display_name": "...",
+    "product_type": "...",
+    "selection_state": "explicit|fallback|request|not_applicable"
+  },
+  "decision": {
+    "question": "Can the current workflow safely continue?",
+    "status": "ready|blocked|manual_required|stale|unknown|not_applicable",
+    "confidence_level": "high|medium|low|none",
+    "authority": "authoritative|manual_required|advisory|not_collected",
+    "freshness_state": "current|stale|not_collected|unknown",
+    "primary_blocker_ref": "...",
+    "next_safe_action": "...",
+    "approval_boundary": "...",
+    "risk_level": "low|medium|high|critical"
+  },
+  "facets": [
+    { "id": "worklog", "roles": ["task_tracker", "handoff"], "status": "...", "evidence_refs": [] },
+    { "id": "product_docs", "roles": ["requirements", "specification", "implementation_plan"], "status": "...", "evidence_refs": [] },
+    { "id": "repository", "status": "...", "head": "...", "dirty_count": 0, "evidence_refs": [] },
+    { "id": "git_pr_ci", "status": "...", "head_match_status": "...", "evidence_refs": [] },
+    { "id": "tests", "status": "...", "evidence_refs": [] },
+    { "id": "safety", "status": "...", "evidence_refs": [] },
+    { "id": "observations", "status": "...", "evidence_refs": [] }
+  ],
+  "evidence_refs": [
+    {
+      "ref_id": "...",
+      "source_type": "live_observation|structured_evidence|document_report|policy|setting",
+      "owner_source": "dashboard-data|product-authority|git-workflow|repository-development-workflow",
+      "source_id": "...",
+      "document_role": "...",
+      "status": "...",
+      "authority": "...",
+      "freshness_state": "...",
+      "confidence_level": "...",
+      "observed_at": "...",
+      "repository_head": "...",
+      "source_hash": "...",
+      "artifact_ref": "...",
+      "command_preview": "..."
+    }
+  ],
+  "conflicts": [
+    {
+      "fact_id": "...",
+      "winner_ref": "...",
+      "losing_refs": [],
+      "reason": "..."
+    }
+  ]
+}
 ```
 
-その後、release gate に進む前に構造チェック、`./tools/test_lesson_repository.sh`、full hooks/pre-commit、PR CI を別枠で確認します。
+### Evidence Priority
+
+Evidence priority depends on the fact being decided.
+
+| Fact | Priority |
+| --- | --- |
+| Current worktree, branch, HEAD, dirty count, ahead, and behind | live observation, then structured evidence, then document report |
+| CI and test pass proof | structured evidence, then live observation, then document report |
+| Requirements, specification, and implementation intent | document report, then structured evidence |
+| Task tracker and handoff progress or restart point | document report with source hash, then live observation |
+| Safety boundaries, approvals, dangerous operations, secrets, and external sending | policy and structured safety evidence first |
+| User-facing summary | normalized producer decision, then evidence references |
+
+Live observation is strong for current state.
+It is weaker as completion proof.
+Document reports are strong for intent and handoff context.
+They are weaker as current Git, CI, or test proof.
+
+The dashboard must make this distinction visible.
+It must not treat a document statement, a stale evidence row, or an advisory observation as authoritative proof.
+
+### Confidence Levels
+
+The producer should provide a structured confidence level.
+
+| Confidence | Meaning |
+| --- | --- |
+| high | Current authoritative evidence exists and matches the selected repository and HEAD when applicable. |
+| medium | Current advisory live observation exists, or a document hash is current but no authoritative proof exists. |
+| low | Document-only, cached, manual-required, or head-unknown evidence. |
+| none | Missing, not collected, or unknown evidence. |
+
+The UI should display the confidence level.
+It should not infer it.
+
+### Display Modes
+
+The existing display-depth model should be used as the audience model:
+
+| Display depth | Intended audience | Dashboard behavior |
+| --- | --- | --- |
+| friendly | Non-engineers | Show whether to continue, why, and where to look next. Hide source IDs, HEADs, run IDs, and artifact paths by default. |
+| standard | Beginner engineers | Show Git, tests, CI, documents, blockers, and command previews in familiar terms. |
+| technical | Intermediate engineers and above | Show source IDs, authority, freshness, current item IDs, HEAD matching, artifact refs, and detailed evidence. |
+
+Non-engineer display must not hide blockers.
+It should translate blockers into plain language.
+Technical display must not obscure safety boundaries.
+
+### Top Dashboard Layout Direction
+
+The top dashboard should be reorganized into:
+
+1. Primary Decision Snapshot
+2. Compact controls row for display depth, selected product repository, and language or settings link
+3. Key evidence mini cards for Git/CI, Tests, Safety, and Worklog/Docs
+4. Blocker strip when blockers exist
+5. Detail links into Workflow, Maintenance Sync, Safety Confirmation, Repository Info, Documents, Settings, and History
+
+The current duplicated top-level summaries should be reduced.
+The same Git, CI, Safety, and next-action data should not be repeated in multiple unrelated blocks.
+
+Every mini card should have a consistent detail path.
+If a card summarizes Git or CI, it should link to Development Workflow or Repository Info.
+If a card summarizes safety, it should link to Safety Confirmation.
+If a card summarizes documents or handoff, it should link to Maintenance Sync or Documents.
+
+### Detail Page Relationship
+
+The top dashboard must aggregate.
+The detail pages must explain.
+
+| Detail page | Required role |
+| --- | --- |
+| Development Workflow | Show current work, local checks, Git state, PR, CI, merge, main sync, and next safe workflow operation. |
+| Maintenance Sync | Show document sync, evidence freshness, source hashes, stale sources, update targets, and repository synchronization state. |
+| Safety Confirmation | Show blockers, approvals, dangerous operations, secrets, external sending, provider, MCP, browser, shell, and credential boundaries. |
+| Repository Info | Show selected repository identity, branch, HEAD, worktree, structure, and key source files. |
+| Documents | Show document roles, paths, readiness, freshness, and relationship to the selected repository. |
+| Settings | Show display language, display depth, repository selection, Git/CI mode, and safety boundaries. |
+| History | Show when data changed, what was observed, what failed, and which evidence was refreshed. |
+
+The top dashboard and detail pages must use the same evidence references.
+They must not tell different stories.
+
+### Safety Boundaries
+
+The dashboard remains a display and decision-support surface.
+It must not directly perform Git push, merge, cleanup, destructive operations, OAuth, credential handling, provider dispatch, external sending, or external repository writes.
+
+Command previews may be shown.
+Execution authority remains outside the dashboard UI and must follow the repository workflow, approval, and safety rules.
+
+### Implementation Roadmap Draft
+
+#### P0: Contract Freeze
+
+Define the acceptance criteria for the Decision Snapshot.
+Before adding UI, identify which fields are already available through `operational_decision`, `decision_pages`, `development.repository_changes`, `documents.brief_cards`, `product_authority`, and `live_status.checks`.
+
+The producer must own:
+
+- `status`
+- `confidence_level`
+- `authority`
+- `freshness_state`
+- `primary_blocker_ref`
+- `next_safe_action`
+- `risk_level`
+- `evidence_refs`
+
+#### P1: Evidence Normalization
+
+Add a thin producer adapter that projects existing data into common evidence references:
+
+- document brief cards
+- repository changes
+- product authority evidence
+- live status checks
+- CI evidence
+- maintenance evidence rows
+- selected context blockers
+
+The adapter must be generic and must not contain fixed product names, repository names, paths, PR numbers, or task IDs.
+
+#### P2: Decision Computation
+
+Compute the top-level decision in the producer.
+
+The decision must distinguish:
+
+- current live state;
+- authoritative proof;
+- document report;
+- stale evidence;
+- missing evidence;
+- advisory observation;
+- blockers;
+- approval boundaries.
+
+If evidence conflicts, record the conflict rather than hiding it.
+
+#### P3: Overview Rebuild
+
+Rebuild the Overview page around the normalized snapshot:
+
+- one Primary Decision Snapshot;
+- compact controls row;
+- Git/CI, Tests, Safety, and Worklog/Docs mini cards;
+- blocker strip;
+- detail links.
+
+Remove duplicated top-level summaries that repeat the same decision in different words.
+
+#### P4: Detail Page Alignment
+
+Align Development Workflow, Maintenance Sync, and Safety Confirmation with the same evidence references.
+Each detail page must show:
+
+- current judgment;
+- why;
+- evidence;
+- next safe action;
+- source and confidence details when display depth allows.
+
+#### P5: Display Mode and Localization
+
+Make the same snapshot render differently for friendly, standard, and technical modes.
+Apply the configured dashboard language.
+Known producer text may be localized only when the meaning is controlled by the dashboard contract.
+Dynamic repository text should be summarized or translated through the approved agent/provider boundary only when that boundary is implemented.
+
+#### P6: Design System Alignment
+
+Apply visual changes through the Dashboard Control Center design system source of truth.
+Do not directly edit generated design-system artifacts.
+Move card density, status variants, icon treatments, and Decision Snapshot variants into the design-system contract when visual changes are needed.
+
+#### P7: Verification
+
+Use focused checks first:
+
+- shell syntax for changed scripts;
+- dashboard schema test;
+- dashboard data test;
+- dashboard i18n test when text changes;
+- dashboard control-center test when React changes;
+- design-system drift check when design-system sources change.
+
+Use Playwright visual checks for desktop and mobile after the Overview structure changes.
+Use TraceCue or external browser review only as read-only review.
+External repositories must not be modified during dashboard review.
+
+### Stop Gates
+
+Stop before implementation proceeds if any of the following occurs:
+
+- UI begins calculating readiness instead of displaying producer-owned readiness.
+- A fixed product name, repository name, PR number, task ID, URL, absolute path, or threshold is introduced.
+- Stale, advisory, missing, or document-only evidence is displayed as authoritative proof.
+- CI is shown as passed without matching HEAD, current freshness, and authoritative source.
+- STEP 1-7, STEP 1-14, free development, product improvement, external integration, or lesson repository improvement contexts are mixed.
+- External repository writes, push, merge, cleanup, OAuth, provider API, or destructive actions become necessary.
+- Playwright or TraceCue review shows selected-repository leakage, stale evidence presented as current, command previews that look executable, or overflow/overlap in the top dashboard.
+
+### Deferred Memory Sections
+
+No detail-page directions remain reserved for later synchronization in this initialized developer memory.
+
+## Dashboard Control Center: Development Workflow Page Direction
+
+STATUS: synced
+
+This section records the Development Workflow page direction. It extends the Dashboard page direction above and must remain consistent with the Dashboard Control Center source-of-truth rules, repository-development workflow, design-system contract, producer-owned evidence boundary, localization policy, and changeability invariant.
+
+### Page Purpose
+
+The Development Workflow page should be the evidence-backed current-position page for development decisions.
+If the top Dashboard page is the overall signal, the Development Workflow page explains why the selected workflow is in its current state and what can safely happen next.
+
+The page must answer five questions:
+
+1. What is the current development target?
+2. What was most recently completed?
+3. Are requirements, specifications, implementation plans, task tracking, and handoff context synchronized?
+4. Is there any next autonomous work that can safely proceed?
+5. Which verification evidence supports the completion or continuation judgment?
+
+The page must not become a generic activity feed.
+It must help a developer decide whether to continue implementation, prepare a new proposal, repair evidence, inspect Git and CI, or stop for approval.
+
+### Required First-Viewport Judgment
+
+The first viewport must lead with the next decision, not with background explanation.
+It should show:
+
+- current judgment: continue, confirm first, closed, blocked, or stop;
+- selected target scope: workflow context, repository identity, branch or HEAD when relevant, and selection source;
+- latest reliable observation, including source and observed time;
+- autonomous continuation state: allowed, not allowed, or approval required;
+- top reason or blocker;
+- next safe action.
+
+Friendly, standard, and technical display depths must show the same truth with different disclosure density.
+Friendly mode should hide technical IDs, hashes, run IDs, source paths, and command previews unless the user opens details.
+Technical mode may show evidence chains, HEAD matches, source IDs, command IDs, CI run metadata, and file references.
+
+### Required Sections
+
+The page should organize its body around these sections:
+
+- Current Position
+- Latest Completed Task
+- Roadmap Progress
+- Documentation Sync
+- Implementation Results
+- Verification Results
+- Next Decision
+- Evidence Links
+
+The lead summary should prioritize Next Decision and Current Position.
+Latest Completed Task and Roadmap Progress should support the current judgment, not replace it with a historical list.
+Implementation Results must explain what changed and whether that work is complete.
+
+### Data Contract Direction
+
+The FrameCue FC-208 example is useful as a current-state example only.
+Task IDs, product names, repository names, PR numbers, CI run IDs, branch names, file paths, URLs, command strings, and thresholds must be data-derived and configurable.
+They must not be hard-coded in React, shell scripts, schema defaults, tests, fixtures, or prose-specific branches.
+
+Before rendering the full Development Workflow page, add or align a producer-owned workflow state contract.
+The preferred shape is a structured object such as `workflow_state` generated by `tools/dashboard-data` and validated by the dashboard data contract.
+It should expose:
+
+- `current_target`
+- `latest_completed`
+- `roadmap_progress`
+- `document_sync`
+- `implementation_results`
+- `verification_results`
+- `handoff_readiness`
+- `next_autonomous_decision`
+- `evidence_links`
+
+Each item that can influence a decision must include enough evidence metadata to avoid UI inference:
+
+- stable id;
+- label and localized label key when controlled by the dashboard;
+- status;
+- source id;
+- selected repository id;
+- observed time;
+- freshness state;
+- authority level;
+- related evidence reference;
+- next safe action;
+- optional command id and redacted arguments for display-only command previews.
+
+The browser must display this producer-owned state.
+It must not calculate readiness from colors, labels, section order, source names, route names, or matched prose.
+
+### Source Mapping
+
+The producer should derive current state from structured sources first:
+
+- selected context and repository selection for scope;
+- lesson or workflow state files joined with their flow definitions for current target;
+- structured task or workflow rows for latest completed work and roadmap progress;
+- requirements, specification, implementation plan, task tracker, and handoff sync checks for document state;
+- product authority and repository authority evidence for product workflow readiness;
+- Git worktree, branch, remote sync, PR, merge, and main synchronization evidence for repository operations;
+- local test, focused check, aggregate check, PR CI, and main CI evidence for verification;
+- security, approval, and dangerous-operation policies for autonomous continuation boundaries.
+
+Markdown documents may remain human-readable sources, but the dashboard should not depend on brittle prose parsing for authoritative workflow decisions.
+If Markdown content is still needed during migration, display it as advisory or summarized context and expose the weaker authority or freshness state.
+
+### Git, PR, CI, and Test Evidence
+
+Git and CI evidence should be structured separately instead of folded into one generic status.
+The page should distinguish:
+
+- branch and upstream;
+- worktree cleanliness and change counts;
+- local and remote synchronization;
+- pull request identity and state when available;
+- PR CI status and matching HEAD;
+- main CI status and matching HEAD;
+- merge state;
+- branch cleanup state when applicable;
+- local test commands and latest results;
+- visual checks and why they were run or skipped.
+
+CI must not be shown as passed without matching current HEAD, freshness, and authoritative source.
+Missing, stale, cached, manual-required, or advisory evidence must remain visibly different from proof.
+
+### Documentation, Task Tracker, and Handoff
+
+The page must show what the selected repository's task tracker and handoff currently say, not generic explanations of what those documents are.
+It should summarize:
+
+- latest completed task or phase;
+- remaining task or next target;
+- whether the handoff is sufficient for the next session;
+- whether the task tracker, handoff, requirements, specification, and implementation plan agree;
+- which exact source rows or sections support the summary when display depth allows.
+
+The page should avoid checklist progress labels that do not help the developer decide what to do next.
+The key decision is whether the next session can resume safely from the recorded handoff and implementation plan.
+
+### AI Summary and Localization Boundary
+
+AI-style summaries may improve readability, especially for dynamic repository prose and multilingual display.
+However, AI summaries are explanatory display text only.
+They must not become the authority for readiness, completion, approval, CI state, Git state, command execution, or safety boundaries.
+
+Language settings must apply to dashboard-controlled labels and summaries.
+Dynamic repository text may be summarized or translated only through the approved agent or provider boundary when that boundary is implemented.
+Until then, dynamic text should be displayed with clear source and authority metadata instead of pretending to be fully localized proof.
+
+### Cross-Page Responsibilities
+
+The Development Workflow page should link to related detail pages instead of duplicating everything:
+
+- Maintenance Sync for document synchronization, evidence freshness, source hashes, and stale sources;
+- Safety Confirmation for approvals, blockers, dangerous operations, credentials, provider, MCP, browser, shell, and external-send boundaries;
+- Repository Info for repository identity, branch, worktree, and file scope;
+- History for observed events and evidence timelines;
+- Documents for source document review.
+
+The Dashboard Overview should remain the aggregate signal.
+The Development Workflow page should provide the evidence-backed workflow current position.
+
+### UI and Implementation Direction
+
+Do not continue growing the Development Workflow page as ad hoc logic inside `App.jsx`.
+Extract workflow-specific rendering and derivation into focused components and helpers while preserving the existing route, stale snapshot handling, selected-context handling, shared status components, and detail surfaces.
+
+Use the Dashboard Control Center design-system source of truth for visual changes.
+Reuse existing page headers, operational cards, status pills, source chips, command previews, detail surfaces, and decision summary patterns before introducing new page-local UI rules.
+
+Card details must be useful.
+Opening a detail surface should show where the claim came from, why it matters, what is missing or stale, and the next safe check.
+It should not repeat a static definition of the card title.
+
+### Acceptance Criteria
+
+The Development Workflow page is acceptable when:
+
+- the first viewport answers current target, current judgment, latest reliable observation, autonomous continuation, top reason, and next safe action;
+- every readiness or completion claim maps to producer-owned data;
+- selected repository scope does not leak across free development, product improvement, external integration, lesson workflows, or lesson-repository maintenance;
+- friendly, standard, and technical display depths show the same state with appropriate detail density;
+- configured dashboard language applies to dashboard-controlled text;
+- stale, missing, cached, manual-required, and advisory evidence cannot appear as ready proof;
+- task tracker and handoff summaries reflect the selected repository's current state;
+- Git, PR, CI, tests, and synchronization evidence are separated enough for developer judgment;
+- command previews are display-only and cannot be mistaken for executable controls;
+- detail surfaces remain keyboard accessible and return focus correctly;
+- tests cover ready, closed, approval-required, stale CI, missing repository selection, multiple repositories, no PR, multiple PRs, non-GitHub CI, missing task tracker or handoff, and selected-repository leakage.
+
+### Implementation Roadmap
+
+1. Confirm the information map for the Development Workflow page and map each visible section to an existing or new producer-owned field.
+2. Add the `workflow_state` contract to the dashboard data schema only where existing fields are insufficient.
+3. Generate `workflow_state` in `tools/dashboard-data` from structured sources before Markdown prose.
+4. Add structured Git, PR, CI, test, and synchronization evidence where current strings are too weak for generic display.
+5. Strengthen repository selection metadata so product workflows with multiple repositories can select and display the correct target without menu-specific assumptions.
+6. Replace brittle task tracker and handoff prose parsing with structured rows, indexes, or manifests where available, while preserving Markdown as human-readable context.
+7. Render the Development Workflow page from the producer-owned contract using design-system components and localized labels.
+8. Add detail surfaces that explain evidence, freshness, authority, missing data, and next safe checks.
+9. Add focused tests for schema, dashboard data, i18n, selected repository scope, stale evidence, and workflow page rendering.
+10. Use Playwright and read-only TraceCue review after the page can show realistic selected-repository states.
+
+### Stop Conditions
+
+Stop or redesign before implementation proceeds if:
+
+- a fixed product name, repository name, task id, PR number, CI run id, branch, URL, path, command, or threshold is introduced;
+- React infers workflow readiness instead of displaying producer-owned readiness;
+- Markdown prose parsing becomes the only authority for latest completion, handoff readiness, or next autonomous decision;
+- stale or advisory evidence is shown as proof;
+- selected repository data is mixed across workflow contexts;
+- AI-generated summaries are treated as authoritative evidence;
+- a detail card repeats generic definitions instead of showing current evidence and next safe checks;
+- UI changes bypass the design-system source of truth.
+
+## Dashboard Control Center: Maintenance Sync Page Direction
+
+STATUS: synced
+
+This section records the Maintenance Sync page direction. It extends the Dashboard page and Development Workflow page directions above and must remain consistent with the Dashboard Control Center source-of-truth rules, repository-development workflow, design-system contract, producer-owned evidence boundary, localization policy, and changeability invariant.
+
+### Page Purpose
+
+The Maintenance Sync page should answer whether the selected repository is safe to move to the next phase after implementation work.
+If the Development Workflow page explains what was built and what can be built next, the Maintenance Sync page explains whether post-build consistency is still intact.
+
+The page must answer six questions:
+
+1. Is the Git worktree clean or intentionally dirty?
+2. Do local and remote references match when the selected workflow requires remote synchronization?
+3. Did the relevant pull request CI and main CI pass, or are they missing, stale, advisory, or not applicable?
+4. Is product gate evidence current enough to trust?
+5. Are requirements, specifications, implementation plans, task tracker, handoff, and memory synchronized?
+6. Is any maintenance action required now, or is the item only a later warning?
+
+The page must distinguish immediate blockers from non-blocking maintenance warnings.
+Its most important output is not a generic pass or fail label.
+It must show whether no immediate maintenance action is required, which warnings should be reviewed later, and which actions are blocked until a new scope, approval, evidence refresh, or synchronization step exists.
+
+### Required First-Viewport Judgment
+
+The first viewport should lead with the overall sync judgment and the next maintenance decision.
+It should show:
+
+- overall sync status;
+- selected repository identity and selection source;
+- branch and upstream when Git applies;
+- worktree state;
+- local and remote ahead or behind counts when available;
+- latest reliable HEAD or equivalent revision when available;
+- latest merge or release event when available;
+- PR CI and main CI state when applicable;
+- product gate freshness;
+- document sync state;
+- immediate maintenance action;
+- non-blocking warnings count.
+
+The page should make push and pull needs explicit.
+For example, it should not only show that the worktree is clean.
+It should also show whether ahead and behind are zero, whether upstream is configured, and whether push or pull is unnecessary.
+
+### Required Sections
+
+The page should organize its body around these sections:
+
+- Sync Summary
+- Git State
+- CI State
+- Product Gate Evidence
+- Documentation Sync
+- Maintenance Warnings
+- Recommended Actions
+
+Sync Summary should lead the page.
+Git State, CI State, Product Gate Evidence, and Documentation Sync should provide the supporting evidence.
+Maintenance Warnings should separate later work from current blockers.
+Recommended Actions should state what can safely happen next and what must not happen without a new scope or approval.
+
+### Data Contract Direction
+
+Current product examples such as specific pull request numbers, CI run ids, task ids, product names, branch names, file paths, command strings, timestamps, or annotations are examples only.
+They must be data-derived from the selected repository, product authority evidence, Git evidence, CI evidence, product gate evidence, document sync evidence, and workflow settings.
+They must not be hard-coded in React, shell scripts, schema defaults, tests, fixtures, or prose-specific branches.
+
+Before rendering the full Maintenance Sync page, align or add a producer-owned maintenance state contract.
+The preferred shape is a structured object such as `maintenance_sync_state` generated by `tools/dashboard-data` and validated by the dashboard data contract.
+It should expose:
+
+- `sync_summary`
+- `git_state`
+- `ci_state`
+- `product_gate_evidence`
+- `documentation_sync`
+- `maintenance_warnings`
+- `recommended_actions`
+- `blocked_actions`
+- `evidence_links`
+
+Each maintenance item that can influence a decision must include enough evidence metadata to avoid UI inference:
+
+- stable id;
+- label and localized label key when controlled by the dashboard;
+- status;
+- severity or maintenance priority;
+- source id;
+- selected repository id;
+- observed time;
+- freshness state;
+- authority level;
+- related evidence reference;
+- impact;
+- next safe action;
+- optional command id and redacted arguments for display-only command previews.
+
+The browser must display this producer-owned state.
+It must not calculate sync readiness from labels, colors, route names, source names, command text, or matched prose.
+
+### Git State
+
+Git State should show repository synchronization as actionable facts:
+
+- worktree state;
+- staged, unstaged, modified, deleted, and untracked counts when relevant;
+- current branch;
+- upstream branch;
+- local and remote relationship;
+- ahead count;
+- behind count;
+- local and remote HEAD or equivalent revision when available;
+- latest merge or release event when available;
+- branch cleanup state when applicable;
+- worktree count when the selected workflow uses Git worktrees.
+
+The page should explain whether push, pull, commit, merge, cleanup, or no action is currently needed.
+It should not collapse all Git information into a single failed or passed label.
+Dirty worktree, missing upstream, ahead-only, behind-only, diverged, stale observation, and not-applicable states should remain visibly different.
+
+### CI State
+
+CI State should separate:
+
+- PR CI;
+- branch CI;
+- main CI;
+- provider visibility;
+- CI annotations;
+- CI freshness;
+- HEAD match;
+- skipped or not-applicable CI;
+- failed or missing CI evidence.
+
+A CI annotation is not automatically a failure.
+It should be displayed as a maintenance warning when the job passed but the provider reported future-facing concerns, deprecations, runtime warnings, or advisories.
+
+CI must not be shown as passed without current authoritative evidence and matching HEAD.
+If the selected workflow does not require CI, the page should show CI as not applicable instead of unknown failure.
+
+### Product Gate Evidence
+
+Product gate evidence should be grouped by layer instead of shown as one generic product gate result.
+At minimum, the page should be able to show:
+
+- local tests;
+- structure checks;
+- product-specific focused checks;
+- security checks;
+- local artifact checks;
+- secrets checks;
+- external sending checks;
+- Git synchronization checks;
+- final or aggregate product gate checks when present.
+
+Each row should show command or check id, result, latest evidence time, source, freshness, authority, and selected repository.
+The page should make clear which layer passed, which layer was not run, which layer is stale, and which layer is not applicable.
+
+### Documentation Sync
+
+Documentation Sync should focus on synchronization gaps, not on repeating implementation content.
+It should show whether the selected repository's source-of-truth documents agree:
+
+- Requirements;
+- Specification;
+- Implementation Plan;
+- Task Tracker;
+- Handoff;
+- Developer Memory;
+- Session Memory;
+- other configured workflow documents when the selected repository declares them.
+
+The page should state whether each document is synced, missing, stale, advisory, or not applicable.
+It should show the current source row or evidence reference when display depth allows.
+
+For task tracker and handoff, the page should show whether the pair is consistent enough for the next session.
+It should avoid generic definitions of task trackers and handoffs.
+
+### Maintenance Warnings
+
+Maintenance Warnings should capture non-blocking issues that are worth remembering but should not be confused with current failure.
+Examples include:
+
+- provider annotations where the job passed;
+- known legacy content that was intentionally not modified;
+- future runtime deprecation warnings;
+- cleanup candidates that require explicit scope;
+- stale advisory evidence that is not used as proof;
+- optional checks that are useful but not required for the selected workflow.
+
+Each warning should show:
+
+- status;
+- impact;
+- reason;
+- suggested follow-up;
+- whether it blocks the current phase.
+
+The page should clearly separate immediate blockers from scheduled or optional maintenance follow-up.
+
+### Recommended Actions
+
+Recommended Actions should state:
+
+- whether immediate maintenance action is required;
+- next safe actions;
+- later maintenance follow-ups;
+- blocked actions;
+- why each blocked action is blocked.
+
+When no immediate maintenance action is required, say so clearly.
+If the current roadmap is closed, the page should not suggest continuing autonomous implementation without a new roadmap proposal.
+If historical documents contain legacy content that is intentionally out of scope, the page should not suggest modifying that content unless the change is explicitly scoped.
+
+### Cross-Page Responsibilities
+
+The Maintenance Sync page should link to related detail pages instead of duplicating everything:
+
+- Development Workflow for current target, latest completed work, roadmap progress, and next autonomous decision;
+- Safety Confirmation for blockers, approvals, dangerous operations, credentials, provider, MCP, browser, shell, and external-send boundaries;
+- Repository Info for repository identity, branch, worktree, and file scope;
+- History for observed events and evidence timelines;
+- Documents for source document review.
+
+The Dashboard Overview should remain the aggregate signal.
+The Maintenance Sync page should provide the evidence-backed post-build consistency view.
+
+### AI Summary and Localization Boundary
+
+AI-style summaries may improve readability for maintenance warnings, document sync summaries, and dynamic repository prose.
+However, AI summaries are explanatory display text only.
+They must not become the authority for Git cleanliness, local and remote sync, CI result, product gate result, document sync, approval state, command execution, or safety boundaries.
+
+Language settings must apply to dashboard-controlled labels and summaries.
+Dynamic repository text may be summarized or translated only through the approved agent or provider boundary when that boundary is implemented.
+Until then, dynamic text should be displayed with clear source and authority metadata instead of pretending to be fully localized proof.
+
+### UI and Implementation Direction
+
+Do not implement the Maintenance Sync page as a larger static checklist.
+Render it from producer-owned sync, evidence, warning, and action rows.
+
+Use the Dashboard Control Center design-system source of truth for visual changes.
+Reuse existing page headers, operational cards, status pills, source chips, command previews, detail surfaces, and decision summary patterns before introducing new page-local UI rules.
+
+Card details must be useful.
+Opening a detail surface should show where the claim came from, why it matters, what is stale or missing, whether it blocks the current phase, and the next safe check.
+It should not repeat a static definition of the card title.
+
+### Acceptance Criteria
+
+The Maintenance Sync page is acceptable when:
+
+- the first viewport answers overall sync status, selected repository, Git sync, CI state, product gate freshness, document sync, immediate maintenance action, and non-blocking warnings;
+- every sync, CI, product gate, or document claim maps to producer-owned data;
+- selected repository scope does not leak across free development, product improvement, external integration, lesson workflows, or lesson-repository maintenance;
+- friendly, standard, and technical display depths show the same state with appropriate detail density;
+- configured dashboard language applies to dashboard-controlled text;
+- stale, missing, cached, manual-required, optional, advisory, and not-applicable evidence cannot appear as ready proof;
+- Git ahead and behind state is visible when Git applies;
+- PR CI and main CI are separate when both exist;
+- product gate evidence is grouped by useful layers rather than one generic passed label;
+- maintenance warnings are separated from blockers;
+- recommended actions distinguish immediate action, later follow-up, and blocked action;
+- command previews are display-only and cannot be mistaken for executable controls;
+- detail surfaces remain keyboard accessible and return focus correctly;
+- tests cover clean sync, dirty worktree, ahead-only, behind-only, diverged branch, missing upstream, stale CI, CI annotation with passed job, no CI required, missing product gate evidence, stale product gate evidence, missing document sync evidence, known non-blocking warning, multiple repositories, and selected-repository leakage.
+
+### Implementation Roadmap
+
+1. Confirm the information map for the Maintenance Sync page and map each visible section to an existing or new producer-owned field.
+2. Add the `maintenance_sync_state` contract to the dashboard data schema only where existing fields are insufficient.
+3. Generate `maintenance_sync_state` in `tools/dashboard-data` from structured Git, CI, product gate, document sync, warning, and action sources.
+4. Add or align structured Git sync evidence so worktree state, upstream, ahead, behind, HEAD, merge, and cleanup are displayed without parsing prose.
+5. Add or align structured CI evidence so PR CI, main CI, annotations, provider visibility, HEAD match, and freshness remain separate.
+6. Add or align product gate layer evidence so tests, structure, security, local artifacts, secrets, external sending, and Git sync can be displayed independently.
+7. Add or align document sync evidence so requirements, specifications, implementation plans, task tracker, handoff, and memory synchronization can be displayed without generic fallback text.
+8. Render the Maintenance Sync page from the producer-owned contract using design-system components and localized labels.
+9. Add detail surfaces that explain evidence, freshness, authority, warning impact, missing data, and next safe checks.
+10. Add focused tests for schema, dashboard data, i18n, selected repository scope, Git sync variants, CI variants, product gate freshness, document sync, warnings, and page rendering.
+11. Use Playwright and read-only TraceCue review after the page can show realistic selected-repository maintenance states.
+
+### Stop Conditions
+
+Stop or redesign before implementation proceeds if:
+
+- a fixed product name, repository name, task id, PR number, CI run id, branch, URL, path, command, timestamp, annotation, or threshold is introduced;
+- React infers maintenance readiness instead of displaying producer-owned readiness;
+- Markdown prose parsing becomes the only authority for Git sync, CI, product gate, document sync, warnings, or recommended actions;
+- stale or advisory evidence is shown as proof;
+- selected repository data is mixed across workflow contexts;
+- AI-generated summaries are treated as authoritative evidence;
+- non-blocking warnings are shown as failures;
+- current blockers are hidden as optional warnings;
+- product gate is collapsed into one passed label without useful layer detail;
+- UI changes bypass the design-system source of truth.
+
+## Dashboard Control Center: Safety Confirmation Page Direction
+
+STATUS: synced
+
+This section records the Safety Confirmation page direction. It extends the Dashboard page, Development Workflow page, and Maintenance Sync page directions above and must remain consistent with the Dashboard Control Center source-of-truth rules, repository-development workflow, design-system contract, producer-owned evidence boundary, localization policy, and changeability invariant.
+
+### Page Purpose
+
+The Safety Confirmation page should answer one practical question first:
+
+Can the selected workflow safely continue now?
+
+Internally, the page verifies whether dangerous authority is closed before the next action.
+For user-facing copy, especially friendly mode, the page should lead with safe to continue, approval required, blocked, or evidence missing or stale.
+The authority matrix belongs in standard or technical details, not as the main first-viewport message.
+
+If the Development Workflow page explains what was built or what can be built next, and the Maintenance Sync page explains whether post-build consistency is intact, the Safety Confirmation page explains whether execution, sending, authentication, credential, provider, browser, shell, MCP, and destructive-operation boundaries remain closed.
+
+The page must answer seven questions:
+
+1. Are secrets, credentials, tokens, private URLs, or secret-like values exposed?
+2. Are raw artifacts, generated local outputs, media bodies, OCR bodies, transcript bodies, logs, prompts, provider payloads, or receipt bodies kept out of dashboard output and source control?
+3. Are external send, provider dispatch, API execution, and provider request or response handling closed unless explicitly scoped and approved?
+4. Are browser, shell, MCP, endpoint, action, and settings-write execution boundaries unchanged?
+5. Are destructive actions, cleanup, delete, push, merge, OAuth, credential rotation, or external-service operations blocked or approval-gated as required?
+6. Which operations are allowed, prohibited, or approval-required in the current scope?
+7. If a blocker exists, which source and next safe check explain it?
+
+### Required First-Viewport Judgment
+
+The first viewport should lead with:
+
+- safety status;
+- current judgment;
+- selected repository and workflow scope;
+- current safety result;
+- active stop condition, if any;
+- evidence freshness and authority;
+- latest security evidence summary;
+- next safe check or next safe action.
+
+Friendly mode should say whether the user can continue, stop, or ask for approval, with the reason.
+Standard mode should show blockers, gates, evidence names, and display-only command previews.
+Technical mode may show source ids, freshness, authority, HEAD or source references, safe receipt metadata, redacted argv, and the authority matrix.
+
+Missing, stale, cached, advisory, not-collected, or manual-required evidence must never appear as safe proof.
+"Not checked" is not safe.
+
+### Required Sections
+
+The page should organize its body around these sections:
+
+- Safety Status
+- Scope
+- Security Evidence
+- Authority Boundaries
+- Safety Boundary
+- Authority Matrix
+- Security Blockers
+- Redaction and Sensitive Data
+- Recommended Actions
+
+The first viewport should emphasize Safety Status, Scope, Current Judgment, and Next Safe Check.
+Authority Boundaries and Security Evidence should be primary detail.
+Authority Matrix, source ids, command previews, safe receipt metadata, and redaction policy should be technical detail.
+
+### Route and Page Composition
+
+Do not add a separate `#safety-confirmation` route unless a later implementation plan explicitly justifies the extra route, schema, navigation, fixture, and Playwright coverage.
+Implement Safety Confirmation inside the existing `#safety` page.
+
+The preferred UI shape is a `SafetyConfirmationPanel` inside the existing Safety page.
+It should reuse shared status, detail, source, command-preview, and modal patterns instead of creating a second modal or page-local visual system.
+
+### Data Contract Direction
+
+Current product examples such as specific task ids, product names, repository names, HEAD values, timestamps, evidence ids, provider names, command names, URLs, paths, or approval labels are examples only.
+They must be data-derived from the selected repository, product security policy, workflow context map, product-local security manifest, evidence detail manifest, product gate evidence, approval policy, command-preview policy, and product authority evidence.
+They must not be hard-coded in React, shell scripts, schema defaults, tests, fixtures, or prose-specific branches.
+
+Before rendering the full Safety Confirmation page, add or align a producer-owned safety confirmation contract.
+The preferred shape is `security.confirmation` generated by `tools/dashboard-data` and validated by the dashboard data contract.
+It should expose:
+
+- `status`
+- `scope`
+- `current_judgment`
+- `active_stop_condition`
+- `groups[]`
+- `items[]`
+- `boundaries`
+- `authority_matrix`
+- `redaction_policy`
+- `recommended_actions`
+- `blocked_actions`
+- `source_artifacts`
+
+Each safety item that can influence a decision must include enough evidence metadata to avoid UI inference:
+
+- stable id;
+- group id;
+- label and localized label key when controlled by the dashboard;
+- status;
+- risk level;
+- source id;
+- selected repository id;
+- observed time;
+- freshness state;
+- authority level;
+- evidence reference;
+- product HEAD or source revision when applicable;
+- approval requirement;
+- next safe action;
+- optional command id and redacted arguments for display-only command previews.
+
+The browser must display this producer-owned state.
+It must not calculate safety readiness from labels, colors, source names, route names, copied text, command text, first array rows, or matched prose.
+
+### Producer Sources
+
+The producer should derive safety confirmation items from structured sources first:
+
+- `PRODUCT_SECURITY_POLICY.tsv`
+- `WORKFLOW_CONTEXT_MAP.tsv`
+- product-local `ops/SECURITY_MANIFEST.tsv`
+- product-local `ops/EVIDENCE_DETAIL_MANIFEST.tsv`
+- product gate evidence;
+- product authority evidence;
+- Git workflow approval policy;
+- action and command-preview policy;
+- dashboard design-system provider and proposal boundaries where relevant;
+- product-local security documents when the selected repository declares them.
+
+Avoid parsing `tools/product-security` stdout or stderr as an authority source.
+If product-security data is needed, add a JSON or evidence-export path, or route Safety Confirmation through product-authority evidence.
+Human-readable CLI output may remain advisory display text only.
+
+### Security Evidence Categories
+
+The page should normalize safety evidence into reusable categories:
+
+- local artifacts;
+- secrets and secret-like data;
+- external sending;
+- provider dispatch;
+- provider request building;
+- provider response handling;
+- API execution;
+- credential reads;
+- approval receipt reads and writes;
+- browser execution expansion;
+- shell execution expansion;
+- MCP execution expansion;
+- endpoint or action expansion;
+- settings-write expansion;
+- destructive execution;
+- raw body forwarding;
+- raw artifact reads and writes;
+- output path changes;
+- preview id changes;
+- runtime dependency additions;
+- duplicate locale or authority sources when relevant.
+
+Each category should be able to show open, closed, blocked, approval-required, missing, stale, not applicable, or unknown states.
+Closed means the authority is not available in the current scope.
+Closed does not mean the feature is implemented or usable.
+
+### Authority Boundaries
+
+The page should show which capabilities are closed, approval-required, or allowed for the current scope.
+The authority matrix should include capability, state, approval requirement, evidence source, and next safe check.
+
+At minimum, the matrix should cover:
+
+- translation execution;
+- provider dispatch;
+- external send;
+- credential read;
+- approval receipt read and write;
+- browser execution expansion;
+- shell execution expansion;
+- MCP execution expansion;
+- endpoint or action expansion;
+- settings-write expansion;
+- destructive delete or cleanup;
+- raw body forwarding.
+
+For each approval-required capability, show who or which external workflow owns the approval path when known.
+Do not add browser approval buttons unless a later owner-tool contract explicitly introduces that capability.
+
+### Redaction and Sensitive Data
+
+Leak prevention must happen before browser delivery, not only at React render time.
+Dashboard snapshot JSON and live-status JSON must not contain raw secrets, raw prompts, raw provider payloads, raw logs, raw stderr with sensitive values, raw approval receipt bodies, plan or apply tokens, private messages, signed URLs, raw transcripts, raw OCR bodies, raw artifact bodies, frame pixels, private media previews, absolute local paths, or executable browser or shell commands.
+
+The page must not display:
+
+- API key values;
+- tokens or credentials;
+- signed or private URLs;
+- raw transcript bodies;
+- raw OCR bodies;
+- frame pixels or private media previews;
+- provider prompts or responses;
+- full local artifact bodies;
+- raw approval receipt bodies or memos;
+- raw shell output or stderr when it can contain sensitive data;
+- absolute paths when a product-scoped or artifact-scoped reference is enough.
+
+Allowed display patterns include:
+
+- environment variable name without value;
+- value present or missing as a boolean;
+- inert receipt id or receipt hash;
+- product-scoped artifact reference;
+- run-relative artifact reference;
+- redacted argv;
+- digest or source hash;
+- provider mode and capability status without provider payload.
+
+### Command Preview Boundary
+
+Command previews must remain display-only.
+The page must not introduce run, execute, approve, dispatch, send, merge, push, cleanup, delete, OAuth, credential, provider, browser, shell, or MCP execution buttons.
+
+Command preview data should use command ids and redacted argv where possible.
+Approval-bound, destructive, provider-dispatch, external-send, credential, raw-path, or unsafe command previews should not expose copy affordances unless they are representable as validated safe argv and explicitly marked non-executable.
+
+The Safety page should have focused tests that fail if opening the page triggers POST requests, token creation, receipt creation, mutation endpoints, provider calls, browser execution, shell execution, MCP execution, or repository writes.
+
+### Approval Receipt Boundary
+
+Approval receipts are sensitive contract data.
+The page may show only safe receipt metadata:
+
+- present or missing;
+- action id;
+- repository id;
+- branch or scope;
+- HEAD-match status;
+- expiry status;
+- receipt hash or inert id;
+- authority source;
+- next safe check.
+
+It must never show raw receipt bodies, raw memos, secret-bearing receipt fields, or approval tokens.
+
+### External Integration Boundary
+
+External integration requires first-class safety rows when the selected workflow can involve external services.
+The page should surface service, data movement, OAuth or API permissions, token storage, webhook behavior, logging, rate limit, sandbox, rollback, and audit evidence as separate producer-owned rows.
+If required external-integration evidence is absent, Safety must not be shown as ready.
+
+### Worst-State Aggregation
+
+The page must compute the safety headline from all relevant rows, not from the first approval row or first dangerous-operation row.
+Aggregate the strictest state across:
+
+- `security.gate_status`;
+- `security.confirmation` rows;
+- all approvals;
+- all dangerous operations;
+- partial failures;
+- live security evidence;
+- command previews;
+- external-integration evidence when applicable.
+
+The producer should own the headline whenever possible.
+If the UI must aggregate for display, the aggregation rules must be generic, tested, and conservative.
+
+### Cross-Page Responsibilities
+
+The Safety Confirmation page should link to related detail pages instead of duplicating everything:
+
+- Development Workflow for current target, latest completed work, roadmap progress, and autonomous continuation;
+- Maintenance Sync for Git, CI, product gate, document sync, and maintenance warnings;
+- Repository Info for repository identity, branch, worktree, and file scope;
+- History for observed events and evidence timelines;
+- Documents for source document review;
+- Settings only for guarded settings visibility, not unsafe execution.
+
+The Dashboard Overview should remain the aggregate signal.
+The Safety Confirmation page should provide the evidence-backed authority and blocker boundary view.
+
+### AI Summary and Localization Boundary
+
+AI-style summaries may improve readability for safety warnings, blocker summaries, and dynamic repository prose.
+However, AI summaries are explanatory display text only.
+They must not become the authority for safety readiness, secrets, external sending, provider dispatch, approval state, receipt validity, command execution, Git state, CI state, or destructive-operation boundaries.
+
+Language settings must apply to dashboard-controlled labels and summaries.
+Dynamic repository text may be summarized or translated only through the approved agent or provider boundary when that boundary is implemented.
+Until then, dynamic text should be displayed with clear source and authority metadata instead of pretending to be fully localized proof.
+
+### UI and Implementation Direction
+
+Do not implement the Safety Confirmation page as a long compliance checklist.
+Render it from producer-owned confirmation, evidence, boundary, blocker, warning, and action rows.
+
+Use the Dashboard Control Center design-system source of truth for visual changes.
+Reuse existing page headers, operational cards, status pills, source chips, command previews, detail surfaces, and decision summary patterns before introducing new page-local UI rules.
+
+Card details must be useful.
+Opening a detail surface should show where the claim came from, why it matters, what is missing or stale, whether it blocks the current phase, what authority is closed or approval-required, and the next safe check.
+It should not repeat a static definition of the card title.
+
+### Acceptance Criteria
+
+The Safety Confirmation page is acceptable when:
+
+- the first viewport answers whether the selected workflow can safely continue now;
+- every safety, blocker, authority, approval, command, or redaction claim maps to producer-owned data;
+- selected repository scope does not leak across free development, product improvement, external integration, lesson workflows, or lesson-repository maintenance;
+- friendly, standard, and technical display depths show the same state with appropriate detail density;
+- configured dashboard language applies to dashboard-controlled text;
+- missing, stale, cached, manual-required, optional, advisory, not-collected, and not-applicable evidence cannot appear as ready proof;
+- secrets, raw artifacts, raw prompts, raw payloads, raw logs, raw receipt bodies, tokens, private URLs, and absolute paths do not reach dashboard JSON or live-status JSON;
+- external send, provider, browser, shell, MCP, credential, approval receipt, and destructive-operation boundaries are visible when relevant;
+- external-integration evidence is first-class when the selected workflow requires it;
+- command previews remain display-only and unsafe command previews cannot be mistaken for executable controls;
+- opening the Safety page does not call mutation endpoints, create tokens, create receipts, dispatch providers, execute commands, or write repositories;
+- detail surfaces remain keyboard accessible and return focus correctly;
+- tests cover safe, blocked, approval-required, missing evidence, stale evidence, external-integration missing approval, secret-like data, raw artifact leakage, unsafe command previews, no POST from Safety, multiple repositories, selected-repository leakage, and display-depth behavior.
+
+### Implementation Roadmap
+
+1. Confirm the information map for the Safety Confirmation page and map each visible section to an existing or new producer-owned field.
+2. Add or align `security.confirmation` in the dashboard data schema only where existing `security`, `partial_failures`, `actions.command_previews`, and `decision_pages[id=safety]` fields are insufficient.
+3. Generate `security.confirmation` in `tools/dashboard-data` from structured security policy, workflow context, product-local manifests, product authority evidence, command-preview policy, and approval policy sources.
+4. Add or align a product-security JSON or evidence-export path, or route Safety Confirmation through product-authority evidence, so the dashboard does not parse `product-security` stdout or stderr.
+5. Add producer-side and validator-side leak rejection for snapshot JSON and live-status JSON.
+6. Add safe command grammar, command ids, redacted argv, and copy restrictions for unsafe or approval-bound command previews.
+7. Add safe approval receipt metadata fields without raw receipt bodies or approval tokens.
+8. Add first-class external-send, provider, credential, OAuth, webhook, token-storage, browser, shell, MCP, and destructive-operation rows where applicable.
+9. Render `SafetyConfirmationPanel` inside the existing `#safety` page using design-system components and localized labels.
+10. Aggregate worst-state conservatively across all safety rows or display a producer-owned headline.
+11. Add detail surfaces that explain evidence, freshness, authority, missing data, approval requirements, redaction boundaries, and next safe checks.
+12. Add focused tests for schema, dashboard data, live-status leak rejection, i18n, selected repository scope, no mutation endpoints, command preview safety, external-integration safety, and Safety page rendering.
+13. Use Playwright and read-only TraceCue review after the page can show realistic selected-repository safety states.
+
+### Stop Conditions
+
+Stop or redesign before implementation proceeds if:
+
+- a fixed product name, repository name, task id, PR number, CI run id, branch, URL, path, command, provider name, timestamp, annotation, or threshold is introduced;
+- React infers safety readiness instead of displaying producer-owned readiness;
+- Markdown prose, stdout, or stderr parsing becomes the only authority for safety confirmation, approval, external sending, provider dispatch, command preview, or blocker state;
+- stale or advisory evidence is shown as proof;
+- selected repository data is mixed across workflow contexts;
+- AI-generated summaries are treated as authoritative evidence;
+- Safety lacks current authoritative rows for secrets, external send, provider, MCP, browser, shell, credentials, approvals, destructive operations, and command previews when those boundaries are relevant;
+- any dashboard JSON includes raw secrets, private messages, raw prompts, raw payloads, raw logs, raw stderr with sensitive values, raw approval receipts, plan or apply tokens, provider payloads, absolute paths, or executable browser or shell commands;
+- a copied command is destructive, approval-bound, contains raw paths or secrets, or is not representable as validated safe argv;
+- external-integration evidence lacks service, data movement, OAuth or API permissions, token storage, webhook, logging, rate limit, sandbox, and rollback confirmation when required;
+- opening the Safety page calls mutation endpoints, creates receipts, creates tokens, dispatches providers, executes commands, or writes repositories;
+- UI changes bypass the design-system source of truth.
+
+## Repository Invariant Records Required By Local Gates
+
+STATUS: synced
+
+This section preserves repository-wide lesson and implementation invariants that must remain visible in developer memory even when the dashboard redesign memory is initialized.
+
+- Approval checkpoints now have tooling enforcement.
+- `tools/lesson 学習モード <A|B|C>` records the 7-day learning mode.
+- `tools/lesson14 学習モード <A|B|C>` records the 14-day learning mode.
+- Learners can change learning mode at any time during either lesson.
+- Standard language choices should include `ja`, `en`, `ko`, `zh-CN`, `zh-TW`, `es`, `pt-BR`, `fr`, `de`, `id`, `vi`, `th`, `hi`, and `ar`.
+- Implementation work must stay refactorable, ecosystem-friendly, reusable, and general.
+- Existing functionality must not be traded away for a new implementation.
+- Final tests pass only when every improvement or problem recorded in this developer memory has been cleared, implemented, deferred with explicit reason, or converted into a tracked next plan.
+- Explain MCP Purpose Before MCP Workflows.

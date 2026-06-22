@@ -25,7 +25,10 @@ export const DASHBOARD_UI_LOCALES = new Set(DASHBOARD_LOCALE_CODES);
 export const DASHBOARD_UI_DIRECTIONS = new Set(["ltr", "rtl"]);
 
 const SECRET_PATTERN =
-  /(SECRET|TOKEN|API_KEY|PASSWORD|PRIVATE_KEY)\s*[:=]\s*[^\s#]{8,}|gh[pousr]_[A-Za-z0-9_]{20,}|sk-[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16}|BEGIN (RSA |OPENSSH |EC |DSA )?PRIVATE KEY/i;
+  /(SECRET|TOKEN|API_KEY|PASSWORD|PRIVATE_KEY)\s*[:=]\s*[^\s#]{8,}|Authorization:\s*Bearer\s+[A-Za-z0-9._-]{16,}|Bearer\s+eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}|gh[pousr]_[A-Za-z0-9_]{20,}|sk-[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16}|BEGIN (RSA |OPENSSH |EC |DSA )?PRIVATE KEY/i;
+const RAW_ABSOLUTE_PATH_PATTERN = /(^|\s)(\/(?:home|tmp|mnt|var|etc|root|opt|Users)\/|[A-Za-z]:[\\/]|\\\\[^\s\\]+[\\/])/;
+const SIGNED_PRIVATE_URL_PATTERN = /https?:\/\/[^\s"'<>]*(?:X-Amz-Signature|X-Goog-Signature|signature=|sig=|token=|access_token=)[^\s"'<>]*/i;
+const COMMAND_TOKEN_PATTERN = /^(\[absolute-path\]|\.[/][A-Za-z0-9._/-]+|[A-Za-z0-9._:@/%+=,\-[\]]+)$/;
 
 const MENU_IDS = new Set([
   "step_1_7",
@@ -55,7 +58,8 @@ const PRODUCT_GIT_USAGE_MODES = new Set(["none", "local", "remote_sync", "ci", "
 const PRODUCT_GIT_REQUIREMENTS = new Set(["required", "not_applicable", "unknown"]);
 const EVIDENCE_FRESHNESS_STATES = new Set(["current", "stale", "not_collected", "unknown"]);
 const EVIDENCE_AUTHORITIES = new Set(["authoritative", "manual_required", "advisory", "not_collected"]);
-const PRODUCT_HEAD_PATTERN = /^(none|[a-f0-9]{40}|[a-f0-9]{64})$/;
+const EVIDENCE_CONFIDENCE_LEVELS = new Set(["high", "medium", "low", "unknown"]);
+const PRODUCT_HEAD_PATTERN = /^(none|not_collected|[a-f0-9]{7,64})$/i;
 const LIVE_CHECK_KEYS = ["local_tests", "git_sync", "ci", "security"];
 const LIVE_DETAIL_PAGES = new Set(["#workflow", "#maintenance", "#safety", "#repository-info", "#documents", "#history", "#help"]);
 const CI_HEAD_MATCH_STATES = new Set(["matched", "different", "unknown"]);
@@ -68,6 +72,8 @@ const AGENT_OBSERVATION_AUTHORITY = new Set(["authoritative", "manual_required",
 const AGENT_OBSERVATION_FRESHNESS = new Set(["current", "stale", "not_collected", "unknown"]);
 const DECISION_PAGE_IDS = new Set(["overview", "lessons", "workflow", "maintenance", "safety", "repository-info", "documents", "settings", "history"]);
 const DECISION_PAGE_TARGETS = new Set(["#overview", "#lessons", "#workflow", "#maintenance", "#safety", "#repository-info", "#documents", "#settings", "#history"]);
+const OVERVIEW_DETAIL_PAGES = new Set([...DECISION_PAGE_TARGETS, "#help"]);
+const OVERVIEW_SECTION_IDS = new Set(["overall", "current_work", "docs_sync", "task_tracker", "handoff", "git_pr_ci", "tests", "safety", "blockers", "next_safe_action"]);
 const DECISION_AUDIENCES = new Set(["non_engineer", "junior_engineer"]);
 const DECISION_OWNER_SOURCES = new Set(["dashboard-data", "product-authority", "git-workflow", "repository-development-workflow"]);
 const DECISION_COMMAND_EXECUTION_MODES = new Set(["preview_only"]);
@@ -76,11 +82,21 @@ const REPOSITORY_DEVELOPMENT_RUNNER_RECORD_STATUSES = new Set(["missing", "curre
 const CI_EVIDENCE_ROLES = new Set(["branch_ci", "pr_ci", "main_ci", "local_tests", "provider_visibility"]);
 const DOCUMENT_AUDIENCES = new Set(["non_engineer", "engineer", "all"]);
 const DOCUMENT_RELATED_PAGES = new Set(["#documents", "#maintenance", "#workflow", "#safety", "#repository-info", "#history"]);
+const DOCUMENT_SUMMARY_PROVIDER_MODES = new Set(["local_summary", "subscription_agent", "api_key", "unknown"]);
+const LIVE_AGENT_LOCALIZATION_PROVIDER_MODES = DOCUMENT_SUMMARY_PROVIDER_MODES;
+const LOCALIZED_TEXT_OBJECT_KEYS = new Set([...DASHBOARD_LOCALE_CODES, "key"]);
 const SETTING_SCOPES = new Set(["selected_context", "learning", "workflow", "security", "repository", "dashboard"]);
 const SETTINGS_RELATED_PAGES = new Set(["#overview", "#lessons", "#workflow", "#maintenance", "#safety", "#repository-info", "#documents", "#settings", "#history", "#help"]);
 const PRODUCT_REPOSITORY_REGISTRY_CONTEXTS = new Set(["free-development", "product-improvement", "external-integration"]);
 const REPOSITORY_SELECTION_STATES = new Set(["none", "explicit", "fallback", "request", "not_applicable"]);
 const REPOSITORY_REGISTRATION_SOURCES = new Set(["explicit", "discover", "legacy", "unknown"]);
+const SECURITY_BOUNDARY_STATES = new Set(["closed", "open", "approval_required", "unknown"]);
+const SECURITY_DISPLAY_POLICY_STATES = new Set(["do_not_display", "redact", "safe", "recommended", "unknown"]);
+const SECURITY_CONFIRMATION_ACTION_STATES = new Set(["safe", "recommended", "approval_required", "blocked", "unknown"]);
+const SECURITY_CONFIRMATION_RECEIPT_STATES = new Set(["closed", "open", "not_configured", "unknown"]);
+const SECURITY_UNSAFE_COMMAND_POLICY_STATES = new Set(["display_only", "blocked", "approval_required", "unknown"]);
+const MAINTENANCE_ACTION_TYPES = new Set(["immediate", "later", "blocked"]);
+const MAINTENANCE_GIT_ACTIONS = new Set(["none", "commit_or_discard", "pull_required", "push_required", "reconcile_diverged", "select_repository", "not_applicable"]);
 const LANGUAGE_CODE_PATTERN = /^[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8})?$|^custom$/;
 const LIVE_PARTIAL_FAILURE_SOURCES = new Set([
   "as_built_sync_live",
@@ -126,10 +142,30 @@ function safeScopedRelativePath(value) {
   if (typeof value !== "string") {
     return "";
   }
+  if (/^[A-Za-z][A-Za-z0-9+.-]*:\/\//.test(value)) {
+    return "";
+  }
   if (value.startsWith("product:")) {
     return safeRelativePath(value.slice("product:".length));
   }
+  if (value.includes(":")) {
+    return "";
+  }
   return safeRelativePath(value);
+}
+
+function safeScopedReferenceList(value) {
+  if (typeof value !== "string" || !value.trim()) {
+    return "";
+  }
+  const references = value
+    .split(/[;,]/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+  if (!references.length) {
+    return "";
+  }
+  return references.every((item) => item === "not_collected" || item === "not_applicable" || item === "none" || safeScopedRelativePath(item)) ? references.join(";") : "";
 }
 
 function safeDisplayCommand(value) {
@@ -152,6 +188,59 @@ function safeRuntimePreview(value) {
     return "";
   }
   if (/(^|\s)(\/|[A-Za-z]:[\\/]|\\\\)/.test(normalized)) {
+    return "";
+  }
+  return normalized;
+}
+
+function assertNoUnsafeDashboardValue(value, label = "dashboard data", seen = new Set()) {
+  if (value === null || value === undefined) {
+    return;
+  }
+  if (typeof value === "string") {
+    if (SECRET_PATTERN.test(value) || RAW_ABSOLUTE_PATH_PATTERN.test(value) || SIGNED_PRIVATE_URL_PATTERN.test(value)) {
+      throw new Error(`${label} contains unsafe raw value`);
+    }
+    return;
+  }
+  if (Array.isArray(value)) {
+    value.forEach((item, index) => assertNoUnsafeDashboardValue(item, `${label}[${index}]`, seen));
+    return;
+  }
+  if (typeof value === "object") {
+    if (seen.has(value)) {
+      return;
+    }
+    seen.add(value);
+    for (const [key, nested] of Object.entries(value)) {
+      assertNoUnsafeDashboardValue(nested, `${label}.${key}`, seen);
+    }
+  }
+}
+
+function safeCommandPreviewToken(value) {
+  if (typeof value !== "string") {
+    return "";
+  }
+  const normalized = value.replace(/[\u0000-\u001f]/g, "").trim();
+  if (!normalized || normalized.length > 160 || SECRET_PATTERN.test(normalized) || RAW_ABSOLUTE_PATH_PATTERN.test(normalized) || SIGNED_PRIVATE_URL_PATTERN.test(normalized)) {
+    return "";
+  }
+  if (/[;&|`$<>]/.test(normalized) || /\s/.test(normalized)) {
+    return "";
+  }
+  return COMMAND_TOKEN_PATTERN.test(normalized) ? normalized : "";
+}
+
+function safeCommandPreviewText(value) {
+  if (typeof value !== "string") {
+    return "";
+  }
+  const normalized = value.replace(/[\u0000-\u001f]/g, "").replace(/\s+/g, " ").trim();
+  if (!normalized || normalized.length > 240 || SECRET_PATTERN.test(normalized) || RAW_ABSOLUTE_PATH_PATTERN.test(normalized) || SIGNED_PRIVATE_URL_PATTERN.test(normalized)) {
+    return "";
+  }
+  if (/[;&|`$<>]/.test(normalized)) {
     return "";
   }
   return normalized;
@@ -222,8 +311,8 @@ function validateLocalizedTextObject(value, label) {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     throw new Error(`${label} must be a localized object`);
   }
-  assertAllowedKeys(value, new Set(["ja", "en", "key"]), label);
-  if (!displayText(value.ja, "") && !displayText(value.en, "") && !displayText(value.key, "")) {
+  assertAllowedKeys(value, LOCALIZED_TEXT_OBJECT_KEYS, label);
+  if (![...LOCALIZED_TEXT_OBJECT_KEYS].some((key) => displayText(value[key], ""))) {
     throw new Error(`${label} is missing localized text`);
   }
 }
@@ -300,6 +389,19 @@ export function validateCommandPreviews(actions) {
     if (!preview || typeof preview !== "object" || Array.isArray(preview)) {
       throw new Error("dashboard command preview must be an object");
     }
+    assertAllowedKeys(
+      preview,
+      new Set(["command_id", "intent", "target", "risk_level", "requires_approval", "approval_gate_id", "argv", "safe_argv", "argv_redacted", "command_text", "execution_mode", "non_executable", "copy_allowed", "copy_block_reason"]),
+      "dashboard command preview",
+    );
+    if (!/^cmd-[a-f0-9]{12}$/.test(displayText(preview.command_id, ""))) {
+      throw new Error("dashboard command preview command_id is invalid");
+    }
+    for (const key of ["intent", "target", "approval_gate_id", "command_text", "copy_block_reason"]) {
+      if (!displayText(preview[key], "")) {
+        throw new Error(`dashboard command preview ${key} is missing`);
+      }
+    }
     if (displayText(preview.execution_mode, "") !== "preview_only") {
       throw new Error("dashboard command preview execution mode must be preview_only");
     }
@@ -311,6 +413,28 @@ export function validateCommandPreviews(actions) {
     }
     if (typeof preview.requires_approval !== "boolean") {
       throw new Error("dashboard command preview approval flag is invalid");
+    }
+    if (typeof preview.argv_redacted !== "boolean" || typeof preview.copy_allowed !== "boolean") {
+      throw new Error("dashboard command preview safety flags are invalid");
+    }
+    const argv = asArray(preview.argv);
+    const safeArgv = asArray(preview.safe_argv);
+    if (!argv.length || argv.length !== safeArgv.length) {
+      throw new Error("dashboard command preview argv contract is invalid");
+    }
+    for (const token of [...argv, ...safeArgv]) {
+      if (!safeCommandPreviewToken(token)) {
+        throw new Error("dashboard command preview argv contains unsafe token");
+      }
+    }
+    if (stableStringify(argv) !== stableStringify(safeArgv)) {
+      throw new Error("dashboard command preview argv must match safe_argv");
+    }
+    if (!safeCommandPreviewText(preview.command_text)) {
+      throw new Error("dashboard command preview text is unsafe");
+    }
+    if (preview.copy_allowed === true && (preview.requires_approval === true || preview.argv_redacted === true || displayText(preview.risk_level, "") !== "low")) {
+      throw new Error("dashboard command preview copy_allowed contradicts safety state");
     }
   }
 }
@@ -339,6 +463,48 @@ function validatePrimaryAction(summary) {
   }
   if (!ALLOWED_STATES.has(displayText(primaryAction.status, ""))) {
     throw new Error("dashboard primary action status is invalid");
+  }
+}
+
+function validateOverviewSections(summary) {
+  const sections = asArray(summary.overview_sections);
+  const seen = new Set();
+  for (const section of sections) {
+    const row = asObject(section, "dashboard overview section");
+    assertAllowedKeys(row, new Set(["id", "title_key", "status", "value", "detail", "source_id", "owner_source", "freshness_state", "authority", "detail_page", "required_command"]), "dashboard overview section");
+    const id = displayText(row.id, "");
+    if (!OVERVIEW_SECTION_IDS.has(id) || seen.has(id)) {
+      throw new Error("dashboard overview section id is invalid");
+    }
+    seen.add(id);
+    for (const key of ["title_key", "value", "detail", "source_id", "required_command"]) {
+      if (!displayText(row[key], "")) {
+        throw new Error(`dashboard overview section ${id}.${key} is missing`);
+      }
+    }
+    if (!ALLOWED_STATES.has(displayText(row.status, ""))) {
+      throw new Error("dashboard overview section status is invalid");
+    }
+    if (!DECISION_OWNER_SOURCES.has(displayText(row.owner_source, ""))) {
+      throw new Error("dashboard overview section owner_source is invalid");
+    }
+    if (!EVIDENCE_FRESHNESS_STATES.has(displayText(row.freshness_state, ""))) {
+      throw new Error("dashboard overview section freshness_state is invalid");
+    }
+    if (!EVIDENCE_AUTHORITIES.has(displayText(row.authority, ""))) {
+      throw new Error("dashboard overview section authority is invalid");
+    }
+    if (!OVERVIEW_DETAIL_PAGES.has(displayText(row.detail_page, ""))) {
+      throw new Error("dashboard overview section detail_page is invalid");
+    }
+    if (displayText(row.required_command, "") !== "not_applicable" && !safeCommandPreviewText(row.required_command)) {
+      throw new Error("dashboard overview section required_command is unsafe");
+    }
+  }
+  for (const id of OVERVIEW_SECTION_IDS) {
+    if (!seen.has(id)) {
+      throw new Error(`dashboard overview section is missing: ${id}`);
+    }
   }
 }
 
@@ -455,7 +621,7 @@ function validateProductAuthority(development) {
     throw new Error("dashboard product authority blocker scope is invalid");
   }
   const productSummary = asObject(authority.product_summary, "dashboard product summary");
-  if (!["missing", "ready", "failed", "unknown"].includes(displayText(productSummary.status, ""))) {
+  if (!ALLOWED_STATES.has(displayText(productSummary.status, ""))) {
     throw new Error("dashboard product summary status is invalid");
   }
   const productSummaryStatus = displayText(productSummary.status, "");
@@ -481,7 +647,7 @@ function validateProductAuthority(development) {
     throw new Error("dashboard product summary source_path is invalid");
   }
   const operationMode = asObject(authority.operation_mode, "dashboard product operation mode");
-  if (!["missing", "ready", "failed", "unknown", "repair_required"].includes(displayText(operationMode.status, ""))) {
+  if (!ALLOWED_STATES.has(displayText(operationMode.status, "")) && displayText(operationMode.status, "") !== "repair_required") {
     throw new Error("dashboard product operation mode status is invalid");
   }
   if (!["parent_managed", "standalone", "reconnecting", "repair_required"].includes(displayText(operationMode.workflow_mode, ""))) {
@@ -660,6 +826,18 @@ function validateRepositoryScope(data) {
   const repositoryName = displayText(scope.repository_name, "");
   if (!repositoryName) {
     throw new Error("dashboard repository scope repository_name is missing");
+  }
+  const repositoryId = displayText(scope.repo_id, "");
+  if (!repositoryId) {
+    throw new Error("dashboard repository scope repo_id is missing");
+  }
+  const selectedRepositoryId = displayText(data.selected_context?.target_repository?.repo_id, "");
+  const selectedSelectionId = displayText(data.repository_selection?.current_repo_id, "");
+  if (selectedRepositoryId && repositoryId !== selectedRepositoryId) {
+    throw new Error("dashboard repository scope must match selected context repo_id");
+  }
+  if (selectedSelectionId && !["not_applicable", "not_selected"].includes(selectedSelectionId) && repositoryId !== selectedSelectionId) {
+    throw new Error("dashboard repository scope must match repository selection repo_id");
   }
   const selectedRepositoryName = displayText(data.selected_context?.target_repository?.name, "");
   const developmentRepositoryName = displayText(data.development?.product_repository?.configured_name, "");
@@ -1147,6 +1325,7 @@ function validateDecisionPages(data) {
         "source_id",
         "authority",
         "freshness_state",
+        "confidence_level",
         "risk_level",
         "command_execution_mode",
       ]),
@@ -1171,6 +1350,9 @@ function validateDecisionPages(data) {
       throw new Error(`dashboard decision page ${pageId}.must_review_keys is invalid`);
     }
     validateEvidenceSourceFields(page, `dashboard decision page ${pageId}`);
+    if (!EVIDENCE_CONFIDENCE_LEVELS.has(displayText(page.confidence_level, ""))) {
+      throw new Error(`dashboard decision page ${pageId} confidence_level is invalid`);
+    }
     if (!RISK_LEVELS.has(displayText(page.risk_level, ""))) {
       throw new Error(`dashboard decision page ${pageId} risk_level is invalid`);
     }
@@ -1486,7 +1668,7 @@ function validateDocuments(data) {
     if (!card || typeof card !== "object" || Array.isArray(card)) {
       throw new Error("dashboard document brief card must be an object");
     }
-    assertAllowedKeys(card, new Set(["id", "menu_id", "workflow_context", "repo_id", "document_role", "source_label_key", "title", "title_key", "detail", "detail_key", "summary", "summary_key", "action", "action_key", "status", "metric_label_key", "metric_value", "source_paths", "source_hash", "stored_source_hash", "brief_updated_at", "freshness_state", "related_page", "order"]), "dashboard document brief card");
+    assertAllowedKeys(card, new Set(["id", "menu_id", "workflow_context", "repo_id", "document_role", "source_label_key", "title", "title_key", "detail", "detail_key", "summary", "summary_key", "action", "action_key", "agent_summary", "status", "metric_label_key", "metric_value", "source_paths", "source_hash", "stored_source_hash", "brief_updated_at", "freshness_state", "related_page", "order"]), "dashboard document brief card");
     for (const key of ["id", "source_label_key", "title_key", "detail_key", "summary_key", "action_key", "metric_label_key", "metric_value"]) {
       if (!displayText(card[key], "")) {
         throw new Error(`dashboard document brief card ${key} is missing`);
@@ -1494,6 +1676,26 @@ function validateDocuments(data) {
     }
     for (const key of ["title", "detail", "summary", "action"]) {
       validateLocalizedTextObject(card[key], `dashboard document brief card ${key}`);
+    }
+    if (card.agent_summary !== undefined && card.agent_summary !== null) {
+      const agentSummary = asObject(card.agent_summary, "dashboard document brief card agent_summary");
+      assertAllowedKeys(agentSummary, new Set(["status", "provider_mode", "source", "summary", "detail", "generated_at", "source_paths"]), "dashboard document brief card agent_summary");
+      if (!ALLOWED_STATES.has(displayText(agentSummary.status, ""))) {
+        throw new Error("dashboard document brief card agent_summary status is invalid");
+      }
+      if (!DOCUMENT_SUMMARY_PROVIDER_MODES.has(displayText(agentSummary.provider_mode, ""))) {
+        throw new Error("dashboard document brief card agent_summary provider_mode is invalid");
+      }
+      if (!displayText(agentSummary.source, "") || !displayText(agentSummary.generated_at, "")) {
+        throw new Error("dashboard document brief card agent_summary source fields are missing");
+      }
+      validateLocalizedTextObject(agentSummary.summary, "dashboard document brief card agent_summary summary");
+      validateLocalizedTextObject(agentSummary.detail, "dashboard document brief card agent_summary detail");
+      for (const sourcePath of asArray(agentSummary.source_paths)) {
+        if (!safeScopedRelativePath(sourcePath)) {
+          throw new Error("dashboard document brief card agent_summary source_paths is invalid");
+        }
+      }
     }
     const briefId = displayText(card.id, "");
     if (briefIds.has(briefId)) {
@@ -1818,6 +2020,46 @@ function validateSettingsMutationResponse(value, label) {
   return result;
 }
 
+function validateProductRepositorySelectionMutationResponse(value, label) {
+  const result = asObject(value, label);
+  assertAllowedKeys(
+    result,
+    new Set([
+      "status",
+      "applied",
+      "menu_id",
+      "repo_id",
+      "snapshot_regenerated",
+      "snapshot_id",
+      "content_hash",
+      "tool_command",
+    ]),
+    label,
+  );
+  if (!["passed", "ready"].includes(displayText(result.status, ""))) {
+    throw new Error(`${label} status is invalid`);
+  }
+  if (typeof result.applied !== "boolean" || typeof result.snapshot_regenerated !== "boolean") {
+    throw new Error(`${label} boolean fields are invalid`);
+  }
+  if (result.applied !== true || result.snapshot_regenerated !== true) {
+    throw new Error(`${label} must apply and regenerate a snapshot`);
+  }
+  if (!MENU_IDS.has(displayText(result.menu_id, "")) || displayText(result.menu_id, "") === "unknown") {
+    throw new Error(`${label} menu_id is invalid`);
+  }
+  if (!/^[A-Za-z0-9._-]+$/.test(displayText(result.repo_id, ""))) {
+    throw new Error(`${label} repo_id is invalid`);
+  }
+  if (!displayText(result.snapshot_id, "") || !/^[a-f0-9]{64}$/.test(displayText(result.content_hash, ""))) {
+    throw new Error(`${label} snapshot identity is invalid`);
+  }
+  if (!safeDisplayCommand(result.tool_command)) {
+    throw new Error(`${label} tool command is invalid`);
+  }
+  return result;
+}
+
 function validateDesignSystemInteraction(value, label) {
   const interaction = asObject(value, label);
   assertAllowedKeys(interaction, new Set(["tooltip", "copyFeedback"]), label);
@@ -2094,6 +2336,151 @@ function validateMaintenanceEvidence(maintenance) {
     if (!ALLOWED_STATES.has(displayText(row.status, ""))) {
       throw new Error("dashboard maintenance evidence row status is invalid");
     }
+  }
+}
+
+function safeMaintenanceReference(value) {
+  const text = displayText(value, "");
+  if (!text) {
+    return "";
+  }
+  if (safeScopedReferenceList(text)) {
+    return text;
+  }
+  return /^[A-Za-z0-9._:-]+$/.test(text) ? text : "";
+}
+
+function validateMaintenanceSyncRow(row, label) {
+  const source = asObject(row, label);
+  assertAllowedKeys(
+    source,
+    new Set(["id", "label", "status", "source_id", "freshness_state", "authority", "observed_at", "detail", "next_action", "reference", "priority"]),
+    label,
+  );
+  for (const key of ["id", "label", "source_id", "observed_at", "detail", "next_action", "reference", "priority"]) {
+    if (!displayText(source[key], "")) {
+      throw new Error(`${label} ${key} is missing`);
+    }
+  }
+  if (!ALLOWED_STATES.has(displayText(source.status, ""))) {
+    throw new Error(`${label} status is invalid`);
+  }
+  if (!EVIDENCE_FRESHNESS_STATES.has(displayText(source.freshness_state, "")) || !EVIDENCE_AUTHORITIES.has(displayText(source.authority, ""))) {
+    throw new Error(`${label} evidence metadata is invalid`);
+  }
+  if (!RISK_LEVELS.has(displayText(source.priority, ""))) {
+    throw new Error(`${label} priority is invalid`);
+  }
+  if (!safeMaintenanceReference(source.reference)) {
+    throw new Error(`${label} reference is invalid`);
+  }
+}
+
+function validateMaintenanceAction(row, label) {
+  const source = asObject(row, label);
+  assertAllowedKeys(source, new Set(["id", "label", "status", "action_type", "detail", "source_id"]), label);
+  for (const key of ["id", "label", "action_type", "detail", "source_id"]) {
+    if (!displayText(source[key], "")) {
+      throw new Error(`${label} ${key} is missing`);
+    }
+  }
+  if (!ALLOWED_STATES.has(displayText(source.status, "")) || !MAINTENANCE_ACTION_TYPES.has(displayText(source.action_type, ""))) {
+    throw new Error(`${label} state is invalid`);
+  }
+}
+
+function validateMaintenanceSyncState(data) {
+  if (data.maintenance_sync_state === undefined || data.maintenance_sync_state === null) {
+    return;
+  }
+  const state = asObject(data.maintenance_sync_state, "dashboard maintenance_sync_state");
+  assertAllowedKeys(
+    state,
+    new Set(["status", "observed_at", "menu_id", "workflow_context", "repo_id", "repository_name", "sync_summary", "git_state", "ci_state", "product_gate_evidence", "documentation_sync", "maintenance_warnings", "recommended_actions", "blocked_actions", "evidence_links"]),
+    "dashboard maintenance_sync_state",
+  );
+  if (!ALLOWED_STATES.has(displayText(state.status, "")) || !MENU_IDS.has(displayText(state.menu_id, "")) || !WORKFLOW_CONTEXTS.has(displayText(state.workflow_context, ""))) {
+    throw new Error("dashboard maintenance_sync_state status or context is invalid");
+  }
+  for (const key of ["observed_at", "repo_id", "repository_name"]) {
+    if (!displayText(state[key], "")) {
+      throw new Error(`dashboard maintenance_sync_state ${key} is missing`);
+    }
+  }
+  const selectedRepoId = displayText(data.selected_context?.target_repository?.repo_id, "");
+  if (selectedRepoId && selectedRepoId !== "not_applicable" && displayText(state.repo_id, "") !== selectedRepoId) {
+    throw new Error("dashboard maintenance_sync_state repo_id must match selected context");
+  }
+
+  const summary = asObject(state.sync_summary, "dashboard maintenance sync_summary");
+  assertAllowedKeys(summary, new Set(["status", "current_result", "immediate_action_required", "blocker_count", "warning_count", "next_safe_action"]), "dashboard maintenance sync_summary");
+  if (!ALLOWED_STATES.has(displayText(summary.status, "")) || typeof summary.immediate_action_required !== "boolean") {
+    throw new Error("dashboard maintenance sync_summary state is invalid");
+  }
+  for (const key of ["current_result", "next_safe_action"]) {
+    if (!displayText(summary[key], "")) {
+      throw new Error(`dashboard maintenance sync_summary ${key} is missing`);
+    }
+  }
+  validateNonNegativeInteger(summary.blocker_count, "dashboard maintenance sync_summary blocker_count");
+  validateNonNegativeInteger(summary.warning_count, "dashboard maintenance sync_summary warning_count");
+
+  const gitState = asObject(state.git_state, "dashboard maintenance git_state");
+  assertAllowedKeys(gitState, new Set(["status", "source_id", "observed_at", "branch", "upstream", "main_target", "head", "worktree_state", "staged_count", "unstaged_count", "untracked_count", "changed_count", "ahead", "behind", "worktree_count", "sync_status", "action_needed"]), "dashboard maintenance git_state");
+  if (!ALLOWED_STATES.has(displayText(gitState.status, "")) || !ALLOWED_STATES.has(displayText(gitState.sync_status, "")) || !MAINTENANCE_GIT_ACTIONS.has(displayText(gitState.action_needed, ""))) {
+    throw new Error("dashboard maintenance git_state state is invalid");
+  }
+  for (const field of ["staged_count", "unstaged_count", "untracked_count", "changed_count", "ahead", "behind", "worktree_count"]) {
+    validateNonNegativeInteger(gitState[field], `dashboard maintenance git_state ${field}`);
+  }
+  for (const key of ["source_id", "observed_at", "worktree_state"]) {
+    if (!displayText(gitState[key], "")) {
+      throw new Error(`dashboard maintenance git_state ${key} is missing`);
+    }
+  }
+
+  const ciState = asObject(state.ci_state, "dashboard maintenance ci_state");
+  assertAllowedKeys(ciState, new Set(["status", "observed_at", "branch_ci_status", "pr_ci_status", "main_ci_status", "provider_visibility_status", "local_tests_status", "head_match_status", "annotations"]), "dashboard maintenance ci_state");
+  for (const key of ["status", "branch_ci_status", "pr_ci_status", "main_ci_status", "provider_visibility_status", "local_tests_status"]) {
+    if (!ALLOWED_STATES.has(displayText(ciState[key], ""))) {
+      throw new Error(`dashboard maintenance ci_state ${key} is invalid`);
+    }
+  }
+  if (!CI_HEAD_MATCH_STATES.has(displayText(ciState.head_match_status, ""))) {
+    throw new Error("dashboard maintenance ci_state head_match_status is invalid");
+  }
+  for (const annotation of asArray(ciState.annotations)) {
+    validateMaintenanceSyncRow(annotation, "dashboard maintenance ci_state annotation");
+  }
+
+  const productGateEvidence = asObject(state.product_gate_evidence, "dashboard maintenance product_gate_evidence");
+  assertAllowedKeys(productGateEvidence, new Set(["status", "layers"]), "dashboard maintenance product_gate_evidence");
+  if (!ALLOWED_STATES.has(displayText(productGateEvidence.status, ""))) {
+    throw new Error("dashboard maintenance product_gate_evidence status is invalid");
+  }
+  for (const layer of asArray(productGateEvidence.layers)) {
+    validateMaintenanceSyncRow(layer, "dashboard maintenance product_gate_evidence layer");
+  }
+
+  const documentationSync = asObject(state.documentation_sync, "dashboard maintenance documentation_sync");
+  assertAllowedKeys(documentationSync, new Set(["status", "rows"]), "dashboard maintenance documentation_sync");
+  if (!ALLOWED_STATES.has(displayText(documentationSync.status, ""))) {
+    throw new Error("dashboard maintenance documentation_sync status is invalid");
+  }
+  for (const row of asArray(documentationSync.rows)) {
+    validateMaintenanceSyncRow(row, "dashboard maintenance documentation_sync row");
+  }
+  for (const row of asArray(state.maintenance_warnings)) {
+    validateMaintenanceSyncRow(row, "dashboard maintenance warning row");
+  }
+  for (const row of asArray(state.evidence_links)) {
+    validateMaintenanceSyncRow(row, "dashboard maintenance evidence link");
+  }
+  for (const row of asArray(state.recommended_actions)) {
+    validateMaintenanceAction(row, "dashboard maintenance recommended action");
+  }
+  for (const row of asArray(state.blocked_actions)) {
+    validateMaintenanceAction(row, "dashboard maintenance blocked action");
   }
 }
 
@@ -2634,6 +3021,134 @@ function validateDesignStudio(data) {
   validateDesignStudioBoundary(designStudio.boundaries, "dashboard design_studio boundaries");
 }
 
+function validateSecurityConfirmation(data) {
+  const security = asObject(data.security, "dashboard security");
+  const selectedContext = asObject(data.selected_context, "dashboard selected_context");
+  const selectedRepository = asObject(selectedContext.target_repository, "dashboard selected_context target_repository");
+  const confirmation = asObject(security.confirmation, "dashboard security confirmation");
+  assertAllowedKeys(
+    confirmation,
+    new Set(["status", "observed_at", "menu_id", "workflow_context", "repo_id", "repository_name", "product_head", "current_result", "safe_next_action", "approval_receipts", "unsafe_command_policy", "evidence", "authority_boundaries", "display_policy", "blockers", "recommended_actions", "restricted_actions"]),
+    "dashboard security confirmation",
+  );
+  if (!ALLOWED_STATES.has(displayText(confirmation.status, ""))) {
+    throw new Error("dashboard security confirmation status is invalid");
+  }
+  if (!MENU_IDS.has(displayText(confirmation.menu_id, "")) || !WORKFLOW_CONTEXTS.has(displayText(confirmation.workflow_context, ""))) {
+    throw new Error("dashboard security confirmation context is invalid");
+  }
+  if (
+    displayText(confirmation.menu_id, "") !== displayText(selectedContext.menu_id, "") ||
+    displayText(confirmation.workflow_context, "") !== displayText(selectedContext.workflow_context, "") ||
+    displayText(confirmation.repo_id, "") !== displayText(selectedRepository.repo_id, "")
+  ) {
+    throw new Error("dashboard security confirmation scope does not match selected context");
+  }
+  for (const key of ["repo_id", "repository_name", "observed_at", "current_result", "safe_next_action"]) {
+    if (!displayText(confirmation[key], "")) {
+      throw new Error(`dashboard security confirmation ${key} is missing`);
+    }
+  }
+  if (!PRODUCT_HEAD_PATTERN.test(displayText(confirmation.product_head, "none"))) {
+    throw new Error("dashboard security confirmation product_head is invalid");
+  }
+  const approvalReceipts = asObject(confirmation.approval_receipts, "dashboard security approval_receipts");
+  assertAllowedKeys(approvalReceipts, new Set(["state", "read_allowed", "write_allowed", "receipt_reference"]), "dashboard security approval_receipts");
+  if (!SECURITY_CONFIRMATION_RECEIPT_STATES.has(displayText(approvalReceipts.state, "")) || typeof approvalReceipts.read_allowed !== "boolean" || typeof approvalReceipts.write_allowed !== "boolean") {
+    throw new Error("dashboard security approval_receipts state is invalid");
+  }
+  if (approvalReceipts.read_allowed || approvalReceipts.write_allowed) {
+    throw new Error("dashboard security approval_receipts must not open read/write authority");
+  }
+  if (!displayText(approvalReceipts.receipt_reference, "")) {
+    throw new Error("dashboard security approval_receipts receipt_reference is missing");
+  }
+  const unsafeCommandPolicy = asObject(confirmation.unsafe_command_policy, "dashboard security unsafe_command_policy");
+  assertAllowedKeys(unsafeCommandPolicy, new Set(["state", "execution_mode", "copy_requires_safe_argv"]), "dashboard security unsafe_command_policy");
+  if (!SECURITY_UNSAFE_COMMAND_POLICY_STATES.has(displayText(unsafeCommandPolicy.state, "")) || displayText(unsafeCommandPolicy.execution_mode, "") !== "preview_only" || unsafeCommandPolicy.copy_requires_safe_argv !== true) {
+    throw new Error("dashboard security unsafe_command_policy is invalid");
+  }
+  const evidenceRows = asArray(confirmation.evidence);
+  if (!evidenceRows.length) {
+    throw new Error("dashboard security confirmation evidence is empty");
+  }
+  for (const evidence of evidenceRows) {
+    if (!evidence || typeof evidence !== "object" || Array.isArray(evidence)) {
+      throw new Error("dashboard security confirmation evidence must be an object");
+    }
+    assertAllowedKeys(evidence, new Set(["id", "label", "status", "source_id", "freshness_state", "authority", "observed_at", "source_artifacts", "meaning", "next_action"]), "dashboard security confirmation evidence");
+    for (const key of ["id", "label", "source_id", "observed_at", "meaning", "next_action"]) {
+      if (!displayText(evidence[key], "")) {
+        throw new Error(`dashboard security confirmation evidence ${key} is missing`);
+      }
+    }
+    if (!ALLOWED_STATES.has(displayText(evidence.status, "")) || !EVIDENCE_FRESHNESS_STATES.has(displayText(evidence.freshness_state, "")) || !EVIDENCE_AUTHORITIES.has(displayText(evidence.authority, ""))) {
+      throw new Error("dashboard security confirmation evidence state is invalid");
+    }
+    if (!safeScopedReferenceList(evidence.source_artifacts)) {
+      throw new Error("dashboard security confirmation evidence source_artifacts is invalid");
+    }
+  }
+  const boundaries = asArray(confirmation.authority_boundaries);
+  if (!boundaries.length) {
+    throw new Error("dashboard security authority boundaries are empty");
+  }
+  for (const boundary of boundaries) {
+    if (!boundary || typeof boundary !== "object" || Array.isArray(boundary)) {
+      throw new Error("dashboard security authority boundary must be an object");
+    }
+    assertAllowedKeys(boundary, new Set(["id", "label", "state", "approval_required", "risk_level", "detail"]), "dashboard security authority boundary");
+    for (const key of ["id", "label", "detail"]) {
+      if (!displayText(boundary[key], "")) {
+        throw new Error(`dashboard security authority boundary ${key} is missing`);
+      }
+    }
+    if (!SECURITY_BOUNDARY_STATES.has(displayText(boundary.state, "")) || typeof boundary.approval_required !== "boolean" || !RISK_LEVELS.has(displayText(boundary.risk_level, ""))) {
+      throw new Error("dashboard security authority boundary state is invalid");
+    }
+    if (displayText(boundary.state, "") === "open") {
+      throw new Error("dashboard security authority boundary must not be open");
+    }
+  }
+  const displayPolicyRows = asArray(confirmation.display_policy);
+  if (!displayPolicyRows.length) {
+    throw new Error("dashboard security display_policy is empty");
+  }
+  for (const row of displayPolicyRows) {
+    if (!row || typeof row !== "object" || Array.isArray(row)) {
+      throw new Error("dashboard security display_policy row must be an object");
+    }
+    assertAllowedKeys(row, new Set(["id", "label", "state", "detail"]), "dashboard security display_policy row");
+    if (!displayText(row.id, "") || !displayText(row.label, "") || !displayText(row.detail, "") || !SECURITY_DISPLAY_POLICY_STATES.has(displayText(row.state, ""))) {
+      throw new Error("dashboard security display_policy row is invalid");
+    }
+  }
+  for (const collectionName of ["recommended_actions", "restricted_actions"]) {
+    const rows = asArray(confirmation[collectionName]);
+    if (!rows.length) {
+      throw new Error(`dashboard security ${collectionName} is empty`);
+    }
+    for (const row of rows) {
+      if (!row || typeof row !== "object" || Array.isArray(row)) {
+        throw new Error(`dashboard security ${collectionName} row must be an object`);
+      }
+      assertAllowedKeys(row, new Set(["id", "label", "state", "detail"]), `dashboard security ${collectionName} row`);
+      if (!displayText(row.id, "") || !displayText(row.label, "") || !displayText(row.detail, "") || !SECURITY_CONFIRMATION_ACTION_STATES.has(displayText(row.state, ""))) {
+        throw new Error(`dashboard security ${collectionName} row is invalid`);
+      }
+    }
+  }
+  for (const blocker of asArray(confirmation.blockers)) {
+    if (!blocker || typeof blocker !== "object" || Array.isArray(blocker)) {
+      throw new Error("dashboard security confirmation blocker must be an object");
+    }
+    assertAllowedKeys(blocker, new Set(["id", "status", "source_id", "detail", "next_action"]), "dashboard security confirmation blocker");
+    if (!displayText(blocker.id, "") || !displayText(blocker.source_id, "") || !displayText(blocker.detail, "") || !displayText(blocker.next_action, "") || !ALLOWED_STATES.has(displayText(blocker.status, ""))) {
+      throw new Error("dashboard security confirmation blocker is invalid");
+    }
+  }
+}
+
 function validateSecurityRows(security) {
   for (const collectionName of ["approvals", "dangerous_operations"]) {
     for (const row of asArray(security[collectionName])) {
@@ -2673,6 +3188,7 @@ export function validateDashboardData(data) {
   if (!data || typeof data !== "object" || Array.isArray(data)) {
     throw new Error("dashboard data must be an object");
   }
+  assertNoUnsafeDashboardValue(data);
   if (!/^[0-9]+\.[0-9]+\.[0-9]+$/.test(displayText(data.schema_version, ""))) {
     throw new Error("dashboard data schema version is invalid");
   }
@@ -2697,6 +3213,7 @@ export function validateDashboardData(data) {
   }
   validateSummaryLocale(data.summary);
   validatePrimaryAction(data.summary);
+  validateOverviewSections(data.summary);
   validateCategoryMetrics(data.summary);
   validateIssues(data);
   validateSelectedContext(data);
@@ -2715,9 +3232,11 @@ export function validateDashboardData(data) {
   validateRepositoryScope(data);
   validateDocuments(data);
   validateSettings(data);
+  validateMaintenanceSyncState(data);
   validateBrowserDebug(data);
   validateDesignStudio(data);
   validateMaintenanceEvidence(data.maintenance);
+  validateSecurityConfirmation(data);
   validateSecurityRows(data.security);
   validateCommandPreviews(data.actions);
   validateCommandPreviewGroups(data.actions);
@@ -2742,6 +3261,23 @@ function dashboardLiveStatusUrl(options = {}) {
   return `./dashboard-live-status.json?${params.toString()}`;
 }
 
+function validateDashboardLiveAgentLocalization(value, label) {
+  const localization = asObject(value, label);
+  assertAllowedKeys(localization, new Set(["status", "provider_mode", "source", "summary", "reason", "next_action", "generated_at"]), label);
+  if (!ALLOWED_STATES.has(displayText(localization.status, ""))) {
+    throw new Error(`${label} status is invalid`);
+  }
+  if (!LIVE_AGENT_LOCALIZATION_PROVIDER_MODES.has(displayText(localization.provider_mode, ""))) {
+    throw new Error(`${label} provider_mode is invalid`);
+  }
+  if (!displayText(localization.source, "") || !displayText(localization.generated_at, "")) {
+    throw new Error(`${label} source fields are missing`);
+  }
+  validateLocalizedTextObject(localization.summary, `${label} summary`);
+  validateLocalizedTextObject(localization.reason, `${label} reason`);
+  validateLocalizedTextObject(localization.next_action, `${label} next_action`);
+}
+
 function validateDashboardLiveCheckItem(item, key) {
   const liveItem = asObject(item, `dashboard live check ${key} item`);
   if (!displayText(liveItem.source_id, "") || !displayText(liveItem.category, "") || !displayText(liveItem.kind, "")) {
@@ -2756,11 +3292,14 @@ function validateDashboardLiveCheckItem(item, key) {
   if (!displayText(liveItem.summary, "") || !displayText(liveItem.next_command, "")) {
     throw new Error(`dashboard live check ${key} item decision text is missing`);
   }
-  if (liveItem.source_artifacts !== undefined && typeof liveItem.source_artifacts !== "string") {
-    throw new Error(`dashboard live check ${key} item source_artifacts must be a string`);
+  if (liveItem.source_artifacts !== undefined && !safeScopedReferenceList(liveItem.source_artifacts)) {
+    throw new Error(`dashboard live check ${key} item source_artifacts is invalid`);
   }
   if (liveItem.blocker_count !== undefined) {
     validateNonNegativeInteger(Number(liveItem.blocker_count), `dashboard live check ${key} item blocker_count`);
+  }
+  if (liveItem.agent_localization !== undefined && liveItem.agent_localization !== null) {
+    validateDashboardLiveAgentLocalization(liveItem.agent_localization, `dashboard live check ${key} item agent_localization`);
   }
 }
 
@@ -2787,6 +3326,9 @@ function validateDashboardLiveCheck(check, key) {
   }
   if (check.blocker_count !== undefined) {
     validateNonNegativeInteger(Number(check.blocker_count), `dashboard live check ${key} blocker_count`);
+  }
+  if (check.agent_localization !== undefined && check.agent_localization !== null) {
+    validateDashboardLiveAgentLocalization(check.agent_localization, `dashboard live check ${key} agent_localization`);
   }
   if (key === "ci") {
     const headMatchStatus = displayText(check.head_match_status, "unknown");
@@ -2873,8 +3415,11 @@ function validateAgentStringList(value, label) {
 
 function validateDashboardAgentSession(row) {
   const session = asObject(row, "dashboard live agent session");
-  for (const key of ["session_id", "agent_kind", "surface", "cwd_role", "menu_id", "repo_id", "authority_profile", "source_artifacts"]) {
+  for (const key of ["session_id", "agent_kind", "surface", "cwd_role", "menu_id", "repo_id", "authority_profile"]) {
     validateAgentObservationId(session[key], `dashboard live agent session ${key}`);
+  }
+  if (!safeScopedReferenceList(session.source_artifacts)) {
+    throw new Error("dashboard live agent session source_artifacts is invalid");
   }
   if (!ALLOWED_STATES.has(displayText(session.status, ""))) {
     throw new Error("dashboard live agent session status is invalid");
@@ -3128,6 +3673,29 @@ async function postDashboardSettingMutation(endpoint, payload, label) {
   return validateSettingsMutationResponse(parsed, label);
 }
 
+async function postDashboardProductRepositorySelection(endpoint, payload, label) {
+  const response = await fetch(endpoint, {
+    method: "POST",
+    cache: "no-store",
+    credentials: "same-origin",
+    headers: {
+      "content-type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+  const raw = await response.text();
+  let parsed;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    throw new Error(`${label} returned invalid JSON`);
+  }
+  if (!response.ok) {
+    throw new Error(displayText(parsed.error || parsed.message, `${label} failed`));
+  }
+  return validateProductRepositorySelectionMutationResponse(parsed, label);
+}
+
 async function postDashboardDesignSystemMutation(endpoint, payload, label) {
   const response = await fetch(endpoint, {
     method: "POST",
@@ -3176,6 +3744,20 @@ export async function applyDashboardSettingChange(settingId, value, menuId, plan
       confirm: true,
     },
     "dashboard settings apply",
+  );
+}
+
+export async function selectDashboardProductRepository(menuId, repoId, snapshotIdentity = {}) {
+  return postDashboardProductRepositorySelection(
+    "/dashboard-product-repository/select",
+    {
+      menu_id: menuId,
+      repo_id: repoId,
+      snapshot_id: snapshotIdentity.snapshotId,
+      content_hash: snapshotIdentity.contentHash,
+      confirm: true,
+    },
+    "dashboard product repository selection",
   );
 }
 

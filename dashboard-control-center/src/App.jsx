@@ -75,6 +75,7 @@ import {
   pickFirst,
   planDashboardSettingChange,
   planDashboardDesignSystemChange,
+  selectDashboardProductRepository,
   stateLabelKey,
 } from "./dashboardData.js";
 import {
@@ -737,10 +738,29 @@ function overviewLiveCheckedDetail(liveStatus, context, check, t) {
   return `${overviewLiveTargetDetail(liveStatus, context, t)} / ${t("overview.fact.lastChecked")}: ${checkedAt}`;
 }
 
+function overviewLivePhaseStateSummary(text, t) {
+  const match = displayText(text, "").match(/\b(Phase\s+[0-9][0-9A-Za-z._-]*)\b.*?\bis\s+(complete|implemented|ready|blocked|failed)\b/i);
+  if (!match) {
+    return "";
+  }
+  const stateKey = {
+    complete: "overview.liveText.phaseComplete",
+    implemented: "overview.liveText.phaseImplemented",
+    ready: "overview.liveText.phaseReady",
+    blocked: "overview.liveText.phaseBlocked",
+    failed: "overview.liveText.phaseFailed",
+  }[match[2].toLowerCase()] || "overview.liveText.phaseReady";
+  return `${match[1]} ${t(stateKey, match[2].toLowerCase())}`;
+}
+
 function overviewLiveLocalizedText(value, t) {
   const text = displayText(value, "");
   if (!text) {
     return "";
+  }
+  const phaseSummary = overviewLivePhaseStateSummary(text, t);
+  if (phaseSummary) {
+    return phaseSummary;
   }
   const localChanges = text.match(/^(\d+|Uncommitted) local file change\(s\) are not committed\.$/);
   if (localChanges) {
@@ -783,6 +803,43 @@ function overviewLiveLocalizedText(value, t) {
     "Git synchronization evidence is older than the configured freshness window or product HEAD.": "overview.liveText.gitSyncStale",
     "Structure evidence is older than the configured freshness window or product HEAD.": "overview.liveText.structureStale",
     "Local test evidence is older than the configured freshness window or product HEAD.": "overview.liveText.localTestsStale",
+    "CI evidence is older than the configured freshness window or product HEAD.": "overview.liveText.ciStale",
+    "Shows whether the product was checked locally before the next workflow decision.": "overview.liveText.productLocalTestChecked",
+    "Declared local test commands and latest recorded results.": "overview.liveText.productLocalTestScope",
+    "Local test evidence is current and passed.": "overview.liveText.productLocalTestPassed",
+    "At least one local test failed.": "overview.liveText.productLocalTestFailed",
+    "Local test evidence has not been recorded yet.": "overview.liveText.productLocalTestNotRecorded",
+    "Unit test command and latest recorded result.": "overview.liveText.productUnitTestScope",
+    "Smoke test command and latest recorded result.": "overview.liveText.productSmokeTestScope",
+    "End-to-end test command and latest recorded result.": "overview.liveText.productE2eTestScope",
+    "Shows whether the repository can be maintained by the product workflow.": "overview.liveText.productWorkflowMaintainable",
+    "Shows whether the selected repository has the files needed for product workflow decisions.": "overview.liveText.productWorkflowRequiredFiles",
+    "Shows whether product workflow settings can be trusted without guessing from repository names.": "overview.liveText.productWorkflowSettingsTrusted",
+    "Product structure, required files, manifests, and product-local tools.": "overview.liveText.productStructureScope",
+    "Required product files, canonical docs, and source/test authorities.": "overview.liveText.productRequiredFilesScope",
+    "Product workflow settings, operation mode, manifests, and profile files.": "overview.liveText.productSettingsScope",
+    "Product-local tools, checks, and workflow scripts.": "overview.liveText.productScriptsScope",
+    "Structure evidence is current and passed.": "overview.liveText.productStructurePassed",
+    "Structure check failed or required files are missing.": "overview.liveText.productStructureFailed",
+    "Structure evidence has not been recorded yet.": "overview.liveText.productStructureNotRecorded",
+    "Current Git status for the selected repository could not be treated as ready.": "overview.liveText.currentGitNotReady",
+    "Current CI status for the selected repository could not be treated as ready.": "overview.liveText.currentCiNotReady",
+    "Current product-security gate for the selected repository could not be treated as ready.": "overview.liveText.currentSecurityNotReady",
+    "CI evidence manifest has not been configured.": "overview.liveText.ciManifestNotConfigured",
+    "CI is required for the selected workflow mode, but ops/CI_MANIFEST.tsv is missing.": "overview.liveText.ciManifestRequiredMissing",
+    "Create ops/CI_MANIFEST.tsv or change the workflow mode before treating CI as checked.": "overview.liveText.ciManifestCreateOrChangeMode",
+    "Ready to continue with the current evidence.": "decisionPage.status.ready.current_judgment",
+    "Blocked until the top issue is repaired.": "decisionPage.status.blocked.current_judgment",
+    "Approval is required before the next operation.": "decisionPage.status.approval_required.current_judgment",
+    "Required evidence is missing.": "decisionPage.status.missing.current_judgment",
+    "Evidence exists but may be stale.": "decisionPage.status.stale.current_judgment",
+    "Manual review is required before treating this as complete.": "decisionPage.status.manual_required.current_judgment",
+    "This page is not required for the selected context.": "decisionPage.status.not_applicable.current_judgment",
+    "Evidence is incomplete or unknown.": "decisionPage.status.unknown.current_judgment",
+    "Local tests, structure checks, and focused checks are grouped separately from remote CI.": "overview.liveText.localTestsOpenWorkflowAction",
+    "Workflow, maintenance, or safety blockers require review before risky operations.": "overview.operationalText.reviewWorkflowSafetyMaintenance",
+    "No active blocker is currently reported by producer-owned evidence.": "overview.situation.noBlockersDetail",
+    "Use the linked detail page before running any Git, CI, merge, cleanup, provider, or destructive operation.": "overview.operationalText.reviewApprovalBoundaries",
     "No blocking item is currently reported by the dashboard producer.": "overview.operationalText.noBlocker",
     "One or more workflow actions remain behind an approval boundary.": "overview.operationalText.approvalBoundary",
     "A required repository, document, or evidence source is missing.": "overview.operationalText.requiredSourceMissing",
@@ -806,9 +863,44 @@ function overviewLiveLocalizedText(value, t) {
   return map[text] ? t(map[text], text) : text;
 }
 
-function overviewLiveCheckPoint(item, t) {
+function translatorLocaleFallback(t) {
+  return t("nav.overview", "Dashboard") === "ダッシュボード" ? "ja" : "en";
+}
+
+function localizedObjectValue(value, locale, t) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return "";
+  }
+  const requestedLocale = displayText(locale, translatorLocaleFallback(t));
+  const baseLocale = requestedLocale.includes("-") ? requestedLocale.split("-")[0] : requestedLocale;
+  const candidates = [
+    value[requestedLocale],
+    value[baseLocale],
+    requestedLocale === "ja" || baseLocale === "ja" ? value.ja : "",
+    value.en,
+  ];
+  const localized = candidates.map((candidate) => displayText(candidate, "")).find(Boolean);
+  if (localized) {
+    return localized;
+  }
+  const key = displayText(value.key, "");
+  return key ? t(key, "") : "";
+}
+
+function liveAgentLocalizedField(localization, field, fallback, locale, t) {
+  const localized = localizedObjectValue(localization?.[field], locale, t);
+  return localized || overviewLiveLocalizedText(fallback, t);
+}
+
+function localizedDecisionField(decision, field, t) {
+  const key = displayText(decision?.[`${field}_key`], "");
+  const fallback = overviewLiveLocalizedText(decision?.[field], t);
+  return key ? t(key, fallback) : fallback;
+}
+
+function overviewLiveCheckPoint(item, t, locale = "") {
   const sourceId = displayText(item?.source_id || item?.current_item_id, "");
-  const summary = overviewLiveLocalizedText(item?.summary, t) || (sourceId ? sourcePresentationKey(sourceId, t) : "");
+  const summary = liveAgentLocalizedField(item?.agent_localization, "summary", item?.summary, locale, t) || (sourceId ? sourcePresentationKey(sourceId, t) : "");
   const status = statusLabelForChip(item?.status, t);
   const observedAt = liveStatusObservedTime(item?.observed_at);
   const detailArtifactPath = displayText(item?.detail_artifact_path, "");
@@ -823,7 +915,7 @@ function overviewLiveCheckPoint(item, t) {
   ].filter(Boolean).join(" / ");
 }
 
-function overviewLiveCheckModalDetail(id, title, liveStatus, context, check, t) {
+function overviewLiveCheckModalDetail(id, title, liveStatus, context, check, t, locale = "") {
   const observedAt = liveStatusObservedTime(check?.observed_at) || t("overview.fact.noEvidence");
   const detailPage = displayText(check?.detail_page, id === "security" ? "#safety" : "#workflow");
   const sourceId = displayText(check?.source_id, "");
@@ -831,7 +923,7 @@ function overviewLiveCheckModalDetail(id, title, liveStatus, context, check, t) 
   const detailArtifactPath = displayText(check?.detail_artifact_path, "");
   const requiredCommand = displayText(check?.required_command, "");
   const points = asArray(check?.items)
-    .map((item) => overviewLiveCheckPoint(item, t))
+    .map((item) => overviewLiveCheckPoint(item, t, locale))
     .filter(Boolean)
     .slice(0, 6);
   const sourceParts = [
@@ -843,11 +935,11 @@ function overviewLiveCheckModalDetail(id, title, liveStatus, context, check, t) 
   ].filter(Boolean);
   return {
     title,
-    summary: overviewLiveLocalizedText(check?.summary, t) || points[0] || overviewLiveLocalizedText(check?.reason, t),
+    summary: liveAgentLocalizedField(check?.agent_localization, "summary", check?.summary, locale, t) || points[0] || liveAgentLocalizedField(check?.agent_localization, "reason", check?.reason, locale, t),
     href: detailPage,
     where: `${overviewLiveTargetDetail(liveStatus, context, t)} / ${detailPage}`,
-    why: overviewLiveLocalizedText(check?.reason, t),
-    action: overviewLiveLocalizedText(check?.next_action, t),
+    why: liveAgentLocalizedField(check?.agent_localization, "reason", check?.reason, locale, t),
+    action: liveAgentLocalizedField(check?.agent_localization, "next_action", check?.next_action, locale, t),
     source: sourceParts.join(" / "),
     sourceId,
     currentItemId,
@@ -1168,7 +1260,7 @@ function overviewLiveSecurityDetail(liveStatus, context, check, t) {
   return `${overviewLiveTargetDetail(liveStatus, context, t)} / ${t("summary.blockers")}: ${Number(check?.blocker_count || 0)} / ${t("overview.fact.lastChecked")}: ${checkedAt}`;
 }
 
-function overviewPrimaryStatusCard(data, context, lessonMetric, t, liveStatus = null) {
+function overviewPrimaryStatusCard(data, context, lessonMetric, t, liveStatus = null, locale = "") {
   if (isLessonWorkflowContext(context)) {
     const selectedLessonProgress = contextProgress(context, lessonMetric);
     return {
@@ -1201,7 +1293,7 @@ function overviewPrimaryStatusCard(data, context, lessonMetric, t, liveStatus = 
       detail: runningChecks.length
         ? `${overviewLiveTargetDetail(activeLiveStatus, context, t)} / ${t("overview.situation.runningCount")}: ${runningChecks.length} / ${t("overview.fact.lastChecked")}: ${liveStatusObservedTime(activeLiveStatus?.generated_at) || t("overview.fact.noEvidence")}`
         : progressDetail || overviewLiveLocalTestDetail(activeLiveStatus, context, liveLocalTests, t),
-      detailInfo: overviewLiveCheckModalDetail("local_tests", t("overview.status.localTests"), activeLiveStatus, context, liveLocalTests, t),
+      detailInfo: overviewLiveCheckModalDetail("local_tests", t("overview.status.localTests"), activeLiveStatus, context, liveLocalTests, t, locale),
       detailHref: displayText(liveLocalTests.detail_page, "#workflow"),
       chipLabel: runningChecks.length ? t("overview.progress.runningChip") : progressEvidence ? t("overview.progress.recordedChip") : statusLabelForChip(status, t),
     };
@@ -1249,7 +1341,7 @@ function overviewFirstReviewFact(facts, preferredIds = []) {
   return preferred || facts.find((fact) => isReviewState(fact.status)) || facts[0] || null;
 }
 
-function overviewGitCard(data, context, t, liveStatus = null) {
+function overviewGitCard(data, context, t, liveStatus = null, locale = "") {
   const activeLiveStatus = liveStatusForContext(liveStatus, context);
   const liveGit = liveCheck(activeLiveStatus, "git_sync");
   if (liveGit) {
@@ -1262,7 +1354,7 @@ function overviewGitCard(data, context, t, liveStatus = null) {
       status,
       value: overviewLiveGitCurrent(activeLiveStatus, liveGit, t),
       detail: overviewLiveGitDetail(activeLiveStatus, context, liveGit, t),
-      detailInfo: overviewLiveCheckModalDetail("git_sync", t("overview.status.git"), activeLiveStatus, context, liveGit, t),
+      detailInfo: overviewLiveCheckModalDetail("git_sync", t("overview.status.git"), activeLiveStatus, context, liveGit, t, locale),
       detailHref: displayText(liveGit.detail_page, "#workflow"),
       chipLabel: hasWork ? t("overview.progress.workingChip") : statusLabelForChip(status, t),
     };
@@ -1316,7 +1408,7 @@ function overviewRunReference(row, context, t) {
   return target ? `${reference} / ${target}` : reference;
 }
 
-function overviewCiCard(data, context, t, liveStatus = null) {
+function overviewCiCard(data, context, t, liveStatus = null, locale = "") {
   const activeLiveStatus = liveStatusForContext(liveStatus, context);
   const liveCi = liveCheck(activeLiveStatus, "ci");
   if (liveCi) {
@@ -1327,7 +1419,7 @@ function overviewCiCard(data, context, t, liveStatus = null) {
       status,
       value: overviewLiveCiCurrent(liveCi, t),
       detail: overviewLiveCiDetail(activeLiveStatus, context, liveCi, t),
-      detailInfo: overviewLiveCheckModalDetail("ci", t("overview.status.ci"), activeLiveStatus, context, liveCi, t),
+      detailInfo: overviewLiveCheckModalDetail("ci", t("overview.status.ci"), activeLiveStatus, context, liveCi, t, locale),
       detailHref: displayText(liveCi.detail_page, "#workflow"),
       chipLabel: statusLabelForChip(status, t),
     };
@@ -1460,7 +1552,7 @@ function overviewLocalTestDetail(productAuthority, context, t) {
   return `${overviewTargetDetail(context, t)} / ${t("overview.fact.missing")}: ${t("overview.fact.localTestEvidence")}`;
 }
 
-function overviewSecurityCard(data, context, t, liveStatus = null) {
+function overviewSecurityCard(data, context, t, liveStatus = null, locale = "") {
   const activeLiveStatus = liveStatusForContext(liveStatus, context);
   const liveSecurity = liveCheck(activeLiveStatus, "security");
   if (liveSecurity) {
@@ -1473,7 +1565,7 @@ function overviewSecurityCard(data, context, t, liveStatus = null) {
       status,
       value: overviewLiveSecurityCurrent(liveSecurity, t),
       detail: overviewLiveSecurityDetail(activeLiveStatus, context, liveSecurity, t),
-      detailInfo: overviewLiveCheckModalDetail("security", t("overview.status.security"), activeLiveStatus, context, liveSecurity, t),
+      detailInfo: overviewLiveCheckModalDetail("security", t("overview.status.security"), activeLiveStatus, context, liveSecurity, t, locale),
       detailHref: displayText(liveSecurity.detail_page, "#safety"),
       chipLabel: blockerCount === 0 ? t("overview.progress.noBlockerChip") : statusLabelForChip(status, t),
     };
@@ -1608,8 +1700,8 @@ function situationWorstStatus(statuses, fallback = "ready") {
 function situationRepositoryState(data, context, activeLiveStatus) {
   const liveRepositoryState = activeLiveStatus?.repository_state || {};
   const gitActivity = situationLiveGitActivity(activeLiveStatus);
-  const repositoryChanges = data.repository_changes || {};
-  const repositoryScope = data.repository_scope || {};
+  const repositoryChanges = data.development?.repository_changes || data.repository_changes || {};
+  const repositoryScope = data.development?.product_repository || data.repository_scope || {};
   const targetRepository = activeLiveStatus?.target_repository || context.target_repository || {};
   return {
     branch: displayText(gitActivity.current_branch || gitActivity.branches?.current || liveRepositoryState.branch || repositoryChanges.branch || repositoryScope.branch, ""),
@@ -1627,6 +1719,36 @@ function situationRepositoryState(data, context, activeLiveStatus) {
     worktreeCount: situationNumber(gitActivity.worktrees?.count ?? repositoryChanges.worktree_count),
     unusedBranchCount: situationNumber(gitActivity.branches?.unused_count),
   };
+}
+
+function situationRepositoryObservedClean(repo) {
+  return Boolean(repo?.branch || repo?.head)
+    && situationNumber(repo.stagedCount) === 0
+    && situationNumber(repo.unstagedCount) === 0
+    && situationNumber(repo.dirtyCount) === 0
+    && situationNumber(repo.untrackedCount) === 0
+    && situationNumber(repo.ahead) === 0
+    && situationNumber(repo.behind) === 0;
+}
+
+function situationRepositoryMetaDetail(data, context, activeLiveStatus, t) {
+  const repo = situationRepositoryState(data, context, activeLiveStatus);
+  const selection = repositorySelectionForMenu(data, context?.menu_id) || {};
+  const gitEvidence = productAuthorityEvidence(data, context, ["product.git.worktree", "product.git.local_remote_sync", "product.git.upstream"]);
+  const localChanges = Math.max(repo.stagedCount + repo.unstagedCount, repo.dirtyCount) + repo.untrackedCount;
+  const observedClean = situationRepositoryObservedClean(repo);
+  const syncParts = uniqueDisplayParts(
+    repo.ahead ? `${t("overview.situation.ahead")}: ${repo.ahead}` : "",
+    repo.behind ? `${t("overview.situation.behind")}: ${repo.behind}` : "",
+  );
+  return uniqueDisplayParts(
+    repo.branch ? `${t("overview.fact.branch")}: ${repo.branch}` : "",
+    repo.head ? `${t("overview.situation.head")}: ${shortRevision(repo.head)}` : "",
+    localChanges ? `${t("overview.situation.gitWorkingChanges")}: ${localChanges}` : observedClean ? t("overview.current.gitClean") : productAuthorityEvidenceSummary(gitEvidence, t) || t("overview.current.gitClean"),
+    syncParts.length ? `${t("overview.progress.repositorySync")}: ${syncParts.join(" / ")}` : "",
+    repo.worktreeCount ? `${t("overview.situation.worktrees")}: ${repo.worktreeCount}` : "",
+    selection.selection_state ? `${t("context.repositorySelection.selectionState")}: ${repositorySelectionStateLabel(selection.selection_state, t)}` : "",
+  ).join(" / ") || t("overview.fact.noEvidence");
 }
 
 function situationLiveObject(value) {
@@ -1697,10 +1819,10 @@ function situationAgentWorkSummary(activeLiveStatus, t) {
     return null;
   }
   const labels = uniqueDisplayParts(
-    ...assignments.map((item) => displayText(item.title || item.objective || item.assignment_id, "")),
-    ...sessions.map((item) => displayText(item.agent_label || item.agent_id || item.session_id, "")),
-    ...toolCalls.map((item) => displayText(item.tool_name || item.tool_call_id, "")),
-    ...liveOperations.map((item) => operationalPageOperationLabel(item, t)),
+    assignments.length ? `${t("overview.situation.agentAssignments")}: ${assignments.length}` : "",
+    sessions.length ? `${t("overview.situation.agentSessions")}: ${sessions.length}` : "",
+    toolCalls.length ? `${t("overview.situation.toolCalls")}: ${toolCalls.length}` : "",
+    ...uniqueDisplayParts(...liveOperations.map((item) => operationalPageOperationLabel(item, t))).map((label) => `${label}: ${liveOperations.filter((item) => operationalPageOperationLabel(item, t) === label).length}`),
   ).slice(0, 4);
   return {
     value: `${t("overview.situation.agentWork")}: ${count}`,
@@ -1712,8 +1834,85 @@ function situationFirstCommand(...values) {
   return values.map((value) => displayText(value, "")).find((value) => value && value !== "not_applicable") || "";
 }
 
+function productAuthorityEvidenceItems(data, context) {
+  const contextId = displayText(context?.workflow_context || context?.menu_id, "");
+  return asArray(data?.development?.product_authority?.evidence_summary?.items).filter((item) => {
+    const itemContext = displayText(item?.context, "");
+    return itemContext === contextId || itemContext === "all";
+  });
+}
+
+function productAuthorityEvidence(data, context, sourceIds) {
+  const wanted = new Set(sourceIds);
+  return productAuthorityEvidenceItems(data, context).find((item) => wanted.has(displayText(item?.source_id, ""))) || null;
+}
+
+function productAuthorityEvidenceSummary(item, t) {
+  if (!item) {
+    return "";
+  }
+  const sourceId = displayText(item.source_id, "");
+  const status = normalizeState(item.status || "unknown");
+  if (status === "stale") {
+    if (sourceId === "product.git.worktree") {
+      return t("overview.liveText.gitWorktreeStale");
+    }
+    if (sourceId.startsWith("product.git.")) {
+      return t("overview.liveText.gitSyncStale");
+    }
+    if (sourceId === "product.gates.structure") {
+      return t("overview.liveText.structureStale");
+    }
+    if (sourceId.startsWith("product.gates.")) {
+      return t("overview.liveText.localTestsStale");
+    }
+    if (sourceId.startsWith("product.ci.")) {
+      return t("overview.liveText.ciStale");
+    }
+  }
+  const localizedSummary = overviewLiveLocalizedText(item.summary, t);
+  if (localizedSummary && localizedSummary !== sourceId) {
+    return localizedSummary;
+  }
+  return sourceId ? `${sourcePresentationKey(sourceId, t)}: ${statusLabelForChip(status, t)}` : statusLabelForChip(status, t);
+}
+
+function productAuthorityEvidenceDetail(item, t) {
+  if (!item) {
+    return "";
+  }
+  return uniqueDisplayParts(
+    item.source_id ? `${t("overview.situation.source")}: ${sourcePresentationKey(item.source_id, t)}` : "",
+    item.observed_at ? `${t("overview.fact.lastChecked")}: ${liveStatusObservedTime(item.observed_at) || displayText(item.observed_at, "")}` : "",
+    item.product_head ? `${t("overview.situation.head")}: ${shortRevision(item.product_head)}` : "",
+    item.source_artifacts ? `${t("overview.situation.evidenceItems")}: ${displayText(item.source_artifacts, "")}` : "",
+    item.detail_code ? `${t("overview.situation.detailCode")}: ${displayKey(item.detail_code)}` : "",
+  ).join(" / ");
+}
+
+function productAuthorityEvidenceArtifactItems(item) {
+  return displayText(item?.source_artifacts, "")
+    .split(/[;,]/)
+    .map((artifact) => artifact.trim())
+    .filter(Boolean);
+}
+
+function productAuthorityEvidenceTestArtifactSummary(item, t) {
+  const artifacts = productAuthorityEvidenceArtifactItems(item);
+  if (!artifacts.length) {
+    return "";
+  }
+  const commandLike = artifacts.filter((artifact) => /\b(npm|pnpm|yarn|node|vitest|playwright|cargo|pytest|go test|tools\/|\.\/tools\/)/.test(artifact));
+  const selected = (commandLike.length ? commandLike : artifacts).slice(0, 3).map((artifact) => displayText(artifact, ""));
+  return selected.length ? `${t("overview.situation.recordedTests")}: ${selected.join(" / ")}` : "";
+}
+
+function isHardBlockerStatus(status) {
+  return ["blocked", "failed", "missing", "approval_required"].includes(normalizeState(status));
+}
+
 function contextPrimaryBlocker(context) {
-  return asArray(context?.blockers).find((blocker) => displayText(blocker?.reason || blocker?.source || blocker?.required_command, "")) || null;
+  return asArray(context?.blockers).find((blocker) => isHardBlockerStatus(blocker?.status) && displayText(blocker?.reason || blocker?.source || blocker?.required_command, "")) || null;
 }
 
 function contextNextSafeActionText(context, t) {
@@ -1751,6 +1950,7 @@ function situationCheck(activeLiveStatus, key) {
 function situationBlockingRows(data, context, activeLiveStatus) {
   const rows = [
     ...asArray(context?.blockers),
+    ...asArray(data.development?.product_authority?.product_operation_blockers),
     ...asArray(data.summary?.blocking_items),
   ];
   for (const [key, check] of objectEntries(activeLiveStatus?.checks || {})) {
@@ -1766,7 +1966,7 @@ function situationBlockingRows(data, context, activeLiveStatus) {
     }
   }
   const seen = new Set();
-  return rows.filter((row) => {
+  return rows.filter((row) => isHardBlockerStatus(row?.status) || situationNumber(row?.blocker_count) > 0).filter((row) => {
     const key = [
       displayText(row?.source || row?.source_id || row?.id, ""),
       displayText(row?.reason || row?.summary || row?.detail, ""),
@@ -1787,37 +1987,60 @@ function situationStatusDetail(label, status, t) {
 function situationRepositorySummary(data, context, activeLiveStatus, t) {
   const gitActivity = situationLiveGitActivity(activeLiveStatus);
   const repo = situationRepositoryState(data, context, activeLiveStatus);
+  const gitEvidence = productAuthorityEvidence(data, context, ["product.git.worktree", "product.git.local_remote_sync", "product.git.upstream"]);
   const localChanges = Math.max(repo.stagedCount + repo.unstagedCount, repo.dirtyCount) + repo.untrackedCount;
+  const observedClean = situationRepositoryObservedClean(repo);
   const liveGit = situationCheck(activeLiveStatus, "git_sync");
   const primaryOperation = situationPrimaryGitOperation(gitActivity);
   const operationStatus = primaryOperation ? normalizeState(primaryOperation.status) : "";
-  const rawStatus = normalizeState(gitActivity.status || liveGit?.status || context.git_status || "unknown");
-  const status = operationStatus || rawStatus;
-  const cleanText = localChanges > 0
-    ? `${t("overview.situation.gitWorkingChanges")} ${localChanges}`
-    : repo.behind > 0
-      ? `${t("overview.current.gitRemotePending")} ${repo.behind}`
-      : repo.ahead > 0
-        ? `${t("overview.current.gitPushPending")} ${repo.ahead}`
-        : primaryOperation && situationOperationNeedsAttention(primaryOperation)
-          ? `${situationGitOperationLabel(primaryOperation, t)}: ${statusLabelForChip(primaryOperation.status, t)}`
-          : t("overview.current.gitClean");
-  const syncParts = [
+  const rawStatus = normalizeState(gitActivity.status || liveGit?.status || (observedClean ? "ready" : "") || gitEvidence?.status || context.git_status || "unknown");
+  const status = operationStatus === "manual_required" ? "cached" : operationStatus || rawStatus;
+  const cleanText = (() => {
+    if (localChanges > 0) {
+      return `${t("overview.situation.gitWorkingChanges")} ${localChanges}`;
+    }
+    if (repo.behind > 0) {
+      return `${t("overview.current.gitRemotePending")} ${repo.behind}`;
+    }
+    if (repo.ahead > 0) {
+      return `${t("overview.current.gitPushPending")} ${repo.ahead}`;
+    }
+    if (observedClean) {
+      return t("overview.current.gitClean");
+    }
+    if (gitEvidence) {
+      return productAuthorityEvidenceSummary(gitEvidence, t);
+    }
+    if (primaryOperation && situationOperationNeedsAttention(primaryOperation)) {
+      return `${situationGitOperationLabel(primaryOperation, t)}: ${statusLabelForChip(primaryOperation.status, t)}`;
+    }
+    return t("overview.current.gitClean");
+  })();
+  const changeParts = [
     repo.stagedCount ? `${t("overview.situation.staged")}: ${repo.stagedCount}` : "",
     repo.unstagedCount ? `${t("overview.situation.unstaged")}: ${repo.unstagedCount}` : "",
     repo.dirtyCount ? `${t("overview.situation.modified")}: ${repo.dirtyCount}` : "",
     repo.untrackedCount ? `${t("overview.situation.untracked")}: ${repo.untrackedCount}` : "",
+  ].filter(Boolean);
+  const syncParts = [
     repo.ahead ? `${t("overview.situation.ahead")}: ${repo.ahead}` : "",
     repo.behind ? `${t("overview.situation.behind")}: ${repo.behind}` : "",
+  ].filter(Boolean);
+  const repositoryParts = [
     repo.worktreeCount ? `${t("overview.situation.worktrees")}: ${repo.worktreeCount}` : "",
     repo.unusedBranchCount ? `${t("overview.situation.unusedBranches")}: ${repo.unusedBranchCount}` : "",
     situationGitOperationDetail(primaryOperation, t),
   ].filter(Boolean);
-  const branchParts = [
-    repo.branch ? `${t("overview.fact.branch")}: ${repo.branch}` : "",
-    repo.upstream ? `${t("overview.situation.upstream")}: ${repo.upstream}` : "",
-    repo.head ? `${t("overview.situation.head")}: ${shortRevision(repo.head)}` : "",
-    gitActivity.observed_at || activeLiveStatus?.generated_at ? `${t("overview.situation.liveUpdated")}: ${situationObservedAt(gitActivity.observed_at, activeLiveStatus?.generated_at)}` : "",
+  const evidenceDetail = productAuthorityEvidenceDetail(gitEvidence, t);
+  const observedTime = gitActivity.observed_at || activeLiveStatus?.generated_at ? situationObservedAt(gitActivity.observed_at, activeLiveStatus?.generated_at) : "";
+  const detailItems = [
+    repo.branch ? { label: t("overview.situation.branchCurrent"), value: uniqueDisplayParts(repo.branch, repo.upstream ? `${t("overview.situation.upstream")}: ${repo.upstream}` : "").join(" / ") } : null,
+    changeParts.length ? { label: t("overview.situation.changeBreakdown"), value: changeParts.join(" / ") } : null,
+    syncParts.length ? { label: t("overview.situation.syncState"), value: syncParts.join(" / ") } : null,
+    repo.head ? { label: t("overview.situation.head"), value: shortRevision(repo.head) } : null,
+    observedTime ? { label: t("overview.situation.liveUpdated"), value: observedTime } : null,
+    repositoryParts.length ? { label: t("overview.situation.repositoryFacts"), value: repositoryParts.join(" / ") } : null,
+    evidenceDetail ? { label: t("overview.situation.savedEvidence"), value: evidenceDetail, technical: true } : null,
   ].filter(Boolean);
   return {
     id: "git",
@@ -1825,9 +2048,10 @@ function situationRepositorySummary(data, context, activeLiveStatus, t) {
     title: t("overview.situation.gitTitle"),
     status,
     value: cleanText,
-    detail: [...branchParts, ...syncParts].join(" / ") || t("overview.fact.noEvidence"),
-    source: displayText(liveGit?.source_id || liveGit?.current_item_id || repo.gitState || repo.pathState, ""),
-    command: situationFirstCommand(liveGit?.required_command, liveGit?.items?.[0]?.next_command),
+    detail: detailItems.length ? "" : t("overview.fact.noEvidence"),
+    detailItems,
+    source: displayText(liveGit?.source_id || liveGit?.current_item_id || gitEvidence?.source_id || repo.gitState || repo.pathState, ""),
+    command: situationFirstCommand(liveGit?.required_command, liveGit?.items?.[0]?.next_command, gitEvidence?.next_command),
     chipLabel: primaryOperation && situationOperationNeedsAttention(primaryOperation) ? situationGitOperationLabel(primaryOperation, t) : statusLabelForChip(status, t),
   };
 }
@@ -1835,28 +2059,34 @@ function situationRepositorySummary(data, context, activeLiveStatus, t) {
 function situationTestsSummary(data, context, activeLiveStatus, t) {
   const testActivity = situationLiveTestActivity(activeLiveStatus);
   const localTests = situationCheck(activeLiveStatus, "local_tests");
+  const testEvidence = productAuthorityEvidence(data, context, ["product.gates.tests", "product.gates.product_gate", "product.gates.structure"]);
   const runningTests = runtimeOperationsForCategories(activeLiveStatus, ["test", "check", "build"]);
   const runningCount = situationNumber(testActivity.running_count) + runningTests.length;
   const latestCompleted = situationLatestTestRow(testActivity);
   const activityStatus = normalizeState(testActivity.status || "");
-  const localStatus = normalizeState(activityStatus || localTests?.status || overviewLocalTestStatus(data.development?.product_authority || {}, context));
   const observed = situationObservedAt(testActivity.observed_at || localTests?.observed_at, activeLiveStatus?.generated_at);
   const itemCount = Math.max(asArray(localTests?.items).length, situationNumber(testActivity.completed_count));
+  const hasTestEvidence = Boolean(runningCount || latestCompleted || observed || itemCount || overviewLiveLocalizedText(localTests?.summary, t) || testEvidence);
+  const rawLocalStatus = normalizeState(activityStatus || localTests?.status || testEvidence?.status || overviewLocalTestStatus(data.development?.product_authority || {}, context));
+  const localStatus = hasTestEvidence ? rawLocalStatus : "unknown";
   const source = displayText(localTests?.source_id || localTests?.current_item_id || "", "");
   const runningSummary = operationalPageOperationSummary(runningTests, t);
   const latestSummary = latestCompleted
     ? `${situationTestRowCategoryLabel(latestCompleted.category, t)}: ${statusLabelForChip(latestCompleted.status, t)}`
     : "";
+  const recordedTestSummary = productAuthorityEvidenceTestArtifactSummary(testEvidence, t);
   const value = runningCount
     ? `${t("overview.situation.runningNow")}: ${runningCount}`
-    : latestSummary || overviewLiveLocalizedText(localTests?.summary, t) || t("overview.situation.testNoRecords");
+    : latestSummary || recordedTestSummary || overviewLiveLocalizedText(localTests?.summary, t) || productAuthorityEvidenceSummary(testEvidence, t) || t("overview.situation.testNoRecords");
   const detailParts = uniqueDisplayParts(
     runningCount ? `${t("overview.situation.runningCount")}: ${runningCount}` : "",
     latestCompleted?.command ? `${t("overview.situation.latestTest")}: ${latestCompleted.command}` : "",
+    recordedTestSummary,
     observed ? `${t("overview.fact.lastChecked")}: ${observed}` : "",
     itemCount ? `${t("overview.situation.completedCount")}: ${itemCount}` : "",
     situationNumber(testActivity.failed_count) ? `${t("overview.situation.failedCount")}: ${situationNumber(testActivity.failed_count)}` : "",
     localTests?.detail_code ? `${t("overview.situation.detailCode")}: ${localTests.detail_code}` : "",
+    productAuthorityEvidenceDetail(testEvidence, t),
   );
   return {
     id: "tests",
@@ -1865,32 +2095,51 @@ function situationTestsSummary(data, context, activeLiveStatus, t) {
     status: runningCount ? "cached" : localStatus,
     value: runningSummary || value,
     detail: detailParts.join(" / ") || t("overview.situation.testNoRecords"),
-    source,
-    command: situationFirstCommand(localTests?.required_command, localTests?.items?.[0]?.next_command),
+    detailItems: [
+      recordedTestSummary ? { label: t("overview.situation.testContent"), value: recordedTestSummary.replace(`${t("overview.situation.recordedTests")}: `, "") } : null,
+      latestCompleted?.command ? { label: t("overview.situation.latestTest"), value: latestCompleted.command } : null,
+      observed ? { label: t("overview.fact.lastChecked"), value: observed } : null,
+      itemCount ? { label: t("overview.situation.completedCount"), value: String(itemCount) } : null,
+      situationNumber(testActivity.failed_count) ? { label: t("overview.situation.failedCount"), value: String(situationNumber(testActivity.failed_count)) } : null,
+      localTests?.detail_code ? { label: t("overview.situation.detailCode"), value: displayKey(localTests.detail_code), technical: true } : null,
+      testEvidence ? { label: t("overview.situation.savedEvidence"), value: productAuthorityEvidenceDetail(testEvidence, t), technical: true } : null,
+    ].filter(Boolean),
+    source: source || displayText(testEvidence?.source_id, ""),
+    command: situationFirstCommand(localTests?.required_command, localTests?.items?.[0]?.next_command, testEvidence?.next_command),
     chipLabel: runningCount ? t("overview.situation.runningNow") : statusLabelForChip(localStatus, t),
   };
 }
 
 function situationCiSummary(data, context, activeLiveStatus, t) {
   const ci = situationCheck(activeLiveStatus, "ci");
-  const ciStatus = normalizeState(ci?.status || context.ci_status || data.development?.ci_status || "unknown");
+  const ciEvidence = productAuthorityEvidence(data, context, ["product.ci.github_actions", "product.ci.main", "product.ci.pr"]);
   const observed = situationObservedAt(ci?.observed_at, activeLiveStatus?.generated_at);
   const workflowName = displayText(ci?.workflow_name, "");
   const runStatus = displayText(ci?.run_status || ci?.conclusion, "");
+  const hasCiEvidence = Boolean((ci && (overviewLiveLocalizedText(ci.summary, t) || observed || workflowName || runStatus || asArray(ci.items).length)) || ciEvidence);
+  const ciStatus = hasCiEvidence ? normalizeState(ci?.status || ciEvidence?.status || context.ci_status || data.development?.ci_status || "unknown") : "unknown";
   return {
     id: "ci",
     Icon: GitPullRequest,
     title: t("overview.situation.ciTitle"),
     status: ciStatus,
-    value: overviewLiveLocalizedText(ci?.summary, t) || statusLabelForChip(ciStatus, t),
+    value: overviewLiveLocalizedText(ci?.summary, t) || productAuthorityEvidenceSummary(ciEvidence, t) || statusLabelForChip(ciStatus, t),
     detail: uniqueDisplayParts(
       workflowName ? `${t("overview.situation.workflowName")}: ${workflowName}` : "",
       runStatus ? `${t("overview.situation.runStatus")}: ${runStatus}` : "",
       observed ? `${t("overview.fact.lastChecked")}: ${observed}` : "",
       ci?.head_match_status ? `${t("overview.situation.headMatch")}: ${ci.head_match_status}` : "",
+      productAuthorityEvidenceDetail(ciEvidence, t),
     ).join(" / ") || t("overview.fact.noEvidence"),
-    source: displayText(ci?.source_id || ci?.current_item_id || "", ""),
-    command: situationFirstCommand(ci?.required_command, ci?.items?.[0]?.next_command),
+    detailItems: [
+      workflowName ? { label: t("overview.situation.workflowName"), value: workflowName } : null,
+      runStatus ? { label: t("overview.situation.runStatus"), value: runStatus } : null,
+      observed ? { label: t("overview.fact.lastChecked"), value: observed } : null,
+      ci?.head_match_status ? { label: t("overview.situation.headMatch"), value: ci.head_match_status } : null,
+      ciEvidence ? { label: t("overview.situation.savedEvidence"), value: productAuthorityEvidenceDetail(ciEvidence, t), technical: true } : null,
+    ].filter(Boolean),
+    source: displayText(ci?.source_id || ci?.current_item_id || ciEvidence?.source_id || "", ""),
+    command: situationFirstCommand(ci?.required_command, ci?.items?.[0]?.next_command, ciEvidence?.next_command),
   };
 }
 
@@ -1905,6 +2154,13 @@ function situationBlockerSummary(data, context, activeLiveStatus, t) {
     status: blockerCount > 0 ? "blocked" : "ready",
     value: blockerCount > 0 ? `${blockerCount} ${t("overview.situation.blockerUnit")}` : t("overview.situation.noBlockers"),
     detail: first ? overviewLiveLocalizedText(first.reason || first.summary || first.detail, t) : t("overview.situation.noBlockersDetail"),
+    detailItems: first ? [
+      { label: t("overview.situation.blockerReason"), value: overviewLiveLocalizedText(first.reason || first.summary || first.detail, t) },
+      displayText(first.source || first.source_id || first.id, "") ? { label: t("overview.situation.source"), value: sourcePresentationKey(first.source || first.source_id || first.id, t), technical: true } : null,
+      first.status ? { label: t("field.status"), value: statusLabelForChip(first.status, t) } : null,
+    ].filter(Boolean) : [
+      { label: t("overview.situation.statusSummary"), value: t("overview.situation.noBlockersDetail") },
+    ],
     source: displayText(first?.source || first?.source_id || first?.id, ""),
     command: situationFirstCommand(first?.required_command, first?.next_command),
   };
@@ -1926,6 +2182,8 @@ function situationCurrentWorkSummary(data, context, activeLiveStatus, t) {
   const step = currentStepTextDisplay(context, t);
   const contextValue = contextCurrentWorkValue(context, displayPolicy, t);
   const contextNextSafeAction = contextNextSafeActionText(context, t);
+  const rawStatus = normalizeState(contextBlocker?.status || contextAction.status || decision.status || context.evidence_status || "unknown");
+  const status = rawStatus === "manual_required" && !contextBlocker ? "ready" : rawStatus;
   const operationalDetail = uniqueDisplayParts(
     menu,
     agentWork?.detail,
@@ -1938,9 +2196,16 @@ function situationCurrentWorkSummary(data, context, activeLiveStatus, t) {
     id: "current-work",
     Icon: Compass,
     title: t("overview.situation.currentWorkTitle"),
-    status: agentWork ? "cached" : context.evidence_status || contextAction.status || decision.status || "manual_required",
+    status: agentWork ? "cached" : status,
     value: agentWork?.value || contextValue || audienceBrief || reason || menu,
     detail: operationalDetail.join(" / ") || [menu, workflow, step].filter(Boolean).join(" / "),
+    detailItems: [
+      { label: t("overview.fact.workflow"), value: workflow },
+      repository ? { label: t("overview.fact.target"), value: repository } : null,
+      step ? { label: t("overview.situation.currentStep"), value: step } : null,
+      contextNextSafeAction ? { label: t("overview.situation.nextSafeTitle"), value: contextNextSafeAction } : null,
+      agentWork?.detail ? { label: t("overview.situation.agentWork"), value: agentWork.detail } : null,
+    ].filter(Boolean),
     source: displayText(contextAction.source || contextBlocker?.source || context.current_step_id || decision.source_id || decision.primary_blocker_source_id || context.menu_id, ""),
     command: situationFirstCommand(contextBlocker?.required_command, contextAction.required_command, decision.next_safe_action_command, decision.required_command),
     chipLabel: agentWork ? t("overview.situation.workingNow") : "",
@@ -1961,6 +2226,12 @@ function situationNextSafeSummary(data, context, activeLiveStatus, facts, t) {
     status,
     value: nextActionShort(context, data, t) || t("detail.nextSafeCheck"),
     detail: detail || t("overview.situation.nextSafeDetail"),
+    detailItems: [
+      detail ? { label: t("overview.situation.expectedResult"), value: detail } : null,
+      nextAction.target ? { label: t("overview.fact.target"), value: displayText(nextAction.target) } : null,
+      nextAction.risk_level ? { label: t("field.risk"), value: t(`risk.${normalizeRisk(nextAction.risk_level)}`, normalizeRisk(nextAction.risk_level)) } : null,
+      command ? { label: t("overview.situation.command"), value: command, technical: true } : null,
+    ].filter(Boolean),
     source: displayText(nextAction.source || nextAction.target || "", ""),
     command,
   };
@@ -1968,11 +2239,7 @@ function situationNextSafeSummary(data, context, activeLiveStatus, facts, t) {
 
 function situationFacts(data, context, activeLiveStatus, t) {
   const baseFacts = [
-    situationCurrentWorkSummary(data, context, activeLiveStatus, t),
     situationBlockerSummary(data, context, activeLiveStatus, t),
-    situationRepositorySummary(data, context, activeLiveStatus, t),
-    situationTestsSummary(data, context, activeLiveStatus, t),
-    situationCiSummary(data, context, activeLiveStatus, t),
   ];
   return [...baseFacts, situationNextSafeSummary(data, context, activeLiveStatus, baseFacts, t)];
 }
@@ -2140,7 +2407,7 @@ function operationalProgressLocale(data) {
   return displayText(data?.summary?.ui_locale || data?.summary?.display_locale || data?.summary?.workflow_language, "en");
 }
 
-function operationalProgressBriefFact({ id, Icon, card, fallbackTitle, fallbackValue, fallbackDetail, t, locale }) {
+function operationalProgressBriefFact({ id, Icon, card, fallbackTitle, fallbackValue, fallbackDetail, t, locale, contentFirst = false }) {
   if (!card) {
     return {
       id,
@@ -2153,14 +2420,33 @@ function operationalProgressBriefFact({ id, Icon, card, fallbackTitle, fallbackV
       command: "",
     };
   }
+  const metricLabel = documentBriefMetricLabel(card, t);
+  const metricValue = documentBriefMetricValue(card, t);
+  const action = documentBriefAction(card, t, locale);
+  const summary = documentBriefSummary(card, t, locale);
+  const agentSummary = documentBriefAgentSummary(card, t, locale);
+  const title = documentBriefTitle(card, t, locale);
+  const documentRole = displayText(card.id || id, "");
+  const isWorkflowMemoryCard = ["taskTracker", "task-tracker", "task_tracker", "handoff", "handOff", "hand-off"].includes(documentRole);
+  const isHandoffCard = ["handoff", "handOff", "hand-off"].includes(documentRole);
+  const value = contentFirst ? agentSummary?.summary || summary || action || title : title;
+  const detail = contentFirst
+    ? uniqueDisplayParts(agentSummary?.detail || action, metricLabel && metricValue ? `${metricLabel}: ${metricValue}` : "", documentBriefDetail(card, t, locale)).join(" / ")
+    : uniqueDisplayParts(summary, metricLabel && metricValue ? `${metricLabel}: ${metricValue}` : "", action).join(" / ");
+  const detailItems = contentFirst ? [
+    agentSummary?.detail || action ? { label: isHandoffCard ? t("overview.situation.handoffReadiness") : t("overview.situation.nextOrRemaining"), value: agentSummary?.detail || action } : null,
+    !isWorkflowMemoryCard && metricLabel && metricValue ? { label: metricLabel, value: metricValue } : null,
+    !isWorkflowMemoryCard && documentBriefDetail(card, t, locale) ? { label: t("overview.situation.documentScope"), value: documentBriefDetail(card, t, locale) } : null,
+  ].filter(Boolean) : [];
   return {
     id,
     Icon,
     title: fallbackTitle,
-    status: card.status || card.freshness_state || "unknown",
-    value: documentBriefTitle(card, t, locale),
-    detail: documentBriefSummary(card, t, locale),
-    source: asArray(card.source_paths).join(" / "),
+    status: agentSummary?.status || card.status || card.freshness_state || "unknown",
+    value,
+    detail,
+    detailItems,
+    source: agentSummary?.source || asArray(card.source_paths).join(" / "),
     command: "",
   };
 }
@@ -2174,7 +2460,6 @@ function operationalProgressFacts(data, context, activeLiveStatus, t) {
   const git = situationRepositorySummary(data, context, activeLiveStatus, t);
   const tests = situationTestsSummary(data, context, activeLiveStatus, t);
   const ci = situationCiSummary(data, context, activeLiveStatus, t);
-  const checksStatus = situationWorstStatus([tests.status, ci.status], "unknown");
   return [
     {
       ...currentWork,
@@ -2190,6 +2475,7 @@ function operationalProgressFacts(data, context, activeLiveStatus, t) {
       fallbackDetail: t("overview.progress.taskTrackerMissingDetail"),
       t,
       locale,
+      contentFirst: true,
     }),
     operationalProgressBriefFact({
       id: "handoff",
@@ -2200,20 +2486,21 @@ function operationalProgressFacts(data, context, activeLiveStatus, t) {
       fallbackDetail: t("overview.progress.handoffMissingDetail"),
       t,
       locale,
+      contentFirst: true,
     }),
     {
       ...git,
       title: t("overview.progress.gitTitle"),
     },
     {
-      id: "checks",
-      Icon: CheckCircle2,
-      title: t("overview.progress.checksTitle"),
-      status: checksStatus,
-      value: `${tests.title}: ${tests.value}`,
-      detail: `${ci.title}: ${ci.value}${ci.detail ? ` / ${ci.detail}` : ""}`,
-      source: uniqueDisplayParts(tests.source, ci.source).join(" / "),
-      command: situationFirstCommand(tests.command, ci.command),
+      ...tests,
+      id: "tests",
+      title: t("overview.progress.testsTitle"),
+    },
+    {
+      ...ci,
+      id: "ci",
+      title: t("overview.progress.ciTitle"),
     },
   ];
 }
@@ -2222,10 +2509,12 @@ function OperationalPageDecisionSummary({ data, context, liveStatus, t, tone = "
   const displayPolicy = displayDepthPolicyForData(data);
   const activeLiveStatus = situationLiveStatusForContext(liveStatus, context);
   const evidenceKeys = Array.isArray(keys) && keys.length ? keys : operationalPageEvidenceKeys(pageId);
-  const rows = liveEvidenceRows(activeLiveStatus, evidenceKeys, t);
+  const locale = operationalProgressLocale(data);
+  const rows = liveEvidenceRows(activeLiveStatus, evidenceKeys, t, locale);
   const progressFacts = operationalProgressFacts(data, context, activeLiveStatus, t);
-  const overallStatus = situationWorstStatus([context?.evidence_status, ...rows.map((row) => row.status), ...progressFacts.map((fact) => fact.status)], "ready");
+  const overallStatus = situationWorstStatus([...rows.map((row) => row.status), ...progressFacts.map((fact) => fact.status)], "ready");
   const repository = repositoryDisplayName(activeLiveStatus?.target_repository?.name || context?.target_repository?.name, t);
+  const repositoryDetail = situationRepositoryMetaDetail(data, context, activeLiveStatus, t);
   const freshness = situationFreshnessMeta(data, activeLiveStatus, t);
   return (
     <section className={`operational-situation operational-situation--progress operational-situation--${tone}`} aria-labelledby={`${pageId}-progress-summary-heading`} data-operational-progress-summary={pageId} data-dashboard-display-depth={displayPolicy.depth}>
@@ -2244,6 +2533,7 @@ function OperationalPageDecisionSummary({ data, context, liveStatus, t, tone = "
       </div>
       <div className="operational-situation__meta" aria-label={t("overview.progress.meta")}>
         <span>{t("overview.fact.target")}: <strong>{repository}</strong></span>
+        <span>{t("overview.progress.repositoryState")}: <strong>{repositoryDetail}</strong></span>
         <span>{t("overview.fact.workflow")}: <strong>{workflowContextLabel(context?.workflow_context, t)}</strong></span>
         <span>{t("overview.progress.updated")}: <strong>{freshness.time}</strong></span>
       </div>
@@ -2259,7 +2549,7 @@ function OperationalPageDecisionSummary({ data, context, liveStatus, t, tone = "
 function OperationalPageSummaryStack({ data, context, liveStatus, t, tone = "sidebar", pageId = "overview", keys = null }) {
   return (
     <>
-      <ProducerDecisionSummaryCompat data={data} pageId={pageId} tone={tone} t={t} />
+      {pageId === "overview" ? null : <ProducerDecisionSummaryCompat data={data} pageId={pageId} tone={tone} t={t} />}
       <OperationalPageDecisionSummary data={data} context={context} liveStatus={liveStatus} pageId={pageId} tone={tone} keys={keys} t={t} />
     </>
   );
@@ -2281,8 +2571,8 @@ function ProducerDecisionSummaryCompat({ data, pageId, tone = "sidebar", t }) {
       t={t}
       displayPolicy={policy}
       items={[
-        { Icon: Target, label: t("detail.checks"), value: overviewLiveLocalizedText(decision.decision_question, t), detail: displayText(decision.scope, "") },
-        { Icon: Eye, label: t("detail.nextSafeCheck"), value: overviewLiveLocalizedText(decision.next_safe_action, t), detail: [source, owner, detailPage].filter(Boolean).join(" / "), technicalReferences },
+        { Icon: Target, label: t("detail.checks"), value: localizedDecisionField(decision, "decision_question", t), detail: displayText(decision.scope, "") },
+        { Icon: Eye, label: t("detail.nextSafeCheck"), value: localizedDecisionField(decision, "next_safe_action", t), detail: [source, owner, detailPage].filter(Boolean).join(" / "), technicalReferences },
       ]}
     />
   );
@@ -2306,6 +2596,7 @@ function SituationFactCard({ fact, t, displayPolicy }) {
   const showSource = source && !displayPolicy.isFriendly;
   const chipLabel = displayText(fact.chipLabel, "") || statusLabelForChip(fact.status, t);
   const sourceLabel = source.split(/\s*\/\s*/).map((item) => sourcePresentationKey(item, t)).filter(Boolean).join(" / ");
+  const detailItems = asArray(fact.detailItems).filter((item) => item && displayText(item.label, "") && displayText(item.value, "") && (!item.technical || displayPolicy.isTechnical));
   return (
     <article className={`operational-situation__fact operational-situation__fact--${fact.id}`} data-operational-situation-fact={fact.id}>
       <div className="operational-situation__fact-head">
@@ -2318,7 +2609,16 @@ function SituationFactCard({ fact, t, displayPolicy }) {
         </div>
       </div>
       <strong>{fact.value}</strong>
-      {fact.detail ? <p>{fact.detail}</p> : null}
+      {detailItems.length ? (
+        <dl className="operational-situation__detail-list">
+          {detailItems.map((item) => (
+            <div key={`${displayText(item.label, "")}:${displayText(item.value, "")}`}>
+              <dt>{item.label}</dt>
+              <dd>{item.value}</dd>
+            </div>
+          ))}
+        </dl>
+      ) : fact.detail ? <p>{fact.detail}</p> : null}
       {showSource || command ? (
         <div className="operational-situation__evidence">
           {showSource ? (
@@ -2373,13 +2673,394 @@ function OperationalSituationBoard({ data, context, liveStatus, t }) {
   );
 }
 
+const OVERVIEW_EXECUTIVE_TEXT = {
+  en: {
+    title: "Control center summary",
+    subtitle: "Can this repository safely continue, and where should you look next?",
+    overall: "Overall",
+    currentWork: "Current work",
+    docs: "Docs sync",
+    gitCi: "Git / CI",
+    tests: "Tests",
+    safety: "Safety",
+    blockersNext: "Blockers / next",
+    source: "Source",
+    freshness: "Freshness",
+    authority: "Authority",
+    command: "Check",
+    requiredChecks: "Required checks",
+    recommendedChecks: "Recommended checks",
+    repositoryWorkflowPhase: "Repository workflow phase",
+    documentsPrefix: "Documents",
+    branch: "Branch",
+    worktreeChanges: "Worktree changes",
+    testsPrefix: "Tests",
+    docsSyncDetail: "Requirements, specification, implementation plan, task tracker, handoff, and developer memory are checked as source-of-truth documents.",
+    safetyDetail: "Safety confirmation lists security evidence, closed authority boundaries, display policy, blockers, and restricted actions.",
+    noBlockers: "No active blockers",
+    unknownTarget: "No current target is defined",
+    docsReady: "Source documents are synchronized enough for this snapshot.",
+    docsReview: "Review source documents before relying on this snapshot.",
+    gitClean: "Worktree clean",
+    gitChanges: "Working changes",
+    syncClean: "local and remote aligned",
+    syncReview: "sync needs review",
+    testsReady: "Current test evidence is usable.",
+    testsReview: "Review test evidence before continuing.",
+    safetyReady: "No active safety blocker is recorded.",
+    safetyReview: "Review safety evidence before risky operations.",
+    next: "Next",
+    details: "Details",
+  },
+  ja: {
+    title: "管制サマリー",
+    subtitle: "このリポジトリを安全に続行できるか、次にどこを見るべきかをまとめます。",
+    overall: "総合",
+    currentWork: "現在地",
+    docs: "文書同期",
+    gitCi: "Git / CI",
+    tests: "テスト",
+    safety: "安全確認",
+    blockersNext: "ブロッカー / 次",
+    source: "根拠",
+    freshness: "鮮度",
+    authority: "信頼度",
+    command: "確認",
+    requiredChecks: "必須確認",
+    recommendedChecks: "推奨確認",
+    repositoryWorkflowPhase: "リポジトリ開発フェーズ",
+    documentsPrefix: "文書",
+    branch: "ブランチ",
+    worktreeChanges: "作業ツリー変更",
+    testsPrefix: "テスト",
+    docsSyncDetail: "要件、仕様、実装計画、タスクトラッカー、ハンドオフ、開発者メモリを正本文書として確認します。",
+    safetyDetail: "安全確認は、セキュリティ証跡、閉じている権限境界、表示方針、ブロッカー、制限操作をまとめます。",
+    noBlockers: "有効なブロッカーなし",
+    unknownTarget: "現在のターゲットは未定義です",
+    docsReady: "このスナップショットでは正本文書を判断に使えます。",
+    docsReview: "このスナップショットを使う前に正本文書を確認します。",
+    gitClean: "作業ツリー clean",
+    gitChanges: "作業中の変更",
+    syncClean: "ローカルとリモートは整合",
+    syncReview: "同期確認が必要",
+    testsReady: "現在のテスト証跡を判断に使えます。",
+    testsReview: "続行前にテスト証跡を確認します。",
+    safetyReady: "有効な安全ブロッカーは記録されていません。",
+    safetyReview: "危険操作前に安全証跡を確認します。",
+    next: "次",
+    details: "詳細",
+  },
+};
+
+function overviewExecutiveLocale(locale) {
+  return displayText(locale, "").toLowerCase().startsWith("ja") ? "ja" : "en";
+}
+
+function overviewExecutiveText(locale, key) {
+  const resolved = overviewExecutiveLocale(locale);
+  return OVERVIEW_EXECUTIVE_TEXT[resolved]?.[key] || OVERVIEW_EXECUTIVE_TEXT.en[key] || key;
+}
+
+function overviewExecutiveCountByStatus(rows) {
+  return asArray(rows).reduce((counts, row) => {
+    const state = normalizeState(row?.status || "unknown");
+    counts[state] = (counts[state] || 0) + 1;
+    return counts;
+  }, {});
+}
+
+function overviewExecutiveStatusSummary(rows, t) {
+  const counts = overviewExecutiveCountByStatus(rows);
+  const parts = ["passed", "ready", "failed", "blocked", "stale", "manual_required", "not_run", "missing", "unknown"]
+    .filter((state) => counts[state])
+    .map((state) => `${statusLabelForChip(state, t)} ${counts[state]}`);
+  return parts.join(" / ");
+}
+
+function overviewExecutiveTaskText(card, t, locale) {
+  if (!card) {
+    return "";
+  }
+  const agentSummary = documentBriefAgentSummary(card, t, locale);
+  return agentSummary?.summary || documentBriefSummary(card, t, locale) || documentBriefAction(card, t, locale) || documentBriefTitle(card, t, locale);
+}
+
+function overviewExecutiveTaskDetail(card, t, locale) {
+  if (!card) {
+    return "";
+  }
+  const agentSummary = documentBriefAgentSummary(card, t, locale);
+  return agentSummary?.detail || documentBriefAction(card, t, locale) || documentBriefDetail(card, t, locale);
+}
+
+function overviewExecutiveClassId(id) {
+  return displayText(id, "unknown").replace(/_/g, "-");
+}
+
+function overviewExecutiveIconForSection(id) {
+  const map = {
+    overall: Target,
+    current_work: Compass,
+    docs_sync: FileText,
+    task_tracker: ListChecks,
+    handoff: ClipboardCheck,
+    git_pr_ci: GitBranch,
+    tests: FileCheck2,
+    safety: ShieldCheck,
+    blockers: BadgeAlert,
+    next_safe_action: ArrowRightCircle,
+  };
+  return map[id] || CircleHelp;
+}
+
+function overviewExecutiveTitleForSection(row, t, locale) {
+  const fallbackById = {
+    overall: overviewExecutiveText(locale, "overall"),
+    current_work: overviewExecutiveText(locale, "currentWork"),
+    docs_sync: overviewExecutiveText(locale, "docs"),
+    task_tracker: t("overview.progress.taskTrackerTitle"),
+    handoff: t("overview.progress.handoffTitle"),
+    git_pr_ci: overviewExecutiveText(locale, "gitCi"),
+    tests: overviewExecutiveText(locale, "tests"),
+    safety: overviewExecutiveText(locale, "safety"),
+    blockers: t("overview.situation.blockersTitle"),
+    next_safe_action: t("overview.situation.nextSafeTitle"),
+  };
+  const id = displayText(row?.id, "unknown");
+  const titleKey = displayText(row?.title_key, "");
+  return titleKey ? t(titleKey, fallbackById[id] || technicalKeyFromId(id)) : (fallbackById[id] || technicalKeyFromId(id));
+}
+
+function overviewExecutiveLocalizedProducerText(row, field, t, locale) {
+  const raw = displayText(row?.[field], "");
+  if (!raw) {
+    return "";
+  }
+  const exactLocalText = {
+    "Requirements, specification, implementation plan, task tracker, handoff, and developer memory are checked as source-of-truth documents.": overviewExecutiveText(locale, "docsSyncDetail"),
+    "Safety confirmation lists security evidence, closed authority boundaries, display policy, blockers, and restricted actions.": overviewExecutiveText(locale, "safetyDetail"),
+  }[raw];
+  if (exactLocalText) {
+    return exactLocalText;
+  }
+  let text = overviewLiveLocalizedText(raw, t);
+  text = text
+    .replace(/^Repository workflow phase:/, `${overviewExecutiveText(locale, "repositoryWorkflowPhase")}:`)
+    .replace(/^Required checks:/, `${overviewExecutiveText(locale, "requiredChecks")}:`)
+    .replace(/\bRecommended checks:/g, `${overviewExecutiveText(locale, "recommendedChecks")}:`)
+    .replace(/^Documents:/, `${overviewExecutiveText(locale, "documentsPrefix")}:`)
+    .replace(/^Branch:/, `${overviewExecutiveText(locale, "branch")}:`)
+    .replace(/\bHEAD:/g, `${t("overview.situation.head")}:`)
+    .replace(/^Worktree changes:/, `${overviewExecutiveText(locale, "worktreeChanges")}:`)
+    .replace(/\bstaged\b/g, t("overview.situation.staged"))
+    .replace(/\bunstaged\b/g, t("overview.situation.unstaged"))
+    .replace(/\buntracked\b/g, t("overview.situation.untracked"))
+    .replace(/\bAhead:/g, `${t("overview.situation.ahead")}:`)
+    .replace(/\bBehind:/g, `${t("overview.situation.behind")}:`)
+    .replace(/\bCI:/g, `${t("overview.situation.ci")}:`)
+    .replace(/^Tests:/, `${overviewExecutiveText(locale, "testsPrefix")}:`);
+  return text;
+}
+
+function overviewExecutiveCardsFromSections(data, t, locale) {
+  const sections = asArray(data?.summary?.overview_sections);
+  if (!sections.length) {
+    return [];
+  }
+  const order = ["overall", "current_work", "docs_sync", "task_tracker", "handoff", "git_pr_ci", "tests", "safety", "blockers", "next_safe_action"];
+  const byId = new Map(sections.map((row) => [displayText(row?.id, ""), row]));
+  return order
+    .map((id) => byId.get(id))
+    .filter(Boolean)
+    .map((row) => {
+      const id = displayText(row.id, "unknown");
+      const requiredCommand = displayText(row.required_command, "");
+      return {
+        id: overviewExecutiveClassId(id),
+        Icon: overviewExecutiveIconForSection(id),
+        status: normalizeState(row.status),
+        title: overviewExecutiveTitleForSection(row, t, locale),
+        value: overviewExecutiveLocalizedProducerText(row, "value", t, locale),
+        detail: overviewExecutiveLocalizedProducerText(row, "detail", t, locale),
+        href: displayText(row.detail_page, "#overview"),
+        meta: [
+          { label: overviewExecutiveText(locale, "source"), value: sourcePresentationKey(row.source_id, t), technical: false },
+          { label: overviewExecutiveText(locale, "freshness"), value: t(`decisionPage.freshness.${displayText(row.freshness_state, "unknown")}`, displayText(row.freshness_state, "unknown")), technical: true },
+          { label: overviewExecutiveText(locale, "authority"), value: t(`decisionPage.authority.${displayText(row.authority, "not_collected")}`, displayText(row.authority, "not_collected")), technical: true },
+          requiredCommand && requiredCommand !== "not_applicable" ? { label: overviewExecutiveText(locale, "command"), value: requiredCommand, technical: true } : null,
+        ].filter(Boolean),
+      };
+    });
+}
+
+function overviewExecutiveCards(data, context, liveStatus, t, locale) {
+  const producerCards = overviewExecutiveCardsFromSections(data, t, locale);
+  if (producerCards.length) {
+    return producerCards;
+  }
+  const activeLiveStatus = situationLiveStatusForContext(liveStatus, context);
+  const maintenanceState = data.maintenance_sync_state && typeof data.maintenance_sync_state === "object" ? data.maintenance_sync_state : {};
+  const maintenanceSummary = maintenanceState.sync_summary || {};
+  const git = maintenanceState.git_state || {};
+  const ci = maintenanceState.ci_state || {};
+  const docs = maintenanceState.documentation_sync || {};
+  const productGate = maintenanceState.product_gate_evidence || {};
+  const securityConfirmation = data.security?.confirmation || {};
+  const taskCard = operationalProgressBriefCard(data, ["taskTracker", "task-tracker", "task_tracker"], context);
+  const handoffCard = operationalProgressBriefCard(data, ["handoff", "handOff", "hand-off"], context);
+  const currentWork = situationCurrentWorkSummary(data, context, activeLiveStatus, t);
+  const blockers = situationBlockingRows(data, context, activeLiveStatus);
+  const securityBlockers = asArray(securityConfirmation.blockers);
+  const blockerCount = Math.max(
+    blockers.length,
+    securityBlockers.length,
+    Number(maintenanceSummary.blocker_count || 0),
+  );
+  const gitChangedCount = Number(git.changed_count || 0);
+  const gitSyncClean = Number(git.ahead || 0) === 0 && Number(git.behind || 0) === 0;
+  const productLayers = asArray(productGate.layers);
+  const testRows = productLayers.filter((row) => ["local_tests", "focused_checks", "structure"].includes(displayText(row.id, "")));
+  const docsRows = asArray(docs.rows);
+  const overallStatus = situationWorstStatus([
+    maintenanceSummary.status || maintenanceState.status,
+    git.status,
+    ci.status,
+    productGate.status,
+    docs.status,
+    securityConfirmation.status,
+    blockerCount ? "blocked" : "ready",
+  ], "unknown");
+  const currentTarget = overviewExecutiveTaskText(handoffCard, t, locale)
+    || overviewExecutiveTaskText(taskCard, t, locale)
+    || currentWork.value
+    || overviewExecutiveText(locale, "unknownTarget");
+  const latestCompleted = overviewExecutiveTaskText(taskCard, t, locale);
+  const nextAction = safetyConfirmationSentence(locale, securityConfirmation.safe_next_action)
+    || displayText(maintenanceSummary.next_safe_action, "")
+    || currentWork.detail
+    || contextNextSafeActionText(context, t);
+  return [
+    {
+      id: "overall",
+      Icon: Target,
+      status: overallStatus,
+      title: overviewExecutiveText(locale, "overall"),
+      value: statusLabelForChip(overallStatus, t),
+      detail: maintenanceSummary.current_result || currentWork.detail,
+      href: "#workflow",
+    },
+    {
+      id: "current-work",
+      Icon: Compass,
+      status: currentWork.status,
+      title: overviewExecutiveText(locale, "currentWork"),
+      value: currentTarget,
+      detail: latestCompleted || overviewExecutiveTaskDetail(handoffCard, t, locale) || currentWork.detail,
+      href: "#workflow",
+    },
+    {
+      id: "docs",
+      Icon: FileText,
+      status: docs.status || data.documents?.status || "unknown",
+      title: overviewExecutiveText(locale, "docs"),
+      value: docsRows.length ? overviewExecutiveStatusSummary(docsRows, t) : statusLabelForChip(docs.status || data.documents?.status, t),
+      detail: normalizeState(docs.status) === "ready" || normalizeState(docs.status) === "passed" ? overviewExecutiveText(locale, "docsReady") : overviewExecutiveText(locale, "docsReview"),
+      href: "#documents",
+    },
+    {
+      id: "git-ci",
+      Icon: GitBranch,
+      status: situationWorstStatus([git.status, ci.status], "unknown"),
+      title: overviewExecutiveText(locale, "gitCi"),
+      value: `${displayText(git.branch, t("summary.none"))} / ${shortRevision(git.head) || t("summary.none")}`,
+      detail: `${gitChangedCount ? `${overviewExecutiveText(locale, "gitChanges")} ${gitChangedCount}` : overviewExecutiveText(locale, "gitClean")} / ${gitSyncClean ? overviewExecutiveText(locale, "syncClean") : overviewExecutiveText(locale, "syncReview")} / ${statusLabelForChip(ci.main_ci_status || ci.status, t)}`,
+      href: "#maintenance",
+    },
+    {
+      id: "tests",
+      Icon: FileCheck2,
+      status: productGate.status || ci.local_tests_status || "unknown",
+      title: overviewExecutiveText(locale, "tests"),
+      value: testRows.length ? overviewExecutiveStatusSummary(testRows, t) : statusLabelForChip(ci.local_tests_status || productGate.status, t),
+      detail: ["ready", "passed"].includes(normalizeState(productGate.status || ci.local_tests_status)) ? overviewExecutiveText(locale, "testsReady") : overviewExecutiveText(locale, "testsReview"),
+      href: "#workflow",
+    },
+    {
+      id: "safety",
+      Icon: ShieldCheck,
+      status: securityConfirmation.status || data.security?.gate_status || "unknown",
+      title: overviewExecutiveText(locale, "safety"),
+      value: safetyConfirmationSentence(locale, securityConfirmation.current_result) || statusLabelForChip(securityConfirmation.status, t),
+      detail: securityBlockers.length ? overviewExecutiveText(locale, "safetyReview") : overviewExecutiveText(locale, "safetyReady"),
+      href: "#safety",
+    },
+    {
+      id: "blockers-next",
+      Icon: blockerCount ? BadgeAlert : ArrowRightCircle,
+      status: blockerCount ? "blocked" : "ready",
+      title: overviewExecutiveText(locale, "blockersNext"),
+      value: blockerCount ? `${blockerCount} ${t("overview.situation.blockerUnit")}` : overviewExecutiveText(locale, "noBlockers"),
+      detail: nextAction ? `${overviewExecutiveText(locale, "next")}: ${nextAction}` : overviewExecutiveText(locale, "noBlockers"),
+      href: blockerCount ? "#safety" : "#workflow",
+    },
+  ];
+}
+
+function OverviewExecutiveSummary({ data, context, liveStatus, t, locale }) {
+  const cards = overviewExecutiveCards(data, context, liveStatus, t, locale);
+  const displayPolicy = displayDepthPolicyForData(data);
+  const overallStatus = cards[0]?.status || "unknown";
+  return (
+    <section className="overview-executive" aria-labelledby="overview-executive-heading" data-overview-executive="true">
+      <div className="overview-executive__head">
+        <div>
+          <h2 id="overview-executive-heading">{overviewExecutiveText(locale, "title")}</h2>
+          <p>{overviewExecutiveText(locale, "subtitle")}</p>
+        </div>
+        <StatusPill value={overallStatus} t={t} label={statusLabelForChip(overallStatus, t)} />
+      </div>
+      <div className="overview-executive__grid">
+        {cards.map(({ id, Icon, status, title, value, detail, href, meta = [] }) => {
+          const visibleMeta = asArray(meta).filter((item) => item && displayText(item.label, "") && displayText(item.value, "") && !displayPolicy.isFriendly && (!item.technical || displayPolicy.isTechnical));
+          return (
+          <article className={`overview-executive-card overview-executive-card--${id}`} key={id}>
+            <div className="overview-executive-card__head">
+              <span className="overview-executive-card__icon">
+                <Icon aria-hidden="true" size={20} />
+              </span>
+              <div>
+                <h3>{title}</h3>
+                <StatusPill value={status} t={t} label={statusLabelForChip(status, t)} />
+              </div>
+            </div>
+            <strong>{value}</strong>
+            {detail ? <p>{detail}</p> : null}
+            {visibleMeta.length ? (
+              <dl className="overview-executive-card__meta">
+                {visibleMeta.map((item) => (
+                  <div key={`${id}-${item.label}`}>
+                    <dt>{item.label}</dt>
+                    <dd>{item.value}</dd>
+                  </div>
+                ))}
+              </dl>
+            ) : null}
+            <a className="overview-executive-card__link" href={href}>{overviewExecutiveText(locale, "details")}</a>
+          </article>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
 function operationalDetailFacts(data, context, activeLiveStatus, t) {
   const factsById = new Map(situationFacts(data, context, activeLiveStatus, t).map((fact) => [fact.id, fact]));
   return ["blockers", "git", "tests", "ci", "next-safe"].map((id) => factsById.get(id)).filter(Boolean);
 }
 
-function operationalDetailEvidenceRows(activeLiveStatus, keys, t, limit = 6) {
-  const rows = liveEvidenceRows(activeLiveStatus, keys, t);
+function operationalDetailEvidenceRows(activeLiveStatus, keys, t, locale = "", limit = 6) {
+  const rows = liveEvidenceRows(activeLiveStatus, keys, t, locale);
   const selected = [];
   const selectedIds = new Set();
   const addRow = (row) => {
@@ -2405,7 +3086,7 @@ function snapshotEvidenceStatusForKey(context, key) {
     return context?.security_status || "unknown";
   }
   if (key === "local_tests") {
-    return context?.evidence_status || "manual_required";
+    return context?.evidence_status || "not_run";
   }
   return context?.evidence_status || "unknown";
 }
@@ -2446,6 +3127,7 @@ function OperationalDetailDecisionCard({ fact, t, displayPolicy }) {
   const showSource = source && displayPolicy.isTechnical;
   const chipLabel = displayText(fact.chipLabel, "") || statusLabelForChip(fact.status, t);
   const sourceLabel = source.split(/\s*\/\s*/).map((item) => sourcePresentationKey(item, t)).filter(Boolean).join(" / ");
+  const detailItems = asArray(fact.detailItems).filter((item) => item && displayText(item.label, "") && displayText(item.value, "") && (!item.technical || displayPolicy.isTechnical));
   return (
     <article className={`operational-detail-card operational-detail-card--${fact.id}`} data-operational-detail-fact={fact.id}>
       <div className="operational-detail-card__head">
@@ -2458,7 +3140,16 @@ function OperationalDetailDecisionCard({ fact, t, displayPolicy }) {
         </div>
       </div>
       <strong>{fact.value}</strong>
-      {fact.detail ? <p>{fact.detail}</p> : null}
+      {detailItems.length ? (
+        <dl className="operational-situation__detail-list">
+          {detailItems.map((item) => (
+            <div key={`${displayText(item.label, "")}:${displayText(item.value, "")}`}>
+              <dt>{item.label}</dt>
+              <dd>{item.value}</dd>
+            </div>
+          ))}
+        </dl>
+      ) : fact.detail ? <p>{fact.detail}</p> : null}
       {showSource || command ? (
         <div className="operational-detail-card__evidence">
           {showSource ? (
@@ -2477,8 +3168,8 @@ function OperationalDetailDecisionCard({ fact, t, displayPolicy }) {
   );
 }
 
-function OperationalDetailEvidenceQueue({ activeLiveStatus, context, keys, t, tone, displayPolicy }) {
-  const rows = operationalDetailEvidenceRows(activeLiveStatus, keys, t);
+function OperationalDetailEvidenceQueue({ activeLiveStatus, context, keys, t, tone, displayPolicy, locale = "" }) {
+  const rows = operationalDetailEvidenceRows(activeLiveStatus, keys, t, locale);
   const fallbackRows = rows.length ? rows : snapshotEvidenceRowsForContext(context, keys, t);
   const visibleRows = fallbackRows.slice(0, 6);
   const showTechnicalSource = displayPolicy.isTechnical;
@@ -2540,7 +3231,8 @@ function OperationalDetailDecisionPanel({ data, context, liveStatus, t, tone = "
   const activeLiveStatus = situationLiveStatusForContext(liveStatus, context);
   const facts = operationalDetailFacts(data, context, activeLiveStatus, t);
   const displayPolicy = displayDepthPolicyForData(data);
-  const evidenceRows = liveEvidenceRows(activeLiveStatus, keys, t);
+  const locale = operationalProgressLocale(data);
+  const evidenceRows = liveEvidenceRows(activeLiveStatus, keys, t, locale);
   const overallStatus = situationWorstStatus([...facts.map((fact) => fact.status), ...evidenceRows.map((row) => row.status)], "ready");
   const repository = repositoryDisplayName(activeLiveStatus?.target_repository?.name || context.target_repository?.name, t);
   const freshness = situationFreshnessMeta(data, activeLiveStatus, t);
@@ -2575,7 +3267,7 @@ function OperationalDetailDecisionPanel({ data, context, liveStatus, t, tone = "
           <OperationalDetailDecisionCard key={fact.id} fact={fact} t={t} displayPolicy={displayPolicy} />
         ))}
       </div>
-      <OperationalDetailEvidenceQueue activeLiveStatus={activeLiveStatus} context={context} keys={keys} t={t} tone={tone} displayPolicy={displayPolicy} />
+      <OperationalDetailEvidenceQueue activeLiveStatus={activeLiveStatus} context={context} keys={keys} t={t} tone={tone} displayPolicy={displayPolicy} locale={locale} />
     </section>
   );
 }
@@ -3091,7 +3783,7 @@ function SecurityStatusCards({ security, partialFailures, data, t }) {
   );
 }
 
-function ContextPanel({ data, t, activeMenuId, activeContext, onActiveMenuChange }) {
+function ContextPanel({ data, t, activeMenuId, activeContext, onActiveMenuChange, onRepositorySelect, repositorySelectionState }) {
   const context = activeContext && typeof activeContext === "object" ? activeContext : selectedContextData(data);
   const availableContexts = asArray(data.available_contexts);
   const selectedMenuId = displayText(activeMenuId || context.menu_id, availableContexts[0]?.menu_id || "unknown");
@@ -3156,7 +3848,7 @@ function ContextPanel({ data, t, activeMenuId, activeContext, onActiveMenuChange
           {`${stateLabel(context.git_status, t)} / ${stateLabel(context.ci_status, t)}`}
         </ActionMetaRow>
       </div>
-      <RepositorySelectionPanel selection={repositorySelection} t={t} />
+      <RepositorySelectionPanel selection={repositorySelection} t={t} onRepositorySelect={onRepositorySelect} selectionState={repositorySelectionState} />
       <div className="context-panel__footer">
         <span>
           <AlertTriangle aria-hidden="true" size={16} />
@@ -3217,22 +3909,38 @@ function RepositorySelectionCommand({ command, selected, t }) {
   );
 }
 
-function RepositorySelectionOption({ option, t }) {
+function RepositorySelectionOption({ option, selection, t, onRepositorySelect, selectionState }) {
   const selected = option.selected === true;
   const selectable = option.selectable === true;
   const Icon = selected ? Check : selectable ? Database : Lock;
+  const repoId = displayText(option.repo_id, "");
+  const isSelecting = selectionState?.repoId === repoId && selectionState?.status === "selecting";
+  const selectionDisabled = !selectable || selected || selectionState?.status === "selecting";
   return (
-    <article className={`repository-selection__option${selected ? " is-selected" : ""}${selectable ? "" : " is-disabled"}`} data-repository-option={displayText(option.repo_id, "")}>
+    <article className={`repository-selection__option${selected ? " is-selected" : ""}${selectable ? "" : " is-disabled"}`} data-repository-option={repoId}>
       <div className="repository-selection__option-main">
         <span className="repository-selection__option-icon">
           <Icon aria-hidden="true" size={17} />
         </span>
         <div>
           <strong>{repositoryDisplayName(option.display_name, t)}</strong>
-          <small>{displayText(option.repo_id, "")}</small>
+          <small>{repoId}</small>
         </div>
       </div>
-      <StatusPill value={option.status} t={t} label={selected ? t("context.repositorySelection.selected") : statusLabelForChip(option.status, t)} />
+      <div className="repository-selection__option-actions">
+        <StatusPill value={option.status} t={t} label={selected ? t("context.repositorySelection.selected") : statusLabelForChip(option.status, t)} />
+        {!selected ? (
+          <button
+            className="repository-selection__select"
+            type="button"
+            disabled={selectionDisabled}
+            onClick={() => onRepositorySelect?.(selection, option)}
+          >
+            {isSelecting ? <RefreshCw aria-hidden="true" size={14} /> : <Database aria-hidden="true" size={14} />}
+            {isSelecting ? t("context.repositorySelection.selecting") : t("context.repositorySelection.selectAction")}
+          </button>
+        ) : null}
+      </div>
       <dl className="repository-selection__option-meta">
         <div>
           <dt>{t("context.repositorySelection.productType")}</dt>
@@ -3261,12 +3969,13 @@ function RepositorySelectionOption({ option, t }) {
   );
 }
 
-function RepositorySelectionPanel({ selection, t }) {
+function RepositorySelectionPanel({ selection, t, onRepositorySelect, selectionState }) {
   if (!selection) {
     return null;
   }
   const options = asArray(selection.options);
   const currentName = repositoryDisplayName(selection.current_repository_name, t);
+  const panelSelectionState = displayText(selectionState?.menuId, "") === displayText(selection.menu_id, "") ? selectionState : { status: "idle", repoId: "", menuId: "", message: "" };
   return (
     <section className="repository-selection" aria-labelledby="repository-selection-heading">
       <div className="repository-selection__head">
@@ -3276,6 +3985,12 @@ function RepositorySelectionPanel({ selection, t }) {
         </div>
         <StatusPill value={selection.status} t={t} />
       </div>
+      {panelSelectionState?.status === "selected" || panelSelectionState?.status === "failed" ? (
+        <div className={`repository-selection__notice repository-selection__notice--${panelSelectionState.status}`} role={panelSelectionState.status === "failed" ? "alert" : "status"}>
+          {panelSelectionState.status === "selected" ? <CheckCircle2 aria-hidden="true" size={16} /> : <AlertTriangle aria-hidden="true" size={16} />}
+          <span>{panelSelectionState.status === "selected" ? t("context.repositorySelection.selectSuccess") : displayText(panelSelectionState.message, t("context.repositorySelection.selectFailed"))}</span>
+        </div>
+      ) : null}
       <div className="repository-selection__current">
         <ActionMetaRow Icon={Database} label={t("context.repositorySelection.current")}>
           {currentName}
@@ -3291,7 +4006,7 @@ function RepositorySelectionPanel({ selection, t }) {
         <div className="repository-selection__options" role="list" aria-label={t("context.repositorySelection.candidates")}>
           {options.map((option) => (
             <div role="listitem" key={displayText(option.repo_id, "")}>
-              <RepositorySelectionOption option={option} t={t} />
+              <RepositorySelectionOption option={option} selection={selection} t={t} onRepositorySelect={onRepositorySelect} selectionState={panelSelectionState} />
             </div>
           ))}
         </div>
@@ -3301,6 +4016,75 @@ function RepositorySelectionPanel({ selection, t }) {
           <span>{t("context.repositorySelection.noCandidates")}</span>
         </div>
       )}
+    </section>
+  );
+}
+
+function RepositorySelectionDropdownPanel({ selection, t, onRepositorySelect, selectionState }) {
+  if (!selection) {
+    return null;
+  }
+  const options = asArray(selection.options);
+  const currentRepoId = displayText(selection.current_repo_id, "not_selected");
+  const currentName = repositoryDisplayName(selection.current_repository_name, t);
+  const panelSelectionState = displayText(selectionState?.menuId, "") === displayText(selection.menu_id, "") ? selectionState : { status: "idle", repoId: "", menuId: "", message: "" };
+  const pending = panelSelectionState?.status === "selecting";
+  const failed = panelSelectionState?.status === "failed";
+  const currentOption = options.find((option) => displayText(option.repo_id, "") === currentRepoId) || null;
+  const currentStatus = currentOption?.status || selection.status;
+  const onChange = (event) => {
+    const nextRepoId = event.target.value;
+    const option = options.find((item) => displayText(item.repo_id, "") === nextRepoId);
+    if (!option || nextRepoId === currentRepoId || option.selectable !== true) {
+      return;
+    }
+    onRepositorySelect?.(selection, option);
+  };
+  return (
+    <section className="overview-control-card repository-selection repository-selection--compact" aria-labelledby="overview-repository-selection-heading">
+      <div className="repository-selection__head">
+        <div>
+          <h3 id="overview-repository-selection-heading">{t("context.repositorySelection.title")}</h3>
+          <p>{t("context.repositorySelection.detail")}</p>
+        </div>
+        <StatusPill value={currentStatus} t={t} label={statusLabelForChip(currentStatus, t)} />
+      </div>
+      {options.length ? (
+        <label className="repository-selection__field">
+          <span>{t("context.repositorySelection.selectLabel")}</span>
+          <select className="repository-selection__dropdown" value={currentRepoId} disabled={pending} onChange={onChange}>
+            {options.map((option) => {
+              const repoId = displayText(option.repo_id, "");
+              const disabled = option.selectable !== true && repoId !== currentRepoId;
+              return (
+                <option value={repoId} disabled={disabled} key={repoId}>
+                  {repositoryDisplayName(option.display_name, t)}
+                </option>
+              );
+            })}
+          </select>
+        </label>
+      ) : (
+        <div className="repository-selection__empty" role="status">
+          <Lock aria-hidden="true" size={16} />
+          <span>{t("context.repositorySelection.noCandidates")}</span>
+        </div>
+      )}
+      <dl className="repository-selection__compact-meta">
+        <div>
+          <dt>{t("context.repositorySelection.current")}</dt>
+          <dd>{currentName}</dd>
+        </div>
+        <div>
+          <dt>{t("context.repositorySelection.selectionState")}</dt>
+          <dd>{repositorySelectionStateLabel(selection.selection_state, t)}</dd>
+        </div>
+      </dl>
+      {panelSelectionState?.status === "selected" || failed ? (
+        <p className={`repository-selection__notice repository-selection__notice--${panelSelectionState.status}`} role={failed ? "alert" : "status"}>
+          {panelSelectionState.status === "selected" ? t("context.repositorySelection.selectSuccess") : displayText(panelSelectionState.message, t("context.repositorySelection.selectFailed"))}
+        </p>
+      ) : null}
     </section>
   );
 }
@@ -4000,7 +4784,7 @@ function liveEvidenceCheckTitle(key, t) {
   return t(map[key] || "detail.liveEvidence.title", displayKey(key));
 }
 
-function liveEvidenceRows(activeLiveStatus, keys, t) {
+function liveEvidenceRows(activeLiveStatus, keys, t, locale = "") {
   if (!activeLiveStatus) {
     return [];
   }
@@ -4016,9 +4800,11 @@ function liveEvidenceRows(activeLiveStatus, keys, t) {
       const currentItemId = displayText(item?.current_item_id || check.current_item_id || sourceId, "");
       const status = item?.status || check.status || "unknown";
       const rawSummary = displayText(item?.summary || check.summary, "");
+      const localization = item?.agent_localization || check.agent_localization;
       const observedAt = liveStatusObservedTime(item?.observed_at || check.observed_at);
       const detailArtifactPath = displayText(item?.detail_artifact_path || check.detail_artifact_path, "");
       const command = displayText(item?.next_command || item?.required_command || check.required_command, "");
+      const localizedSummary = liveAgentLocalizedField(localization, "summary", rawSummary, locale, t);
       rows.push({
         id: `${key}-${sourceId || index}-${index}`,
         key,
@@ -4028,9 +4814,9 @@ function liveEvidenceRows(activeLiveStatus, keys, t) {
         target: repositoryDisplayName(activeLiveStatus.target_repository?.name, t),
         branch: displayText(check.branch || activeLiveStatus.repository_state?.branch, ""),
         status,
-        summary: rawSummary && sourceId && rawSummary === `${sourceId} ${normalizeState(status)}` ? `${sourcePresentationKey(sourceId, t)} ${statusLabelForChip(status, t)}` : (overviewLiveLocalizedText(rawSummary, t) || (sourceId ? sourcePresentationKey(sourceId, t) : liveEvidenceCheckTitle(key, t))),
-        reason: overviewLiveLocalizedText(item?.reason || check.reason, t),
-        action: overviewLiveLocalizedText(item?.next_action || check.next_action, t),
+        summary: rawSummary && sourceId && rawSummary === `${sourceId} ${normalizeState(status)}` ? `${sourcePresentationKey(sourceId, t)} ${statusLabelForChip(status, t)}` : (localizedSummary || (sourceId ? sourcePresentationKey(sourceId, t) : liveEvidenceCheckTitle(key, t))),
+        reason: liveAgentLocalizedField(localization, "reason", item?.reason || check.reason, locale, t),
+        action: liveAgentLocalizedField(localization, "next_action", item?.next_action || check.next_action, locale, t),
         observedAt,
         detailArtifactPath,
         command,
@@ -4062,9 +4848,9 @@ function liveEvidenceRowInsight(row, t) {
   };
 }
 
-function LiveEvidenceTable({ liveStatus, context, keys, title, headingId, t, tone = "workflow" }) {
+function LiveEvidenceTable({ liveStatus, context, keys, title, headingId, t, tone = "workflow", locale = "" }) {
   const activeLiveStatus = liveStatusForContext(liveStatus, context);
-  const rows = liveEvidenceRows(activeLiveStatus, keys, t);
+  const rows = liveEvidenceRows(activeLiveStatus, keys, t, locale);
   const id = headingId || `live-evidence-${keys.join("-")}`;
   return (
     <section className={`mock-table-section mock-table-section--${tone}`} aria-labelledby={id}>
@@ -4248,6 +5034,216 @@ function maintenanceReviewPoints(t) {
     t("maintenance.review.developerMemory"),
     t("maintenance.review.evidence"),
   ];
+}
+
+function maintenanceSyncRowLabel(row, t) {
+  const id = displayText(row?.id, "");
+  return t(`maintenance.sync.row.${id}`, displayText(row?.label));
+}
+
+function maintenanceSyncActionLabel(row, t) {
+  const id = displayText(row?.id, "");
+  return t(`maintenance.sync.action.${id}`, displayText(row?.label));
+}
+
+function maintenanceSyncGitActionLabel(value, t) {
+  const action = displayText(value, "unknown");
+  return t(`maintenance.sync.gitAction.${action}`, displayKey(action));
+}
+
+function maintenanceSyncWorktreeLabel(value, t) {
+  const state = displayText(value, "unknown");
+  return t(`maintenance.sync.worktree.${state}`, displayKey(state));
+}
+
+function maintenanceSyncRowDetail(row, t) {
+  const id = displayText(row?.id, "");
+  return t(`maintenance.sync.rowDetail.${id}`, displayText(row?.detail));
+}
+
+function MaintenanceSyncSummary({ data, t }) {
+  const state = data.maintenance_sync_state && typeof data.maintenance_sync_state === "object" ? data.maintenance_sync_state : null;
+  if (!state) {
+    return null;
+  }
+  const displayPolicy = displayDepthPolicyForData(data);
+  const summary = state.sync_summary || {};
+  const git = state.git_state || {};
+  const ci = state.ci_state || {};
+  const productGate = state.product_gate_evidence || {};
+  const docs = state.documentation_sync || {};
+  const productLayers = asArray(productGate.layers);
+  const docRows = asArray(docs.rows);
+  const warnings = asArray(state.maintenance_warnings);
+  const actions = asArray(state.recommended_actions);
+  const blockedActions = asArray(state.blocked_actions);
+  const visibleLayers = displayPolicy?.collapseTechnicalDetails ? productLayers.slice(0, 6) : productLayers;
+  const visibleDocs = displayPolicy?.collapseTechnicalDetails ? docRows.slice(0, 6) : docRows;
+  const repositoryName = repositoryDisplayName(state.repository_name, t);
+  const observedAt = formatDashboardDateTime(state.observed_at) || displayText(state.observed_at);
+  const summaryStatus = normalizeState(summary.status || state.status);
+  const gitFacts = [
+    [t("maintenance.sync.branch"), displayText(git.branch, t("summary.none"))],
+    [t("maintenance.sync.upstream"), displayText(git.upstream, t("summary.none"))],
+    [t("maintenance.sync.head"), displayText(git.head, t("summary.none"))],
+    [t("maintenance.sync.worktree"), maintenanceSyncWorktreeLabel(git.worktree_state, t)],
+    [t("maintenance.sync.changes"), `${Number(git.changed_count || 0)} (${t("maintenance.sync.staged")}: ${Number(git.staged_count || 0)} / ${t("maintenance.sync.unstaged")}: ${Number(git.unstaged_count || 0)} / ${t("maintenance.sync.untracked")}: ${Number(git.untracked_count || 0)})`],
+    [t("maintenance.sync.aheadBehind"), `${t("maintenance.sync.ahead")}: ${Number(git.ahead || 0)} / ${t("maintenance.sync.behind")}: ${Number(git.behind || 0)}`],
+    [t("maintenance.sync.worktreeCount"), `${Number(git.worktree_count || 0)}`],
+    [t("maintenance.sync.actionNeeded"), maintenanceSyncGitActionLabel(git.action_needed, t)],
+  ];
+  const ciFacts = [
+    [t("maintenance.sync.branchCi"), statusLabelForChip(ci.branch_ci_status, t)],
+    [t("maintenance.sync.prCi"), statusLabelForChip(ci.pr_ci_status, t)],
+    [t("maintenance.sync.mainCi"), statusLabelForChip(ci.main_ci_status, t)],
+    [t("maintenance.sync.providerVisibility"), statusLabelForChip(ci.provider_visibility_status, t)],
+    [t("maintenance.sync.localTests"), statusLabelForChip(ci.local_tests_status, t)],
+    [t("maintenance.sync.headMatch"), t(`maintenance.sync.headMatch.${displayText(ci.head_match_status, "unknown")}`, displayKey(ci.head_match_status))],
+  ];
+  return (
+    <section className="maintenance-sync-summary" aria-labelledby="maintenance-sync-summary-heading">
+      <div className="maintenance-sync-summary__head">
+        <div>
+          <span className="maintenance-sync-summary__eyebrow">{t("maintenance.sync.eyebrow")}</span>
+          <h2 id="maintenance-sync-summary-heading">{t("maintenance.sync.title")}</h2>
+          <p>{t(`maintenance.sync.summary.${summaryStatus}`, displayText(summary.current_result))}</p>
+        </div>
+        <div className="maintenance-sync-summary__status">
+          <StatusPill value={summary.status || state.status} t={t} />
+          <span>{observedAt}</span>
+        </div>
+      </div>
+      <div className="maintenance-sync-summary__scope">
+        <div>
+          <span>{t("context.repositorySelection.current")}</span>
+          <strong>{repositoryName}</strong>
+        </div>
+        <div>
+          <span>{t("overview.status.workflowContext")}</span>
+          <strong>{workflowContextLabel(state.workflow_context, t)}</strong>
+        </div>
+        <div>
+          <span>{t("maintenance.sync.immediateAction")}</span>
+          <strong>{summary.immediate_action_required ? t("maintenance.sync.required") : t("maintenance.sync.notRequired")}</strong>
+        </div>
+        <div>
+          <span>{t("maintenance.sync.blockersWarnings")}</span>
+          <strong>{Number(summary.blocker_count || 0)} / {Number(summary.warning_count || 0)}</strong>
+        </div>
+      </div>
+      <div className="maintenance-sync-summary__next">
+        <ArrowRightCircle aria-hidden="true" size={18} />
+        <p>{t(`maintenance.sync.next.${summaryStatus}`, displayText(summary.next_safe_action))}</p>
+      </div>
+      <div className="maintenance-sync-grid">
+        <article className="maintenance-sync-panel maintenance-sync-panel--git">
+          <div className="maintenance-sync-panel__title">
+            <GitBranch aria-hidden="true" size={20} />
+            <h3>{t("maintenance.sync.gitState")}</h3>
+            <StatusPill value={git.status} t={t} />
+          </div>
+          <dl className="maintenance-sync-facts">
+            {gitFacts.map(([label, value]) => (
+              <div key={label}>
+                <dt>{label}</dt>
+                <dd>{value}</dd>
+              </div>
+            ))}
+          </dl>
+        </article>
+        <article className="maintenance-sync-panel maintenance-sync-panel--ci">
+          <div className="maintenance-sync-panel__title">
+            <Activity aria-hidden="true" size={20} />
+            <h3>{t("maintenance.sync.ciState")}</h3>
+            <StatusPill value={ci.status} t={t} />
+          </div>
+          <dl className="maintenance-sync-facts">
+            {ciFacts.map(([label, value]) => (
+              <div key={label}>
+                <dt>{label}</dt>
+                <dd>{value}</dd>
+              </div>
+            ))}
+          </dl>
+          <p className="maintenance-sync-panel__note">{asArray(ci.annotations).length ? t("maintenance.sync.ciAnnotationsPresent") : t("maintenance.sync.ciAnnotationsNone")}</p>
+        </article>
+      </div>
+      <div className="maintenance-sync-grid maintenance-sync-grid--wide">
+        <section className="maintenance-sync-panel" aria-labelledby="maintenance-sync-product-gate-heading">
+          <div className="maintenance-sync-panel__title">
+            <FileCheck2 aria-hidden="true" size={20} />
+            <h3 id="maintenance-sync-product-gate-heading">{t("maintenance.sync.productGate")}</h3>
+            <StatusPill value={productGate.status} t={t} />
+          </div>
+          <div className="maintenance-sync-row-list">
+            {visibleLayers.map((row) => (
+              <article className="maintenance-sync-row" key={displayText(row.id)}>
+                <div>
+                  <strong>{maintenanceSyncRowLabel(row, t)}</strong>
+                  <p>{maintenanceSyncRowDetail(row, t)}</p>
+                </div>
+                <StatusPill value={row.status} t={t} />
+              </article>
+            ))}
+          </div>
+          {displayPolicy?.collapseTechnicalDetails && productLayers.length > visibleLayers.length ? <p className="maintenance-sync-summary__more">{showMoreItemsLabel(productLayers.length - visibleLayers.length, t)}</p> : null}
+        </section>
+        <section className="maintenance-sync-panel" aria-labelledby="maintenance-sync-docs-heading">
+          <div className="maintenance-sync-panel__title">
+            <FileText aria-hidden="true" size={20} />
+            <h3 id="maintenance-sync-docs-heading">{t("maintenance.sync.documentation")}</h3>
+            <StatusPill value={docs.status} t={t} />
+          </div>
+          <div className="maintenance-sync-row-list">
+            {visibleDocs.map((row) => (
+              <article className="maintenance-sync-row" key={displayText(row.id)}>
+                <div>
+                  <strong>{maintenanceSyncRowLabel(row, t)}</strong>
+                  <p>{maintenanceSyncRowDetail(row, t)}</p>
+                </div>
+                <StatusPill value={row.status} t={t} />
+              </article>
+            ))}
+          </div>
+          {displayPolicy?.collapseTechnicalDetails && docRows.length > visibleDocs.length ? <p className="maintenance-sync-summary__more">{showMoreItemsLabel(docRows.length - visibleDocs.length, t)}</p> : null}
+        </section>
+      </div>
+      <div className="maintenance-sync-actions">
+        <section aria-labelledby="maintenance-sync-actions-heading">
+          <h3 id="maintenance-sync-actions-heading">{t("maintenance.sync.recommendedActions")}</h3>
+          {[...actions, ...blockedActions].map((row) => (
+            <article className="maintenance-sync-action" key={displayText(row.id)}>
+              <div>
+                <strong>{maintenanceSyncActionLabel(row, t)}</strong>
+                <p>{t(`maintenance.sync.actionDetail.${displayText(row.id)}`, displayText(row.detail))}</p>
+              </div>
+              <StatusPill value={row.status} t={t} />
+            </article>
+          ))}
+        </section>
+        <section aria-labelledby="maintenance-sync-warnings-heading">
+          <h3 id="maintenance-sync-warnings-heading">{t("maintenance.sync.warnings")}</h3>
+          {warnings.length ? warnings.map((row) => (
+            <article className="maintenance-sync-action" key={displayText(row.id)}>
+              <div>
+                <strong>{maintenanceSyncRowLabel(row, t)}</strong>
+                <p>{maintenanceSyncRowDetail(row, t)}</p>
+              </div>
+              <StatusPill value={row.status} t={t} />
+            </article>
+          )) : (
+            <article className="maintenance-sync-action maintenance-sync-action--empty">
+              <div>
+                <strong>{t("maintenance.sync.noWarnings")}</strong>
+                <p>{t("maintenance.sync.noWarningsDetail")}</p>
+              </div>
+              <StatusPill value="ready" t={t} />
+            </article>
+          )}
+        </section>
+      </div>
+    </section>
+  );
 }
 
 function stateDetail(value, t) {
@@ -4928,7 +5924,77 @@ function RepositoryNotice({ t }) {
   );
 }
 
-function OverviewSection({ data, t, locale, activeMenuId, pendingMenuId, onActiveMenuChange, liveStatus }) {
+function dashboardDisplayDepthSetting(data) {
+  const { items } = settingsCatalogData(data);
+  return items.find((item) => displayText(item.id, "") === "dashboard_display_depth") || null;
+}
+
+function OverviewDisplayDepthControl({ data, context, t, onDisplayDepthChange, displayDepthSelectionState }) {
+  const displayPolicy = displayDepthPolicyForData(data);
+  const setting = dashboardDisplayDepthSetting(data);
+  const currentValue = displayText(setting?.current_value || displayPolicy.depth, displayPolicy.depth);
+  const options = setting ? settingEditableOptions(setting) : [];
+  const canChange = Boolean(setting?.editable && options.length && onDisplayDepthChange);
+  const pendingValue = displayText(displayDepthSelectionState?.value, "");
+  const pending = displayDepthSelectionState?.status === "selecting";
+  const failed = displayDepthSelectionState?.status === "failed";
+  const onChange = (event) => {
+    const value = event.target.value;
+    if (!value || value === currentValue || !canChange) {
+      return;
+    }
+    onDisplayDepthChange?.(setting, value, displayText(context?.menu_id, ""));
+  };
+  return (
+    <section className="overview-control-card display-depth-control" aria-labelledby="display-depth-control-heading" data-dashboard-display-depth={displayPolicy.depth}>
+      <div className="display-depth-control__head">
+        <span className="display-depth-control__icon">
+          <Eye aria-hidden="true" size={20} />
+        </span>
+        <div>
+          <h2 id="display-depth-control-heading">{t("overview.displayDepth.title")}</h2>
+          <p>{t(displayPolicy.audienceDetailKey)}</p>
+        </div>
+        <AudienceModeBadge displayPolicy={displayPolicy} t={t} />
+      </div>
+      {options.length ? (
+        <label className="display-depth-control__field">
+          <span>{t("overview.displayDepth.selectLabel")}</span>
+          <select className="display-depth-control__select" value={currentValue} disabled={!canChange || pending} onChange={onChange}>
+            {options.map((value) => (
+              <option value={value} key={value}>
+                {settingAllowedValueLabel(value, setting, t)}
+              </option>
+            ))}
+          </select>
+          <small>{pending ? `${t("overview.displayDepth.changing")}: ${settingAllowedValueLabel(pendingValue, setting, t)}` : t("overview.displayDepth.current")}</small>
+        </label>
+      ) : (
+        <div className="display-depth-control__options">
+          <a className="display-depth-control__settings-link" href="#settings">
+            <Settings aria-hidden="true" size={16} />
+            {t("overview.displayDepth.openSettings")}
+          </a>
+        </div>
+      )}
+      {failed ? (
+        <p className="display-depth-control__notice" role="alert">
+          {displayText(displayDepthSelectionState?.message, t("overview.displayDepth.changeFailed"))}
+        </p>
+      ) : null}
+    </section>
+  );
+}
+
+function OverviewControlRow({ children }) {
+  const visibleChildren = asArray(children).filter(Boolean);
+  if (!visibleChildren.length) {
+    return null;
+  }
+  return <div className="overview-control-row">{visibleChildren}</div>;
+}
+
+function OverviewSection({ data, t, locale, activeMenuId, pendingMenuId, onActiveMenuChange, onRepositorySelect, repositorySelectionState, onDisplayDepthChange, displayDepthSelectionState, liveStatus }) {
   const summary = data.summary || {};
   const partialFailures = asArray(data.partial_failures);
   const categorySummaries = buildCategorySummaries({
@@ -4943,10 +6009,10 @@ function OverviewSection({ data, t, locale, activeMenuId, pendingMenuId, onActiv
       ? `${context.current_step_index} / ${context.current_step_total}`
       : displayText(context.current_step_label || context.current_step_id);
   const lessonMetric = metrics.lessons || {};
-  const primaryStatusCard = overviewPrimaryStatusCard(data, context, lessonMetric, t, liveStatus);
-  const gitStatusCard = overviewGitCard(data, context, t, liveStatus);
-  const ciStatusCard = overviewCiCard(data, context, t, liveStatus);
-  const securityStatusCard = overviewSecurityCard(data, context, t, liveStatus);
+  const primaryStatusCard = overviewPrimaryStatusCard(data, context, lessonMetric, t, liveStatus, locale);
+  const gitStatusCard = overviewGitCard(data, context, t, liveStatus, locale);
+  const ciStatusCard = overviewCiCard(data, context, t, liveStatus, locale);
+  const securityStatusCard = overviewSecurityCard(data, context, t, liveStatus, locale);
   const selectedMenuId = displayText(activeMenuId || context.menu_id, context.menu_id);
   const repositorySelection = repositorySelectionForMenu(data, selectedMenuId);
   const overviewEvidenceStatus = normalizeState(context.evidence_status || summary.evidence_status);
@@ -4956,10 +6022,14 @@ function OverviewSection({ data, t, locale, activeMenuId, pendingMenuId, onActiv
     <section className="view-surface" id="overview" aria-labelledby="overview-heading" data-status={overviewEvidenceStatus} data-risk={overviewRiskLevel}>
       <PageTitleHeader viewId="overview" Icon={Home} title={t("nav.overview")} subtitle={t("overview.subtitle")} data={data} locale={locale} t={t} actionLabel={t("detail.refreshDisplayOnly")} headingId="overview-heading" />
       <MenuTileStrip data={data} t={t} activeMenuId={activeMenuId} pendingMenuId={pendingMenuId} onActiveMenuChange={onActiveMenuChange} />
+      <OverviewControlRow>
+        <OverviewDisplayDepthControl data={data} context={context} t={t} onDisplayDepthChange={onDisplayDepthChange} displayDepthSelectionState={displayDepthSelectionState} />
+        <RepositorySelectionDropdownPanel selection={repositorySelection} t={t} onRepositorySelect={onRepositorySelect} selectionState={repositorySelectionState} />
+      </OverviewControlRow>
       <ContextSnapshotStrip data={data} t={t} locale={locale} />
+      <OverviewExecutiveSummary data={data} context={context} liveStatus={liveStatus} t={t} locale={locale} />
       <OperationalPageSummaryStack data={data} context={context} liveStatus={liveStatus} pageId="overview" tone="sidebar" t={t} />
       <OperationalSituationBoard data={data} context={context} liveStatus={liveStatus} t={t} />
-      <RepositorySelectionPanel selection={repositorySelection} t={t} />
       <section className="overview-status-grid" aria-label={t("overview.currentStatus")}>
         <OverviewStatusCard
           id={primaryStatusCard.id}
@@ -5533,7 +6603,7 @@ function WorkflowSection({ development, gitWorkflow, data, locale, t, liveStatus
       <OperationalDetailDecisionPanel data={data} context={context} liveStatus={liveStatus} t={t} tone="workflow" pageId="workflow" keys={["local_tests", "git_sync", "ci"]} />
       <GitOperationRail operations={development.git_operations} t={t} />
       <WorkflowStatusCards data={data} t={t} />
-      <LiveEvidenceTable liveStatus={liveStatus} context={context} keys={["local_tests", "git_sync", "ci"]} title={t("detail.liveEvidence.workflowTitle")} headingId="workflow-live-evidence-heading" t={t} tone="workflow" />
+      <LiveEvidenceTable liveStatus={liveStatus} context={context} keys={["local_tests", "git_sync", "ci"]} title={t("detail.liveEvidence.workflowTitle")} headingId="workflow-live-evidence-heading" t={t} tone="workflow" locale={locale} />
       <WorkflowRecentTable rows={development.recent_runs} data={data} t={t} />
       <MockNotice
         tone="workflow-warning"
@@ -5828,6 +6898,7 @@ function MaintenanceSection({ maintenance, data, locale, t, liveStatus }) {
     <section className="view-surface view-surface--maintenance" id="maintenance" aria-labelledby="maintenance-heading">
       <PageTitleHeader viewId="maintenance" Icon={RefreshCw} title={t("maintenance.title")} subtitle={t("maintenance.description")} data={data} locale={locale} t={t} actionLabel={t("detail.refreshMaintenance")} headingId="maintenance-heading" />
       <ContextSnapshotStrip data={data} t={t} locale={locale} variant="maintenance" />
+      <MaintenanceSyncSummary data={data} t={t} />
       <OperationalPageSummaryStack data={data} context={context} liveStatus={liveStatus} pageId="maintenance" tone="maintenance" keys={["local_tests", "git_sync", "ci", "security"]} t={t} />
       <DetailDecisionSummary
         tone="maintenance"
@@ -5841,7 +6912,7 @@ function MaintenanceSection({ maintenance, data, locale, t, liveStatus }) {
       />
       <OperationalDetailDecisionPanel data={data} context={context} liveStatus={liveStatus} t={t} tone="maintenance" pageId="maintenance" keys={["local_tests", "git_sync", "ci", "security"]} />
       <MaintenanceStatusCards maintenance={maintenance} data={data} t={t} />
-      <LiveEvidenceTable liveStatus={liveStatus} context={context} keys={["local_tests", "git_sync", "ci", "security"]} title={t("detail.liveEvidence.maintenanceTitle")} headingId="maintenance-live-evidence-heading" t={t} tone="maintenance" />
+      <LiveEvidenceTable liveStatus={liveStatus} context={context} keys={["local_tests", "git_sync", "ci", "security"]} title={t("detail.liveEvidence.maintenanceTitle")} headingId="maintenance-live-evidence-heading" t={t} tone="maintenance" locale={locale} />
       <BrowserDebugHandoffPanel browserDebug={data.browser_debug} t={t} />
       <section className="maintenance-confirmation-section evidence-table-section" aria-labelledby="maintenance-confirmation-heading">
         <h3 id="maintenance-confirmation-heading">{t("maintenance.confirmationFlow")}</h3>
@@ -6000,9 +7071,369 @@ function safetyFailureInsight(item, t) {
   };
 }
 
+const SAFETY_CONFIRMATION_JA_TEXT = {
+  ui: {
+    freshness: "鮮度",
+    authority: "根拠の強さ",
+    nextCheck: "次に見る場所",
+    approvalRequired: "承認",
+    approvalRequiredYes: "必要",
+    approvalRequiredNo: "不要",
+    executionBoundary: "承認・実行境界",
+    approvalReceiptAccess: "承認レシートの読み書き",
+    approvalReceiptDetail: "この画面では承認レシートを読み書きしません。",
+    commandPolicy: "コマンド実行",
+    commandPolicyDetail: "コマンドはプレビュー専用で、安全な argv がある場合だけコピー対象です。",
+    securityBlockers: "安全ブロッカー",
+    noBlockerDetail: "現在の安全確認では、進行を止める安全ブロッカーはありません。",
+    restrictedActions: "新しいスコープや承認が必要な操作",
+  },
+  sentence: {
+    "Active security blockers require review before risky operations.": "危険操作の前に、有効な安全ブロッカーの確認が必要です。",
+    "Security evidence needs review before risky operations.": "危険操作の前に、安全証跡の確認が必要です。",
+    "No active security blockers are recorded for the selected repository context.": "選択中リポジトリでは、有効な安全ブロッカーは記録されていません。",
+    "Review planning, maintenance, or workflow details while dangerous authority boundaries remain closed.": "危険権限を閉じたまま、計画、保守、ワークフロー詳細を確認します。",
+    "Open Safety evidence rows and product security details before continuing.": "継続前に、安全証跡行と成果物側の security 詳細を確認します。",
+  },
+  evidence: {
+    local_artifacts: {
+      label: "ローカル生成物",
+      meaning: "実行生成物やローカル出力を source 管理へ混ぜない確認です。",
+      next: "生成物を追加する前に、成果物側の安全証跡を確認します。",
+    },
+    secrets: {
+      label: "秘密情報",
+      meaning: "認証情報、トークン、署名付き URL、秘密らしい値を表示しない確認です。",
+      next: "認証情報に触れる前に、成果物側の安全チェックを再実行します。",
+    },
+    external_sending: {
+      label: "外部送信",
+      meaning: "外部 AI/API/クラウド送信が明示的なスコープなしに開いていない確認です。",
+      next: "ネットワーク連携を有効化する前に、provider と外部送信の方針を確認します。",
+    },
+    security_blockers: {
+      label: "安全ブロッカー",
+      meaning: "有効な安全ブロッカーがある場合は危険操作を止めます。",
+      next: "安全扱いにする前に、ブロック元の証跡を解消します。",
+    },
+  },
+  boundary: {
+    translation_execution: { label: "翻訳実行", detail: "新しい実装計画で許可されるまで、翻訳実行は開きません。" },
+    provider_dispatch: { label: "provider/API 実行", detail: "provider 実行は閉じています。明示スコープと監査可能な設定が必要です。" },
+    external_send: { label: "外部送信", detail: "選択中ワークフローと承認証跡が明示しない限り、外部送信は閉じています。" },
+    credential_read: { label: "認証情報の読み取り", detail: "認証情報の値は dashboard data で読み取らず、表示もしません。" },
+    approval_receipt_read_write: { label: "承認レシート読み書き", detail: "承認レシートへのアクセスは、専用契約ができるまで閉じています。" },
+    browser_execution_expansion: { label: "ブラウザ実行拡張", detail: "ブラウザ操作の拡張には、レビュー済み allowlist が必要です。" },
+    shell_execution_expansion: { label: "シェル実行拡張", detail: "シェル実行拡張は明示的な実装計画が必要で、表示専用コマンドとは別です。" },
+    mcp_execution_expansion: { label: "MCP 実行拡張", detail: "MCP 実行拡張は CLI 同等性と安全契約ができるまで使いません。" },
+    endpoint_action_expansion: { label: "endpoint/action 拡張", detail: "新しい endpoint や操作 UI は、スコープ付きレビューなしに追加しません。" },
+    settings_write_expansion: { label: "設定書き込み拡張", detail: "設定書き込みは既存の確認導線に閉じ、広い書き込み権限を付与しません。" },
+    destructive_execution: { label: "破壊的操作", detail: "破壊的操作は、将来の明示スコープで許可されるまで閉じています。" },
+    raw_body_forwarding: { label: "本文の転送", detail: "Transcript、OCR、prompt、provider 応答、生成物本文は dashboard 出力へ転送しません。" },
+  },
+  policy: {
+    api_keys: { label: "API キーとトークン", detail: "値は表示せず、環境変数名や不活性な参照だけを扱います。" },
+    private_urls: { label: "署名付き・非公開 URL", detail: "ブラウザへ届く前に伏せます。" },
+    raw_artifact_bodies: { label: "生成物や素材の本文", detail: "Transcript、OCR、frame、prompt、応答、生成物本文は表示対象にしません。" },
+    local_absolute_paths: { label: "ローカル絶対パス", detail: "端末固有の絶対パスではなく、成果物スコープまたはリポジトリ相対参照で表示します。" },
+  },
+  action: {
+    review_next_roadmap: { label: "次ロードマップ提案を確認", detail: "危険権限が閉じている間は、計画とレビューを安全に進められます。" },
+    inspect_maintenance: { label: "保守・同期を確認", detail: "Git、CI、product gate を現在根拠として扱う前に保守状態を確認します。" },
+    rerun_security_check: { label: "新規実装前に安全チェックを再実行", detail: "新しい実装スコープでは、危険操作前に安全証跡を更新します。" },
+    enable_provider_backed_execution: { label: "provider 実行を有効化", detail: "新しいスコープ、credential 方針、費用境界、監査可能な承認が必要です。" },
+    expand_mcp_or_shell_execution: { label: "MCP または shell 実行を拡張", detail: "使用前に CLI 同等性と安全契約が必要です。" },
+    run_destructive_operations: { label: "破壊的操作を実行", detail: "将来の明示スコープで許可されるまで閉じています。" },
+  },
+  blocker: {
+    security_gate: {
+      detail: "安全確認ゲートが現在の進行を止めています。",
+      next_action: "継続前に安全証跡と成果物側の security 詳細を確認します。",
+    },
+  },
+};
+
+function safetyConfirmationLocale(locale) {
+  return displayText(locale, "").toLowerCase().startsWith("ja") ? "ja" : "en";
+}
+
+function safetyConfirmationUiText(locale, key, fallback) {
+  return safetyConfirmationLocale(locale) === "ja" ? SAFETY_CONFIRMATION_JA_TEXT.ui[key] || fallback : fallback;
+}
+
+function safetyConfirmationSentence(locale, value) {
+  const text = displayText(value, "");
+  return safetyConfirmationLocale(locale) === "ja" ? SAFETY_CONFIRMATION_JA_TEXT.sentence[text] || text : text;
+}
+
+function safetyConfirmationLocalized(locale, group, row, field) {
+  const fallback = displayText(row?.[field], "");
+  if (safetyConfirmationLocale(locale) !== "ja") {
+    return fallback;
+  }
+  const id = displayText(row?.id, "");
+  return SAFETY_CONFIRMATION_JA_TEXT[group]?.[id]?.[field] || fallback;
+}
+
+function safetyConfirmationAuthorityLabel(value, locale) {
+  const normalized = displayText(value, "unknown");
+  if (safetyConfirmationLocale(locale) !== "ja") {
+    return displayKey(normalized);
+  }
+  const labels = {
+    authoritative: "判断に使える",
+    manual_required: "手動確認が必要",
+    advisory: "参考情報",
+    not_collected: "未収集",
+    unknown: "不明",
+  };
+  return labels[normalized] || displayKey(normalized);
+}
+
+function safetyConfirmationActionStateLabel(value, locale, t) {
+  const normalized = displayText(value, "unknown");
+  if (["approval_required", "blocked", "unknown"].includes(normalized)) {
+    return statusLabelForChip(normalized, t);
+  }
+  if (safetyConfirmationLocale(locale) !== "ja") {
+    return displayKey(normalized);
+  }
+  return normalized === "safe" ? "安全" : normalized === "recommended" ? "推奨" : displayKey(normalized);
+}
+
+function SafetyConfirmationPanel({ security, data, t, displayPolicy, locale }) {
+  const confirmation = security?.confirmation && typeof security.confirmation === "object" ? security.confirmation : null;
+  if (!confirmation) {
+    return null;
+  }
+  const evidence = asArray(confirmation.evidence);
+  const boundaries = asArray(confirmation.authority_boundaries);
+  const displayPolicyRows = asArray(confirmation.display_policy);
+  const recommendedActions = asArray(confirmation.recommended_actions);
+  const restrictedActions = asArray(confirmation.restricted_actions);
+  const blockers = asArray(confirmation.blockers);
+  const approvalReceipts = confirmation.approval_receipts || {};
+  const commandPolicy = confirmation.unsafe_command_policy || {};
+  const uiText = (key, fallback) => safetyConfirmationUiText(locale, key, fallback);
+  const scopeRows = [
+    [t("context.selectLabel"), contextLabel(confirmation.menu_id, t)],
+    [t("overview.status.workflowContext"), workflowContextLabel(confirmation.workflow_context, t)],
+    [t("context.repositorySelection.current"), displayText(confirmation.repository_name)],
+    [t("repositoryInfo.gitDetail.head", "HEAD"), displayText(confirmation.product_head, t("summary.none"))],
+    [t("overview.progress.updated"), formatDashboardDateTime(confirmation.observed_at) || displayText(confirmation.observed_at)],
+  ];
+  const visibleBoundaries = displayPolicy?.collapseTechnicalDetails ? boundaries.slice(0, 6) : boundaries;
+  return (
+    <section className="safety-confirmation" aria-labelledby="safety-confirmation-heading">
+      <div className="safety-confirmation__summary">
+        <div className="safety-confirmation__summary-main">
+          <span className="safety-confirmation__icon">
+            <ShieldCheck aria-hidden="true" size={24} />
+          </span>
+          <div>
+            <h2 id="safety-confirmation-heading">{t("security.confirmation.title")}</h2>
+            <p>{safetyConfirmationSentence(locale, confirmation.current_result) || t("security.confirmation.fallbackResult")}</p>
+          </div>
+        </div>
+        <div className="safety-confirmation__summary-status">
+          <StatusPill value={confirmation.status} t={t} />
+          {blockers.length ? <span className="small-badge small-badge--warning">{blockers.length} {t("security.confirmation.blockers")}</span> : <span className="small-badge small-badge--soft">{t("security.confirmation.noBlockers")}</span>}
+        </div>
+      </div>
+      <div className="safety-confirmation__scope">
+        {scopeRows.map(([label, value]) => (
+          <div className="safety-confirmation__scope-item" key={label}>
+            <span>{label}</span>
+            <strong>{value}</strong>
+          </div>
+        ))}
+      </div>
+      <div className="safety-confirmation__next">
+        <ArrowRightCircle aria-hidden="true" size={18} />
+        <p>{safetyConfirmationSentence(locale, confirmation.safe_next_action) || t("detail.security.nextSafe")}</p>
+      </div>
+
+      <section className="safety-confirmation__section" aria-labelledby="safety-confirmation-evidence-heading">
+        <div className="safety-confirmation__section-head">
+          <h3 id="safety-confirmation-evidence-heading">{t("security.confirmation.evidence")}</h3>
+          <p>{t("security.confirmation.evidenceDetail")}</p>
+        </div>
+        <div className="confirmation-table confirmation-table--safety-evidence">
+          <div className="confirmation-table__head">
+            <span>{t("detail.failure.item")}</span>
+            <span>{t("detail.whyItMatters")}</span>
+            <span>{t("detail.failure.status")}</span>
+            <span>{t("source.detector.label")}</span>
+          </div>
+          {evidence.map((row) => (
+            <article className="confirmation-row" key={displayText(row.id)}>
+              <div className="confirmation-row__name">
+                <FileCheck2 aria-hidden="true" size={20} />
+                <div>
+                  <strong>{safetyConfirmationLocalized(locale, "evidence", row, "label")}</strong>
+                  <span>{displayText(row.source_id)}</span>
+                </div>
+              </div>
+              <p>{safetyConfirmationLocalized(locale, "evidence", row, "meaning")}</p>
+              <StatusPill value={row.status} t={t} />
+              <div className="safety-confirmation__source">
+                <span>{t("overview.fact.lastChecked")}: {formatDashboardDateTime(row.observed_at) || displayText(row.observed_at)}</span>
+                <div className="safety-confirmation__meta">
+                  <span className="small-badge small-badge--soft">{uiText("freshness", "Freshness")}: {t(`decisionPage.freshness.${displayText(row.freshness_state, "unknown")}`, displayKey(row.freshness_state))}</span>
+                  <span className="small-badge small-badge--soft">{uiText("authority", "Authority")}: {safetyConfirmationAuthorityLabel(row.authority, locale)}</span>
+                </div>
+                <p className="safety-confirmation__next-check">{uiText("nextCheck", "Next check")}: {safetyConfirmationLocalized(locale, "evidence", row, "next")}</p>
+                {displayPolicy?.collapseTechnicalDetails ? (
+                  <details data-dashboard-display-depth={displayPolicy.depth} open={displayPolicy.openTechnicalDetails}>
+                    <summary>{t("settingsPage.modal.technicalDetails")}</summary>
+                    <SourceBoundaryChips values={String(row.source_artifacts || "").split(/[;,]/)} t={t} limit={2} variant="evidence" />
+                  </details>
+                ) : (
+                  <SourceBoundaryChips values={String(row.source_artifacts || "").split(/[;,]/)} t={t} limit={2} variant="evidence" />
+                )}
+              </div>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section className="safety-confirmation__section" aria-labelledby="safety-confirmation-boundary-heading">
+        <div className="safety-confirmation__section-head">
+          <h3 id="safety-confirmation-boundary-heading">{t("security.confirmation.authorityBoundaries")}</h3>
+          <p>{t("security.confirmation.authorityBoundariesDetail")}</p>
+        </div>
+        <div className="security-row-table__grid safety-boundary-table">
+          <div className="security-row-table__head">
+            <span>{t("detail.failure.item")}</span>
+            <span>{t("field.status")}</span>
+            <span>{t("field.risk")}</span>
+            <span>{t("detail.whyItMatters")}</span>
+          </div>
+          {visibleBoundaries.map((boundary) => (
+            <article className="security-row" key={displayText(boundary.id)}>
+              <div className="security-row__name">
+                <Lock aria-hidden="true" size={20} />
+                <strong>{safetyConfirmationLocalized(locale, "boundary", boundary, "label")}</strong>
+              </div>
+              <span className="small-badge small-badge--soft">{t(`security.confirmation.boundaryState.${displayText(boundary.state)}`, displayText(boundary.state))}</span>
+              <span>{t(`risk.${normalizeRisk(boundary.risk_level)}`, displayText(boundary.risk_level))}</span>
+              <div>
+                <p>{safetyConfirmationLocalized(locale, "boundary", boundary, "detail")}</p>
+                <span className="small-badge small-badge--soft">{uiText("approvalRequired", "Approval")}: {boundary.approval_required ? uiText("approvalRequiredYes", "required") : uiText("approvalRequiredNo", "not required")}</span>
+              </div>
+            </article>
+          ))}
+        </div>
+        {displayPolicy?.collapseTechnicalDetails && boundaries.length > visibleBoundaries.length ? <p className="safety-confirmation__more">{showMoreItemsLabel(boundaries.length - visibleBoundaries.length, t)}</p> : null}
+      </section>
+
+      <section className="safety-confirmation__section" aria-labelledby="safety-confirmation-blockers-heading">
+        <div className="safety-confirmation__section-head">
+          <h3 id="safety-confirmation-blockers-heading">{uiText("securityBlockers", "Security blockers")}</h3>
+        </div>
+        {blockers.length ? (
+          <div className="security-row-table__grid safety-boundary-table">
+            <div className="security-row-table__head">
+              <span>{t("detail.failure.item")}</span>
+              <span>{t("field.status")}</span>
+              <span>{t("source.detector.label")}</span>
+              <span>{uiText("nextCheck", "Next check")}</span>
+            </div>
+            {blockers.map((blocker) => (
+              <article className="security-row" key={displayText(blocker.id)}>
+                <div className="security-row__name">
+                  <BadgeAlert aria-hidden="true" size={20} />
+                  <strong>{displayKey(blocker.id)}</strong>
+                </div>
+                <StatusPill value={blocker.status} t={t} />
+                <span>{displayText(blocker.source_id)}</span>
+                <div>
+                  <p>{safetyConfirmationLocalized(locale, "blocker", blocker, "detail")}</p>
+                  <p>{safetyConfirmationLocalized(locale, "blocker", blocker, "next_action") || safetyConfirmationSentence(locale, blocker.next_action)}</p>
+                </div>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <article className="safety-confirmation__list-row">
+            <ShieldCheck aria-hidden="true" size={18} />
+            <div>
+              <strong>{t("security.confirmation.noBlockers")}</strong>
+              <p>{uiText("noBlockerDetail", "No security blocker is stopping the current safety confirmation.")}</p>
+            </div>
+            <StatusPill value="ready" t={t} label={statusLabelForChip("ready", t)} />
+          </article>
+        )}
+      </section>
+
+      <div className="safety-confirmation__lists">
+        <section aria-labelledby="safety-confirmation-execution-boundary-heading">
+          <h3 id="safety-confirmation-execution-boundary-heading">{uiText("executionBoundary", "Approval and execution boundary")}</h3>
+          <article className="safety-confirmation__list-row">
+            <Lock aria-hidden="true" size={18} />
+            <div>
+              <strong>{uiText("approvalReceiptAccess", "Approval receipt access")}</strong>
+              <p>{uiText("approvalReceiptDetail", "The dashboard does not read or write approval receipts here.")}</p>
+            </div>
+            <span>{t(`security.confirmation.boundaryState.${displayText(approvalReceipts.state, "unknown")}`, displayText(approvalReceipts.state, "unknown"))}</span>
+          </article>
+          <article className="safety-confirmation__list-row">
+            <TerminalSquare aria-hidden="true" size={18} />
+            <div>
+              <strong>{uiText("commandPolicy", "Command execution")}</strong>
+              <p>{uiText("commandPolicyDetail", "Commands are preview-only and copy requires safe argv metadata.")}</p>
+            </div>
+            <span>{commandExecutionModeLabel(commandPolicy.execution_mode, t)}</span>
+          </article>
+        </section>
+        <section aria-labelledby="safety-confirmation-display-policy-heading">
+          <h3 id="safety-confirmation-display-policy-heading">{t("security.confirmation.displayPolicy")}</h3>
+          {displayPolicyRows.map((row) => (
+            <article className="safety-confirmation__list-row" key={displayText(row.id)}>
+              <Eye aria-hidden="true" size={18} />
+              <div>
+                <strong>{safetyConfirmationLocalized(locale, "policy", row, "label")}</strong>
+                <p>{safetyConfirmationLocalized(locale, "policy", row, "detail")}</p>
+              </div>
+              <span>{t(`security.confirmation.policyState.${displayText(row.state)}`, displayText(row.state))}</span>
+            </article>
+          ))}
+        </section>
+        <section aria-labelledby="safety-confirmation-actions-heading">
+          <h3 id="safety-confirmation-actions-heading">{t("security.confirmation.recommendedActions")}</h3>
+          {recommendedActions.map((row) => (
+            <article className="safety-confirmation__list-row" key={displayText(row.id)}>
+              <CheckCircle2 aria-hidden="true" size={18} />
+              <div>
+                <strong>{safetyConfirmationLocalized(locale, "action", row, "label")}</strong>
+                <p>{safetyConfirmationLocalized(locale, "action", row, "detail")}</p>
+              </div>
+              <span>{safetyConfirmationActionStateLabel(row.state, locale, t)}</span>
+            </article>
+          ))}
+        </section>
+        <section aria-labelledby="safety-confirmation-restricted-actions-heading">
+          <h3 id="safety-confirmation-restricted-actions-heading">{uiText("restrictedActions", "Actions requiring new scope or approval")}</h3>
+          {restrictedActions.map((row) => (
+            <article className="safety-confirmation__list-row safety-confirmation__list-row--restricted" key={displayText(row.id)}>
+              <Lock aria-hidden="true" size={18} />
+              <div>
+                <strong>{safetyConfirmationLocalized(locale, "action", row, "label")}</strong>
+                <p>{safetyConfirmationLocalized(locale, "action", row, "detail")}</p>
+              </div>
+              <span>{safetyConfirmationActionStateLabel(row.state, locale, t)}</span>
+            </article>
+          ))}
+        </section>
+      </div>
+    </section>
+  );
+}
+
 function SecuritySection({ security, partialFailures, data, locale, t, liveStatus }) {
   const context = selectedContextData(data);
-  const securityItems = objectEntries(security).filter(([id]) => !["approvals", "dangerous_operations"].includes(id)).map(([id, value]) => {
+  const displayPolicy = displayDepthPolicyForData(data);
+  const securityItems = objectEntries(security).filter(([id]) => !["approvals", "dangerous_operations", "confirmation"].includes(id)).map(([id, value]) => {
     const meta = safetyItemMeta(id, t);
     const hasSecurityGateFailure = id === "gate_status" && asArray(partialFailures).some((failure) => normalizeState(failure.status) === "blocked" || displayText(failure.source) === "security_gate");
     return {
@@ -6020,6 +7451,7 @@ function SecuritySection({ security, partialFailures, data, locale, t, liveStatu
     <div className="safety-primary">
       <PageTitleHeader viewId="safety" Icon={ShieldCheck} title={t("security.title")} subtitle={t("security.description")} data={data} locale={locale} t={t} actionLabel={t("detail.refreshDisplayOnly")} headingId="security-heading" />
       <ContextSnapshotStrip data={data} t={t} locale={locale} variant="safety" />
+      <SafetyConfirmationPanel security={security} data={data} t={t} displayPolicy={displayPolicy} locale={locale} />
       <OperationalPageSummaryStack data={data} context={context} liveStatus={liveStatus} pageId="safety" tone="safety" keys={["security", "git_sync", "ci", "local_tests"]} t={t} />
       <DetailDecisionSummary
         tone="safety"
@@ -6033,7 +7465,7 @@ function SecuritySection({ security, partialFailures, data, locale, t, liveStatu
       />
       <OperationalDetailDecisionPanel data={data} context={context} liveStatus={liveStatus} t={t} tone="safety" pageId="safety" keys={["security", "git_sync", "ci", "local_tests"]} />
       <SecurityStatusCards security={security} partialFailures={partialFailures} data={data} t={t} />
-      <LiveEvidenceTable liveStatus={liveStatus} context={context} keys={["security"]} title={t("detail.liveEvidence.safetyTitle")} headingId="safety-live-evidence-heading" t={t} tone="safety" />
+      <LiveEvidenceTable liveStatus={liveStatus} context={context} keys={["security"]} title={t("detail.liveEvidence.safetyTitle")} headingId="safety-live-evidence-heading" t={t} tone="safety" locale={locale} />
       <SecurityRowsTable rows={security?.approvals} title={t("security.approvalTable")} type="approval" t={t} />
       <SecurityRowsTable rows={security?.dangerous_operations} title={t("security.dangerousOperationTable")} type="dangerous" t={t} />
       <SafetyFailuresTable items={partialFailures} t={t} />
@@ -6335,6 +7767,25 @@ function documentBriefSummary(card, t, locale = "en") {
 
 function documentBriefAction(card, t, locale = "en") {
   return localizedDocumentText(card.action, card.action_key, "", locale, t);
+}
+
+function documentBriefAgentSummary(card, t, locale = "en") {
+  const agentSummary = card?.agent_summary;
+  if (!agentSummary || typeof agentSummary !== "object" || Array.isArray(agentSummary)) {
+    return null;
+  }
+  const summary = localizedDocumentText(agentSummary.summary, "", "", locale, t);
+  const detail = localizedDocumentText(agentSummary.detail, "", "", locale, t);
+  if (!summary && !detail) {
+    return null;
+  }
+  return {
+    summary,
+    detail,
+    status: agentSummary.status || card.status || card.freshness_state || "unknown",
+    source: displayText(agentSummary.source, ""),
+    providerMode: displayText(agentSummary.provider_mode, ""),
+  };
 }
 
 function documentBriefSourceLabel(card, t) {
@@ -7273,7 +8724,7 @@ function RepositoryInfoPage({ data, locale, t, liveStatus }) {
         />
       </DetailSection>
       <RepositoryRealStatePanel authority={authority} context={context} t={t} />
-      <LiveEvidenceTable liveStatus={liveStatus} context={context} keys={["git_sync", "ci", "local_tests", "security"]} title={t("detail.liveEvidence.repositoryTitle")} headingId="repository-live-evidence-heading" t={t} tone="workflow" />
+      <LiveEvidenceTable liveStatus={liveStatus} context={context} keys={["git_sync", "ci", "local_tests", "security"]} title={t("detail.liveEvidence.repositoryTitle")} headingId="repository-live-evidence-heading" t={t} tone="workflow" locale={locale} />
       <DetailSection id="repository-file-map" title={t("repositoryInfo.fileMapTitle")} Icon={FileSearch}>
         <RepositoryFileTree rows={fileRows} t={t} defaultExpandDepth={0} />
       </DetailSection>
@@ -10265,6 +11716,8 @@ export default function App() {
   const [pendingMenuId, setPendingMenuId] = useState("");
   const [contextSwitchFailure, setContextSwitchFailure] = useState(null);
   const [contextSwitchProgress, setContextSwitchProgress] = useState(null);
+  const [repositorySelectionState, setRepositorySelectionState] = useState({ status: "idle", repoId: "", menuId: "", message: "" });
+  const [displayDepthSelectionState, setDisplayDepthSelectionState] = useState({ status: "idle", value: "", menuId: "", message: "" });
   const [liveStatus, setLiveStatus] = useState(null);
   const activeMenuIdRef = useRef(initialActiveMenuIdRef.current);
   const pendingMenuIdRef = useRef("");
@@ -10483,9 +11936,23 @@ export default function App() {
         })
         .catch((error) => {
           window.clearTimeout(fallbackTimerId);
-          if (pendingMenuIdRef.current === resolvedMenuId) {
-            setContextSwitchFailure({ menuId: resolvedMenuId, message: displayText(error?.message, "") });
-          }
+          let recovered = false;
+          const recoverFromSavedSnapshot = async () => {
+            try {
+              const savedSnapshot = await refreshSnapshotNow({ savedSnapshotOnly: true, suppressRefreshError: true });
+              recovered = Boolean(savedSnapshot?.data && applyMenuFromSnapshotData(savedSnapshot.data, resolvedMenuId, { fallbackApplied: true }));
+            } catch {
+              recovered = false;
+            }
+          };
+          void recoverFromSavedSnapshot().finally(() => {
+            if (recovered) {
+              return;
+            }
+            if (pendingMenuIdRef.current === resolvedMenuId) {
+              setContextSwitchFailure({ menuId: resolvedMenuId, message: displayText(error?.message, "") });
+            }
+          });
         })
         .finally(() => {
           if (backgroundRefreshMenuIdRef.current === resolvedMenuId) {
@@ -10495,6 +11962,92 @@ export default function App() {
         });
     },
     [applyMenuFromSnapshotData, clearContextSwitchPending, contextSwitchFallbackMs, rawData, refreshSnapshotNow, snapshotMatchesActiveMenu],
+  );
+
+  const handleRepositorySelect = useCallback(
+    async (selection, option) => {
+      const menuId = displayText(selection?.menu_id, "");
+      const repoId = displayText(option?.repo_id, "");
+      if (!menuId || !repoId || option?.selectable !== true || option?.selected === true) {
+        return;
+      }
+      setRepositorySelectionState({ status: "selecting", repoId, menuId, message: "" });
+      try {
+        await selectDashboardProductRepository(menuId, repoId, {
+          snapshotId: displayText(rawData.snapshot_id, ""),
+          contentHash: displayText(rawData.content_hash, ""),
+        });
+        const snapshot = await refreshSnapshotNow({ menuId, suppressRefreshError: true });
+        if (snapshot?.data) {
+          applyMenuFromSnapshotData(snapshot.data, menuId);
+        }
+        setLiveStatus(null);
+        setRepositorySelectionState({ status: "selected", repoId, menuId, message: "" });
+        window.setTimeout(() => {
+          setRepositorySelectionState((current) => (
+            current.status === "selected" && current.repoId === repoId && current.menuId === menuId
+              ? { status: "idle", repoId: "", menuId: "", message: "" }
+              : current
+          ));
+        }, 5000);
+      } catch (error) {
+        setRepositorySelectionState({
+          status: "failed",
+          repoId,
+          menuId,
+          message: displayText(error?.message, t("context.repositorySelection.selectFailed")),
+        });
+      }
+    },
+    [applyMenuFromSnapshotData, rawData.content_hash, rawData.snapshot_id, refreshSnapshotNow, t],
+  );
+
+  const handleDisplayDepthChange = useCallback(
+    async (setting, value, menuId) => {
+      const settingId = displayText(setting?.id, "");
+      const requestedValue = displayText(value, "");
+      const selectedMenuId = displayText(menuId || activeMenuIdRef.current, "");
+      if (settingId !== "dashboard_display_depth" || !requestedValue || setting?.editable !== true || !settingEditableOptions(setting).includes(requestedValue)) {
+        return;
+      }
+      setDisplayDepthSelectionState({ status: "selecting", value: requestedValue, menuId: selectedMenuId, message: "" });
+      try {
+        const plan = await planDashboardSettingChange(settingId, requestedValue, selectedMenuId);
+        if (plan.status === "blocked" || !plan.plan_token) {
+          throw new Error(t(displayText(plan.reason_key, ""), t("overview.displayDepth.changeFailed")));
+        }
+        const result = await applyDashboardSettingChange(settingId, requestedValue, selectedMenuId, plan.plan_token, {
+          snapshotId: displayText(rawData.snapshot_id, ""),
+          contentHash: displayText(rawData.content_hash, ""),
+        });
+        if (!result.applied) {
+          throw new Error(t(displayText(result.reason_key, ""), t("overview.displayDepth.changeFailed")));
+        }
+        const snapshot = await refreshSnapshotNow({ menuId: selectedMenuId, suppressRefreshError: true });
+        if (!settingsSnapshotReconciles(snapshot?.data, settingId, requestedValue, result)) {
+          throw new Error(t("overview.displayDepth.changePending"));
+        }
+        if (snapshot?.data && selectedMenuId) {
+          applyMenuFromSnapshotData(snapshot.data, selectedMenuId, { silent: true });
+        }
+        setDisplayDepthSelectionState({ status: "selected", value: requestedValue, menuId: selectedMenuId, message: "" });
+        window.setTimeout(() => {
+          setDisplayDepthSelectionState((current) => (
+            current.status === "selected" && current.value === requestedValue
+              ? { status: "idle", value: "", menuId: "", message: "" }
+              : current
+          ));
+        }, 2500);
+      } catch (error) {
+        setDisplayDepthSelectionState({
+          status: "failed",
+          value: requestedValue,
+          menuId: selectedMenuId,
+          message: displayText(error?.message, t("overview.displayDepth.changeFailed")),
+        });
+      }
+    },
+    [applyMenuFromSnapshotData, rawData.content_hash, rawData.snapshot_id, refreshSnapshotNow, t],
   );
 
   const activeDashboard = useMemo(() => resolveActiveDashboardData(rawData, activeMenuId), [rawData, activeMenuId]);
@@ -10613,7 +12166,7 @@ export default function App() {
           </section>
         ) : null}
 
-        {loaded && activeView === "overview" ? <OverviewSection data={data} t={t} locale={locale} activeMenuId={activeDashboard.activeMenuId} pendingMenuId={pendingMenuId} onActiveMenuChange={handleActiveMenuChange} liveStatus={liveStatus} /> : null}
+        {loaded && activeView === "overview" ? <OverviewSection data={data} t={t} locale={locale} activeMenuId={activeDashboard.activeMenuId} pendingMenuId={pendingMenuId} onActiveMenuChange={handleActiveMenuChange} onRepositorySelect={handleRepositorySelect} repositorySelectionState={repositorySelectionState} onDisplayDepthChange={handleDisplayDepthChange} displayDepthSelectionState={displayDepthSelectionState} liveStatus={liveStatus} /> : null}
         {loaded && activeView === "lessons" ? <LessonSection lessons={data.lessons || {}} data={data} locale={locale} t={t} liveStatus={liveStatus} /> : null}
         {loaded && evidenceViewNeedsCurrentSnapshot ? <ContextSwitchHoldingPage pendingMenuId={activeDashboard.activeMenuId} t={t} switching={isContextSwitching && !contextSwitchProgress?.fallbackApplied} /> : null}
         {loaded && !evidenceViewNeedsCurrentSnapshot && activeView === "workflow" ? <WorkflowSection development={data.development || {}} gitWorkflow={data.git_workflow || {}} data={data} locale={locale} t={t} liveStatus={liveStatus} /> : null}

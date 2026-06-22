@@ -15,6 +15,7 @@ const runtimeRoot = path.join(repoRoot, ".dashboard-control-center");
 const dashboardDataToolPath = path.join(repoRoot, "tools", "dashboard-data");
 const settingsToolPath = path.join(repoRoot, "tools", "dashboard-settings");
 const designSystemToolPath = path.join(repoRoot, "tools", "dashboard-design-system");
+const productRepositoryRegistryToolPath = path.join(repoRoot, "tools", "product-repository-registry");
 const allowedStates = new Set(["missing", "ready", "passed", "failed", "blocked", "unknown", "approval_required", "optional", "cached", "not_run", "stale", "manual_required", "not_applicable"]);
 const riskLevels = new Set(["low", "medium", "high", "critical"]);
 const partialFailureStates = new Set(["failed", "blocked", "unknown"]);
@@ -24,11 +25,23 @@ const dashboardDisplayDepths = new Set(["friendly", "standard", "technical"]);
 const settingsRelatedPages = new Set(["#overview", "#lessons", "#workflow", "#maintenance", "#safety", "#repository-info", "#documents", "#settings", "#history", "#help"]);
 const dashboardUiLocales = new Set(DASHBOARD_LOCALE_CODES);
 const dashboardUiDirections = new Set(["ltr", "rtl"]);
-const dashboardMenuIds = new Set(["step_1_7", "step_1_14", "advanced", "free-development", "product-improvement", "external-integration", "lesson-repository-improvement"]);
+const dashboardMenuIds = new Set(["step_1_7", "step_1_14", "advanced", "free-development", "product-improvement", "external-integration", "lesson-repository-improvement", "unknown"]);
+const dashboardProductMenuIds = new Set(["free-development", "product-improvement", "external-integration"]);
+const dashboardWorkflowContexts = new Set(["none", "lesson", "free-development", "product-improvement", "external-integration", "lesson-maintenance", "custom", "unknown"]);
 const repositoryPathStates = new Set(["configured", "missing", "not_applicable", "unknown"]);
 const repositorySelectionStates = new Set(["none", "explicit", "fallback", "request", "not_applicable"]);
 const evidenceFreshnessStates = new Set(["current", "stale", "not_collected", "unknown"]);
 const evidenceAuthorities = new Set(["authoritative", "manual_required", "advisory", "not_collected"]);
+const overviewSectionIds = new Set(["overall", "current_work", "docs_sync", "task_tracker", "handoff", "git_pr_ci", "tests", "safety", "blockers", "next_safe_action"]);
+const overviewDetailPages = new Set(["#overview", "#lessons", "#workflow", "#maintenance", "#safety", "#repository-info", "#documents", "#settings", "#history", "#help"]);
+const decisionOwnerSources = new Set(["dashboard-data", "product-authority", "git-workflow", "repository-development-workflow"]);
+const securityBoundaryStates = new Set(["closed", "open", "approval_required", "unknown"]);
+const securityDisplayPolicyStates = new Set(["do_not_display", "redact", "safe", "recommended", "unknown"]);
+const securityConfirmationActionStates = new Set(["safe", "recommended", "approval_required", "blocked", "unknown"]);
+const securityConfirmationReceiptStates = new Set(["closed", "open", "not_configured", "unknown"]);
+const securityUnsafeCommandPolicyStates = new Set(["display_only", "blocked", "approval_required", "unknown"]);
+const maintenanceActionTypes = new Set(["immediate", "later", "blocked"]);
+const maintenanceGitActions = new Set(["none", "commit_or_discard", "pull_required", "push_required", "reconcile_diverged", "select_repository", "not_applicable"]);
 const liveCheckKeys = ["local_tests", "git_sync", "ci", "security"];
 const liveDetailPages = new Set(["#workflow", "#maintenance", "#safety", "#repository-info", "#documents", "#history", "#help"]);
 const ciHeadMatchStates = new Set(["matched", "different", "unknown"]);
@@ -36,7 +49,11 @@ const runtimeActivityCategories = new Set(["ai_agent", "browser_review", "contro
 const runtimeActivityStates = new Set(["running", "exited", "unknown"]);
 const runtimeActivityCwdRoles = new Set(["lesson_repository", "product_repository", "unknown"]);
 const runtimeRedactionStates = new Set(["redacted"]);
-const secretLikePattern = /(SECRET|TOKEN|API_KEY|PASSWORD|PRIVATE_KEY)\s*[:=]\s*[^\s#]{8,}|gh[pousr]_[A-Za-z0-9_]{20,}|sk-[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16}|BEGIN (RSA |OPENSSH |EC |DSA )?PRIVATE KEY/i;
+const secretLikePattern = /(SECRET|TOKEN|API_KEY|PASSWORD|PRIVATE_KEY)\s*[:=]\s*[^\s#]{8,}|Authorization:\s*Bearer\s+[A-Za-z0-9._-]{16,}|Bearer\s+eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}|gh[pousr]_[A-Za-z0-9_]{20,}|sk-[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16}|BEGIN (RSA |OPENSSH |EC |DSA )?PRIVATE KEY/i;
+const rawAbsolutePathPattern = /(^|\s)(\/(?:home|tmp|mnt|var|etc|root|opt|Users)\/|[A-Za-z]:[\\/]|\\\\[^\s\\]+[\\/])/;
+const signedPrivateUrlPattern = /https?:\/\/[^\s"'<>]*(?:X-Amz-Signature|X-Goog-Signature|signature=|sig=|token=|access_token=)[^\s"'<>]*/i;
+const commandTokenPattern = /^(\[absolute-path\]|\.[/][A-Za-z0-9._/-]+|[A-Za-z0-9._:@/%+=,\-[\]]+)$/;
+const safeIdPattern = /^[A-Za-z0-9._:-]{1,160}$/;
 const languageCodePattern = /^[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8})?$|^custom$/;
 const designSystemPlanTokenTtlMs = 10 * 60 * 1000;
 const settingsPlanTokenTtlMs = designSystemPlanTokenTtlMs;
@@ -44,6 +61,7 @@ const designSystemPlanTokens = new Map();
 const settingsPlanTokens = new Map();
 const dashboardDataGenerationByMenu = new Map();
 const dashboardLiveStatusGenerationByMenu = new Map();
+const dashboardDataCacheEpochByMenu = new Map();
 const dashboardDataGenerationTimeoutMs = Math.max(5000, Number(process.env.DASHBOARD_DATA_GENERATION_TIMEOUT_MS || 60000));
 const dashboardLiveStatusGenerationTimeoutMs = Math.max(3000, Number(process.env.DASHBOARD_LIVE_STATUS_GENERATION_TIMEOUT_MS || 10000));
 let lastDashboardDataValidationError = "";
@@ -81,7 +99,27 @@ function safeScopedRelativePath(value) {
   if (typeof value !== "string") {
     return false;
   }
-  return value.startsWith("product:") ? safeRelativePath(value.slice("product:".length)) : safeRelativePath(value);
+  if (/^[A-Za-z][A-Za-z0-9+.-]*:\/\//.test(value)) {
+    return false;
+  }
+  if (value.startsWith("product:")) {
+    return safeRelativePath(value.slice("product:".length));
+  }
+  if (value.includes(":")) {
+    return false;
+  }
+  return safeRelativePath(value);
+}
+
+function safeScopedReferenceList(value) {
+  if (typeof value !== "string" || !value.trim()) {
+    return false;
+  }
+  return value
+    .split(/[;,]/)
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .every((item) => item === "not_collected" || item === "not_applicable" || item === "none" || safeScopedRelativePath(item));
 }
 
 function safeRuntimePreview(value) {
@@ -93,6 +131,309 @@ function safeRuntimePreview(value) {
     return false;
   }
   return !/(^|\s)(\/|[A-Za-z]:[\\/]|\\\\)/.test(normalized);
+}
+
+function dashboardDataContainsUnsafeValue(value, seen = new Set()) {
+  if (value === null || value === undefined) {
+    return false;
+  }
+  if (typeof value === "string") {
+    return secretLikePattern.test(value) || rawAbsolutePathPattern.test(value) || signedPrivateUrlPattern.test(value);
+  }
+  if (Array.isArray(value)) {
+    return value.some((item) => dashboardDataContainsUnsafeValue(item, seen));
+  }
+  if (typeof value === "object") {
+    if (seen.has(value)) {
+      return false;
+    }
+    seen.add(value);
+    return Object.values(value).some((item) => dashboardDataContainsUnsafeValue(item, seen));
+  }
+  return false;
+}
+
+function safeCommandPreviewToken(value) {
+  if (typeof value !== "string") {
+    return false;
+  }
+  const normalized = value.replace(/[\u0000-\u001f]/g, "").trim();
+  return Boolean(
+    normalized &&
+      normalized.length <= 160 &&
+      !secretLikePattern.test(normalized) &&
+      !rawAbsolutePathPattern.test(normalized) &&
+      !signedPrivateUrlPattern.test(normalized) &&
+      !/[;&|`$<>]/.test(normalized) &&
+      !/\s/.test(normalized) &&
+      commandTokenPattern.test(normalized),
+  );
+}
+
+function safeCommandPreviewText(value) {
+  if (typeof value !== "string") {
+    return false;
+  }
+  const normalized = value.replace(/[\u0000-\u001f]/g, "").replace(/\s+/g, " ").trim();
+  return Boolean(
+    normalized &&
+      normalized.length <= 240 &&
+      !secretLikePattern.test(normalized) &&
+      !rawAbsolutePathPattern.test(normalized) &&
+      !signedPrivateUrlPattern.test(normalized) &&
+      !/[;&|`$<>]/.test(normalized),
+  );
+}
+
+function validateRepositoryContextScope(data) {
+  const selected = data.selected_context;
+  const selection = data.repository_selection;
+  const scope = data.repository_scope;
+  if (!isObject(selected) || !isObject(selected.target_repository) || !isObject(selection) || !isObject(scope)) {
+    return validationFailure("invalid_repository_context_scope");
+  }
+  const menuId = String(selected.menu_id || "");
+  const workflowContext = String(selected.workflow_context || "");
+  const selectedRepoId = String(selected.target_repository.repo_id || "");
+  if (!dashboardMenuIds.has(menuId) || !dashboardWorkflowContexts.has(workflowContext) || !safeIdPattern.test(selectedRepoId)) {
+    return validationFailure("invalid_selected_context_scope");
+  }
+  if (
+    String(selection.menu_id || "") !== menuId ||
+    String(selection.workflow_context || "") !== workflowContext ||
+    !repositorySelectionStates.has(String(selection.selection_state || "")) ||
+    !nonEmptyString(selection.current_repo_id) ||
+    !nonEmptyString(selection.current_repository_name) ||
+    !safeRelativePath(selection.registry_file) ||
+    !safeRelativePath(selection.selection_file)
+  ) {
+    return validationFailure("invalid_repository_selection_scope");
+  }
+  const currentRepoId = String(selection.current_repo_id || "");
+  if (!["not_applicable", "not_selected"].includes(currentRepoId) && currentRepoId !== selectedRepoId) {
+    return validationFailure("repository_selection_selected_context_mismatch");
+  }
+  if (
+    String(scope.menu_id || "") !== menuId ||
+    String(scope.workflow_context || "") !== workflowContext ||
+    String(scope.repo_id || "") !== selectedRepoId ||
+    !repositoryPathStates.has(String(scope.path_state || "")) ||
+    !repositoryPathStates.has(String(scope.git_state || ""))
+  ) {
+    return validationFailure("invalid_repository_scope");
+  }
+  return true;
+}
+
+function validateSecurityConfirmation(data) {
+  const confirmation = data.security?.confirmation;
+  if (!isObject(confirmation)) {
+    return validationFailure("invalid_security_confirmation");
+  }
+  const allowedKeys = new Set(["status", "observed_at", "menu_id", "workflow_context", "repo_id", "repository_name", "product_head", "current_result", "safe_next_action", "approval_receipts", "unsafe_command_policy", "evidence", "authority_boundaries", "display_policy", "blockers", "recommended_actions", "restricted_actions"]);
+  for (const key of Object.keys(confirmation)) {
+    if (!allowedKeys.has(key)) {
+      return validationFailure(`invalid_security_confirmation_key:${key}`);
+    }
+  }
+  if (
+    !allowedStates.has(String(confirmation.status || "")) ||
+    String(confirmation.menu_id || "") !== String(data.selected_context?.menu_id || "") ||
+    String(confirmation.workflow_context || "") !== String(data.selected_context?.workflow_context || "") ||
+    String(confirmation.repo_id || "") !== String(data.selected_context?.target_repository?.repo_id || "") ||
+    !nonEmptyString(confirmation.repository_name) ||
+    !nonEmptyString(confirmation.current_result) ||
+    !nonEmptyString(confirmation.safe_next_action)
+  ) {
+    return validationFailure("invalid_security_confirmation_scope");
+  }
+  const receipts = confirmation.approval_receipts;
+  if (!isObject(receipts) || !securityConfirmationReceiptStates.has(String(receipts.state || "")) || receipts.read_allowed !== false || receipts.write_allowed !== false || !nonEmptyString(receipts.receipt_reference)) {
+    return validationFailure("invalid_security_confirmation_receipts");
+  }
+  const commandPolicy = confirmation.unsafe_command_policy;
+  if (!isObject(commandPolicy) || !securityUnsafeCommandPolicyStates.has(String(commandPolicy.state || "")) || commandPolicy.execution_mode !== "preview_only" || commandPolicy.copy_requires_safe_argv !== true) {
+    return validationFailure("invalid_security_confirmation_command_policy");
+  }
+  const evidenceRows = Array.isArray(confirmation.evidence) ? confirmation.evidence : [];
+  if (!evidenceRows.length) {
+    return validationFailure("invalid_security_confirmation_evidence_empty");
+  }
+  for (const row of evidenceRows) {
+    if (
+      !isObject(row) ||
+      !nonEmptyString(row.id) ||
+      !nonEmptyString(row.label) ||
+      !allowedStates.has(String(row.status || "")) ||
+      !nonEmptyString(row.source_id) ||
+      !evidenceFreshnessStates.has(String(row.freshness_state || "")) ||
+      !evidenceAuthorities.has(String(row.authority || "")) ||
+      !nonEmptyString(row.observed_at) ||
+      !safeScopedReferenceList(row.source_artifacts) ||
+      !nonEmptyString(row.meaning) ||
+      !nonEmptyString(row.next_action)
+    ) {
+      return validationFailure("invalid_security_confirmation_evidence");
+    }
+  }
+  const boundaries = Array.isArray(confirmation.authority_boundaries) ? confirmation.authority_boundaries : [];
+  if (!boundaries.length) {
+    return validationFailure("invalid_security_confirmation_boundaries_empty");
+  }
+  for (const row of boundaries) {
+    if (!isObject(row) || !nonEmptyString(row.id) || !nonEmptyString(row.label) || !securityBoundaryStates.has(String(row.state || "")) || typeof row.approval_required !== "boolean" || !riskLevels.has(String(row.risk_level || "")) || !nonEmptyString(row.detail)) {
+      return validationFailure("invalid_security_confirmation_boundary");
+    }
+    if (row.state === "open") {
+      return validationFailure("open_security_confirmation_boundary");
+    }
+  }
+  const displayPolicyRows = Array.isArray(confirmation.display_policy) ? confirmation.display_policy : [];
+  if (!displayPolicyRows.length) {
+    return validationFailure("invalid_security_confirmation_display_policy_empty");
+  }
+  for (const row of displayPolicyRows) {
+    if (!isObject(row) || !nonEmptyString(row.id) || !nonEmptyString(row.label) || !securityDisplayPolicyStates.has(String(row.state || "")) || !nonEmptyString(row.detail)) {
+      return validationFailure("invalid_security_confirmation_display_policy");
+    }
+  }
+  for (const collectionName of ["recommended_actions", "restricted_actions"]) {
+    const rows = Array.isArray(confirmation[collectionName]) ? confirmation[collectionName] : [];
+    if (!rows.length) {
+      return validationFailure(`invalid_security_confirmation_${collectionName}_empty`);
+    }
+    for (const row of rows) {
+      if (!isObject(row) || !nonEmptyString(row.id) || !nonEmptyString(row.label) || !securityConfirmationActionStates.has(String(row.state || "")) || !nonEmptyString(row.detail)) {
+        return validationFailure(`invalid_security_confirmation_${collectionName}`);
+      }
+    }
+  }
+  const blockers = Array.isArray(confirmation.blockers) ? confirmation.blockers : [];
+  for (const blocker of blockers) {
+    if (!isObject(blocker) || !nonEmptyString(blocker.id) || !allowedStates.has(String(blocker.status || "")) || !nonEmptyString(blocker.source_id) || !nonEmptyString(blocker.detail) || !nonEmptyString(blocker.next_action)) {
+      return validationFailure("invalid_security_confirmation_blocker");
+    }
+  }
+  return true;
+}
+
+function safeMaintenanceReference(value) {
+  return nonEmptyString(value) && (safeScopedReferenceList(value) || safeIdPattern.test(value));
+}
+
+function validateMaintenanceSyncRow(row) {
+  return Boolean(
+    isObject(row) &&
+      nonEmptyString(row.id) &&
+      nonEmptyString(row.label) &&
+      allowedStates.has(String(row.status || "")) &&
+      nonEmptyString(row.source_id) &&
+      evidenceFreshnessStates.has(String(row.freshness_state || "")) &&
+      evidenceAuthorities.has(String(row.authority || "")) &&
+      nonEmptyString(row.observed_at) &&
+      nonEmptyString(row.detail) &&
+      nonEmptyString(row.next_action) &&
+      safeMaintenanceReference(row.reference) &&
+      riskLevels.has(String(row.priority || "")),
+  );
+}
+
+function validateMaintenanceAction(row) {
+  return Boolean(
+    isObject(row) &&
+      nonEmptyString(row.id) &&
+      nonEmptyString(row.label) &&
+      allowedStates.has(String(row.status || "")) &&
+      maintenanceActionTypes.has(String(row.action_type || "")) &&
+      nonEmptyString(row.detail) &&
+      nonEmptyString(row.source_id),
+  );
+}
+
+function validateNonNegativeInteger(value) {
+  return Number.isInteger(value) && value >= 0;
+}
+
+function validateMaintenanceSyncState(data) {
+  const state = data.maintenance_sync_state;
+  if (!isObject(state)) {
+    return validationFailure("invalid_maintenance_sync_state");
+  }
+  if (
+    !allowedStates.has(String(state.status || "")) ||
+    String(state.menu_id || "") !== String(data.selected_context?.menu_id || "") ||
+    String(state.workflow_context || "") !== String(data.selected_context?.workflow_context || "") ||
+    String(state.repo_id || "") !== String(data.selected_context?.target_repository?.repo_id || "") ||
+    !nonEmptyString(state.repository_name) ||
+    !nonEmptyString(state.observed_at)
+  ) {
+    return validationFailure("invalid_maintenance_sync_state_scope");
+  }
+  const summary = state.sync_summary;
+  if (
+    !isObject(summary) ||
+    !allowedStates.has(String(summary.status || "")) ||
+    typeof summary.immediate_action_required !== "boolean" ||
+    !validateNonNegativeInteger(summary.blocker_count) ||
+    !validateNonNegativeInteger(summary.warning_count) ||
+    !nonEmptyString(summary.current_result) ||
+    !nonEmptyString(summary.next_safe_action)
+  ) {
+    return validationFailure("invalid_maintenance_sync_summary");
+  }
+  const gitState = state.git_state;
+  if (
+    !isObject(gitState) ||
+    !allowedStates.has(String(gitState.status || "")) ||
+    !allowedStates.has(String(gitState.sync_status || "")) ||
+    !maintenanceGitActions.has(String(gitState.action_needed || "")) ||
+    !nonEmptyString(gitState.source_id) ||
+    !nonEmptyString(gitState.observed_at) ||
+    !["staged_count", "unstaged_count", "untracked_count", "changed_count", "ahead", "behind", "worktree_count"].every((field) => validateNonNegativeInteger(gitState[field]))
+  ) {
+    return validationFailure("invalid_maintenance_git_state");
+  }
+  const ciState = state.ci_state;
+  if (
+    !isObject(ciState) ||
+    !["status", "branch_ci_status", "pr_ci_status", "main_ci_status", "provider_visibility_status", "local_tests_status"].every((field) => allowedStates.has(String(ciState[field] || ""))) ||
+    !ciHeadMatchStates.has(String(ciState.head_match_status || "")) ||
+    !Array.isArray(ciState.annotations) ||
+    ciState.annotations.some((row) => !validateMaintenanceSyncRow(row))
+  ) {
+    return validationFailure("invalid_maintenance_ci_state");
+  }
+  const productGateEvidence = state.product_gate_evidence;
+  if (
+    !isObject(productGateEvidence) ||
+    !allowedStates.has(String(productGateEvidence.status || "")) ||
+    !Array.isArray(productGateEvidence.layers) ||
+    productGateEvidence.layers.length < 4 ||
+    productGateEvidence.layers.some((row) => !validateMaintenanceSyncRow(row))
+  ) {
+    return validationFailure("invalid_maintenance_product_gate_evidence");
+  }
+  const documentationSync = state.documentation_sync;
+  if (
+    !isObject(documentationSync) ||
+    !allowedStates.has(String(documentationSync.status || "")) ||
+    !Array.isArray(documentationSync.rows) ||
+    documentationSync.rows.length < 5 ||
+    documentationSync.rows.some((row) => !validateMaintenanceSyncRow(row))
+  ) {
+    return validationFailure("invalid_maintenance_documentation_sync");
+  }
+  for (const key of ["maintenance_warnings", "evidence_links"]) {
+    if (!Array.isArray(state[key]) || state[key].some((row) => !validateMaintenanceSyncRow(row))) {
+      return validationFailure(`invalid_maintenance_${key}`);
+    }
+  }
+  for (const key of ["recommended_actions", "blocked_actions"]) {
+    if (!Array.isArray(state[key]) || state[key].some((row) => !validateMaintenanceAction(row))) {
+      return validationFailure(`invalid_maintenance_${key}`);
+    }
+  }
+  return true;
 }
 
 function validateSettingsCatalog(settings) {
@@ -246,6 +587,9 @@ export function validateDashboardData(body) {
   } catch {
     return validationFailure("invalid_json");
   }
+  if (dashboardDataContainsUnsafeValue(data)) {
+    return validationFailure("unsafe_dashboard_value");
+  }
   if (!data || typeof data !== "object" || !/^[0-9]+\.[0-9]+\.[0-9]+$/.test(String(data.schema_version || ""))) {
     return validationFailure("invalid_schema_version");
   }
@@ -288,6 +632,39 @@ export function validateDashboardData(body) {
   ) {
     return validationFailure("invalid_primary_action");
   }
+  const overviewSections = Array.isArray(data.summary.overview_sections) ? data.summary.overview_sections : null;
+  if (!overviewSections) {
+    return validationFailure("missing_overview_sections");
+  }
+  const seenOverviewSections = new Set();
+  for (const section of overviewSections) {
+    const id = String(section?.id || "");
+    const requiredCommand = String(section?.required_command || "");
+    if (
+      !isObject(section) ||
+      !overviewSectionIds.has(id) ||
+      seenOverviewSections.has(id) ||
+      !nonEmptyString(section.title_key) ||
+      !allowedStates.has(String(section.status || "")) ||
+      !nonEmptyString(section.value) ||
+      !nonEmptyString(section.detail) ||
+      !nonEmptyString(section.source_id) ||
+      !decisionOwnerSources.has(String(section.owner_source || "")) ||
+      !evidenceFreshnessStates.has(String(section.freshness_state || "")) ||
+      !evidenceAuthorities.has(String(section.authority || "")) ||
+      !overviewDetailPages.has(String(section.detail_page || "")) ||
+      !nonEmptyString(requiredCommand) ||
+      (requiredCommand !== "not_applicable" && !safeCommandPreviewText(requiredCommand))
+    ) {
+      return validationFailure(`invalid_overview_section:${id || "missing"}`);
+    }
+    seenOverviewSections.add(id);
+  }
+  for (const id of overviewSectionIds) {
+    if (!seenOverviewSections.has(id)) {
+      return validationFailure(`missing_overview_section:${id}`);
+    }
+  }
   const metrics = data.summary.category_metrics;
   for (const key of ["overview", "lessons", "workflow", "maintenance", "security"]) {
     const metric = metrics?.[key];
@@ -320,19 +697,40 @@ export function validateDashboardData(body) {
   if (!validateSettingsCatalog(data.settings)) {
     return validationFailure(lastDashboardDataValidationError || "invalid_settings_catalog");
   }
+  if (!validateRepositoryContextScope(data)) {
+    return false;
+  }
+  if (!validateSecurityConfirmation(data)) {
+    return false;
+  }
+  if (!validateMaintenanceSyncState(data)) {
+    return false;
+  }
   const workflowLanguageItem = Array.isArray(data.settings?.items) ? data.settings.items.find((item) => item?.id === "workflow_language") : null;
   if (workflowLanguageItem && data.summary.workflow_language && workflowLanguageItem.current_value !== data.summary.workflow_language) {
     return validationFailure("workflow_language_summary_mismatch");
   }
   const previews = Array.isArray(data.actions?.command_previews) ? data.actions.command_previews : [];
   for (const preview of previews) {
+    const argv = Array.isArray(preview?.argv) ? preview.argv : [];
+    const safeArgv = Array.isArray(preview?.safe_argv) ? preview.safe_argv : [];
     if (
       !preview ||
       typeof preview !== "object" ||
+      !/^cmd-[a-f0-9]{12}$/.test(String(preview.command_id || "")) ||
       preview.execution_mode !== "preview_only" ||
       preview.non_executable !== true ||
       !riskLevels.has(String(preview.risk_level || "")) ||
-      typeof preview.requires_approval !== "boolean"
+      typeof preview.requires_approval !== "boolean" ||
+      typeof preview.argv_redacted !== "boolean" ||
+      typeof preview.copy_allowed !== "boolean" ||
+      !nonEmptyString(preview.copy_block_reason) ||
+      argv.length === 0 ||
+      argv.length !== safeArgv.length ||
+      JSON.stringify(argv) !== JSON.stringify(safeArgv) ||
+      [...argv, ...safeArgv].some((token) => !safeCommandPreviewToken(token)) ||
+      !safeCommandPreviewText(preview.command_text) ||
+      (preview.copy_allowed === true && (preview.requires_approval === true || preview.argv_redacted === true || String(preview.risk_level || "") !== "low"))
     ) {
       return validationFailure("invalid_command_preview");
     }
@@ -360,7 +758,7 @@ function validateDashboardLiveCheckItemPayload(item, key) {
   if (!nonEmptyString(item.summary) || !nonEmptyString(item.next_command)) {
     return validationFailure(`invalid_live_status_check_item_decision:${key}`);
   }
-  if (item.source_artifacts !== undefined && typeof item.source_artifacts !== "string") {
+  if (item.source_artifacts !== undefined && (typeof item.source_artifacts !== "string" || !safeScopedReferenceList(item.source_artifacts))) {
     return validationFailure(`invalid_live_status_check_item_source_artifacts:${key}`);
   }
   if (item.blocker_count !== undefined && !validNonNegativeNumber(item.blocker_count)) {
@@ -461,6 +859,9 @@ export function validateDashboardLiveStatus(body) {
   } catch {
     return validationFailure("invalid_live_status_json");
   }
+  if (dashboardDataContainsUnsafeValue(data)) {
+    return validationFailure("unsafe_live_status_value");
+  }
   if (!isObject(data) || data.schema_version !== "0.1.0" || !nonEmptyString(data.generated_at)) {
     return validationFailure("invalid_live_status_identity");
   }
@@ -509,6 +910,10 @@ function sendJson(response, statusCode, payload) {
   response.end(JSON.stringify(payload));
 }
 
+function safeFailurePayload(error, detailCode) {
+  return { error, detail_code: detailCode };
+}
+
 function dashboardRuntimeDataFile() {
   return dashboardDataFile() || path.join(runtimeRoot, "dashboard-data.json");
 }
@@ -542,13 +947,26 @@ function readCachedDashboardDataForMenu(menuId) {
   }
 }
 
-function writeDashboardDataCache(body) {
+function dashboardDataCacheEpoch(menuId) {
+  return dashboardDataCacheEpochByMenu.get(menuId) || 0;
+}
+
+function bumpDashboardDataCacheEpoch(menuId) {
+  const nextEpoch = dashboardDataCacheEpoch(menuId) + 1;
+  dashboardDataCacheEpochByMenu.set(menuId, nextEpoch);
+  return nextEpoch;
+}
+
+function writeDashboardDataCache(body, menuId = "", expectedEpoch = null) {
   if (!validateDashboardData(body)) {
     return false;
   }
-  fs.mkdirSync(runtimeRoot, { recursive: true });
-  const dataFile = path.join(runtimeRoot, "dashboard-data.json");
-  const tmpFile = path.join(runtimeRoot, `.dashboard-data.${process.pid}.${Date.now()}.tmp`);
+  if (menuId && expectedEpoch !== null && dashboardDataCacheEpoch(menuId) !== expectedEpoch) {
+    return false;
+  }
+  const dataFile = dashboardRuntimeDataFile();
+  fs.mkdirSync(path.dirname(dataFile), { recursive: true });
+  const tmpFile = path.join(path.dirname(dataFile), `.dashboard-data.${process.pid}.${Date.now()}.tmp`);
   fs.writeFileSync(tmpFile, body, { mode: 0o600 });
   fs.renameSync(tmpFile, dataFile);
   return true;
@@ -564,6 +982,10 @@ function sendDashboardDataBody(response, method, body, source) {
 
 function safeSettingsToken(value) {
   return typeof value === "string" && /^[A-Za-z0-9_.:-]+$/.test(value) ? value : "";
+}
+
+function safeProductRepositoryId(value) {
+  return typeof value === "string" && /^[A-Za-z0-9._-]+$/.test(value) ? value : "";
 }
 
 function safeSettingsPlanToken(value) {
@@ -613,6 +1035,15 @@ function settingsSnapshotIdentity(dataFile) {
   }
 }
 
+function settingsSnapshotMatchesMenu(dataFile, menuId) {
+  try {
+    const body = fs.readFileSync(dataFile, "utf8");
+    return validateDashboardData(body) && dashboardDataMatchesRequestedMenu(body, menuId);
+  } catch {
+    return false;
+  }
+}
+
 function settingsPlanFingerprint(result, snapshotIdentity) {
   return JSON.stringify([
     result.setting_id,
@@ -645,6 +1076,28 @@ function runSettingsTool(args, menuId, dataFile) {
           DASHBOARD_SELECTED_MENU_ID: menuId,
           DASHBOARD_CONTROL_CENTER_DATA_FILE: dataFile,
         },
+        maxBuffer: 1024 * 1024,
+        windowsHide: true,
+      },
+      (error, stdout = "", stderr = "") => {
+        if (error) {
+          resolve({ error, stdout, stderr });
+          return;
+        }
+        resolve({ stdout, stderr });
+      },
+    );
+  });
+}
+
+function runProductRepositoryRegistryTool(args) {
+  return new Promise((resolve) => {
+    execFile(
+      productRepositoryRegistryToolPath,
+      args,
+      {
+        cwd: repoRoot,
+        env: process.env,
         maxBuffer: 1024 * 1024,
         windowsHide: true,
       },
@@ -743,15 +1196,17 @@ function generateDashboardDataForMenu(menuId, response, method) {
   const cached = readCachedDashboardDataForMenu(menuId);
   let generation = dashboardDataGenerationByMenu.get(menuId);
   if (!generation) {
+    const cacheEpoch = dashboardDataCacheEpoch(menuId);
     generation = runDashboardDataTool(menuId).finally(() => {
       dashboardDataGenerationByMenu.delete(menuId);
     });
+    generation.cacheEpoch = cacheEpoch;
     dashboardDataGenerationByMenu.set(menuId, generation);
   }
   if (cached) {
     generation.then(({ error, stdout }) => {
       if (!error && validateDashboardData(stdout) && dashboardDataMatchesRequestedMenu(stdout, menuId)) {
-        writeDashboardDataCache(stdout);
+        writeDashboardDataCache(stdout, menuId, generation.cacheEpoch);
       }
     });
     sendDashboardDataBody(response, method, cached.body, "cache");
@@ -761,7 +1216,7 @@ function generateDashboardDataForMenu(menuId, response, method) {
     if (error) {
       response.statusCode = 503;
       response.setHeader("content-type", "application/json; charset=utf-8");
-      response.end(JSON.stringify({ error: String(stderr || error.message).trim() || "dashboard data generation failed" }));
+      response.end(JSON.stringify(safeFailurePayload("dashboard data generation failed", "dashboard_data_generation_failed")));
       return;
     }
     if (!validateDashboardData(stdout)) {
@@ -776,7 +1231,7 @@ function generateDashboardDataForMenu(menuId, response, method) {
       response.end(JSON.stringify({ error: "dashboard data selected menu mismatch" }));
       return;
     }
-    writeDashboardDataCache(stdout);
+    writeDashboardDataCache(stdout, menuId, generation.cacheEpoch);
     sendDashboardDataBody(response, method, stdout, "generated");
   });
 }
@@ -793,7 +1248,7 @@ function generateDashboardLiveStatusForMenu(menuId, response, method) {
     if (error) {
       response.statusCode = 503;
       response.setHeader("content-type", "application/json; charset=utf-8");
-      response.end(JSON.stringify({ error: String(stderr || error.message).trim() || "dashboard live status failed" }));
+      response.end(JSON.stringify(safeFailurePayload("dashboard live status failed", "dashboard_live_status_failed")));
       return;
     }
     if (!validateDashboardLiveStatus(stdout)) {
@@ -997,7 +1452,7 @@ function dashboardSettingsMutationMiddleware(command) {
 
     const planned = await runSettingsTool(planArgs, menuId, dataFile);
     if (planned.error) {
-      sendJson(response, 422, { error: String(planned.stderr || planned.error.message).trim() || "settings update failed" });
+      sendJson(response, 422, safeFailurePayload("settings update failed", "settings_update_failed"));
       return;
     }
     const parsedPlan = parseSettingsToolResult(planned.stdout);
@@ -1042,7 +1497,7 @@ function dashboardSettingsMutationMiddleware(command) {
     ];
     const applied = await runSettingsTool(applyArgs, menuId, dataFile);
     if (applied.error) {
-      sendJson(response, 422, { error: String(applied.stderr || applied.error.message).trim() || "settings update failed" });
+      sendJson(response, 422, safeFailurePayload("settings update failed", "settings_update_failed"));
       return;
     }
     const parsedApply = parseSettingsToolResult(applied.stdout);
@@ -1051,6 +1506,106 @@ function dashboardSettingsMutationMiddleware(command) {
       return;
     }
     sendJson(response, 200, parsedApply);
+  };
+}
+
+function dashboardProductRepositorySelectionMiddleware() {
+  return async (request, response) => {
+    if (request.method !== "POST") {
+      response.statusCode = 405;
+      response.end("method not allowed");
+      return;
+    }
+    if (!requestHasJsonContentType(request)) {
+      sendJson(response, 415, { error: "product repository selection requires application/json" });
+      return;
+    }
+    if (!requestIsSameOrigin(request)) {
+      sendJson(response, 403, { error: "product repository selection requires same-origin dashboard access" });
+      return;
+    }
+
+    let payload;
+    try {
+      payload = await readSettingsJsonBody(request);
+    } catch (error) {
+      sendJson(response, 400, { error: error.message });
+      return;
+    }
+
+    const allowedPayloadKeys = new Set(["menu_id", "repo_id", "confirm", "snapshot_id", "content_hash"]);
+    if (!payload || typeof payload !== "object" || Array.isArray(payload) || Object.keys(payload).some((key) => !allowedPayloadKeys.has(key))) {
+      sendJson(response, 400, { error: "product repository selection contains unsupported fields" });
+      return;
+    }
+    if (payload.confirm !== true) {
+      sendJson(response, 400, { error: "product repository selection requires explicit confirmation" });
+      return;
+    }
+
+    const menuId = safeSettingsToken(payload.menu_id);
+    const repoId = safeProductRepositoryId(payload.repo_id);
+    if (!menuId || !repoId || !dashboardProductMenuIds.has(menuId)) {
+      sendJson(response, 400, { error: "product repository selection contains an invalid menu or repository id" });
+      return;
+    }
+
+    const dataFile = dashboardRuntimeDataFile();
+    const snapshotIdentity = settingsSnapshotIdentity(dataFile);
+    if (!payload.snapshot_id || String(payload.snapshot_id || "") !== snapshotIdentity.snapshotId) {
+      sendJson(response, 409, { error: "product repository selection requires the current dashboard snapshot" });
+      return;
+    }
+    if (!payload.content_hash || String(payload.content_hash || "") !== snapshotIdentity.contentHash) {
+      sendJson(response, 409, { error: "product repository selection requires the current dashboard snapshot" });
+      return;
+    }
+    if (!settingsSnapshotMatchesMenu(dataFile, menuId)) {
+      sendJson(response, 409, { error: "product repository selection requires a dashboard snapshot for the selected menu" });
+      return;
+    }
+
+    const selectEpoch = bumpDashboardDataCacheEpoch(menuId);
+    const selected = await runProductRepositoryRegistryTool(["select", menuId, repoId, "--confirm", "--source", "dashboard"]);
+    if (selected.error) {
+      sendJson(response, 422, safeFailurePayload("product repository selection failed", "product_repository_selection_failed"));
+      return;
+    }
+
+    const regenerated = await runDashboardDataTool(menuId);
+    if (regenerated.error) {
+      sendJson(response, 503, safeFailurePayload("dashboard data regeneration failed after product repository selection", "dashboard_data_regeneration_failed_after_product_repository_selection"));
+      return;
+    }
+    if (!validateDashboardData(regenerated.stdout)) {
+      sendJson(response, 422, { error: "regenerated dashboard data failed validation after product repository selection" });
+      return;
+    }
+    if (!dashboardDataMatchesRequestedMenu(regenerated.stdout, menuId)) {
+      sendJson(response, 422, { error: "regenerated dashboard data selected menu mismatch after product repository selection" });
+      return;
+    }
+    if (!writeDashboardDataCache(regenerated.stdout, menuId, selectEpoch)) {
+      sendJson(response, 409, { error: "dashboard data changed while product repository selection was refreshing" });
+      return;
+    }
+
+    let snapshot = {};
+    try {
+      snapshot = JSON.parse(regenerated.stdout);
+    } catch {
+      snapshot = {};
+    }
+    sendJson(response, 200, {
+      status: "passed",
+      applied: true,
+      menu_id: menuId,
+      repo_id: repoId,
+      snapshot_regenerated: true,
+      snapshot_id: String(snapshot.snapshot_id || ""),
+      content_hash: String(snapshot.content_hash || ""),
+      tool_command: `tools/product-repository-registry select ${menuId} ${repoId} --confirm --source dashboard`,
+    });
   };
 }
 
@@ -1354,7 +1909,7 @@ function dashboardDesignSystemMutationMiddleware(command) {
       },
       (error, stdout, stderr) => {
         if (error) {
-          sendJson(response, 422, { error: String(stderr || error.message).trim() || "design-system update failed" });
+          sendJson(response, 422, safeFailurePayload("design-system update failed", "design_system_update_failed"));
           return;
         }
         try {
@@ -1377,6 +1932,7 @@ function dashboardDataFilePlugin() {
     configureServer(server) {
       server.middlewares.use("/dashboard-settings/plan", dashboardSettingsMutationMiddleware("plan"));
       server.middlewares.use("/dashboard-settings/apply", dashboardSettingsMutationMiddleware("apply"));
+      server.middlewares.use("/dashboard-product-repository/select", dashboardProductRepositorySelectionMiddleware());
       server.middlewares.use("/dashboard-design-system/plan", dashboardDesignSystemMutationMiddleware("plan-interaction"));
       server.middlewares.use("/dashboard-design-system/apply", dashboardDesignSystemMutationMiddleware("apply-interaction"));
       server.middlewares.use("/dashboard-live-status.json", (request, response) => {

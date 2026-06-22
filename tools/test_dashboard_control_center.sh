@@ -427,6 +427,54 @@ function parseJson(response, label) {
     "sec-fetch-site": "same-origin",
     "content-type": "application/json; charset=utf-8",
   };
+  const productSnapshot = parseJson(await request("GET", "/dashboard-data.json?menu_id=free-development"), "free-development dashboard data");
+  if (productSnapshot.selected_context?.menu_id !== "free-development") {
+    fail("product repository selection middleware setup did not serve a free-development snapshot");
+  }
+  const productSelectionWrongMenu = await request(
+    "POST",
+    "/dashboard-product-repository/select",
+    sameOriginHeaders,
+    JSON.stringify({
+      menu_id: "product-improvement",
+      repo_id: "unknown-repository",
+      snapshot_id: productSnapshot.snapshot_id,
+      content_hash: productSnapshot.content_hash,
+      confirm: true,
+    }),
+  );
+  if (productSelectionWrongMenu.status !== 409) {
+    fail(`product repository selection accepted a mismatched menu snapshot with ${productSelectionWrongMenu.status}`);
+  }
+  const productSelectionUnknownRepo = await request(
+    "POST",
+    "/dashboard-product-repository/select",
+    sameOriginHeaders,
+    JSON.stringify({
+      menu_id: "free-development",
+      repo_id: "unknown-repository",
+      snapshot_id: productSnapshot.snapshot_id,
+      content_hash: productSnapshot.content_hash,
+      confirm: true,
+    }),
+  );
+  if (productSelectionUnknownRepo.status !== 422) {
+    fail(`product repository selection did not reject an unknown repository with ${productSelectionUnknownRepo.status}: ${productSelectionUnknownRepo.body}`);
+  }
+  const productSelectionCrossOrigin = await request(
+    "POST",
+    "/dashboard-product-repository/select",
+    {
+      origin: "http://example.invalid",
+      "sec-fetch-site": "cross-site",
+      "content-type": "application/json",
+    },
+    JSON.stringify({ menu_id: "free-development", repo_id: "unknown-repository", confirm: true }),
+  );
+  if (productSelectionCrossOrigin.status !== 403) {
+    fail(`product repository selection accepted cross-origin apply with ${productSelectionCrossOrigin.status}`);
+  }
+
   const plan = await request(
     "POST",
     "/dashboard-settings/plan",
@@ -733,7 +781,7 @@ if grep -Eq 'shell:[[:space:]]*true|exec\(|spawn\(' "$ROOT/vite.config.mjs"; the
   exit 1
 fi
 
-if ! grep -q 'execFile(' "$ROOT/vite.config.mjs" || ! grep -q 'dashboard-settings' "$ROOT/vite.config.mjs" || ! grep -q 'dashboard-design-system' "$ROOT/vite.config.mjs"; then
+if ! grep -q 'execFile(' "$ROOT/vite.config.mjs" || ! grep -q 'dashboard-settings' "$ROOT/vite.config.mjs" || ! grep -q 'dashboard-design-system' "$ROOT/vite.config.mjs" || ! grep -q 'product-repository-registry' "$ROOT/vite.config.mjs"; then
   printf 'dashboard-control-center mutation middleware must call approved tools through execFile\n' >&2
   exit 1
 fi
@@ -752,9 +800,10 @@ mutation_fetches="$(search_guard "method:[[:space:]]*[\"']POST" "$ROOT/dashboard
 if [[ -n "$mutation_fetches" ]]; then
   if ! grep -q '"/dashboard-settings/plan"' "$ROOT/dashboard-control-center/src/dashboardData.js" \
     || ! grep -q '"/dashboard-settings/apply"' "$ROOT/dashboard-control-center/src/dashboardData.js" \
+    || ! grep -q '"/dashboard-product-repository/select"' "$ROOT/dashboard-control-center/src/dashboardData.js" \
     || ! grep -q '"/dashboard-design-system/plan"' "$ROOT/dashboard-control-center/src/dashboardData.js" \
     || ! grep -q '"/dashboard-design-system/apply"' "$ROOT/dashboard-control-center/src/dashboardData.js"; then
-    printf 'dashboard-control-center POST fetches must be limited to approved Settings and Design Studio plan/apply endpoints\n' >&2
+    printf 'dashboard-control-center POST fetches must be limited to approved Settings, repository selection, and Design Studio endpoints\n' >&2
     exit 1
   fi
 fi

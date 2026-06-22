@@ -113,6 +113,7 @@ dashboard_product_profile_menu_id_for_file() {
   [[ -f "$profile_file" ]] || return 1
   DASHBOARD_PRODUCT_PROFILE_FILE="$profile_file" node <<'NODE'
 const fs = require("node:fs");
+const path = require("node:path");
 
 const file = process.env.DASHBOARD_PRODUCT_PROFILE_FILE || "";
 let data;
@@ -429,8 +430,9 @@ dashboard_review_cli_package_entrypoint() {
   [[ -f "$cli_root/package.json" ]] || return 1
   DASHBOARD_REVIEW_CLI_PACKAGE_JSON="$cli_root/package.json" \
   DASHBOARD_REVIEW_CLI_BIN_NAMES="${DASHBOARD_REVIEW_CLI_BIN:-${TRACE_CUE_BIN:-${DASHBOARD_BROWSER_DEBUG_CLI_BIN:-}}}" \
-    node <<'NODE'
+node <<'NODE'
 const fs = require("node:fs");
+const path = require("node:path");
 
 const file = process.env.DASHBOARD_REVIEW_CLI_PACKAGE_JSON || "";
 const requested = String(process.env.DASHBOARD_REVIEW_CLI_BIN_NAMES || "")
@@ -1324,6 +1326,24 @@ dashboard_scoped_file_state() {
   fi
 }
 
+dashboard_scoped_file_path() {
+  local scoped_path="$1"
+  local menu_id="${2:-$SELECTED_MENU_ID}"
+  local relpath="$scoped_path"
+  local root="$ROOT"
+  case "$scoped_path" in
+    product:*)
+      relpath="${scoped_path#product:}"
+      root="$(dashboard_selected_product_root "$menu_id" 2>/dev/null || true)"
+      [[ -n "$root" ]] || return 1
+      ;;
+  esac
+  case "$relpath" in
+    /*|\\*|*..*) return 1 ;;
+  esac
+  printf '%s/%s\n' "$root" "$relpath"
+}
+
 dashboard_document_target_path() {
   local key="$1"
   local menu_id="${2:-$SELECTED_MENU_ID}"
@@ -1487,11 +1507,534 @@ dashboard_json_document_brief_text_for_state() {
   local field="$2"
   local fallback_key="$3"
   local freshness_state="$4"
-  if [[ "$freshness_state" == "ready" ]]; then
+  local menu_id="${5:-$SELECTED_MENU_ID}"
+  local dynamic_ja dynamic_en
+  if [[ "$field" != "title" && "$field" != "detail" ]] \
+    && dynamic_ja="$(dashboard_document_brief_dynamic_text "$id" "$field" "$menu_id" ja 2>/dev/null)" \
+    && dynamic_en="$(dashboard_document_brief_dynamic_text "$id" "$field" "$menu_id" en 2>/dev/null)" \
+    && [[ -n "$dynamic_ja$dynamic_en" ]]; then
+    dashboard_json_raw_object \
+      "ja" "$(dashboard_json_string "${dynamic_ja:-$dynamic_en}")" \
+      "en" "$(dashboard_json_string "${dynamic_en:-$dynamic_ja}")"
+  elif [[ "$freshness_state" == "ready" ]]; then
     dashboard_json_localized_document_brief_text "$id" "$field" "$fallback_key"
+  elif dynamic_ja="$(dashboard_document_brief_dynamic_text "$id" "$field" "$menu_id" ja 2>/dev/null)" \
+    && dynamic_en="$(dashboard_document_brief_dynamic_text "$id" "$field" "$menu_id" en 2>/dev/null)" \
+    && [[ -n "$dynamic_ja$dynamic_en" ]]; then
+    dashboard_json_raw_object \
+      "ja" "$(dashboard_json_string "${dynamic_ja:-$dynamic_en}")" \
+      "en" "$(dashboard_json_string "${dynamic_en:-$dynamic_ja}")"
   else
     dashboard_json_raw_object "key" "$(dashboard_json_string "$fallback_key")"
   fi
+}
+
+dashboard_json_document_brief_agent_summary() {
+  local id="$1"
+  local freshness_state="$2"
+  local summary_json="$3"
+  local action_json="$4"
+  shift 4
+  local -a source_path_array=("$@")
+  case "$id" in
+    taskTracker|handoff) ;;
+    *) return 1 ;;
+  esac
+  printf '{"status":'
+  dashboard_json_string "$freshness_state"
+  printf ',"provider_mode":'
+  dashboard_json_string "local_summary"
+  printf ',"source":'
+  dashboard_json_string "dashboard-data.document-brief"
+  printf ',"summary":%s' "$summary_json"
+  printf ',"detail":%s' "$action_json"
+  printf ',"generated_at":'
+  dashboard_json_string "$generated_at"
+  printf ',"source_paths":'
+  dashboard_json_string_array "${source_path_array[@]}"
+  printf '}'
+}
+
+dashboard_document_brief_first_source_file() {
+  local id="$1"
+  local menu_id="${2:-$SELECTED_MENU_ID}"
+  local source_paths rel path
+  source_paths="$(dashboard_document_decision_brief_source_paths "$id" "$menu_id")"
+  IFS=';' read -r rel _rest <<<"$source_paths"
+  [[ -n "$rel" ]] || return 1
+  path="$(dashboard_scoped_file_path "$rel" "$menu_id")" || return 1
+  [[ -f "$path" ]] || return 1
+  printf '%s\n' "$path"
+}
+
+dashboard_document_brief_section_pattern() {
+  local id="$1"
+  local field="$2"
+  case "$id:$field" in
+    taskTracker:summary) printf '^(Current Status|Status|Progress|Remaining Work|Next Step)$' ;;
+    taskTracker:action) printf '^(Remaining Work|Next Step|Next Steps)$' ;;
+    handoff:summary) printf '^(Current State|Current Status|What Has Been Decided|Status)$' ;;
+    handoff:action) printf '^(Next Step|Next Steps|Restart Notes)$' ;;
+    *) return 1 ;;
+  esac
+}
+
+dashboard_document_brief_dynamic_text() {
+  local id="$1"
+  local field="$2"
+  local menu_id="${3:-$SELECTED_MENU_ID}"
+  local locale="${4:-en}"
+  local path
+  case "$id:$field" in
+    taskTracker:summary|taskTracker:action|handoff:summary|handoff:action) ;;
+    *) return 1 ;;
+  esac
+  path="$(dashboard_document_brief_first_source_file "$id" "$menu_id")" || return 1
+  DASHBOARD_DYNAMIC_DOC_PATH="$path" \
+  DASHBOARD_DYNAMIC_DOC_ID="$id" \
+  DASHBOARD_DYNAMIC_DOC_FIELD="$field" \
+  DASHBOARD_DYNAMIC_DOC_LOCALE="$locale" \
+node <<'NODE'
+const fs = require("node:fs");
+const path = require("node:path");
+
+const file = process.env.DASHBOARD_DYNAMIC_DOC_PATH || "";
+const id = process.env.DASHBOARD_DYNAMIC_DOC_ID || "";
+const field = process.env.DASHBOARD_DYNAMIC_DOC_FIELD || "";
+const locale = process.env.DASHBOARD_DYNAMIC_DOC_LOCALE || "en";
+
+function clean(value) {
+  return String(value || "")
+    .replace(/\r/g, "")
+    .replace(/`([^`]+)`/g, "$1")
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+    .replace(/https?:\/\/\S+/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function clip(value, limit = 260) {
+  const text = clean(value);
+  return text.length > limit ? `${text.slice(0, Math.max(0, limit - 3)).trim()}...` : text;
+}
+
+function tableCells(line) {
+  const value = String(line || "").trim();
+  if (!value.startsWith("|") || !value.endsWith("|")) {
+    return [];
+  }
+  return value
+    .slice(1, -1)
+    .split("|")
+    .map((cell) => clean(cell));
+}
+
+function latestTaskRow(markdown) {
+  const rows = String(markdown || "")
+    .split(/\n/)
+    .map(tableCells)
+    .filter((cells) => cells.length >= 4 && /^[A-Za-z]+-[0-9]+$/.test(cells[0]) && !/^[-:]+$/.test(cells[1]));
+  return rows.length ? rows[rows.length - 1] : null;
+}
+
+function currentResumeTarget(markdown) {
+  const match = String(markdown || "").match(/^Current resume target:\s*(.+?)\s*$/m);
+  return match ? clip(match[1], 220) : "";
+}
+
+function firstCompletionLineAfterResume(markdown, taskId = "") {
+  const lines = String(markdown || "").split(/\n/);
+  const start = lines.findIndex((line) => /^Current resume target:\s*/.test(line));
+  const windowLines = (start >= 0 ? lines.slice(start + 1, start + 12) : lines.slice(0, 12))
+    .map((line) => line.trim())
+    .filter(Boolean);
+  const taskPattern = taskId ? new RegExp(`\\b${taskId.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i") : /FC-[0-9]+/i;
+  return clip(windowLines.find((line) => taskPattern.test(line) && /\bcomplete\b|\bdone\b|完了/.test(line)) || windowLines[0] || "", 220);
+}
+
+function productRootForDocument(filePath) {
+  const marker = `${path.sep}docs${path.sep}`;
+  const index = filePath.indexOf(marker);
+  return index >= 0 ? filePath.slice(0, index) : "";
+}
+
+function implementationPlanTextForDocument(filePath) {
+  const root = productRootForDocument(filePath);
+  if (!root) {
+    return "";
+  }
+  const planPath = path.join(root, "docs", "product", "IMPLEMENTATION_PLAN.md");
+  try {
+    return fs.readFileSync(planPath, "utf8");
+  } catch {
+    return "";
+  }
+}
+
+function implementationPlanAligned(planText, taskId, resumeTarget) {
+  const plan = clean(planText);
+  if (!plan) {
+    return false;
+  }
+  const hasTask = taskId ? plan.includes(taskId) : true;
+  const hasResume = resumeTarget ? plan.includes(resumeTarget) : true;
+  const hasNoRemaining = /no\s+(autonomous\s+)?(?:output material language\s+)?implementation plan remains|zero remaining|no remaining/i.test(plan);
+  return Boolean(hasTask && (hasResume || hasNoRemaining));
+}
+
+function localizedTaskStatus(status) {
+  const value = clean(status).toLowerCase();
+  if (locale !== "ja") {
+    return value || clean(status);
+  }
+  const labels = {
+    done: "完了",
+    complete: "完了",
+    completed: "完了",
+    passed: "完了",
+    ready: "準備完了",
+    in_progress: "作業中",
+    working: "作業中",
+    blocked: "ブロック中",
+    failed: "失敗",
+    pending: "保留",
+  };
+  return labels[value] || clean(status);
+}
+
+function localizedTaskTitle(title) {
+  const value = clean(title);
+  if (locale !== "ja") {
+    return value;
+  }
+  const glossary = [
+    ["Output Language Productization Closure", "出力言語の製品化完了"],
+    ["Output Language", "出力言語"],
+    ["Productization", "製品化"],
+    ["Closure", "完了"],
+  ];
+  let next = value;
+  for (const [needle, replacement] of glossary) {
+    next = next.replace(new RegExp(needle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi"), replacement);
+  }
+  return next;
+}
+
+function localizedNoRemainingTask(taskId) {
+  if (locale === "ja") {
+    return taskId ? `${taskId}後の残実装ターゲットは記録上ありません` : "残実装ターゲットは記録上ありません";
+  }
+  return taskId ? `No remaining implementation target is recorded after ${taskId}` : "No remaining implementation target is recorded";
+}
+
+function localizedResumeTarget(target) {
+  const value = clean(target);
+  if (locale !== "ja" || !looksEnglish(value)) {
+    return value;
+  }
+  const noRemaining = value.match(/^No\s+autonomous\s+(.+?)\s+implementation\s+plan\s+remains\s+after\s+(.+?)\.?$/i);
+  if (noRemaining) {
+    return `残りの自律実装計画はありません。完了後の基準: ${localizedTaskTitle(noRemaining[2])}。`;
+  }
+  const noGeneric = value.match(/^No\s+(.+?)\s+remains\s+after\s+(.+?)\.?$/i);
+  if (noGeneric) {
+    return `残り項目はありません。完了後の基準: ${localizedTaskTitle(noGeneric[2])}。`;
+  }
+  return localizedEnglishSnippet(value, "summary");
+}
+
+function localizedCompletionLine(line, taskId) {
+  const value = clean(line);
+  if (locale !== "ja" || !looksEnglish(value)) {
+    return value;
+  }
+  const complete = value.match(/^(.+?)\s+is\s+complete\.?\s*(.*)$/i);
+  if (complete) {
+    return `完了記録あり: ${localizedTaskTitle(complete[1])}。`;
+  }
+  if (taskId && value.includes(taskId)) {
+    return `完了記録あり: ${taskId}。`;
+  }
+  return localizedEnglishSnippet(value, "summary");
+}
+
+function parseSections(markdown) {
+  const sections = new Map();
+  let current = "";
+  for (const rawLine of markdown.split(/\n/)) {
+    const heading = rawLine.match(/^##\s+(.+?)\s*$/);
+    if (heading) {
+      current = clean(heading[1]);
+      if (!sections.has(current)) {
+        sections.set(current, []);
+      }
+      continue;
+    }
+    if (current) {
+      sections.get(current).push(rawLine);
+    }
+  }
+  return sections;
+}
+
+function sectionText(sections, names) {
+  for (const name of names) {
+    const lines = sections.get(name);
+    if (lines && lines.length) {
+      return lines.join("\n");
+    }
+  }
+  return "";
+}
+
+function uncheckedItems(text) {
+  return String(text || "")
+    .split(/\n/)
+    .map((line) => line.match(/^\s*[-*]\s+\[\s\]\s+(.+?)\s*$/))
+    .filter(Boolean)
+    .map((match) => clip(match[1], 120))
+    .filter(Boolean);
+}
+
+function checkedProgress(text) {
+  const lines = String(text || "").split(/\n/);
+  const checked = lines.filter((line) => /^\s*[-*]\s+\[[xX]\]\s+/.test(line)).length;
+  const unchecked = lines.filter((line) => /^\s*[-*]\s+\[\s\]\s+/.test(line)).length;
+  return { checked, unchecked, total: checked + unchecked };
+}
+
+function sentences(text, max = 2) {
+  const normalized = clean(
+    String(text || "")
+      .split(/\n/)
+      .filter((line) => !/^\s*[-*]\s+\[[xX]\]\s+/.test(line))
+      .map((line) => line.replace(/^\s*[-*]\s+/, ""))
+      .join(" "),
+  );
+  if (!normalized) {
+    return "";
+  }
+  const parts = normalized.match(/[^.!?。！？]+[.!?。！？]?/g) || [normalized];
+  return clip(parts.slice(0, max).join(" "), 300);
+}
+
+function hasJapanese(text) {
+  return /[\u3040-\u30ff\u3400-\u9fff]/.test(String(text || ""));
+}
+
+function looksEnglish(text) {
+  const value = clean(text);
+  return /[A-Za-z]{3,}/.test(value) && !hasJapanese(value);
+}
+
+function phaseSignal(text) {
+  const match = clean(text).match(/\bPhase\s+([0-9][0-9A-Za-z -]*)\s+(.+?)\s+is\s+(complete|implemented|ready|blocked|failed)\b/i);
+  if (!match) {
+    return null;
+  }
+  return {
+    phase: `Phase ${match[1].trim()}`,
+    subject: clip(match[2], 140),
+    state: match[3].toLowerCase(),
+  };
+}
+
+function localizedKeywordSummary(text) {
+  if (locale !== "ja" || !looksEnglish(text)) {
+    return "";
+  }
+  const value = clean(text).toLowerCase();
+  const mappings = [
+    ["requirements", "要件"],
+    ["specification", "仕様"],
+    ["implementation plan", "実装計画"],
+    ["static ui", "静的UI"],
+    ["validation logic", "検証ロジック"],
+    ["unit tests", "単体テスト"],
+    ["local tests", "ローカルテスト"],
+    ["playwright e2e", "Playwright E2E"],
+    ["e2e", "E2E"],
+    ["workflow documents", "ワークフロー文書"],
+    ["operations manifests", "運用マニフェスト"],
+    ["operation manifests", "運用マニフェスト"],
+    ["github remote", "GitHubリモート"],
+    ["github actions", "GitHub Actions"],
+    ["ci", "CI"],
+    ["dashboard settings", "ダッシュボード設定"],
+    ["display locale", "表示言語"],
+    ["artifact language", "成果物言語"],
+    ["locale policy", "言語ポリシー"],
+    ["language settings", "言語設定"],
+    ["product checks", "成果物チェック"],
+    ["repository rename", "リポジトリ名変更"],
+  ];
+  const found = [];
+  for (const [needle, labelText] of mappings) {
+    if (value.includes(needle) && !found.includes(labelText)) {
+      found.push(labelText);
+    }
+  }
+  if (!found.length) {
+    return "";
+  }
+  return `記録済みの範囲: ${found.slice(0, 8).join("、")}。`;
+}
+
+function localizedEnglishSnippet(text, fallbackKind = "summary") {
+  const value = clean(text);
+  if (locale !== "ja" || !looksEnglish(value)) {
+    return sentences(value, fallbackKind === "summary" ? 2 : 1);
+  }
+  const phase = phaseSignal(value);
+  const parts = [];
+  if (phase) {
+    parts.push(localizedPhase(phase));
+  }
+  const keywords = localizedKeywordSummary(value);
+  if (keywords) {
+    parts.push(keywords);
+  }
+  const lower = value.toLowerCase();
+  if (/product checks?.*pass|once product checks?.*pass/.test(lower)) {
+    parts.push("成果物チェックが通れば次へ進めます。");
+  } else if (/no open checklist item/.test(lower)) {
+    parts.push(label("noOpenItems"));
+  } else if (/can be opened|tested with|ready to test/.test(lower)) {
+    parts.push("成果物は起動・確認できる状態です。");
+  } else if (!parts.length) {
+    parts.push(fallbackKind === "action" ? "次に確認する内容を対象文書で確認します。" : "対象文書の現在状態を確認します。");
+  }
+  return clip(parts.join(" "), 320);
+}
+
+function label(kind) {
+  const labels = {
+    ja: {
+      current: "現在状態",
+      remaining: "残り作業",
+      latestDone: "直近完了",
+      restart: "再開地点",
+      handoff: "引き継ぎ内容",
+      handoffReady: "次回引継ぎ可否",
+      handoffReadyYes: "可能",
+      handoffReadyReview: "要確認",
+      implementationPlanAligned: "実装計画との整合を確認済み",
+      implementationPlanUnconfirmed: "実装計画との整合は未確認",
+      phaseComplete: "完了",
+      phaseImplemented: "実装済み",
+      phaseReady: "準備済み",
+      phaseBlocked: "ブロック中",
+      phaseFailed: "失敗",
+      noOpenItems: "未完了チェック項目は見つかりません",
+      checked: "完了チェック",
+    },
+    en: {
+      current: "Current status",
+      remaining: "Remaining work",
+      latestDone: "Latest completed",
+      restart: "Restart point",
+      handoff: "Handoff state",
+      handoffReady: "Next handoff readiness",
+      handoffReadyYes: "ready",
+      handoffReadyReview: "needs review",
+      implementationPlanAligned: "implementation plan alignment confirmed",
+      implementationPlanUnconfirmed: "implementation plan alignment not confirmed",
+      phaseComplete: "complete",
+      phaseImplemented: "implemented",
+      phaseReady: "ready",
+      phaseBlocked: "blocked",
+      phaseFailed: "failed",
+      noOpenItems: "No open checklist item found",
+      checked: "Checked items",
+    },
+  };
+  return (labels[locale] || labels.en)[kind] || kind;
+}
+
+function localizedPhase(signal) {
+  if (!signal) {
+    return "";
+  }
+  const stateKey = {
+    complete: "phaseComplete",
+    implemented: "phaseImplemented",
+    ready: "phaseReady",
+    blocked: "phaseBlocked",
+    failed: "phaseFailed",
+  }[signal.state] || "phaseReady";
+  if (locale === "ja") {
+    return `${signal.phase} は${label(stateKey)}です。`;
+  }
+  return `${signal.phase}: ${label(stateKey)}. ${signal.subject}`;
+}
+
+function prefix(kind, body) {
+  const text = clip(body, 320);
+  return text ? `${label(kind)}: ${text}` : "";
+}
+
+function sentenceText(value) {
+  const text = clean(value).replace(/[。.!?]+$/g, "");
+  if (!text) {
+    return "";
+  }
+  return `${text}${locale === "ja" ? "。" : "."}`;
+}
+
+let markdown = "";
+try {
+  markdown = fs.readFileSync(file, "utf8");
+} catch {
+  process.exit(1);
+}
+
+const sections = parseSections(markdown);
+const current = sectionText(sections, ["Current Status", "Current State", "Status", "Progress"]);
+const remaining = sectionText(sections, ["Remaining Work", "Next Step", "Next Steps"]);
+const next = sectionText(sections, ["Next Step", "Next Steps"]);
+const restart = sectionText(sections, ["Restart Notes", "How To Resume", "Next Step", "Next Steps"]);
+const decisions = sectionText(sections, ["How To Resume", "What Has Been Decided", "Current State", "Current Status"]);
+const progress = checkedProgress(remaining || current);
+const phase = phaseSignal(current);
+const latestTask = latestTaskRow(markdown);
+const resumeTarget = currentResumeTarget(markdown);
+const implementationPlanText = implementationPlanTextForDocument(file);
+const taskId = latestTask?.[0] || (resumeTarget.match(/\b[A-Za-z]+-[0-9]+\b/) || [])[0] || "";
+const planAligned = implementationPlanAligned(implementationPlanText, taskId, resumeTarget);
+
+let output = "";
+if (id === "taskTracker" && field === "summary") {
+  if (latestTask) {
+    const statusText = localizedTaskStatus(latestTask[1]);
+    const titleText = localizedTaskTitle(latestTask[2]);
+    output = prefix("latestDone", locale === "ja" ? `${latestTask[0]} は${statusText}: ${titleText}` : `${latestTask[0]} ${statusText}: ${titleText}`);
+  } else {
+    output = prefix("current", localizedPhase(phase) || localizedEnglishSnippet(current, "summary"));
+  }
+} else if (id === "taskTracker" && field === "action") {
+  const open = uncheckedItems(remaining);
+  const body = open.length
+    ? open.slice(0, 3).join(" / ")
+    : latestTask && /zero remaining|no remaining/i.test(latestTask[3] || "")
+      ? localizedNoRemainingTask(taskId)
+      : `${label("noOpenItems")}${progress.total ? ` / ${label("checked")}: ${progress.checked}/${progress.total}` : ""}${next ? ` / ${localizedEnglishSnippet(next, "action")}` : ""}`;
+  output = prefix("remaining", body);
+} else if (id === "handoff" && field === "summary") {
+  output = prefix("restart", localizedResumeTarget(resumeTarget) || localizedPhase(phaseSignal(decisions)) || localizedEnglishSnippet(decisions, "summary"));
+} else if (id === "handoff" && field === "action") {
+  const completion = localizedCompletionLine(firstCompletionLineAfterResume(markdown, taskId), taskId);
+  const readiness = resumeTarget && /no\s+autonomous|no\s+remaining|残.*なし/i.test(resumeTarget)
+    ? [sentenceText(label("handoffReadyYes")), sentenceText(completion), sentenceText(planAligned ? label("implementationPlanAligned") : label("implementationPlanUnconfirmed"))].filter(Boolean).join(" ")
+    : [sentenceText(label("handoffReadyReview")), sentenceText(localizedEnglishSnippet(restart || next || decisions, "action"))].filter(Boolean).join(" ");
+  output = prefix("handoffReady", readiness);
+}
+
+if (output) {
+  process.stdout.write(output);
+} else {
+  process.exit(1);
+}
+NODE
 }
 
 dashboard_json_document_brief_card() {
@@ -1506,7 +2049,7 @@ dashboard_json_document_brief_card() {
   local related_page="$9"
   local order="${10}"
   local menu_id="${11:-$SELECTED_MENU_ID}"
-  local title_json detail_json summary_json action_json source_paths current_source_hash stored_source_hash updated_at freshness_state
+  local title_json detail_json summary_json action_json agent_summary_json source_paths current_source_hash stored_source_hash updated_at freshness_state
   local workflow_context repo_id
   local -a source_path_array=()
   workflow_context="$(dashboard_selected_workflow_context "$menu_id")"
@@ -1517,11 +2060,12 @@ dashboard_json_document_brief_card() {
   stored_source_hash="$(dashboard_document_decision_brief_field "$id" source_hash 2>/dev/null || printf '')"
   updated_at="$(dashboard_document_decision_brief_field "$id" updated_at 2>/dev/null || printf '')"
   freshness_state="$(dashboard_document_decision_brief_freshness_state "$id" "$menu_id")"
-  title_json="$(dashboard_json_document_brief_text_for_state "$id" title "$title_key" "$freshness_state")"
-  detail_json="$(dashboard_json_document_brief_text_for_state "$id" detail "$detail_key" "$freshness_state")"
-  summary_json="$(dashboard_json_document_brief_text_for_state "$id" summary "$summary_key" "$freshness_state")"
-  action_json="$(dashboard_json_document_brief_text_for_state "$id" action "$action_key" "$freshness_state")"
+  title_json="$(dashboard_json_document_brief_text_for_state "$id" title "$title_key" "$freshness_state" "$menu_id")"
+  detail_json="$(dashboard_json_document_brief_text_for_state "$id" detail "$detail_key" "$freshness_state" "$menu_id")"
+  summary_json="$(dashboard_json_document_brief_text_for_state "$id" summary "$summary_key" "$freshness_state" "$menu_id")"
+  action_json="$(dashboard_json_document_brief_text_for_state "$id" action "$action_key" "$freshness_state" "$menu_id")"
   status="$(dashboard_document_decision_brief_status "$id" "$status" "$menu_id")"
+  agent_summary_json="$(dashboard_json_document_brief_agent_summary "$id" "$freshness_state" "$summary_json" "$action_json" "${source_path_array[@]}" 2>/dev/null || true)"
   printf '{"id":'
   dashboard_json_string "$id"
   printf ',"menu_id":'
@@ -1546,6 +2090,9 @@ dashboard_json_document_brief_card() {
   printf ',"action":%s' "$action_json"
   printf ',"action_key":'
   dashboard_json_string "$action_key"
+  if [[ -n "$agent_summary_json" ]]; then
+    printf ',"agent_summary":%s' "$agent_summary_json"
+  fi
   printf ',"status":'
   dashboard_json_string "$status"
   printf ',"metric_label_key":'
@@ -2403,13 +2950,20 @@ dashboard_first_scoped_reference() {
   local value="$1"
   local fallback="${2:-not_collected}"
   local part
+  local scoped
   local -a parts
   IFS=';' read -r -a parts <<<"$value"
   for part in "${parts[@]}"; do
     part="$(printf '%s' "$part" | sed -E 's/^[[:space:]]+//;s/[[:space:]]+$//')"
     [[ -n "$part" ]] || continue
     case "$part" in
-      /*|../*|*/../*|*\\*) continue ;;
+      product:*)
+        scoped="${part#product:}"
+        case "$scoped" in
+          ""|/*|../*|*/../*|*\\*|*:*) continue ;;
+        esac
+        ;;
+      /*|../*|*/../*|*\\*|*:*) continue ;;
     esac
     printf '%s' "$part"
     return
@@ -3066,7 +3620,7 @@ fi
 
 command_preview_groups=(
   "$(dashboard_json_command_preview_group "safe_checks" "Low-risk checks" "low" 2)"
-  "$(dashboard_json_command_preview_group "evidence_checks" "Evidence checks" "medium" 2)"
+  "$(dashboard_json_command_preview_group "evidence_checks" "Evidence checks" "medium" "$((${#command_previews[@]} - 2))")"
 )
 
 schema_version="$(dashboard_data_schema_version)"
@@ -3135,6 +3689,11 @@ dashboard_deferred_product_authority_json_for_menu() {
 dashboard_product_authority_json_for_menu_lazy() {
   local menu_id="$1"
   local context path_state
+  if [[ "${DASHBOARD_FAST_CONTEXT_AUTHORITY:-0}" == "1" ]]; then
+    dashboard_cached_product_authority_json_for_menu "$menu_id" 2>/dev/null && return
+    dashboard_deferred_product_authority_json_for_menu "$menu_id"
+    return
+  fi
   context="$(dashboard_selected_workflow_context "$menu_id")"
   if [[ "${DASHBOARD_EAGER_CONTEXT_AUTHORITY:-0}" == "1" ]]; then
     dashboard_product_authority_json_for_menu "$menu_id"
@@ -3193,15 +3752,17 @@ dashboard_repository_scope_json() {
   local workflow_context="$2"
   local repository_name="$3"
   local repository_root="$4"
-  local authority_json="$5"
-  local path_state="$6"
-  local git_state="$7"
-  local observed_at="$8"
+  local repository_id="$5"
+  local authority_json="$6"
+  local path_state="$7"
+  local git_state="$8"
+  local observed_at="$9"
 
   DASHBOARD_SCOPE_MENU_ID="$menu_id" \
   DASHBOARD_SCOPE_WORKFLOW_CONTEXT="$workflow_context" \
   DASHBOARD_SCOPE_REPOSITORY_NAME="$repository_name" \
   DASHBOARD_SCOPE_REPOSITORY_ROOT="$repository_root" \
+  DASHBOARD_SCOPE_REPOSITORY_ID="$repository_id" \
   DASHBOARD_SCOPE_AUTHORITY_JSON="$authority_json" \
   DASHBOARD_SCOPE_PATH_STATE="$path_state" \
   DASHBOARD_SCOPE_GIT_STATE="$git_state" \
@@ -3369,6 +3930,7 @@ const menuId = text(process.env.DASHBOARD_SCOPE_MENU_ID, "unknown");
 const workflowContext = text(process.env.DASHBOARD_SCOPE_WORKFLOW_CONTEXT, "unknown");
 const repositoryName = text(process.env.DASHBOARD_SCOPE_REPOSITORY_NAME, "not_selected");
 const repositoryRoot = text(process.env.DASHBOARD_SCOPE_REPOSITORY_ROOT, "");
+const repositoryId = text(process.env.DASHBOARD_SCOPE_REPOSITORY_ID, "not_selected");
 const authority = jsonFromEnv("DASHBOARD_SCOPE_AUTHORITY_JSON", {});
 const index = authority.repository_index && typeof authority.repository_index === "object" ? authority.repository_index : {};
 const observedAt = text(process.env.DASHBOARD_SCOPE_OBSERVED_AT, "");
@@ -3388,6 +3950,7 @@ if (!isDirectoryRoot) {
     menu_id: menuId,
     workflow_context: workflowContext,
     repository_role: repositoryRole,
+    repo_id: repositoryId,
     repository_name: repositoryName,
     path_state: pathState,
     git_state: gitState,
@@ -3567,6 +4130,7 @@ process.stdout.write(JSON.stringify({
   menu_id: menuId,
   workflow_context: workflowContext,
   repository_role: repositoryRole,
+  repo_id: repositoryId,
   repository_name: repositoryName,
   root_name: text(index.root_name, repositoryName),
   path_state: pathState,
@@ -4503,7 +5067,7 @@ function localCheckItem(row, blocker = false) {
   const category = localCheckCategory(row);
   const kind = localCheckKind(row);
   const statusValue = state(row?.status, "unknown");
-  return {
+  return withLiveAgentLocalization({
     source_id: sourceId(row),
     category,
     kind,
@@ -4522,7 +5086,7 @@ function localCheckItem(row, blocker = false) {
     source_artifacts: text(row?.source_artifacts),
     next_command: text(row?.next_command, "not_applicable"),
     blocker_count: blocker ? 1 : 0,
-  };
+  });
 }
 function freshnessState(row, statusValue = state(row?.status, "unknown")) {
   const value = text(row?.freshness_state);
@@ -4572,6 +5136,203 @@ function checkItemSummary(category, kind, statusValue) {
   if (category === "ci") return `CI ${kind.replace(/_/g, " ")} ${statusSummary(statusValue)}`;
   if (category === "security") return `Safety ${kind.replace(/_/g, " ")} ${statusSummary(statusValue)}`;
   return `Check ${statusSummary(statusValue)}`;
+}
+function statusSummaryJa(statusValue) {
+  switch (statusValue) {
+    case "passed":
+    case "ready":
+      return "完了";
+    case "failed":
+      return "失敗";
+    case "blocked":
+      return "ブロック中";
+    case "stale":
+      return "再確認が必要";
+    case "manual_required":
+      return "確認が必要";
+    case "approval_required":
+      return "承認が必要";
+    case "not_applicable":
+      return "対象外";
+    case "not_run":
+      return "未実行";
+    case "missing":
+      return "必要情報不足";
+    default:
+      return "未収集";
+  }
+}
+function categoryLabelJa(category) {
+  const labels = {
+    behavior: "ローカルテスト",
+    structure: "構成確認",
+    git: "Git / 作業ツリー",
+    ci: "CI",
+    security: "安全確認",
+  };
+  return labels[category] || "確認項目";
+}
+function kindLabelJa(category, kind) {
+  const normalized = text(kind).replace(/_/g, " ");
+  const labels = {
+    behavior_overall: "ローカルテスト全体",
+    behavior_check: "動作確認",
+    unit_test: "単体テスト",
+    smoke_test: "スモークテスト",
+    e2e_test: "E2Eテスト",
+    structure_overall: "構成確認全体",
+    structure_check: "構成確認",
+    file_check: "必要ファイル",
+    settings_check: "設定",
+    script_check: "スクリプト",
+    worktree: "作業ツリー",
+    upstream: "同期先ブランチ",
+    local_remote_sync: "ローカルとリモートの同期",
+    sync: "同期",
+    policy: "運用方針",
+    workflow_run: "ワークフロー実行",
+    workflow_lookup: "ワークフロー確認",
+    github_actions: "GitHub Actions",
+    gate: "安全ゲート",
+  };
+  return labels[kind] || (category === "ci" ? normalized.toUpperCase() : normalized);
+}
+function localizeKnownLiveTextJa(value, context = {}) {
+  const raw = text(value);
+  if (!raw) return "";
+  const localChanges = raw.match(/^(\d+|Uncommitted) local file change\(s\) are not committed\.$/);
+  if (localChanges) return localChanges[1] === "Uncommitted" ? "未コミットのローカル変更があります。" : `未コミットのローカル変更が${localChanges[1]}件あります。`;
+  const remoteBehind = raw.match(/^(\d+) remote commit\(s\) are not reflected locally\.$/);
+  if (remoteBehind) return `リモート側のコミットが${remoteBehind[1]}件、ローカルに反映されていません。`;
+  const localAhead = raw.match(/^(\d+) local commit\(s\) are not pushed\.$/);
+  if (localAhead) return `ローカル側のコミットが${localAhead[1]}件、まだpushされていません。`;
+  const safetyBlockers = raw.match(/^(\d+) safety blocker\(s\) need review\.$/);
+  if (safetyBlockers) return `未解消の安全ブロッカーが${safetyBlockers[1]}件あります。`;
+  const observedCiRun = raw.match(/^Observed CI run ([A-Za-z0-9._:-]+)\.$/);
+  if (observedCiRun) return `CI実行 ${observedCiRun[1]} を確認しました。`;
+  const ciManifestMissing = raw.match(/^CI is required for the selected workflow mode, but (.+?) is missing\.$/);
+  if (ciManifestMissing) return `選択中のワークフローモードではCIが必要ですが、${ciManifestMissing[1]} が見つかりません。`;
+  const ciManifestAction = raw.match(/^Create (.+?) or change the workflow mode before treating CI as checked\.$/);
+  if (ciManifestAction) return `CIを確認済みとして扱う前に、${ciManifestAction[1]} を作成するかワークフローモードを変更します。`;
+  const phaseSummary = raw.match(/\b(Phase\s+[0-9][0-9A-Za-z._-]*)\b.*?\bis\s+(complete|implemented|ready|blocked|failed)\b/i);
+  if (phaseSummary) {
+    const stateLabels = { complete: "完了", implemented: "実装済み", ready: "準備完了", blocked: "ブロック中", failed: "失敗" };
+    return `${phaseSummary[1]} ${stateLabels[phaseSummary[2].toLowerCase()] || statusSummaryJa(context.status)}`;
+  }
+  const map = {
+    "No remote branch is configured for synchronization.": "同期先のリモートブランチが設定されていません。",
+    "No upstream branch is configured for remote sync.": "リモート同期用の upstream ブランチが設定されていません。",
+    "Open workflow details to inspect commit, push, upstream, and local/remote sync state.": "ワークフロー詳細で、commit、push、upstream、ローカル/リモート同期の状態を確認します。",
+    "No local file changes are waiting for commit.": "コミット待ちのローカル変更はありません。",
+    "Commit readiness has not been confirmed.": "コミット可能な状態かまだ確認できていません。",
+    "Remote branch setup is not required for this mode.": "このモードではリモートブランチ設定は必須ではありません。",
+    "Remote upstream is not required for this mode.": "このモードでは upstream 設定は必須ではありません。",
+    "Remote branch setup is configured.": "リモートブランチ設定は完了しています。",
+    "Upstream branch is configured.": "upstream ブランチは設定済みです。",
+    "Remote branch setup has not been confirmed.": "リモートブランチ設定はまだ確認できていません。",
+    "Local/remote sync is not required for this mode.": "このモードではローカル/リモート同期は必須ではありません。",
+    "Remote synchronization is not required for this mode.": "このモードではリモート同期は必須ではありません。",
+    "Local/remote sync has not been confirmed.": "ローカル/リモート同期はまだ確認できていません。",
+    "Local and remote commit counts are aligned.": "ローカルとリモートのコミット数は一致しています。",
+    "Git sync passed": "Git同期は完了しています。",
+    "Git state not collected": "Git状態はまだ収集されていません。",
+    "Inspect details when a workflow decision needs supporting evidence.": "判断根拠が必要なときは詳細を確認します。",
+    "CI blocked": "CIはブロック中です。",
+    "CI needs manual review": "CIは確認が必要です。",
+    "CI not run": "CIは未実行です。",
+    "CI not collected": "CI情報はまだ収集されていません。",
+    "No current CI run could be associated with the selected repository.": "選択中リポジトリに紐づく現在のCI実行を確認できませんでした。",
+    "Open workflow details to inspect the CI run, branch, and collection reason.": "ワークフロー詳細で、CI実行、ブランチ、収集できない理由を確認します。",
+    "Open workflow details to inspect local test and structure evidence.": "ワークフロー詳細で、ローカルテストと構成確認の根拠を確認します。",
+    "Local tests not collected": "ローカルテスト情報はまだ収集されていません。",
+    "No local test evidence is available for the selected repository.": "選択中リポジトリのローカルテスト根拠はまだありません。",
+    "Local test evidence is current for the selected repository.": "選択中リポジトリのローカルテスト根拠は最新です。",
+    "At least one local test or structure check needs review for the selected repository.": "選択中リポジトリで、ローカルテストまたは構成確認の再確認が必要です。",
+    "Security evidence not collected": "安全確認の根拠はまだ収集されていません。",
+    "Safety evidence is current for the selected repository.": "選択中リポジトリの安全確認根拠は最新です。",
+    "Safety evidence has not been collected for the selected repository.": "選択中リポジトリの安全確認根拠はまだ収集されていません。",
+    "Open safety details to inspect blockers, approvals, and dangerous-operation guards.": "安全詳細で、ブロッカー、承認、危険操作の保護を確認します。",
+    "CI evidence manifest has not been configured.": "CI証跡マニフェストが設定されていません。",
+    "Review live evidence before acting.": "操作前にライブ根拠を確認します。",
+  };
+  return map[raw] || "";
+}
+function localizeLiveTextJa(value, field, context = {}) {
+  const known = localizeKnownLiveTextJa(value, context);
+  if (known) return known;
+  const category = categoryLabelJa(context.category);
+  const kind = kindLabelJa(context.category, context.kind);
+  const status = statusSummaryJa(state(context.status, "unknown"));
+  const blockerCount = number(context.blocker_count);
+  if (field === "next_action") {
+    if (context.category === "git") return "ワークフロー詳細でGit状態と同期状態を確認します。";
+    if (context.category === "ci") return "ワークフロー詳細でCI実行と取得根拠を確認します。";
+    if (context.category === "security") return "安全詳細で未解消項目と承認境界を確認します。";
+    return "ワークフロー詳細で現在の根拠を確認します。";
+  }
+  if (field === "reason") {
+    if (blockerCount > 0) return `${category}で確認が必要な項目が${blockerCount}件あります。`;
+    return `${category}${kind ? ` / ${kind}` : ""}の現在状態は「${status}」です。`;
+  }
+  return `${category}${kind ? ` / ${kind}` : ""}: ${status}。`;
+}
+function localizedLiveTextObject(value, field, context = {}) {
+  const fallback = field === "summary" ? checkItemSummary(context.category, context.kind, state(context.status, "unknown")) : text(context.summary, checkItemSummary(context.category, context.kind, state(context.status, "unknown")));
+  const en = text(value, fallback);
+  return {
+    en,
+    ja: localizeLiveTextJa(en, field, context),
+  };
+}
+function liveAgentLocalization(entity, overrides = {}) {
+  const context = {
+    category: text(overrides.category || entity?.category, "check"),
+    kind: text(overrides.kind || entity?.kind, "status"),
+    status: state(entity?.status || overrides.status, "unknown"),
+    summary: text(entity?.summary || overrides.summary),
+    blocker_count: number(entity?.blocker_count || overrides.blocker_count),
+  };
+  const summary = text(entity?.summary || overrides.summary, checkItemSummary(context.category, context.kind, context.status));
+  const reason = text(entity?.reason || overrides.reason, summary);
+  const nextAction = text(entity?.next_action || overrides.next_action, "Inspect details when a workflow decision needs supporting evidence.");
+  return {
+    status: context.status,
+    provider_mode: "local_summary",
+    source: "dashboard-data.live-status",
+    summary: localizedLiveTextObject(summary, "summary", context),
+    reason: localizedLiveTextObject(reason, "reason", context),
+    next_action: localizedLiveTextObject(nextAction, "next_action", context),
+    generated_at: generatedAt,
+  };
+}
+function withLiveAgentLocalization(entity, overrides = {}) {
+  const next = { ...entity };
+  next.agent_localization = liveAgentLocalization(next, overrides);
+  return next;
+}
+function liveCheckLocalizationDefaults(key) {
+  const defaults = {
+    local_tests: { category: "behavior", kind: "behavior_overall" },
+    git_sync: { category: "git", kind: "sync" },
+    ci: { category: "ci", kind: "workflow_run" },
+    security: { category: "security", kind: "gate" },
+  };
+  return defaults[key] || { category: "check", kind: key || "status" };
+}
+function localizeLiveChecks(checks) {
+  const localized = {};
+  for (const [key, check] of Object.entries(checks || {})) {
+    const defaults = liveCheckLocalizationDefaults(key);
+    const nextCheck = withLiveAgentLocalization(check, defaults);
+    nextCheck.items = Array.isArray(check.items)
+      ? check.items.map((item) => withLiveAgentLocalization(item, {
+        category: item?.category || defaults.category,
+        kind: item?.kind || defaults.kind,
+      }))
+      : [];
+    localized[key] = nextCheck;
+  }
+  return localized;
 }
 function sourceSummaryLooksGeneric(row, statusValue, summary) {
   const id = sourceId(row);
@@ -4661,7 +5422,7 @@ function liveNextAction(statusValue, detailPage, fallback) {
   return fallback;
 }
 function fallbackCheckItem(source_id, category, kind, statusValue, observed_at, summary, next_command = "not_applicable", blocker_count = 0) {
-  return {
+  return withLiveAgentLocalization({
     source_id,
     category,
     kind,
@@ -4673,10 +5434,10 @@ function fallbackCheckItem(source_id, category, kind, statusValue, observed_at, 
     source_artifacts: "",
     next_command,
     blocker_count,
-  };
+  });
 }
 function gitCheckItem(source_id, kind, statusValue, summary, next_command = "not_applicable", blocker_count = 0) {
-  return {
+  return withLiveAgentLocalization({
     source_id,
     category: "git",
     kind,
@@ -4688,7 +5449,7 @@ function gitCheckItem(source_id, kind, statusValue, summary, next_command = "not
     source_artifacts: "git status; git rev-parse; git rev-list",
     next_command,
     blocker_count,
-  };
+  });
 }
 function gitKindForDetailCode(detailCode) {
   if (detailCode === "git_uncommitted_changes" || detailCode === "git_worktree_clean") return "worktree";
@@ -4710,7 +5471,7 @@ function gitEvidenceItem(row, blocker = false) {
   const statusValue = state(row?.status, "unknown");
   const kind = gitKind(row);
   const summary = text(row?.summary, checkItemSummary("git", kind, statusValue));
-  return {
+  return withLiveAgentLocalization({
     source_id: sourceId(row),
     category: "git",
     kind,
@@ -4729,12 +5490,12 @@ function gitEvidenceItem(row, blocker = false) {
     source_artifacts: text(row?.source_artifacts),
     next_command: text(row?.next_command, "not_applicable"),
     blocker_count: blocker ? 1 : 0,
-  };
+  });
 }
 function ciCheckItem(statusValue) {
   const observed = text(ciSummary.observed_at, "not_collected");
   const hasRun = Boolean(text(ciSummary.run_id) || text(ciSummary.run_url));
-  return {
+  return withLiveAgentLocalization({
     source_id: "product_ci_live",
     category: "ci",
     kind: hasRun ? "workflow_run" : "workflow_lookup",
@@ -4746,13 +5507,13 @@ function ciCheckItem(statusValue) {
     source_artifacts: text(ciSummary.run_url),
     next_command: "not_applicable",
     blocker_count: ["failed", "blocked"].includes(statusValue) ? 1 : 0,
-  };
+  });
 }
 function ciEvidenceItem(row, blocker = false) {
   const id = sourceId(row);
   const statusValue = state(row?.status, "unknown");
   const kind = id.split(".").slice(2).join("_") || "workflow_run";
-  return {
+  return withLiveAgentLocalization({
     source_id: id,
     category: "ci",
     kind,
@@ -4771,12 +5532,12 @@ function ciEvidenceItem(row, blocker = false) {
     source_artifacts: text(row?.source_artifacts),
     next_command: text(row?.next_command, "not_applicable"),
     blocker_count: blocker ? 1 : 0,
-  };
+  });
 }
 function securityCheckItem(row, blocker = false) {
   const id = sourceId(row);
   const statusValue = state(row?.status, "unknown");
-  return {
+  return withLiveAgentLocalization({
     source_id: id,
     category: "security",
     kind: id.split(".").slice(2).join("_") || "gate",
@@ -4795,7 +5556,7 @@ function securityCheckItem(row, blocker = false) {
     source_artifacts: text(row?.source_artifacts),
     next_command: text(row?.next_command, "not_applicable"),
     blocker_count: blocker ? 1 : 0,
-  };
+  });
 }
 const generatedAt = text(process.env.DASHBOARD_LIVE_GENERATED_AT);
 const authority = parseJson(process.env.DASHBOARD_LIVE_AUTHORITY_JSON, {});
@@ -5154,6 +5915,7 @@ const payload = {
     },
   },
 };
+payload.checks = localizeLiveChecks(payload.checks);
 process.stdout.write(JSON.stringify(payload));
 NODE
   printf '\n'
@@ -5327,6 +6089,7 @@ repository_scope_json="$(
     "$SELECTED_WORKFLOW_CONTEXT" \
     "$selected_target_repository_name" \
     "$SELECTED_PRODUCT_ROOT" \
+    "$(dashboard_selected_repository_id_for_menu "$SELECTED_MENU_ID")" \
     "$product_authority_json" \
     "$product_repository_path_state" \
     "$product_repository_git_state" \
@@ -5411,6 +6174,17 @@ dashboard_status_judgment_text() {
     manual_required|not_run) printf 'Manual review is required before treating this as complete.' ;;
     not_applicable) printf 'This page is not required for the selected context.' ;;
     *) printf 'Evidence is incomplete or unknown.' ;;
+  esac
+}
+
+dashboard_json_get_number() {
+  local json="$1"
+  local field="$2"
+  local value
+  value="$(dashboard_json_get_field "$json" "$field" 2>/dev/null || true)"
+  case "$value" in
+    ''|*[!0-9]*) printf '0' ;;
+    *) printf '%s' "$value" ;;
   esac
 }
 
@@ -5949,6 +6723,8 @@ repository_development_json="$(dashboard_repository_development_json)"
 repository_changes_status="$(dashboard_json_get_field "$repository_changes_json" status 2>/dev/null || printf 'unknown')"
 repository_changes_head="$(dashboard_json_get_field "$repository_changes_json" head 2>/dev/null || true)"
 [[ -n "$repository_changes_head" ]] || repository_changes_head="none"
+repository_changes_branch="$(dashboard_json_get_field "$repository_changes_json" branch 2>/dev/null || true)"
+[[ -n "$repository_changes_branch" ]] || repository_changes_branch="unknown"
 category_metric_lessons_status="$(dashboard_json_get_field "$category_metric_lessons" status 2>/dev/null || printf 'unknown')"
 category_metric_workflow_status="$(dashboard_json_get_field "$category_metric_workflow" status 2>/dev/null || printf 'unknown')"
 category_metric_maintenance_status="$(dashboard_json_get_field "$category_metric_maintenance" status 2>/dev/null || printf 'unknown')"
@@ -6053,6 +6829,223 @@ maintenance_evidence_rows=(
   "$(dashboard_json_evidence_row "design_studio_proposal_workflow" "Design Studio proposal workflow" "required" "$design_studio_status" "tools/dashboard-design-system;docs/design-system/dashboard-control-center/orchestration.json" "Design Studio imported proposal workflow" "Confirms Design Studio candidate imports, proposal previews, API-key provider policy, external product export, and owner-tool transaction preview remain proposal-only." "tools/dashboard-design-system proposal-status" "design_studio" "$generated_at" "" "" "medium" "tools/dashboard-design-system;docs/design-system/dashboard-control-center/orchestration.json" "0")"
 )
 
+repo_branch="$(dashboard_json_get_field "$repository_changes_json" branch 2>/dev/null || true)"
+repo_head="$(dashboard_json_get_field "$repository_changes_json" head 2>/dev/null || true)"
+repo_upstream="$(dashboard_json_get_field "$repository_changes_json" upstream 2>/dev/null || true)"
+repo_main_target="$(dashboard_json_get_field "$repository_changes_json" main_target 2>/dev/null || true)"
+repo_staged_count="$(dashboard_json_get_number "$repository_changes_json" staged_count)"
+repo_unstaged_count="$(dashboard_json_get_number "$repository_changes_json" unstaged_count)"
+repo_untracked_count="$(dashboard_json_get_number "$repository_changes_json" untracked_count)"
+repo_ahead_count="$(dashboard_json_get_number "$repository_changes_json" ahead)"
+repo_behind_count="$(dashboard_json_get_number "$repository_changes_json" behind)"
+repo_worktree_count="$(dashboard_json_get_number "$repository_changes_json" worktree_count)"
+repo_changed_count=$((repo_staged_count + repo_unstaged_count + repo_untracked_count))
+if (( repo_changed_count > 0 )); then
+  maintenance_git_worktree_state="dirty"
+elif [[ "$repository_changes_status" == "ready" || "$repository_changes_status" == "passed" ]]; then
+  maintenance_git_worktree_state="clean"
+elif [[ "$repository_changes_status" == "not_applicable" ]]; then
+  maintenance_git_worktree_state="not_applicable"
+else
+  maintenance_git_worktree_state="needs_review"
+fi
+if (( repo_ahead_count > 0 && repo_behind_count > 0 )); then
+  maintenance_git_action_needed="reconcile_diverged"
+elif (( repo_changed_count > 0 )); then
+  maintenance_git_action_needed="commit_or_discard"
+elif (( repo_behind_count > 0 )); then
+  maintenance_git_action_needed="pull_required"
+elif (( repo_ahead_count > 0 )); then
+  maintenance_git_action_needed="push_required"
+elif [[ "$repository_changes_status" == "missing" ]]; then
+  maintenance_git_action_needed="select_repository"
+elif [[ "$repository_changes_status" == "not_applicable" ]]; then
+  maintenance_git_action_needed="not_applicable"
+else
+  maintenance_git_action_needed="none"
+fi
+
+ci_branch_status="$(dashboard_source_status "product.ci.github_actions" "$ci_status")"
+ci_pr_status="$(dashboard_source_status "product.ci.pr" "$(dashboard_git_operation_status pr_ci "$git_operation_pr_ci_mode" "$ci_status")")"
+ci_main_status="$(dashboard_source_status "product.ci.main" "$(dashboard_git_operation_status main_ci "$git_operation_main_ci_mode" "$ci_status")")"
+ci_provider_status="$(dashboard_source_status "product.ci.github_actions" "$provider_visibility_status")"
+ci_main_head_match="$(dashboard_head_match_status "$(dashboard_source_product_head "product.ci.main")" "$repository_changes_head")"
+ci_branch_head_match="$(dashboard_head_match_status "$(dashboard_source_product_head "product.ci.github_actions")" "$repository_changes_head")"
+ci_head_match_status="$ci_main_head_match"
+[[ "$ci_head_match_status" != "unknown" ]] || ci_head_match_status="$ci_branch_head_match"
+maintenance_ci_annotations=()
+
+product_structure_status="$(dashboard_authority_axis_status "$product_authority_json" "product.structure" "$product_authority_status")"
+product_focused_status="$(dashboard_authority_axis_status "$product_authority_json" "product.focused" "optional")"
+product_local_artifacts_status="$(dashboard_source_status "product.security.local_artifacts" "$security_gate_status")"
+product_secrets_status="$(dashboard_source_status "product.security.secrets" "$security_gate_status")"
+product_external_sending_status="$(dashboard_source_status "product.security.external_sending" "$security_gate_status")"
+product_gate_status="$(
+  dashboard_operational_status_from_states \
+    "$product_authority_status" \
+    "$local_tests_status" \
+    "$product_structure_status" \
+    "$security_gate_status" \
+    "$product_local_artifacts_status" \
+    "$product_secrets_status" \
+    "$product_external_sending_status" \
+    "$git_sync_status" \
+    "$ci_status"
+)"
+product_gate_layers=(
+  "$(dashboard_json_maintenance_sync_row "local_tests" "Local tests" "$local_tests_status" "product.tests" "$(dashboard_status_freshness_state "$local_tests_status")" "$(dashboard_status_authority "$local_tests_status")" "$generated_at" "Local test evidence is separated from remote CI evidence." "Review or rerun the selected product test evidence before relying on it." "$(dashboard_source_detail_artifact_path "product.tests" "$product_authority_event_path")" "high")"
+  "$(dashboard_json_maintenance_sync_row "structure" "Structure checks" "$product_structure_status" "product.structure" "$(dashboard_status_freshness_state "$product_structure_status")" "$(dashboard_status_authority "$product_structure_status")" "$(dashboard_source_observed_at "product.structure" "$generated_at")" "Repository structure evidence is grouped separately from tests and CI." "Review structure evidence if this layer is not ready." "$(dashboard_source_detail_artifact_path "product.structure" "$product_authority_event_path")" "medium")"
+  "$(dashboard_json_maintenance_sync_row "focused_checks" "Focused checks" "$product_focused_status" "product.focused" "$(dashboard_status_freshness_state "$product_focused_status")" "$(dashboard_status_authority "$product_focused_status")" "$(dashboard_source_observed_at "product.focused" "$generated_at")" "Product-specific focused checks are shown when the selected repository reports them." "Review focused product evidence before treating specialized checks as complete." "$(dashboard_source_detail_artifact_path "product.focused" "$product_authority_event_path")" "medium")"
+  "$(dashboard_json_maintenance_sync_row "security" "Security checks" "$security_gate_status" "product.security" "$(dashboard_status_freshness_state "$security_gate_status")" "$(dashboard_status_authority "$security_gate_status")" "$(dashboard_source_observed_at "product.security.blockers" "$generated_at")" "Security evidence is grouped separately from functional product checks." "Open Safety Confirmation before risky operations." "$(dashboard_source_detail_artifact_path "product.security.blockers" "$product_security_event_path")" "high")"
+  "$(dashboard_json_maintenance_sync_row "local_artifacts" "Local artifacts" "$product_local_artifacts_status" "product.security.local_artifacts" "$(dashboard_source_freshness_state "product.security.local_artifacts" "$product_local_artifacts_status")" "$(dashboard_source_authority "product.security.local_artifacts" "$product_local_artifacts_status")" "$(dashboard_source_observed_at "product.security.local_artifacts" "$generated_at")" "Raw or generated artifacts must not be mistaken for source readiness." "Review local artifact evidence before committing generated outputs." "$(dashboard_source_detail_artifact_path "product.security.local_artifacts" "$product_security_event_path")" "high")"
+  "$(dashboard_json_maintenance_sync_row "secrets" "Secrets" "$product_secrets_status" "product.security.secrets" "$(dashboard_source_freshness_state "product.security.secrets" "$product_secrets_status")" "$(dashboard_source_authority "product.security.secrets" "$product_secrets_status")" "$(dashboard_source_observed_at "product.security.secrets" "$generated_at")" "Credential and token checks are visible as their own maintenance layer." "Refresh secret checks before provider-backed or credential-touching work." "$(dashboard_source_detail_artifact_path "product.security.secrets" "$product_security_event_path")" "high")"
+  "$(dashboard_json_maintenance_sync_row "external_sending" "External sending" "$product_external_sending_status" "product.security.external_sending" "$(dashboard_source_freshness_state "product.security.external_sending" "$product_external_sending_status")" "$(dashboard_source_authority "product.security.external_sending" "$product_external_sending_status")" "$(dashboard_source_observed_at "product.security.external_sending" "$generated_at")" "External-send evidence is not collapsed into a generic product gate result." "Review external-send policy before any network-backed operation." "$(dashboard_source_detail_artifact_path "product.security.external_sending" "$product_security_event_path")" "high")"
+  "$(dashboard_json_maintenance_sync_row "git_sync" "Git synchronization" "$git_sync_status" "product.git.sync" "$(dashboard_status_freshness_state "$git_sync_status")" "$(dashboard_status_authority "$git_sync_status")" "$(dashboard_source_observed_at "product.git.sync" "$generated_at")" "Git synchronization evidence is grouped with product gate evidence when Git applies." "Resolve Git sync differences before merge or release actions." "$(dashboard_source_detail_artifact_path "product.git.sync" "$product_authority_event_path")" "high")"
+  "$(dashboard_json_maintenance_sync_row "ci" "CI evidence" "$ci_status" "product.ci" "$(dashboard_status_freshness_state "$ci_status")" "$(dashboard_status_authority "$ci_status")" "$(dashboard_source_observed_at "product.ci.main" "$generated_at")" "CI evidence is grouped separately from local tests." "Review PR, branch, and main CI rows when CI is not current." "$(dashboard_source_detail_artifact_path "product.ci.main" "$product_authority_event_path")" "high")"
+)
+
+documentation_sync_status="$(
+  dashboard_operational_status_from_states \
+    "$requirements_doc_status" \
+    "$specification_doc_status" \
+    "$implementation_plan_doc_status" \
+    "$task_tracker_doc_status" \
+    "$handoff_doc_status" \
+    "$developer_memory_doc_status"
+)"
+documentation_sync_rows=(
+  "$(dashboard_json_maintenance_sync_row "requirements" "Requirements" "$requirements_doc_status" "documents.requirements" "$(dashboard_status_freshness_state "$requirements_doc_status")" "$(dashboard_status_authority "$requirements_doc_status")" "$generated_at" "Requirements evidence is checked as a source-of-truth document." "Open the requirements document if this row is not ready." "$requirements_doc_path" "medium")"
+  "$(dashboard_json_maintenance_sync_row "specification" "Specification" "$specification_doc_status" "documents.specification" "$(dashboard_status_freshness_state "$specification_doc_status")" "$(dashboard_status_authority "$specification_doc_status")" "$generated_at" "Specification evidence is checked separately from requirements." "Open the specification document if this row is not ready." "$specification_doc_path" "medium")"
+  "$(dashboard_json_maintenance_sync_row "implementation_plan" "Implementation Plan" "$implementation_plan_doc_status" "documents.implementation_plan" "$(dashboard_status_freshness_state "$implementation_plan_doc_status")" "$(dashboard_status_authority "$implementation_plan_doc_status")" "$generated_at" "Implementation plan evidence confirms the planned work and verification boundary." "Open the implementation plan if this row is not ready." "$implementation_plan_doc_path" "medium")"
+  "$(dashboard_json_maintenance_sync_row "task_tracker" "Task Tracker" "$task_tracker_doc_status" "documents.task_tracker" "$(dashboard_status_freshness_state "$task_tracker_doc_status")" "$(dashboard_status_authority "$task_tracker_doc_status")" "$generated_at" "Task tracker evidence reports progress and completion state." "Review the latest task tracker entries before handoff." "$task_tracker_doc_path" "high")"
+  "$(dashboard_json_maintenance_sync_row "handoff" "Handoff" "$handoff_doc_status" "documents.handoff" "$(dashboard_status_freshness_state "$handoff_doc_status")" "$(dashboard_status_authority "$handoff_doc_status")" "$generated_at" "Handoff evidence reports the next resume point." "Review the current resume target before starting new autonomous work." "$handoff_doc_path" "high")"
+  "$(dashboard_json_maintenance_sync_row "developer_memory" "Developer Memory" "$developer_memory_doc_status" "documents.developer_memory" "$(dashboard_status_freshness_state "$developer_memory_doc_status")" "$(dashboard_status_authority "$developer_memory_doc_status")" "$generated_at" "Developer memory records durable direction for future sessions." "Review developer memory when current direction is unclear." "$developer_memory_doc_path" "medium")"
+)
+
+maintenance_sync_status="$(
+  dashboard_operational_status_from_states \
+    "$repository_changes_status" \
+    "$product_gate_status" \
+    "$documentation_sync_status"
+)"
+maintenance_sync_blocker_count=0
+for maintenance_sync_candidate in "$repository_changes_status" "$product_gate_status" "$documentation_sync_status"; do
+  case "$maintenance_sync_candidate" in
+    failed|blocked|missing) maintenance_sync_blocker_count=$((maintenance_sync_blocker_count + 1)) ;;
+  esac
+done
+maintenance_warning_rows=()
+maintenance_warning_count="${#maintenance_warning_rows[@]}"
+case "$maintenance_sync_status" in
+  ready|passed)
+    maintenance_sync_current_result="Repository maintenance evidence is currently synchronized for the selected context."
+    maintenance_sync_next_action="No immediate maintenance action is required before planning or review."
+    maintenance_sync_immediate_required="false"
+    ;;
+  not_applicable)
+    maintenance_sync_current_result="Maintenance synchronization is not required for the selected context."
+    maintenance_sync_next_action="Continue with the selected lesson or workflow context."
+    maintenance_sync_immediate_required="false"
+    ;;
+  *)
+    maintenance_sync_current_result="Maintenance synchronization needs review before treating the snapshot as final."
+    maintenance_sync_next_action="Review the first non-ready Git, CI, product gate, or document row before proceeding."
+    maintenance_sync_immediate_required="true"
+    ;;
+esac
+maintenance_recommended_actions=()
+if dashboard_attention_state "$maintenance_sync_status"; then
+  maintenance_recommended_actions+=("$(dashboard_json_maintenance_action "review_non_ready_rows" "Review non-ready maintenance rows" "manual_required" "immediate" "Open the row whose status is stale, missing, blocked, unknown, or manual-required before treating the repository as synchronized." "maintenance_sync_state")")
+else
+  maintenance_recommended_actions+=("$(dashboard_json_maintenance_action "no_immediate_maintenance_action" "No immediate maintenance action required" "ready" "immediate" "The selected repository can proceed to planning or review with the current maintenance evidence." "maintenance_sync_state")")
+fi
+maintenance_recommended_actions+=("$(dashboard_json_maintenance_action "inspect_related_pages" "Inspect related detail pages if needed" "optional" "later" "Use Development Workflow, Safety Confirmation, Repository Info, Documents, or History when supporting evidence is needed." "maintenance_sync_state")")
+maintenance_blocked_actions=(
+  "$(dashboard_json_maintenance_action "execute_git_or_ci_from_browser" "Execute Git or CI from the browser dashboard" "approval_required" "blocked" "The dashboard provides display-only evidence and command previews; execution remains in the approved CLI, MCP, or repository workflow boundary." "actions.command_previews")"
+)
+maintenance_evidence_links=(
+  "$(dashboard_json_maintenance_sync_row "repository_changes" "Repository changes" "$repository_changes_status" "development.repository_changes" "$(dashboard_status_freshness_state "$repository_changes_status")" "$(dashboard_status_authority "$repository_changes_status")" "$(dashboard_json_get_field "$repository_changes_json" observed_at 2>/dev/null || printf '%s' "$generated_at")" "Repository branch, worktree, ahead, and behind evidence." "Open Repository Info when Git details need inspection." "development.repository_changes" "high")"
+  "$(dashboard_json_maintenance_sync_row "ci_evidence" "CI evidence" "$ci_status" "development.ci_evidence" "$(dashboard_status_freshness_state "$ci_status")" "$(dashboard_status_authority "$ci_status")" "$(dashboard_source_observed_at "product.ci.main" "$generated_at")" "Branch, PR, main, provider, and local-test CI evidence rows." "Open Development Workflow when CI details need inspection." "development.ci_evidence" "high")"
+  "$(dashboard_json_maintenance_sync_row "documents" "Documents" "$documentation_sync_status" "documents.catalog" "$(dashboard_status_freshness_state "$documentation_sync_status")" "$(dashboard_status_authority "$documentation_sync_status")" "$generated_at" "Configured source-of-truth documents for the selected context." "Open Documents when source documents need inspection." "documents.catalog" "medium")"
+)
+maintenance_sync_state_json="$(
+  printf '{"status":'
+  dashboard_json_string "$maintenance_sync_status"
+  printf ',"observed_at":'
+  dashboard_json_string "$generated_at"
+  printf ',"menu_id":'
+  dashboard_json_string "$SELECTED_MENU_ID"
+  printf ',"workflow_context":'
+  dashboard_json_string "$SELECTED_WORKFLOW_CONTEXT"
+  printf ',"repo_id":'
+  dashboard_json_string "$(dashboard_selected_repository_id_for_menu "$SELECTED_MENU_ID")"
+  printf ',"repository_name":'
+  dashboard_json_string "$selected_target_repository_name"
+  printf ',"sync_summary":{"status":'
+  dashboard_json_string "$maintenance_sync_status"
+  printf ',"current_result":'
+  dashboard_json_string "$maintenance_sync_current_result"
+  printf ',"immediate_action_required":'
+  dashboard_json_bool "$maintenance_sync_immediate_required"
+  printf ',"blocker_count":%d,"warning_count":%d,"next_safe_action":' "$maintenance_sync_blocker_count" "$maintenance_warning_count"
+  dashboard_json_string "$maintenance_sync_next_action"
+  printf '},"git_state":{"status":'
+  dashboard_json_string "$repository_changes_status"
+  printf ',"source_id":"development.repository_changes","observed_at":'
+  dashboard_json_string "$(dashboard_json_get_field "$repository_changes_json" observed_at 2>/dev/null || printf '%s' "$generated_at")"
+  printf ',"branch":'
+  dashboard_json_string "$repo_branch"
+  printf ',"upstream":'
+  dashboard_json_string "$repo_upstream"
+  printf ',"main_target":'
+  dashboard_json_string "$repo_main_target"
+  printf ',"head":'
+  dashboard_json_string "$repo_head"
+  printf ',"worktree_state":'
+  dashboard_json_string "$maintenance_git_worktree_state"
+  printf ',"staged_count":%d,"unstaged_count":%d,"untracked_count":%d,"changed_count":%d,"ahead":%d,"behind":%d,"worktree_count":%d' \
+    "$repo_staged_count" "$repo_unstaged_count" "$repo_untracked_count" "$repo_changed_count" "$repo_ahead_count" "$repo_behind_count" "$repo_worktree_count"
+  printf ',"sync_status":'
+  dashboard_json_string "$repository_changes_status"
+  printf ',"action_needed":'
+  dashboard_json_string "$maintenance_git_action_needed"
+  printf '},"ci_state":{"status":'
+  dashboard_json_string "$ci_status"
+  printf ',"observed_at":'
+  dashboard_json_string "$(dashboard_source_observed_at "product.ci.main" "$generated_at")"
+  printf ',"branch_ci_status":'
+  dashboard_json_string "$ci_branch_status"
+  printf ',"pr_ci_status":'
+  dashboard_json_string "$ci_pr_status"
+  printf ',"main_ci_status":'
+  dashboard_json_string "$ci_main_status"
+  printf ',"provider_visibility_status":'
+  dashboard_json_string "$ci_provider_status"
+  printf ',"local_tests_status":'
+  dashboard_json_string "$local_tests_status"
+  printf ',"head_match_status":'
+  dashboard_json_string "$ci_head_match_status"
+  printf ',"annotations":'
+  dashboard_json_raw_array "${maintenance_ci_annotations[@]}"
+  printf '},"product_gate_evidence":{"status":'
+  dashboard_json_string "$product_gate_status"
+  printf ',"layers":'
+  dashboard_json_raw_array "${product_gate_layers[@]}"
+  printf '},"documentation_sync":{"status":'
+  dashboard_json_string "$documentation_sync_status"
+  printf ',"rows":'
+  dashboard_json_raw_array "${documentation_sync_rows[@]}"
+  printf '},"maintenance_warnings":'
+  dashboard_json_raw_array "${maintenance_warning_rows[@]}"
+  printf ',"recommended_actions":'
+  dashboard_json_raw_array "${maintenance_recommended_actions[@]}"
+  printf ',"blocked_actions":'
+  dashboard_json_raw_array "${maintenance_blocked_actions[@]}"
+  printf ',"evidence_links":'
+  dashboard_json_raw_array "${maintenance_evidence_links[@]}"
+  printf '}'
+)"
+
 security_approvals=(
   "$(dashboard_json_security_item "dangerous_action_approval" "Dangerous action approval" "$dangerous_action_approval_status" "Dangerous operations require explicit approval before execution." "$generated_at")"
   "$(dashboard_json_security_item "git_workflow_approval" "Git workflow approval" "$git_approval_status" "Push, PR, and merge approval states are tracked separately." "$generated_at")"
@@ -6061,6 +7054,125 @@ security_approvals=(
 dangerous_operations=(
   "$(dashboard_json_security_item "merge" "Merge" "$git_approval_status" "Merge is gated and must stay outside the dashboard UI." "$generated_at")"
   "$(dashboard_json_security_item "cleanup" "Product cleanup" "$dangerous_action_approval_status" "Cleanup is preview-only until an explicit external approval path is used." "$generated_at")"
+)
+
+case "$security_gate_status" in
+  failed|blocked)
+    security_confirmation_status="blocked"
+    security_confirmation_result="Active security blockers require review before risky operations."
+    ;;
+  missing|not_run|stale|unknown|manual_required)
+    security_confirmation_status="manual_required"
+    security_confirmation_result="Security evidence needs review before risky operations."
+    ;;
+  *)
+    security_confirmation_status="ready"
+    security_confirmation_result="No active security blockers are recorded for the selected repository context."
+    ;;
+esac
+
+security_confirmation_evidence=(
+  "$(dashboard_json_security_confirmation_evidence "local_artifacts" "Local artifacts" "$(dashboard_source_status "product.security.local_artifacts" "$security_gate_status")" "product.security.local_artifacts" "$(dashboard_source_freshness_state "product.security.local_artifacts" "$security_gate_status")" "$(dashboard_source_authority "product.security.local_artifacts" "$security_gate_status")" "$(dashboard_source_observed_at "product.security.local_artifacts" "$generated_at")" "$(dashboard_source_detail_artifact_path "product.security.local_artifacts" "$product_security_evidence_path")" "Raw run artifacts and generated local outputs must stay out of committed source." "Inspect the product security manifest before adding generated artifacts.")"
+  "$(dashboard_json_security_confirmation_evidence "secrets" "Secrets" "$(dashboard_source_status "product.security.secrets" "$security_gate_status")" "product.security.secrets" "$(dashboard_source_freshness_state "product.security.secrets" "$security_gate_status")" "$(dashboard_source_authority "product.security.secrets" "$security_gate_status")" "$(dashboard_source_observed_at "product.security.secrets" "$generated_at")" "$(dashboard_source_detail_artifact_path "product.security.secrets" "$product_security_evidence_path")" "Credentials, tokens, signed URLs, and secret-like values must not be exposed." "Re-run the product security check before any operation that may touch credentials.")"
+  "$(dashboard_json_security_confirmation_evidence "external_sending" "External sending" "$(dashboard_source_status "product.security.external_sending" "$security_gate_status")" "product.security.external_sending" "$(dashboard_source_freshness_state "product.security.external_sending" "$security_gate_status")" "$(dashboard_source_authority "product.security.external_sending" "$security_gate_status")" "$(dashboard_source_observed_at "product.security.external_sending" "$generated_at")" "$(dashboard_source_detail_artifact_path "product.security.external_sending" "$product_security_evidence_path")" "External AI/API/cloud sending must remain disabled unless the selected workflow explicitly opens it." "Confirm provider and external-send policy before enabling any network-backed operation.")"
+  "$(dashboard_json_security_confirmation_evidence "security_blockers" "Security blockers" "$(dashboard_source_status "product.security.blockers" "$security_gate_status")" "product.security.blockers" "$(dashboard_source_freshness_state "product.security.blockers" "$security_gate_status")" "$(dashboard_source_authority "product.security.blockers" "$security_gate_status")" "$(dashboard_source_observed_at "product.security.blockers" "$generated_at")" "$(dashboard_source_detail_artifact_path "product.security.blockers" "$product_security_evidence_path")" "Active security blockers must stop risky workflow continuation." "Resolve the blocking source before treating the workflow as safe.")"
+)
+
+security_authority_boundaries=(
+  "$(dashboard_json_security_authority_boundary "translation_execution" "Translation execution" "closed" "true" "high" "Translation execution is not opened by the dashboard unless a new scoped implementation plan authorizes it.")"
+  "$(dashboard_json_security_authority_boundary "provider_dispatch" "Provider dispatch" "closed" "true" "critical" "Provider/API dispatch remains closed; provider-backed work requires explicit scope and auditable configuration.")"
+  "$(dashboard_json_security_authority_boundary "external_send" "External send" "closed" "true" "critical" "External sending remains closed unless a selected workflow and approval evidence explicitly open it.")"
+  "$(dashboard_json_security_authority_boundary "credential_read" "Credential read" "closed" "true" "critical" "Credential values are not read or displayed by dashboard data.")"
+  "$(dashboard_json_security_authority_boundary "approval_receipt_read_write" "Approval receipt read/write" "closed" "true" "high" "Approval receipt access is closed until a scoped receipt contract is present.")"
+  "$(dashboard_json_security_authority_boundary "browser_execution_expansion" "Browser execution expansion" "closed" "true" "high" "Browser action expansion requires a reviewed allowlist and cannot be inferred from dashboard display.")"
+  "$(dashboard_json_security_authority_boundary "shell_execution_expansion" "Shell execution expansion" "closed" "true" "critical" "Shell execution expansion requires an explicit implementation plan and remains outside display-only command previews.")"
+  "$(dashboard_json_security_authority_boundary "mcp_execution_expansion" "MCP execution expansion" "closed" "true" "critical" "MCP execution expansion requires a parity and safety contract before use.")"
+  "$(dashboard_json_security_authority_boundary "endpoint_action_expansion" "Endpoint/action expansion" "closed" "true" "high" "New endpoints or action affordances require scoped review and must not appear as implicit authority.")"
+  "$(dashboard_json_security_authority_boundary "settings_write_expansion" "Settings-write expansion" "closed" "true" "high" "Settings writes remain guarded by existing confirmation paths and do not grant broad write authority.")"
+  "$(dashboard_json_security_authority_boundary "destructive_execution" "Destructive execution" "closed" "true" "critical" "Destructive execution is closed by policy unless a future scoped plan explicitly authorizes it.")"
+  "$(dashboard_json_security_authority_boundary "raw_body_forwarding" "Raw body forwarding" "closed" "true" "critical" "Raw transcripts, OCR, prompts, provider responses, and artifact bodies must not be forwarded into dashboard output.")"
+)
+
+security_display_policy=(
+  "$(dashboard_json_security_display_policy_item "api_keys" "API keys and tokens" "do_not_display" "Show only inert environment variable names or receipt references, never secret values.")"
+  "$(dashboard_json_security_display_policy_item "private_urls" "Signed or private URLs" "do_not_display" "Signed URLs and private links must be redacted before browser delivery.")"
+  "$(dashboard_json_security_display_policy_item "raw_artifact_bodies" "Raw artifact bodies" "do_not_display" "Raw transcript, OCR, frame, prompt, response, and generated material bodies are not display data.")"
+  "$(dashboard_json_security_display_policy_item "local_absolute_paths" "Local absolute paths" "redact" "Display product-scoped or repository-relative references instead of machine-local absolute paths.")"
+)
+
+security_confirmation_blockers=()
+if dashboard_attention_state "$security_gate_status"; then
+  security_confirmation_blockers+=("$(dashboard_json_security_confirmation_blocker "security_gate" "$security_gate_status" "security.gate_status" "$security_confirmation_result" "Open Safety evidence rows and product security details before continuing.")")
+fi
+
+security_recommended_actions=(
+  "$(dashboard_json_security_confirmation_action "review_next_roadmap" "Review the next roadmap proposal" "safe" "Planning and review are safe while dangerous authority boundaries remain closed.")"
+  "$(dashboard_json_security_confirmation_action "inspect_maintenance" "Inspect maintenance and sync" "safe" "Use maintenance status before treating Git, CI, and product gates as current.")"
+  "$(dashboard_json_security_confirmation_action "rerun_security_check" "Re-run product security check before new implementation" "recommended" "A new implementation scope should refresh security evidence before risky operations.")"
+)
+
+security_restricted_actions=(
+  "$(dashboard_json_security_confirmation_action "enable_provider_backed_execution" "Enable provider-backed execution" "approval_required" "Provider-backed execution requires a new scoped plan, credential policy, cost boundary, and auditable approval.")"
+  "$(dashboard_json_security_confirmation_action "expand_mcp_or_shell_execution" "Expand MCP or shell execution" "approval_required" "Execution expansion requires a parity and safety contract before use.")"
+  "$(dashboard_json_security_confirmation_action "run_destructive_operations" "Run destructive operations" "blocked" "Destructive operations remain closed unless a future scoped plan explicitly authorizes them.")"
+)
+
+repository_development_phase="$(dashboard_json_get_field "$repository_development_json" current_phase 2>/dev/null || true)"
+repository_development_runner_status="$(dashboard_json_get_field "$repository_development_json" runner_records_status 2>/dev/null || true)"
+repository_development_required_checks="$(dashboard_json_get_field "$repository_development_json" required_checks 2>/dev/null || true)"
+repository_development_recommended_checks="$(dashboard_json_get_field "$repository_development_json" recommended_checks 2>/dev/null || true)"
+repository_development_reason="$(dashboard_json_get_field "$repository_development_json" inference_reason 2>/dev/null || true)"
+case "$repository_development_runner_status" in
+  current) repository_development_overview_status="ready" ;;
+  stale) repository_development_overview_status="stale" ;;
+  missing) repository_development_overview_status="missing" ;;
+  *) repository_development_overview_status="unknown" ;;
+esac
+[[ -n "$repository_development_phase" ]] || repository_development_phase="unknown"
+[[ -n "$repository_development_reason" ]] || repository_development_reason="Repository development workflow phase evidence is not available."
+[[ -n "$repository_development_required_checks" ]] || repository_development_required_checks="unknown"
+[[ -n "$repository_development_recommended_checks" ]] || repository_development_recommended_checks="unknown"
+
+task_tracker_summary="$(dashboard_document_brief_dynamic_text taskTracker summary "$SELECTED_MENU_ID" en 2>/dev/null || true)"
+task_tracker_action="$(dashboard_document_brief_dynamic_text taskTracker action "$SELECTED_MENU_ID" en 2>/dev/null || true)"
+handoff_summary="$(dashboard_document_brief_dynamic_text handoff summary "$SELECTED_MENU_ID" en 2>/dev/null || true)"
+handoff_action="$(dashboard_document_brief_dynamic_text handoff action "$SELECTED_MENU_ID" en 2>/dev/null || true)"
+[[ -n "$task_tracker_summary" ]] || task_tracker_summary="Task tracker status: $task_progress_value"
+[[ -n "$task_tracker_action" ]] || task_tracker_action="Review the latest task tracker entry before handoff."
+[[ -n "$handoff_summary" ]] || handoff_summary="Handoff status: $handoff_value"
+[[ -n "$handoff_action" ]] || handoff_action="Review the current resume target before starting new autonomous work."
+
+overview_worktree_detail="Worktree changes: $(dashboard_json_get_number "$repository_changes_json" staged_count) staged / $(dashboard_json_get_number "$repository_changes_json" unstaged_count) unstaged / $(dashboard_json_get_number "$repository_changes_json" untracked_count) untracked."
+overview_sync_detail="Ahead: $(dashboard_json_get_number "$repository_changes_json" ahead) / Behind: $(dashboard_json_get_number "$repository_changes_json" behind)."
+overview_tests_status="$(dashboard_operational_status_from_states "$local_tests_status" "$product_structure_status" "$product_focused_status")"
+overview_blocker_count=$(( ${#blocking_items[@]} + ${#security_confirmation_blockers[@]} + maintenance_sync_blocker_count ))
+if [[ "$overview_blocker_count" -gt 0 ]]; then
+  overview_blockers_status="blocked"
+  overview_blockers_value="$overview_blocker_count blocker source(s)"
+  overview_blockers_detail="Workflow, maintenance, or safety blockers require review before risky operations."
+else
+  overview_blockers_status="ready"
+  overview_blockers_value="No active blockers"
+  overview_blockers_detail="No active blocker is currently reported by producer-owned evidence."
+fi
+overview_next_command="$(dashboard_operational_next_action "$operational_decision_status")"
+overview_overall_detail_page="#workflow"
+case "$operational_decision_source" in
+  security.*|product.security*) overview_overall_detail_page="#safety" ;;
+  maintenance*|documents.*|development.git*|development.ci*) overview_overall_detail_page="#maintenance" ;;
+  development.repository_changes) overview_overall_detail_page="#repository-info" ;;
+esac
+overview_sections=(
+  "$(dashboard_json_overview_section "overall" "overview.executive.overall" "$operational_decision_status" "$(dashboard_status_judgment_text "$operational_decision_status")" "$operational_decision_reason" "$operational_decision_source" "dashboard-data" "$operational_decision_freshness" "$operational_decision_authority" "$overview_overall_detail_page" "$overview_next_command")"
+  "$(dashboard_json_overview_section "current_work" "overview.executive.currentWork" "$repository_development_overview_status" "Repository workflow phase: $repository_development_phase" "Required checks: $repository_development_required_checks / Recommended checks: $repository_development_recommended_checks / $repository_development_reason" "development.repository_development" "repository-development-workflow" "$(dashboard_status_freshness_state "$repository_development_overview_status")" "$(dashboard_status_authority "$repository_development_overview_status")" "#workflow" "not_applicable")"
+  "$(dashboard_json_overview_section "docs_sync" "overview.executive.docs" "$documentation_sync_status" "Documents: $(dashboard_status_judgment_text "$documentation_sync_status")" "Requirements, specification, implementation plan, task tracker, handoff, and developer memory are checked as source-of-truth documents." "maintenance_sync_state.documentation_sync" "dashboard-data" "$(dashboard_status_freshness_state "$documentation_sync_status")" "$(dashboard_status_authority "$documentation_sync_status")" "#documents" "not_applicable")"
+  "$(dashboard_json_overview_section "task_tracker" "overview.progress.taskTrackerTitle" "$task_tracker_doc_status" "$task_tracker_summary" "$task_tracker_action" "documents.task_tracker" "dashboard-data" "$(dashboard_status_freshness_state "$task_tracker_doc_status")" "$(dashboard_status_authority "$task_tracker_doc_status")" "#maintenance" "not_applicable")"
+  "$(dashboard_json_overview_section "handoff" "overview.progress.handoffTitle" "$handoff_doc_status" "$handoff_summary" "$handoff_action" "documents.handoff" "dashboard-data" "$(dashboard_status_freshness_state "$handoff_doc_status")" "$(dashboard_status_authority "$handoff_doc_status")" "#maintenance" "not_applicable")"
+  "$(dashboard_json_overview_section "git_pr_ci" "overview.executive.gitCi" "$(dashboard_operational_status_from_states "$repository_changes_status" "$git_sync_status" "$ci_status")" "Branch: $repository_changes_branch / HEAD: $repository_changes_head" "$overview_worktree_detail $overview_sync_detail CI: $(dashboard_status_judgment_text "$ci_status")" "maintenance_sync_state.git_state" "dashboard-data" "$(dashboard_status_freshness_state "$git_sync_status")" "$(dashboard_status_authority "$git_sync_status")" "#maintenance" "$product_git_followup_command")"
+  "$(dashboard_json_overview_section "tests" "overview.progress.testsTitle" "$overview_tests_status" "Tests: $(dashboard_status_judgment_text "$overview_tests_status")" "Local tests, structure checks, and focused checks are grouped separately from remote CI." "maintenance_sync_state.product_gate_evidence" "product-authority" "$(dashboard_status_freshness_state "$overview_tests_status")" "$(dashboard_status_authority "$overview_tests_status")" "#workflow" "not_applicable")"
+  "$(dashboard_json_overview_section "safety" "overview.executive.safety" "$security_confirmation_status" "$security_confirmation_result" "Safety confirmation lists security evidence, closed authority boundaries, display policy, blockers, and restricted actions." "security.confirmation" "dashboard-data" "$(dashboard_status_freshness_state "$security_confirmation_status")" "$(dashboard_status_authority "$security_confirmation_status")" "#safety" "$product_security_gate_command")"
+  "$(dashboard_json_overview_section "blockers" "overview.situation.blockersTitle" "$overview_blockers_status" "$overview_blockers_value" "$overview_blockers_detail" "$operational_decision_source" "dashboard-data" "$operational_decision_freshness" "$operational_decision_authority" "$overview_overall_detail_page" "$overview_next_command")"
+  "$(dashboard_json_overview_section "next_safe_action" "overview.situation.nextSafeTitle" "$operational_decision_status" "$operational_decision_next_action" "Use the linked detail page before running any Git, CI, merge, cleanup, provider, or destructive operation." "$operational_decision_source" "dashboard-data" "$operational_decision_freshness" "$operational_decision_authority" "$overview_overall_detail_page" "$overview_next_command")"
 )
 
 lesson_7_json="$(lesson_object "$(lesson_display_label lesson_7)" "$DASHBOARD_LESSON_CONFIG")"
@@ -6083,6 +7195,7 @@ content_seed="$(
     "${blocking_items[*]}" \
     "${guidance_items[*]}" \
     "$primary_action_json" \
+    "${overview_sections[*]}" \
     "$category_metric_overview" \
     "$category_metric_lessons" \
     "$category_metric_workflow" \
@@ -6109,6 +7222,7 @@ content_seed="$(
     "${workflow_evidence_events[*]}" \
     "${ci_evidence_roles[*]}" \
     "$product_authority_json" \
+    "$maintenance_sync_state_json" \
     "$free_development_authority_status" \
     "$product_improvement_authority_status" \
     "$external_integration_authority_status" \
@@ -6219,6 +7333,9 @@ printf ',\n'
 printf '    "primary_action": '
 printf '%s' "$primary_action_json"
 printf ',\n'
+printf '    "overview_sections": '
+dashboard_json_raw_array "${overview_sections[@]}"
+printf ',\n'
 printf '    "category_metrics": {\n'
 printf '      "overview": %s,\n' "$category_metric_overview"
 printf '      "lessons": %s,\n' "$category_metric_lessons"
@@ -6325,6 +7442,9 @@ printf '    "items": '
 dashboard_json_raw_array "${settings_items[@]}"
 printf '\n'
 printf '  },\n'
+printf '  "maintenance_sync_state": '
+printf '%s' "$maintenance_sync_state_json"
+printf ',\n'
 printf '  "maintenance": {\n'
 printf '    "as_built_sync_status": '
 dashboard_json_string "$as_built_sync_status"
@@ -6371,6 +7491,56 @@ dashboard_json_raw_array "${security_approvals[@]}"
 printf ',\n'
 printf '    "dangerous_operations": '
 dashboard_json_raw_array "${dangerous_operations[@]}"
+printf ',\n'
+printf '    "confirmation": {\n'
+printf '      "status": '
+dashboard_json_string "$security_confirmation_status"
+printf ',\n'
+printf '      "observed_at": '
+dashboard_json_string "$generated_at"
+printf ',\n'
+printf '      "menu_id": '
+dashboard_json_string "$SELECTED_MENU_ID"
+printf ',\n'
+printf '      "workflow_context": '
+dashboard_json_string "$SELECTED_WORKFLOW_CONTEXT"
+printf ',\n'
+printf '      "repo_id": '
+dashboard_json_string "$(dashboard_selected_repository_id_for_menu "$SELECTED_MENU_ID")"
+printf ',\n'
+printf '      "repository_name": '
+dashboard_json_string "$selected_target_repository_name"
+printf ',\n'
+printf '      "product_head": '
+dashboard_json_string "$repository_changes_head"
+printf ',\n'
+printf '      "current_result": '
+dashboard_json_string "$security_confirmation_result"
+printf ',\n'
+printf '      "safe_next_action": '
+dashboard_json_string "Review planning, maintenance, or workflow details while dangerous authority boundaries remain closed."
+printf ',\n'
+printf '      "approval_receipts": {"state":"closed","read_allowed":false,"write_allowed":false,"receipt_reference":"none"},\n'
+printf '      "unsafe_command_policy": {"state":"display_only","execution_mode":"preview_only","copy_requires_safe_argv":true},\n'
+printf '      "evidence": '
+dashboard_json_raw_array "${security_confirmation_evidence[@]}"
+printf ',\n'
+printf '      "authority_boundaries": '
+dashboard_json_raw_array "${security_authority_boundaries[@]}"
+printf ',\n'
+printf '      "display_policy": '
+dashboard_json_raw_array "${security_display_policy[@]}"
+printf ',\n'
+printf '      "blockers": '
+dashboard_json_raw_array "${security_confirmation_blockers[@]}"
+printf ',\n'
+printf '      "recommended_actions": '
+dashboard_json_raw_array "${security_recommended_actions[@]}"
+printf ',\n'
+printf '      "restricted_actions": '
+dashboard_json_raw_array "${security_restricted_actions[@]}"
+printf '\n'
+printf '    }'
 printf '\n'
 printf '  },\n'
 printf '  "actions": {\n'

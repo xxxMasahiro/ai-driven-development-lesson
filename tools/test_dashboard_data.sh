@@ -132,6 +132,26 @@ function stableStringify(value) {
   return JSON.stringify(value);
 }
 
+function safeRelativePath(value) {
+  return typeof value === 'string' &&
+    value.length > 0 &&
+    !value.startsWith('/') &&
+    !value.startsWith('\\') &&
+    !/^[A-Za-z]:[\\/]/.test(value) &&
+    !value.split(/[\\/]+/).includes('..');
+}
+
+function safeScopedReference(value) {
+  return typeof value === 'string' &&
+    !/^[A-Za-z][A-Za-z0-9+.-]*:\/\//.test(value) &&
+    (value === 'not_collected' ||
+      value === 'not_applicable' ||
+      value === 'none' ||
+      (value.startsWith('product:')
+        ? safeRelativePath(value.slice('product:'.length))
+        : !value.includes(':') && safeRelativePath(value)));
+}
+
 function requireI18nKey(key) {
   if (typeof key !== 'string' || key.length === 0) {
     fail('i18n key must be a non-empty string');
@@ -189,6 +209,7 @@ for (const seedToken of [
   '"$browser_debug_json"',
   '"$design_studio_json"',
   '"$operational_decision_json"',
+  '"${overview_sections[*]}"',
   '"${decision_page_rows[*]}"',
   '"$repository_changes_json"',
   '"$repository_development_json"',
@@ -471,6 +492,26 @@ if (!contextsByMenu[selectedContext.menu_id]) {
 if (stableStringify(selectedContext) !== stableStringify(contextsByMenu[selectedContext.menu_id])) {
   fail('selected_context must match contexts_by_menu selected entry');
 }
+const repositorySelection = requireField('repository_selection');
+const repositoryScope = requireField('repository_scope');
+if (repositorySelection.menu_id !== selectedContext.menu_id || repositoryScope.menu_id !== selectedContext.menu_id) {
+  fail('repository selection and scope must match selected_context menu_id');
+}
+if (repositorySelection.workflow_context !== selectedContext.workflow_context || repositoryScope.workflow_context !== selectedContext.workflow_context) {
+  fail('repository selection and scope must match selected_context workflow_context');
+}
+if (!targetRepository.repo_id || repositoryScope.repo_id !== targetRepository.repo_id) {
+  fail('repository scope must expose the selected target repository repo_id');
+}
+if (!['not_applicable', 'not_selected'].includes(repositorySelection.current_repo_id) && repositorySelection.current_repo_id !== targetRepository.repo_id) {
+  fail('repository selection current_repo_id must match selected target repository repo_id');
+}
+if (repositoryScope.repository_name !== targetRepository.name) {
+  fail('repository scope repository_name is display-only but must match selected target name');
+}
+if (!repositoryScope.inventory || typeof repositoryScope.inventory !== 'object' || !allowedStates.has(repositoryScope.inventory.status)) {
+  fail('repository scope inventory status is invalid');
+}
 
 if (!['learning', 'development', 'maintenance', 'unknown'].includes(data.summary.mode)) {
   fail(`invalid summary mode: ${data.summary.mode}`);
@@ -505,6 +546,57 @@ if (!['low', 'medium', 'high', 'critical'].includes(primaryAction.risk_level)) {
 }
 if (!allowedStates.has(primaryAction.status)) {
   fail(`invalid primary action status: ${primaryAction.status}`);
+}
+
+const freshnessStates = new Set(['current', 'stale', 'not_collected', 'unknown']);
+const evidenceAuthorities = new Set(['authoritative', 'manual_required', 'advisory', 'not_collected']);
+const decisionOwnerSources = new Set(['dashboard-data', 'product-authority', 'git-workflow', 'repository-development-workflow']);
+const overviewSectionIds = new Set(['overall', 'current_work', 'docs_sync', 'task_tracker', 'handoff', 'git_pr_ci', 'tests', 'safety', 'blockers', 'next_safe_action']);
+const overviewDetailPages = new Set(['#overview', '#lessons', '#workflow', '#maintenance', '#safety', '#repository-info', '#documents', '#settings', '#history', '#help']);
+const overviewSections = requireField('summary.overview_sections');
+if (!Array.isArray(overviewSections)) {
+  fail('summary.overview_sections must be an array');
+}
+const seenOverviewSections = new Set();
+for (const section of overviewSections) {
+  if (!section || typeof section !== 'object' || Array.isArray(section)) {
+    fail('summary.overview_sections entries must be objects');
+  }
+  if (!overviewSectionIds.has(section.id)) {
+    fail(`invalid overview section id: ${section.id}`);
+  }
+  if (seenOverviewSections.has(section.id)) {
+    fail(`duplicate overview section id: ${section.id}`);
+  }
+  seenOverviewSections.add(section.id);
+  for (const field of ['title_key', 'value', 'detail', 'source_id', 'owner_source', 'freshness_state', 'authority', 'detail_page', 'required_command']) {
+    if (typeof section[field] !== 'string' || section[field].length === 0) {
+      fail(`overview section ${section.id} missing ${field}`);
+    }
+  }
+  if (!allowedStates.has(section.status)) {
+    fail(`invalid overview section status for ${section.id}: ${section.status}`);
+  }
+  if (!decisionOwnerSources.has(section.owner_source)) {
+    fail(`invalid overview section owner_source for ${section.id}: ${section.owner_source}`);
+  }
+  if (!freshnessStates.has(section.freshness_state)) {
+    fail(`invalid overview section freshness for ${section.id}: ${section.freshness_state}`);
+  }
+  if (!evidenceAuthorities.has(section.authority)) {
+    fail(`invalid overview section authority for ${section.id}: ${section.authority}`);
+  }
+  if (!overviewDetailPages.has(section.detail_page)) {
+    fail(`invalid overview section detail_page for ${section.id}: ${section.detail_page}`);
+  }
+  if (/^[A-Za-z][A-Za-z0-9+.-]*:\/\//.test(section.required_command) || /^[\\/]/.test(section.required_command) || /^[A-Za-z]:[\\/]/.test(section.required_command)) {
+    fail(`overview section required_command must stay display-safe for ${section.id}: ${section.required_command}`);
+  }
+}
+for (const id of overviewSectionIds) {
+  if (!seenOverviewSections.has(id)) {
+    fail(`missing overview section: ${id}`);
+  }
 }
 
 const categoryMetrics = requireField('summary.category_metrics');
@@ -563,11 +655,9 @@ for (const row of recentRuns) {
 }
 
 const riskLevels = new Set(['low', 'medium', 'high', 'critical']);
-const freshnessStates = new Set(['current', 'stale', 'not_collected', 'unknown']);
-const evidenceAuthorities = new Set(['authoritative', 'manual_required', 'advisory', 'not_collected']);
 const decisionIds = new Set(['overview', 'lessons', 'workflow', 'maintenance', 'safety', 'repository-info', 'documents', 'settings', 'history']);
-const decisionOwnerSources = new Set(['dashboard-data', 'product-authority', 'git-workflow', 'repository-development-workflow']);
 const decisionAudiences = new Set(['non_engineer', 'junior_engineer']);
+const evidenceConfidenceLevels = new Set(['high', 'medium', 'low', 'unknown']);
 const repositoryDevelopmentPhases = new Set(['context_triage', 'proposal', 'implementation_plan', 'fast_loop', 'mid_tests', 'release_gate', 'main_sync_cleanup']);
 const runnerRecordStatuses = new Set(['missing', 'current', 'stale']);
 const ciEvidenceRoles = new Set(['branch_ci', 'pr_ci', 'main_ci', 'local_tests', 'provider_visibility']);
@@ -646,6 +736,9 @@ for (const page of decisionPages) {
     fail(`decision page must_review_keys must align with must_review: ${page.id}`);
   }
   requireEvidenceState(page, `decision_pages.${page.id}`);
+  if (!evidenceConfidenceLevels.has(page.confidence_level)) {
+    fail(`decision page confidence_level is invalid: ${page.id}`);
+  }
   if (!riskLevels.has(page.risk_level)) {
     fail(`decision page risk level is invalid: ${page.id}`);
   }
@@ -871,6 +964,139 @@ for (const row of maintenanceEvidenceRows) {
 }
 if (!maintenanceEvidenceRows.some((row) => row.id === 'browser_debug_agent_handoff')) {
   fail('maintenance evidence rows must include browser_debug_agent_handoff');
+}
+
+const maintenanceSyncState = requireField('maintenance_sync_state');
+if (!maintenanceSyncState || typeof maintenanceSyncState !== 'object' || Array.isArray(maintenanceSyncState)) {
+  fail('maintenance_sync_state must be an object');
+}
+if (!allowedStates.has(maintenanceSyncState.status)) {
+  fail(`invalid maintenance_sync_state status: ${maintenanceSyncState.status}`);
+}
+if (maintenanceSyncState.menu_id !== selectedContext.menu_id || maintenanceSyncState.workflow_context !== selectedContext.workflow_context) {
+  fail('maintenance_sync_state must match the selected context');
+}
+if (maintenanceSyncState.repo_id !== selectedContext.target_repository.repo_id) {
+  fail('maintenance_sync_state repo_id must match selected context target repository');
+}
+const maintenanceSummary = maintenanceSyncState.sync_summary;
+if (!maintenanceSummary || typeof maintenanceSummary !== 'object' || !allowedStates.has(maintenanceSummary.status)) {
+  fail('maintenance_sync_state.sync_summary must expose a valid status');
+}
+if (typeof maintenanceSummary.immediate_action_required !== 'boolean') {
+  fail('maintenance sync summary must expose immediate_action_required as a boolean');
+}
+for (const field of ['blocker_count', 'warning_count']) {
+  if (!Number.isInteger(maintenanceSummary[field]) || maintenanceSummary[field] < 0) {
+    fail(`maintenance sync summary ${field} must be a non-negative integer`);
+  }
+}
+for (const field of ['current_result', 'next_safe_action']) {
+  if (typeof maintenanceSummary[field] !== 'string' || maintenanceSummary[field].length === 0) {
+    fail(`maintenance sync summary missing ${field}`);
+  }
+}
+
+const maintenanceGitState = maintenanceSyncState.git_state;
+if (!maintenanceGitState || typeof maintenanceGitState !== 'object' || !allowedStates.has(maintenanceGitState.status)) {
+  fail('maintenance_sync_state.git_state must expose a valid status');
+}
+for (const field of ['staged_count', 'unstaged_count', 'untracked_count', 'changed_count', 'ahead', 'behind', 'worktree_count']) {
+  if (!Number.isInteger(maintenanceGitState[field]) || maintenanceGitState[field] < 0) {
+    fail(`maintenance git_state ${field} must be a non-negative integer`);
+  }
+}
+if (!['none', 'commit_or_discard', 'pull_required', 'push_required', 'reconcile_diverged', 'select_repository', 'not_applicable'].includes(maintenanceGitState.action_needed)) {
+  fail(`invalid maintenance git action: ${maintenanceGitState.action_needed}`);
+}
+
+const maintenanceCiState = maintenanceSyncState.ci_state;
+if (!maintenanceCiState || typeof maintenanceCiState !== 'object') {
+  fail('maintenance_sync_state.ci_state must be an object');
+}
+for (const field of ['status', 'branch_ci_status', 'pr_ci_status', 'main_ci_status', 'provider_visibility_status', 'local_tests_status']) {
+  if (!allowedStates.has(maintenanceCiState[field])) {
+    fail(`invalid maintenance ci_state ${field}: ${maintenanceCiState[field]}`);
+  }
+}
+if (!ciHeadMatchStates.has(maintenanceCiState.head_match_status)) {
+  fail(`invalid maintenance ci_state head_match_status: ${maintenanceCiState.head_match_status}`);
+}
+if (!Array.isArray(maintenanceCiState.annotations)) {
+  fail('maintenance ci_state annotations must be an array');
+}
+
+function safeMaintenanceSyncReference(value) {
+  return typeof value === 'string' &&
+    value.length > 0 &&
+    value.split(/[;,]/).map((item) => item.trim()).filter(Boolean).every((item) => safeScopedReference(item));
+}
+
+function validateMaintenanceSyncRow(row, label) {
+  for (const field of ['id', 'label', 'status', 'source_id', 'freshness_state', 'authority', 'observed_at', 'detail', 'next_action', 'reference', 'priority']) {
+    if (!(field in row) || row[field] === '') {
+      fail(`${label} missing ${field}`);
+    }
+  }
+  requireEvidenceState(row, label);
+  if (!riskLevels.has(row.priority)) {
+    fail(`${label} has invalid priority: ${row.priority}`);
+  }
+  if (!safeMaintenanceSyncReference(row.reference)) {
+    fail(`${label} reference is not safe: ${row.reference}`);
+  }
+}
+
+const productGateEvidence = maintenanceSyncState.product_gate_evidence;
+if (!productGateEvidence || typeof productGateEvidence !== 'object' || !allowedStates.has(productGateEvidence.status) || !Array.isArray(productGateEvidence.layers) || productGateEvidence.layers.length < 4) {
+  fail('maintenance product_gate_evidence must expose grouped layers');
+}
+for (const row of productGateEvidence.layers) {
+  validateMaintenanceSyncRow(row, `maintenance product gate layer ${row && row.id}`);
+}
+const productGateLayerIds = new Set(productGateEvidence.layers.map((row) => row.id));
+for (const requiredId of ['local_tests', 'structure', 'security', 'git_sync', 'ci']) {
+  if (!productGateLayerIds.has(requiredId)) {
+    fail(`maintenance product gate layers missing ${requiredId}`);
+  }
+}
+
+const documentationSync = maintenanceSyncState.documentation_sync;
+if (!documentationSync || typeof documentationSync !== 'object' || !allowedStates.has(documentationSync.status) || !Array.isArray(documentationSync.rows) || documentationSync.rows.length < 5) {
+  fail('maintenance documentation_sync must expose document rows');
+}
+for (const row of documentationSync.rows) {
+  validateMaintenanceSyncRow(row, `maintenance documentation row ${row && row.id}`);
+}
+const documentationIds = new Set(documentationSync.rows.map((row) => row.id));
+for (const requiredId of ['requirements', 'specification', 'implementation_plan', 'task_tracker', 'handoff']) {
+  if (!documentationIds.has(requiredId)) {
+    fail(`maintenance documentation_sync missing ${requiredId}`);
+  }
+}
+
+for (const field of ['maintenance_warnings', 'recommended_actions', 'blocked_actions', 'evidence_links']) {
+  if (!Array.isArray(maintenanceSyncState[field])) {
+    fail(`maintenance_sync_state.${field} must be an array`);
+  }
+}
+for (const row of maintenanceSyncState.maintenance_warnings) {
+  validateMaintenanceSyncRow(row, `maintenance warning ${row && row.id}`);
+}
+for (const row of maintenanceSyncState.evidence_links) {
+  validateMaintenanceSyncRow(row, `maintenance evidence link ${row && row.id}`);
+}
+for (const field of ['recommended_actions', 'blocked_actions']) {
+  for (const row of maintenanceSyncState[field]) {
+    for (const requiredField of ['id', 'label', 'status', 'action_type', 'detail', 'source_id']) {
+      if (!(requiredField in row) || row[requiredField] === '') {
+        fail(`maintenance ${field} row missing ${requiredField}`);
+      }
+    }
+    if (!allowedStates.has(row.status) || !['immediate', 'later', 'blocked'].includes(row.action_type)) {
+      fail(`maintenance ${field} row has invalid state: ${row.id}`);
+    }
+  }
 }
 
 const browserDebug = requireField('browser_debug');
@@ -1204,6 +1430,63 @@ for (const [collectionName, minCount] of [['approvals', 1], ['dangerous_operatio
     }
   }
 }
+const securityConfirmationActionStates = new Set(['safe', 'recommended', 'approval_required', 'blocked', 'unknown']);
+const securityConfirmation = requireField('security.confirmation');
+for (const field of ['status', 'observed_at', 'menu_id', 'workflow_context', 'repo_id', 'repository_name', 'product_head', 'current_result', 'safe_next_action', 'approval_receipts', 'unsafe_command_policy', 'evidence', 'authority_boundaries', 'display_policy', 'blockers', 'recommended_actions', 'restricted_actions']) {
+  if (!(field in securityConfirmation)) {
+    fail(`security.confirmation missing ${field}`);
+  }
+}
+if (!allowedStates.has(securityConfirmation.status)) {
+  fail(`security.confirmation status is invalid: ${securityConfirmation.status}`);
+}
+if (securityConfirmation.menu_id !== selectedContext.menu_id || securityConfirmation.workflow_context !== selectedContext.workflow_context || securityConfirmation.repo_id !== targetRepository.repo_id) {
+  fail('security.confirmation must stay scoped to the selected repository context');
+}
+if (securityConfirmation.approval_receipts.read_allowed !== false || securityConfirmation.approval_receipts.write_allowed !== false || securityConfirmation.approval_receipts.state !== 'closed') {
+  fail('security.confirmation approval_receipts must stay closed');
+}
+if (securityConfirmation.unsafe_command_policy.execution_mode !== 'preview_only' || securityConfirmation.unsafe_command_policy.copy_requires_safe_argv !== true) {
+  fail('security.confirmation unsafe command policy must remain preview_only with safe argv required');
+}
+for (const collectionName of ['evidence', 'authority_boundaries', 'display_policy', 'recommended_actions', 'restricted_actions']) {
+  if (!Array.isArray(securityConfirmation[collectionName]) || securityConfirmation[collectionName].length < 1) {
+    fail(`security.confirmation ${collectionName} must be a non-empty array`);
+  }
+}
+for (const evidence of securityConfirmation.evidence) {
+  for (const field of ['id', 'label', 'status', 'source_id', 'freshness_state', 'authority', 'observed_at', 'source_artifacts', 'meaning', 'next_action']) {
+    if (!(field in evidence) || evidence[field] === '') {
+      fail(`security.confirmation evidence missing ${field}`);
+    }
+  }
+  requireEvidenceState(evidence, `security.confirmation.evidence.${evidence.id}`);
+  for (const sourcePath of String(evidence.source_artifacts).split(/[;,]/).map((item) => item.trim()).filter(Boolean)) {
+    if (!safeScopedReference(sourcePath)) {
+      fail(`security.confirmation evidence source_artifacts is unsafe: ${sourcePath}`);
+    }
+  }
+}
+for (const boundary of securityConfirmation.authority_boundaries) {
+  if (!['closed', 'approval_required', 'unknown'].includes(boundary.state) || typeof boundary.approval_required !== 'boolean' || !riskLevels.has(boundary.risk_level)) {
+    fail(`security.confirmation authority boundary is invalid: ${boundary.id}`);
+  }
+  if (boundary.state === 'open') {
+    fail(`security.confirmation must not open authority boundary: ${boundary.id}`);
+  }
+}
+for (const row of securityConfirmation.display_policy) {
+  if (!row.id || !row.label || !['do_not_display', 'redact', 'safe', 'recommended', 'unknown'].includes(row.state) || !row.detail) {
+    fail(`security.confirmation display policy row is invalid: ${row.id}`);
+  }
+}
+for (const collectionName of ['recommended_actions', 'restricted_actions']) {
+  for (const row of securityConfirmation[collectionName]) {
+    if (!row.id || !row.label || !securityConfirmationActionStates.has(row.state) || !row.detail) {
+      fail(`security.confirmation ${collectionName} row is invalid: ${row.id}`);
+    }
+  }
+}
 
 for (const failure of data.partial_failures) {
   for (const field of ['source', 'status', 'reason', 'required_command']) {
@@ -1340,6 +1623,52 @@ for (const expectedId of ['agents', 'documentMap', 'requirements', 'specificatio
   if (!catalogIds.has(expectedId)) {
     fail(`missing expected document catalog item: ${expectedId}`);
   }
+}
+if (!Array.isArray(documents.brief_cards) || documents.brief_cards.length < 1) {
+  fail('documents.brief_cards must expose selected-context document summaries');
+}
+let documentBriefCardsWithAgentSummary = 0;
+for (const card of documents.brief_cards) {
+  for (const field of ['id', 'menu_id', 'workflow_context', 'repo_id', 'document_role', 'source_paths', 'freshness_state']) {
+    if (!(field in card)) {
+      fail(`document brief card missing ${field}`);
+    }
+  }
+  if (card.menu_id !== selectedContext.menu_id || card.workflow_context !== selectedContext.workflow_context || card.repo_id !== targetRepository.repo_id) {
+    fail('document brief card must stay scoped to selected repository context');
+  }
+  if (!allowedStates.has(card.freshness_state)) {
+    fail(`invalid document brief card freshness_state: ${card.freshness_state}`);
+  }
+  for (const sourcePath of card.source_paths || []) {
+    if (!safeScopedReference(sourcePath)) {
+      fail(`document brief card source path is unsafe: ${sourcePath}`);
+    }
+  }
+  if (card.agent_summary === undefined || card.agent_summary === null) {
+    continue;
+  }
+  documentBriefCardsWithAgentSummary += 1;
+  const agentSummary = card.agent_summary;
+  if (!agentSummary || typeof agentSummary !== 'object' || Array.isArray(agentSummary)) {
+    fail('document brief card agent_summary must be an object');
+  }
+  for (const field of ['status', 'provider_mode', 'source', 'summary', 'detail', 'generated_at', 'source_paths']) {
+    if (!(field in agentSummary)) {
+      fail(`document brief card agent_summary missing ${field}`);
+    }
+  }
+  if (!allowedStates.has(agentSummary.status) || !['local_summary', 'subscription_agent', 'api_key', 'unknown'].includes(agentSummary.provider_mode)) {
+    fail('document brief card agent_summary status or provider_mode is invalid');
+  }
+  for (const sourcePath of agentSummary.source_paths || []) {
+    if (!safeScopedReference(sourcePath)) {
+      fail(`document brief card agent_summary source path is unsafe: ${sourcePath}`);
+    }
+  }
+}
+if (documentBriefCardsWithAgentSummary < 1) {
+  fail('documents.brief_cards must expose at least one agent_summary contract row');
 }
 if (!Array.isArray(documents.related_commands) || documents.related_commands.length < 2) {
   fail('documents.related_commands must expose docs-tour and dashboard docs reference commands');
@@ -1599,7 +1928,7 @@ if (!Array.isArray(productAuthority.evidence_summary.items)) {
   fail('product authority evidence items must be an array');
 }
 const productEvidenceRiskLevels = new Set(['low', 'medium', 'high', 'critical']);
-const productHeadPattern = /^(none|[a-f0-9]{40}|[a-f0-9]{64})$/;
+const productHeadPattern = /^(none|not_collected|[a-f0-9]{7,64})$/i;
 for (const item of productAuthority.evidence_summary.items) {
   for (const field of [
     'source_id',
@@ -1733,26 +2062,46 @@ for (const lessonPath of ['lessons.step_1_7', 'lessons.step_1_14', 'lessons.adva
 }
 
 const previews = requireField('actions.command_previews');
-if (!Array.isArray(previews) || previews.length !== 4) {
-  fail('command previews must expose the four display-only mock preview cards');
+if (!Array.isArray(previews) || previews.length < 4) {
+  fail('command previews must expose display-only preview cards');
 }
 for (const preview of previews) {
-  for (const field of ['intent', 'target', 'risk_level', 'requires_approval', 'approval_gate_id', 'argv', 'command_text', 'execution_mode', 'non_executable']) {
+  for (const field of ['command_id', 'intent', 'target', 'risk_level', 'requires_approval', 'approval_gate_id', 'argv', 'safe_argv', 'argv_redacted', 'command_text', 'execution_mode', 'non_executable', 'copy_allowed', 'copy_block_reason']) {
     if (!(field in preview)) {
       fail(`command preview missing ${field}`);
     }
   }
+  if (!/^cmd-[a-f0-9]{12}$/.test(preview.command_id)) {
+    fail(`command preview command_id is invalid: ${preview.command_id}`);
+  }
   if (!['low', 'medium', 'high', 'critical'].includes(preview.risk_level)) {
     fail(`invalid command preview risk: ${preview.risk_level}`);
   }
-  if (!Array.isArray(preview.argv)) {
-    fail('command preview argv must be an array');
+  if (!Array.isArray(preview.argv) || !Array.isArray(preview.safe_argv) || preview.argv.length === 0 || preview.argv.length !== preview.safe_argv.length) {
+    fail('command preview argv and safe_argv must be matching non-empty arrays');
+  }
+  if (JSON.stringify(preview.argv) !== JSON.stringify(preview.safe_argv)) {
+    fail('command preview argv must already be sanitized to safe_argv');
+  }
+  for (const token of [...preview.argv, ...preview.safe_argv]) {
+    if (typeof token !== 'string' || /[;&|`$<>]/.test(token) || /(^|\s)(\/home\/|\/tmp\/|\/mnt\/|[A-Za-z]:[\\/]|\\\\)/.test(token) || /SECRET|TOKEN|API_KEY|PASSWORD|PRIVATE_KEY|Authorization:\s*Bearer|X-Amz-Signature|X-Goog-Signature/i.test(token)) {
+      fail('command preview argv leaked unsafe token');
+    }
+  }
+  if (/[;&|`$<>]/.test(preview.command_text) || /(^|\s)(\/home\/|\/tmp\/|\/mnt\/|[A-Za-z]:[\\/]|\\\\)/.test(preview.command_text)) {
+    fail('command preview text leaked unsafe shell or path content');
   }
   if (preview.execution_mode !== 'preview_only' || preview.non_executable !== true) {
     fail('command previews must remain preview_only and non_executable');
   }
   if (preview.requires_approval !== false) {
     fail('Safety command preview cards must stay review-only; dangerous operations are reported under security.dangerous_operations');
+  }
+  if (typeof preview.argv_redacted !== 'boolean' || typeof preview.copy_allowed !== 'boolean' || typeof preview.copy_block_reason !== 'string') {
+    fail('command preview safety flags must be structured');
+  }
+  if (preview.copy_allowed === true && (preview.risk_level !== 'low' || preview.argv_redacted === true)) {
+    fail('command preview copy_allowed contradicts risk or redaction state');
   }
 }
 const commandPreviewGroups = requireField('actions.command_preview_groups');
@@ -1909,6 +2258,7 @@ const authorities = new Set(['authoritative', 'manual_required', 'advisory', 'no
 const riskLevels = new Set(['low', 'medium', 'high', 'critical']);
 const detailPages = new Set(['#workflow', '#maintenance', '#safety', '#repository-info', '#documents', '#history', '#help']);
 const headMatchStates = new Set(['matched', 'different', 'unknown']);
+const localizationProviderModes = new Set(['local_summary', 'subscription_agent', 'api_key', 'unknown']);
 function fail(message) {
   console.error(message);
   process.exit(1);
@@ -1918,6 +2268,39 @@ function requireObject(value, label) {
     fail(`${label} must be an object`);
   }
   return value;
+}
+function requireLocalizedObject(value, label) {
+  const localized = requireObject(value, label);
+  if (typeof localized.en !== 'string' || localized.en.length === 0) {
+    fail(`${label} must include English fallback text`);
+  }
+  if (typeof localized.ja !== 'string' || localized.ja.length === 0) {
+    fail(`${label} must include Japanese presentation text`);
+  }
+  if (localized.ja === localized.en || !/[\u3040-\u30ff\u3400-\u9fff]/.test(localized.ja)) {
+    fail(`${label} Japanese presentation text must not be the raw English fallback`);
+  }
+}
+function requireAgentLocalization(value, label, expectedStatus) {
+  const localization = requireObject(value, label);
+  if (!allowedStates.has(localization.status) || localization.status !== expectedStatus) {
+    fail(`${label} must preserve the summarized status`);
+  }
+  if (!localizationProviderModes.has(localization.provider_mode)) {
+    fail(`${label} provider_mode is invalid: ${localization.provider_mode}`);
+  }
+  if (localization.provider_mode !== 'local_summary') {
+    fail(`${label} must use deterministic local fallback in the dashboard-data test fixture`);
+  }
+  if (localization.source !== 'dashboard-data.live-status') {
+    fail(`${label} source must identify the live-status producer`);
+  }
+  if (localization.generated_at !== data.generated_at) {
+    fail(`${label} generated_at must match the live-status snapshot time`);
+  }
+  requireLocalizedObject(localization.summary, `${label}.summary`);
+  requireLocalizedObject(localization.reason, `${label}.reason`);
+  requireLocalizedObject(localization.next_action, `${label}.next_action`);
 }
 if (data.schema_version !== '0.1.0') {
   fail(`unexpected live status schema version: ${data.schema_version}`);
@@ -1958,6 +2341,7 @@ for (const key of ['local_tests', 'git_sync', 'ci', 'security']) {
   if (!detailPages.has(check.detail_page)) {
     fail(`invalid live check detail_page for ${key}: ${check.detail_page}`);
   }
+  requireAgentLocalization(check.agent_localization, `live check ${key} agent_localization`, check.status);
   if (!Array.isArray(check.items)) {
     fail(`live check ${key} items must be an array`);
   }
@@ -1986,6 +2370,7 @@ for (const key of ['local_tests', 'git_sync', 'ci', 'security']) {
     if (!allowedStates.has(item.status) || !freshnessStates.has(item.freshness_state) || !authorities.has(item.authority)) {
       fail(`live check ${key} item has invalid state vocabulary`);
     }
+    requireAgentLocalization(item.agent_localization, `live check ${key} item agent_localization`, item.status);
   }
 }
 NODE
