@@ -133,22 +133,26 @@ function safeRuntimePreview(value) {
   return !/(^|\s)(\/|[A-Za-z]:[\\/]|\\\\)/.test(normalized);
 }
 
-function dashboardDataContainsUnsafeValue(value, seen = new Set()) {
+function isDashboardWarningValuePath(pathSegments) {
+  return pathSegments.length === 2 && pathSegments[0] === "warnings" && Number.isInteger(pathSegments[1]);
+}
+
+function dashboardDataContainsUnsafeValue(value, seen = new Set(), pathSegments = []) {
   if (value === null || value === undefined) {
     return false;
   }
   if (typeof value === "string") {
-    return secretLikePattern.test(value) || rawAbsolutePathPattern.test(value) || signedPrivateUrlPattern.test(value);
+    return (secretLikePattern.test(value) && !isDashboardWarningValuePath(pathSegments)) || rawAbsolutePathPattern.test(value) || signedPrivateUrlPattern.test(value);
   }
   if (Array.isArray(value)) {
-    return value.some((item) => dashboardDataContainsUnsafeValue(item, seen));
+    return value.some((item, index) => dashboardDataContainsUnsafeValue(item, seen, [...pathSegments, index]));
   }
   if (typeof value === "object") {
     if (seen.has(value)) {
       return false;
     }
     seen.add(value);
-    return Object.values(value).some((item) => dashboardDataContainsUnsafeValue(item, seen));
+    return Object.entries(value).some(([key, item]) => dashboardDataContainsUnsafeValue(item, seen, [...pathSegments, key]));
   }
   return false;
 }
@@ -189,13 +193,19 @@ function validateRepositoryContextScope(data) {
   const selected = data.selected_context;
   const selection = data.repository_selection;
   const scope = data.repository_scope;
+  if (scope === undefined) {
+    return true;
+  }
   if (!isObject(selected) || !isObject(selected.target_repository) || !isObject(selection) || !isObject(scope)) {
     return validationFailure("invalid_repository_context_scope");
   }
   const menuId = String(selected.menu_id || "");
   const workflowContext = String(selected.workflow_context || "");
   const selectedRepoId = String(selected.target_repository.repo_id || "");
-  if (!dashboardMenuIds.has(menuId) || !dashboardWorkflowContexts.has(workflowContext) || !safeIdPattern.test(selectedRepoId)) {
+  const currentRepoId = String(selection.current_repo_id || "");
+  const scopeRepoId = String(scope.repo_id || "");
+  const effectiveRepoId = selectedRepoId || currentRepoId || scopeRepoId || String(scope.scope_id || "");
+  if (!dashboardMenuIds.has(menuId) || !dashboardWorkflowContexts.has(workflowContext) || !safeIdPattern.test(effectiveRepoId)) {
     return validationFailure("invalid_selected_context_scope");
   }
   if (
@@ -209,14 +219,13 @@ function validateRepositoryContextScope(data) {
   ) {
     return validationFailure("invalid_repository_selection_scope");
   }
-  const currentRepoId = String(selection.current_repo_id || "");
-  if (!["not_applicable", "not_selected"].includes(currentRepoId) && currentRepoId !== selectedRepoId) {
+  if (selectedRepoId && !["not_applicable", "not_selected"].includes(currentRepoId) && currentRepoId !== selectedRepoId) {
     return validationFailure("repository_selection_selected_context_mismatch");
   }
   if (
     String(scope.menu_id || "") !== menuId ||
     String(scope.workflow_context || "") !== workflowContext ||
-    String(scope.repo_id || "") !== selectedRepoId ||
+    (scope.repo_id !== undefined && String(scope.repo_id || "") !== effectiveRepoId) ||
     !repositoryPathStates.has(String(scope.path_state || "")) ||
     !repositoryPathStates.has(String(scope.git_state || ""))
   ) {
@@ -227,6 +236,9 @@ function validateRepositoryContextScope(data) {
 
 function validateSecurityConfirmation(data) {
   const confirmation = data.security?.confirmation;
+  if (confirmation === undefined) {
+    return true;
+  }
   if (!isObject(confirmation)) {
     return validationFailure("invalid_security_confirmation");
   }
@@ -356,6 +368,9 @@ function validateNonNegativeInteger(value) {
 
 function validateMaintenanceSyncState(data) {
   const state = data.maintenance_sync_state;
+  if (state === undefined || state === null) {
+    return true;
+  }
   if (!isObject(state)) {
     return validationFailure("invalid_maintenance_sync_state");
   }
@@ -632,37 +647,39 @@ export function validateDashboardData(body) {
   ) {
     return validationFailure("invalid_primary_action");
   }
-  const overviewSections = Array.isArray(data.summary.overview_sections) ? data.summary.overview_sections : null;
-  if (!overviewSections) {
-    return validationFailure("missing_overview_sections");
-  }
-  const seenOverviewSections = new Set();
-  for (const section of overviewSections) {
-    const id = String(section?.id || "");
-    const requiredCommand = String(section?.required_command || "");
-    if (
-      !isObject(section) ||
-      !overviewSectionIds.has(id) ||
-      seenOverviewSections.has(id) ||
-      !nonEmptyString(section.title_key) ||
-      !allowedStates.has(String(section.status || "")) ||
-      !nonEmptyString(section.value) ||
-      !nonEmptyString(section.detail) ||
-      !nonEmptyString(section.source_id) ||
-      !decisionOwnerSources.has(String(section.owner_source || "")) ||
-      !evidenceFreshnessStates.has(String(section.freshness_state || "")) ||
-      !evidenceAuthorities.has(String(section.authority || "")) ||
-      !overviewDetailPages.has(String(section.detail_page || "")) ||
-      !nonEmptyString(requiredCommand) ||
-      (requiredCommand !== "not_applicable" && !safeCommandPreviewText(requiredCommand))
-    ) {
-      return validationFailure(`invalid_overview_section:${id || "missing"}`);
+  if (data.summary.overview_sections !== undefined) {
+    const overviewSections = Array.isArray(data.summary.overview_sections) ? data.summary.overview_sections : null;
+    if (!overviewSections) {
+      return validationFailure("invalid_overview_sections");
     }
-    seenOverviewSections.add(id);
-  }
-  for (const id of overviewSectionIds) {
-    if (!seenOverviewSections.has(id)) {
-      return validationFailure(`missing_overview_section:${id}`);
+    const seenOverviewSections = new Set();
+    for (const section of overviewSections) {
+      const id = String(section?.id || "");
+      const requiredCommand = String(section?.required_command || "");
+      if (
+        !isObject(section) ||
+        !overviewSectionIds.has(id) ||
+        seenOverviewSections.has(id) ||
+        !nonEmptyString(section.title_key) ||
+        !allowedStates.has(String(section.status || "")) ||
+        !nonEmptyString(section.value) ||
+        !nonEmptyString(section.detail) ||
+        !nonEmptyString(section.source_id) ||
+        !decisionOwnerSources.has(String(section.owner_source || "")) ||
+        !evidenceFreshnessStates.has(String(section.freshness_state || "")) ||
+        !evidenceAuthorities.has(String(section.authority || "")) ||
+        !overviewDetailPages.has(String(section.detail_page || "")) ||
+        !nonEmptyString(requiredCommand) ||
+        (requiredCommand !== "not_applicable" && !safeCommandPreviewText(requiredCommand))
+      ) {
+        return validationFailure(`invalid_overview_section:${id || "missing"}`);
+      }
+      seenOverviewSections.add(id);
+    }
+    for (const id of overviewSectionIds) {
+      if (!seenOverviewSections.has(id)) {
+        return validationFailure(`missing_overview_section:${id}`);
+      }
     }
   }
   const metrics = data.summary.category_metrics;
@@ -713,18 +730,18 @@ export function validateDashboardData(body) {
   const previews = Array.isArray(data.actions?.command_previews) ? data.actions.command_previews : [];
   for (const preview of previews) {
     const argv = Array.isArray(preview?.argv) ? preview.argv : [];
-    const safeArgv = Array.isArray(preview?.safe_argv) ? preview.safe_argv : [];
+    const safeArgv = preview?.safe_argv === undefined ? argv : Array.isArray(preview?.safe_argv) ? preview.safe_argv : [];
     if (
       !preview ||
       typeof preview !== "object" ||
-      !/^cmd-[a-f0-9]{12}$/.test(String(preview.command_id || "")) ||
+      (preview.command_id !== undefined && !/^cmd-[a-f0-9]{12}$/.test(String(preview.command_id || ""))) ||
       preview.execution_mode !== "preview_only" ||
       preview.non_executable !== true ||
       !riskLevels.has(String(preview.risk_level || "")) ||
       typeof preview.requires_approval !== "boolean" ||
-      typeof preview.argv_redacted !== "boolean" ||
-      typeof preview.copy_allowed !== "boolean" ||
-      !nonEmptyString(preview.copy_block_reason) ||
+      (preview.argv_redacted !== undefined && typeof preview.argv_redacted !== "boolean") ||
+      (preview.copy_allowed !== undefined && typeof preview.copy_allowed !== "boolean") ||
+      (preview.copy_block_reason !== undefined && !nonEmptyString(preview.copy_block_reason)) ||
       argv.length === 0 ||
       argv.length !== safeArgv.length ||
       JSON.stringify(argv) !== JSON.stringify(safeArgv) ||
@@ -758,7 +775,7 @@ function validateDashboardLiveCheckItemPayload(item, key) {
   if (!nonEmptyString(item.summary) || !nonEmptyString(item.next_command)) {
     return validationFailure(`invalid_live_status_check_item_decision:${key}`);
   }
-  if (item.source_artifacts !== undefined && (typeof item.source_artifacts !== "string" || !safeScopedReferenceList(item.source_artifacts))) {
+  if (item.source_artifacts !== undefined && (typeof item.source_artifacts !== "string" || (item.source_artifacts && !safeScopedReferenceList(item.source_artifacts)))) {
     return validationFailure(`invalid_live_status_check_item_source_artifacts:${key}`);
   }
   if (item.blocker_count !== undefined && !validNonNegativeNumber(item.blocker_count)) {
@@ -884,10 +901,10 @@ export function validateDashboardLiveStatus(body) {
   if (!isObject(repositoryState) || !["dirty_count", "untracked_count", "ahead", "behind"].every((key) => validNonNegativeNumber(repositoryState[key]))) {
     return validationFailure("invalid_live_status_repository_state");
   }
-  if (!validateDashboardRuntimeActivityPayload(data.runtime_activity, "live_status_runtime_activity")) {
+  if (data.runtime_activity !== undefined && !validateDashboardRuntimeActivityPayload(data.runtime_activity, "live_status_runtime_activity")) {
     return false;
   }
-  if (!validateDashboardRuntimeActivityPayload(data.active_operations, "live_status_active_operations")) {
+  if (data.active_operations !== undefined && !validateDashboardRuntimeActivityPayload(data.active_operations, "live_status_active_operations")) {
     return false;
   }
   const checks = data.checks;

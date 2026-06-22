@@ -1908,7 +1908,7 @@ function productAuthorityEvidenceTestArtifactSummary(item, t) {
 }
 
 function isHardBlockerStatus(status) {
-  return ["blocked", "failed", "missing", "approval_required"].includes(normalizeState(status));
+  return ["blocked", "failed", "missing", "not_run", "approval_required"].includes(normalizeState(status));
 }
 
 function contextPrimaryBlocker(context) {
@@ -2034,7 +2034,7 @@ function situationRepositorySummary(data, context, activeLiveStatus, t) {
   const evidenceDetail = productAuthorityEvidenceDetail(gitEvidence, t);
   const observedTime = gitActivity.observed_at || activeLiveStatus?.generated_at ? situationObservedAt(gitActivity.observed_at, activeLiveStatus?.generated_at) : "";
   const detailItems = [
-    repo.branch ? { label: t("overview.situation.branchCurrent"), value: uniqueDisplayParts(repo.branch, repo.upstream ? `${t("overview.situation.upstream")}: ${repo.upstream}` : "").join(" / ") } : null,
+    repo.branch ? { label: `${t("overview.fact.branch")}: `, value: uniqueDisplayParts(repo.branch, repo.upstream ? `${t("overview.situation.upstream")}: ${repo.upstream}` : "").join(" / ") } : null,
     changeParts.length ? { label: t("overview.situation.changeBreakdown"), value: changeParts.join(" / ") } : null,
     syncParts.length ? { label: t("overview.situation.syncState"), value: syncParts.join(" / ") } : null,
     repo.head ? { label: t("overview.situation.head"), value: shortRevision(repo.head) } : null,
@@ -2239,7 +2239,11 @@ function situationNextSafeSummary(data, context, activeLiveStatus, facts, t) {
 
 function situationFacts(data, context, activeLiveStatus, t) {
   const baseFacts = [
+    situationCurrentWorkSummary(data, context, activeLiveStatus, t),
     situationBlockerSummary(data, context, activeLiveStatus, t),
+    situationRepositorySummary(data, context, activeLiveStatus, t),
+    situationTestsSummary(data, context, activeLiveStatus, t),
+    situationCiSummary(data, context, activeLiveStatus, t),
   ];
   return [...baseFacts, situationNextSafeSummary(data, context, activeLiveStatus, baseFacts, t)];
 }
@@ -2549,7 +2553,7 @@ function OperationalPageDecisionSummary({ data, context, liveStatus, t, tone = "
 function OperationalPageSummaryStack({ data, context, liveStatus, t, tone = "sidebar", pageId = "overview", keys = null }) {
   return (
     <>
-      {pageId === "overview" ? null : <ProducerDecisionSummaryCompat data={data} pageId={pageId} tone={tone} t={t} />}
+      <ProducerDecisionSummaryCompat data={data} pageId={pageId} tone={tone} t={t} />
       <OperationalPageDecisionSummary data={data} context={context} liveStatus={liveStatus} pageId={pageId} tone={tone} keys={keys} t={t} />
     </>
   );
@@ -2613,7 +2617,7 @@ function SituationFactCard({ fact, t, displayPolicy }) {
         <dl className="operational-situation__detail-list">
           {detailItems.map((item) => (
             <div key={`${displayText(item.label, "")}:${displayText(item.value, "")}`}>
-              <dt>{item.label}</dt>
+              <dt>{detailTermLabel(item.label)}</dt>
               <dd>{item.value}</dd>
             </div>
           ))}
@@ -2635,6 +2639,14 @@ function SituationFactCard({ fact, t, displayPolicy }) {
       ) : null}
     </article>
   );
+}
+
+function detailTermLabel(label) {
+  const text = displayText(label, "");
+  if (!text) {
+    return "";
+  }
+  return /[:：]\s*$/.test(text) ? `${text.replace(/\s+$/, "")} ` : `${text}: `;
 }
 
 function OperationalSituationBoard({ data, context, liveStatus, t }) {
@@ -3144,7 +3156,7 @@ function OperationalDetailDecisionCard({ fact, t, displayPolicy }) {
         <dl className="operational-situation__detail-list">
           {detailItems.map((item) => (
             <div key={`${displayText(item.label, "")}:${displayText(item.value, "")}`}>
-              <dt>{item.label}</dt>
+              <dt>{detailTermLabel(item.label)}</dt>
               <dd>{item.value}</dd>
             </div>
           ))}
@@ -4080,6 +4092,24 @@ function RepositorySelectionDropdownPanel({ selection, t, onRepositorySelect, se
           <dd>{repositorySelectionStateLabel(selection.selection_state, t)}</dd>
         </div>
       </dl>
+      {options.length ? (
+        <div className="repository-selection__compact-options" aria-label={t("context.repositorySelection.candidates")}>
+          {options.map((option) => {
+            const repoId = displayText(option.repo_id, "");
+            const selected = repoId === currentRepoId || option.selected === true;
+            return (
+              <article className={`repository-selection__compact-option${selected ? " is-selected" : ""}`} data-repository-option={repoId} key={repoId}>
+                <div>
+                  <strong>{repositoryDisplayName(option.display_name, t)}</strong>
+                  <small>{repoId}</small>
+                </div>
+                <StatusPill value={option.status} t={t} label={selected ? t("context.repositorySelection.selected") : statusLabelForChip(option.status, t)} />
+                <RepositorySelectionCommand command={option.select_command} selected={selected} t={t} />
+              </article>
+            );
+          })}
+        </div>
+      ) : null}
       {panelSelectionState?.status === "selected" || failed ? (
         <p className={`repository-selection__notice repository-selection__notice--${panelSelectionState.status}`} role={failed ? "alert" : "status"}>
           {panelSelectionState.status === "selected" ? t("context.repositorySelection.selectSuccess") : displayText(panelSelectionState.message, t("context.repositorySelection.selectFailed"))}

@@ -1341,6 +1341,42 @@ h4 {
   overflow-wrap: anywhere;
 }
 
+.repository-selection__compact-options {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.repository-selection__compact-option {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  min-width: 0;
+  border-top: 1px solid var(--dcc-border);
+  padding-top: 8px;
+}
+
+.repository-selection__compact-option > div {
+  min-width: 0;
+}
+
+.repository-selection__compact-option strong,
+.repository-selection__compact-option small {
+  display: block;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.repository-selection__compact-option small {
+  margin-top: 2px;
+  color: var(--dcc-muted);
+  font-size: 0.74rem;
+}
+
+.repository-selection__compact-option .repository-selection__command {
+  grid-column: 1 / -1;
+}
+
 .display-depth-control {
   display: grid;
   grid-column: 1 / -1;

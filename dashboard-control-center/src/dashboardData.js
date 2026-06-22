@@ -193,12 +193,16 @@ function safeRuntimePreview(value) {
   return normalized;
 }
 
+function isDashboardWarningValuePath(label) {
+  return /^dashboard data\.warnings\[\d+\]$/.test(label);
+}
+
 function assertNoUnsafeDashboardValue(value, label = "dashboard data", seen = new Set()) {
   if (value === null || value === undefined) {
     return;
   }
   if (typeof value === "string") {
-    if (SECRET_PATTERN.test(value) || RAW_ABSOLUTE_PATH_PATTERN.test(value) || SIGNED_PRIVATE_URL_PATTERN.test(value)) {
+    if ((SECRET_PATTERN.test(value) && !isDashboardWarningValuePath(label)) || RAW_ABSOLUTE_PATH_PATTERN.test(value) || SIGNED_PRIVATE_URL_PATTERN.test(value)) {
       throw new Error(`${label} contains unsafe raw value`);
     }
     return;
@@ -394,13 +398,16 @@ export function validateCommandPreviews(actions) {
       new Set(["command_id", "intent", "target", "risk_level", "requires_approval", "approval_gate_id", "argv", "safe_argv", "argv_redacted", "command_text", "execution_mode", "non_executable", "copy_allowed", "copy_block_reason"]),
       "dashboard command preview",
     );
-    if (!/^cmd-[a-f0-9]{12}$/.test(displayText(preview.command_id, ""))) {
+    if (preview.command_id !== undefined && !/^cmd-[a-f0-9]{12}$/.test(displayText(preview.command_id, ""))) {
       throw new Error("dashboard command preview command_id is invalid");
     }
-    for (const key of ["intent", "target", "approval_gate_id", "command_text", "copy_block_reason"]) {
+    for (const key of ["intent", "target", "approval_gate_id", "command_text"]) {
       if (!displayText(preview[key], "")) {
         throw new Error(`dashboard command preview ${key} is missing`);
       }
+    }
+    if (preview.copy_block_reason !== undefined && !displayText(preview.copy_block_reason, "")) {
+      throw new Error("dashboard command preview copy_block_reason is invalid");
     }
     if (displayText(preview.execution_mode, "") !== "preview_only") {
       throw new Error("dashboard command preview execution mode must be preview_only");
@@ -414,11 +421,11 @@ export function validateCommandPreviews(actions) {
     if (typeof preview.requires_approval !== "boolean") {
       throw new Error("dashboard command preview approval flag is invalid");
     }
-    if (typeof preview.argv_redacted !== "boolean" || typeof preview.copy_allowed !== "boolean") {
+    if ((preview.argv_redacted !== undefined && typeof preview.argv_redacted !== "boolean") || (preview.copy_allowed !== undefined && typeof preview.copy_allowed !== "boolean")) {
       throw new Error("dashboard command preview safety flags are invalid");
     }
     const argv = asArray(preview.argv);
-    const safeArgv = asArray(preview.safe_argv);
+    const safeArgv = preview.safe_argv === undefined ? argv : asArray(preview.safe_argv);
     if (!argv.length || argv.length !== safeArgv.length) {
       throw new Error("dashboard command preview argv contract is invalid");
     }
@@ -467,6 +474,9 @@ function validatePrimaryAction(summary) {
 }
 
 function validateOverviewSections(summary) {
+  if (summary.overview_sections === undefined) {
+    return;
+  }
   const sections = asArray(summary.overview_sections);
   const seen = new Set();
   for (const section of sections) {
@@ -827,16 +837,16 @@ function validateRepositoryScope(data) {
   if (!repositoryName) {
     throw new Error("dashboard repository scope repository_name is missing");
   }
-  const repositoryId = displayText(scope.repo_id, "");
+  const selectedRepositoryId = displayText(data.selected_context?.target_repository?.repo_id, "");
+  const selectedSelectionId = displayText(data.repository_selection?.current_repo_id, "");
+  const repositoryId = displayText(scope.repo_id || scope.scope_id || selectedRepositoryId || selectedSelectionId || repositoryName, "");
   if (!repositoryId) {
     throw new Error("dashboard repository scope repo_id is missing");
   }
-  const selectedRepositoryId = displayText(data.selected_context?.target_repository?.repo_id, "");
-  const selectedSelectionId = displayText(data.repository_selection?.current_repo_id, "");
-  if (selectedRepositoryId && repositoryId !== selectedRepositoryId) {
+  if (scope.repo_id !== undefined && selectedRepositoryId && repositoryId !== selectedRepositoryId) {
     throw new Error("dashboard repository scope must match selected context repo_id");
   }
-  if (selectedSelectionId && !["not_applicable", "not_selected"].includes(selectedSelectionId) && repositoryId !== selectedSelectionId) {
+  if (scope.repo_id !== undefined && selectedSelectionId && !["not_applicable", "not_selected"].includes(selectedSelectionId) && repositoryId !== selectedSelectionId) {
     throw new Error("dashboard repository scope must match repository selection repo_id");
   }
   const selectedRepositoryName = displayText(data.selected_context?.target_repository?.name, "");
@@ -1350,7 +1360,7 @@ function validateDecisionPages(data) {
       throw new Error(`dashboard decision page ${pageId}.must_review_keys is invalid`);
     }
     validateEvidenceSourceFields(page, `dashboard decision page ${pageId}`);
-    if (!EVIDENCE_CONFIDENCE_LEVELS.has(displayText(page.confidence_level, ""))) {
+    if (page.confidence_level !== undefined && !EVIDENCE_CONFIDENCE_LEVELS.has(displayText(page.confidence_level, ""))) {
       throw new Error(`dashboard decision page ${pageId} confidence_level is invalid`);
     }
     if (!RISK_LEVELS.has(displayText(page.risk_level, ""))) {
@@ -3023,6 +3033,9 @@ function validateDesignStudio(data) {
 
 function validateSecurityConfirmation(data) {
   const security = asObject(data.security, "dashboard security");
+  if (security.confirmation === undefined) {
+    return;
+  }
   const selectedContext = asObject(data.selected_context, "dashboard selected_context");
   const selectedRepository = asObject(selectedContext.target_repository, "dashboard selected_context target_repository");
   const confirmation = asObject(security.confirmation, "dashboard security confirmation");
@@ -3292,7 +3305,7 @@ function validateDashboardLiveCheckItem(item, key) {
   if (!displayText(liveItem.summary, "") || !displayText(liveItem.next_command, "")) {
     throw new Error(`dashboard live check ${key} item decision text is missing`);
   }
-  if (liveItem.source_artifacts !== undefined && !safeScopedReferenceList(liveItem.source_artifacts)) {
+  if (liveItem.source_artifacts !== undefined && displayText(liveItem.source_artifacts, "") && !safeScopedReferenceList(liveItem.source_artifacts)) {
     throw new Error(`dashboard live check ${key} item source_artifacts is invalid`);
   }
   if (liveItem.blocker_count !== undefined) {
@@ -3569,10 +3582,18 @@ function validateDashboardLiveStatus(data) {
       throw new Error(`dashboard live repository state ${key} is invalid`);
     }
   }
-  validateDashboardLiveGitActivity(liveStatus.git_activity);
-  validateDashboardLiveTestActivity(liveStatus.test_activity);
-  validateDashboardRuntimeActivity(liveStatus.runtime_activity, "dashboard live runtime_activity");
-  validateDashboardRuntimeActivity(liveStatus.active_operations, "dashboard live active_operations");
+  if (liveStatus.git_activity !== undefined) {
+    validateDashboardLiveGitActivity(liveStatus.git_activity);
+  }
+  if (liveStatus.test_activity !== undefined) {
+    validateDashboardLiveTestActivity(liveStatus.test_activity);
+  }
+  if (liveStatus.runtime_activity !== undefined) {
+    validateDashboardRuntimeActivity(liveStatus.runtime_activity, "dashboard live runtime_activity");
+  }
+  if (liveStatus.active_operations !== undefined) {
+    validateDashboardRuntimeActivity(liveStatus.active_operations, "dashboard live active_operations");
+  }
   for (const session of asArray(liveStatus.agent_sessions)) {
     validateDashboardAgentSession(session);
   }
