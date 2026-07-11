@@ -188,6 +188,21 @@ function fail(message) {
 if (!validateDashboardData(validBody)) {
   fail("vite middleware rejected dashboard-data output");
 }
+const invalidMaterialEvent = JSON.parse(validBody);
+invalidMaterialEvent.development.material_update_events = [{
+  event_id: "missing-purpose-code",
+  event_type: "local_test",
+  occurred_at: "2026-06-05T00:00:00Z",
+  source_id: "product.gates.tests",
+  status: "stale",
+  repository_head: "abcdef123456",
+  summary: "Purpose code is intentionally absent.",
+  command: "npm test",
+  detail_artifact_path: "not_collected",
+}];
+if (validateDashboardData(JSON.stringify(invalidMaterialEvent))) {
+  fail("vite middleware accepted a material update event without purpose_code");
+}
 if (validateDashboardData(fs.readFileSync(invalidFile, "utf8"))) {
   fail("vite middleware accepted tools/dashboard prose as a data source");
 }

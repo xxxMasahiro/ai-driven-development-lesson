@@ -56,11 +56,15 @@
   --dcc-technical-preview-chip-max-width: 360px;
   --dcc-technical-source-max-width: 260px;
   --dcc-text: #111820;
+  --dcc-workflow-accent: #0b7c80;
+  --dcc-workflow-body-font-weight: 480;
+  --dcc-workflow-primary-font-weight: 540;
+  --dcc-workflow-soft: #dff4f3;
 }
 
 [data-dcc-design-system="dashboard-control-center"] {
   --dcc-design-system-version: "2026-06-14.source-runtime";
-  --dcc-component-count: 12;
+  --dcc-component-count: 14;
   --dcc-file-tooltip-trigger: hover-only;
   --dcc-tooltip-trigger: hover-only;
   --dcc-tooltip-hide-policy: pointer-leave;

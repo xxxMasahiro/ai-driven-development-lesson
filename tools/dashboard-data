@@ -1536,12 +1536,16 @@ dashboard_json_document_brief_agent_summary() {
   local action_json="$4"
   shift 4
   local -a source_path_array=("$@")
+  local summary_status="$freshness_state"
   case "$id" in
-    taskTracker|handoff) ;;
+    requirements|specification|implementationPlan|taskTracker|handoff) ;;
     *) return 1 ;;
   esac
+  if [[ "$summary_json$action_json" == *'"ja":'* || "$summary_json$action_json" == *'"en":'* ]]; then
+    summary_status="ready"
+  fi
   printf '{"status":'
-  dashboard_json_string "$freshness_state"
+  dashboard_json_string "$summary_status"
   printf ',"provider_mode":'
   dashboard_json_string "local_summary"
   printf ',"source":'
@@ -1586,7 +1590,7 @@ dashboard_document_brief_dynamic_text() {
   local locale="${4:-en}"
   local path
   case "$id:$field" in
-    taskTracker:summary|taskTracker:action|handoff:summary|handoff:action) ;;
+    requirements:summary|requirements:action|specification:summary|specification:action|implementationPlan:summary|implementationPlan:action|taskTracker:summary|taskTracker:action|handoff:summary|handoff:action) ;;
     *) return 1 ;;
   esac
   path="$(dashboard_document_brief_first_source_file "$id" "$menu_id")" || return 1
@@ -1647,9 +1651,9 @@ function firstCompletionLineAfterResume(markdown, taskId = "") {
   const start = lines.findIndex((line) => /^Current resume target:\s*/.test(line));
   const windowLines = (start >= 0 ? lines.slice(start + 1, start + 12) : lines.slice(0, 12))
     .map((line) => line.trim())
-    .filter(Boolean);
+    .filter((line) => line && !/^#+\s+/.test(line));
   const taskPattern = taskId ? new RegExp(`\\b${taskId.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i") : /FC-[0-9]+/i;
-  return clip(windowLines.find((line) => taskPattern.test(line) && /\bcomplete\b|\bdone\b|完了/.test(line)) || windowLines[0] || "", 220);
+  return clip(windowLines.find((line) => taskPattern.test(line) && /\bcomplete\b|\bdone\b|完了/.test(line)) || "", 220);
 }
 
 function productRootForDocument(filePath) {
@@ -1803,6 +1807,124 @@ function checkedProgress(text) {
   return { checked, unchecked, total: checked + unchecked };
 }
 
+function listItems(text) {
+  return String(text || "")
+    .split(/\n/)
+    .map((line) => line.match(/^\s*[-*]\s+(?:\[[ xX]\]\s+)?(.+?)\s*$/))
+    .filter(Boolean)
+    .map((match) => clip(match[1], 180))
+    .filter(Boolean);
+}
+
+function uniqueParts(...parts) {
+  const seen = new Set();
+  return parts
+    .map((part) => clean(part))
+    .filter((part) => {
+      if (!part || seen.has(part)) {
+        return false;
+      }
+      seen.add(part);
+      return true;
+    });
+}
+
+function contextNeedles(...values) {
+  const stop = new Set([
+    "after", "before", "current", "complete", "completion", "implementation", "phase", "plan", "remain", "remains",
+    "local", "with", "without", "from", "that", "this", "next", "target", "status", "workflow",
+  ]);
+  return [...new Set(values
+    .map((value) => clean(value).toLowerCase())
+    .join(" ")
+    .split(/[^a-z0-9]+/)
+    .filter((word) => word.length >= 4 && !stop.has(word))
+    .slice(0, 24))];
+}
+
+function scoreByNeedles(text, needles) {
+  const value = clean(text).toLowerCase();
+  return needles.reduce((score, needle) => score + (value.includes(needle) ? 1 : 0), 0);
+}
+
+function compactRelevantText(text, needles, maxItems = 2) {
+  const items = listItems(text);
+  if (items.length) {
+    const ranked = items
+      .map((item, index) => ({ item, index, score: scoreByNeedles(item, needles) }))
+      .sort((left, right) => (right.score - left.score) || (left.index - right.index));
+    const selected = (ranked[0]?.score > 0 ? ranked.filter((item) => item.score > 0) : ranked)
+      .slice(0, maxItems)
+      .sort((left, right) => left.index - right.index)
+      .map((entry) => entry.item);
+    return clip(selected.join(" / "), 320);
+  }
+  return sentences(text, maxItems);
+}
+
+function phaseBlocks(markdown) {
+  const blocks = [];
+  let currentBlock = null;
+  for (const line of String(markdown || "").split(/\n/)) {
+    const phaseHeading = line.match(/^###\s+(.+?)\s*$/);
+    if (phaseHeading) {
+      if (currentBlock) {
+        blocks.push(currentBlock);
+      }
+      currentBlock = { heading: clean(phaseHeading[1]), lines: [] };
+      continue;
+    }
+    if (currentBlock && /^##\s+/.test(line)) {
+      blocks.push(currentBlock);
+      currentBlock = null;
+      continue;
+    }
+    if (currentBlock) {
+      currentBlock.lines.push(line);
+    }
+  }
+  if (currentBlock) {
+    blocks.push(currentBlock);
+  }
+  return blocks;
+}
+
+function latestPhaseBlock(markdown, needles) {
+  const blocks = phaseBlocks(markdown);
+  if (!blocks.length) {
+    return null;
+  }
+  const ranked = blocks
+    .map((block, index) => ({
+      block,
+      index,
+      score: scoreByNeedles(`${block.heading} ${block.lines.join(" ")}`, needles),
+    }))
+    .sort((left, right) => (right.score - left.score) || (left.index - right.index));
+  return (ranked[0]?.score > 0 ? ranked[0].block : blocks[0]) || null;
+}
+
+function phaseBlockField(block, fieldName) {
+  if (!block) {
+    return "";
+  }
+  const pattern = new RegExp(`^${fieldName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*:\\s*(.+?)\\s*$`, "i");
+  const matched = block.lines.map((line) => clean((line.match(pattern) || [])[1] || "")).find(Boolean);
+  return matched || "";
+}
+
+function readProductRelative(filePath, relativeParts) {
+  const root = productRootForDocument(filePath);
+  if (!root) {
+    return "";
+  }
+  try {
+    return fs.readFileSync(path.join(root, ...relativeParts), "utf8");
+  } catch {
+    return "";
+  }
+}
+
 function sentences(text, max = 2) {
   const normalized = clean(
     String(text || "")
@@ -1818,6 +1940,13 @@ function sentences(text, max = 2) {
   return clip(parts.slice(0, max).join(" "), 300);
 }
 
+function firstParagraph(text) {
+  return String(text || "")
+    .split(/\n\s*\n/)
+    .map((part) => clean(part))
+    .find(Boolean) || "";
+}
+
 function hasJapanese(text) {
   return /[\u3040-\u30ff\u3400-\u9fff]/.test(String(text || ""));
 }
@@ -1828,7 +1957,7 @@ function looksEnglish(text) {
 }
 
 function phaseSignal(text) {
-  const match = clean(text).match(/\bPhase\s+([0-9][0-9A-Za-z -]*)\s+(.+?)\s+is\s+(complete|implemented|ready|blocked|failed)\b/i);
+  const match = clean(text).match(/\bPhase\s+([0-9]+(?:-[0-9]+)?[A-Za-z]*)\s+(.+?)\s+is\s+(complete|implemented|ready|blocked|failed)\b/i);
   if (!match) {
     return null;
   }
@@ -1865,6 +1994,16 @@ function localizedKeywordSummary(text) {
     ["artifact language", "成果物言語"],
     ["locale policy", "言語ポリシー"],
     ["language settings", "言語設定"],
+    ["playwright", "Playwright"],
+    ["browser debugging", "ブラウザデバッグ"],
+    ["ui review", "UIレビュー"],
+    ["visual review", "目視レビュー"],
+    ["visual evidence", "視覚証跡"],
+    ["mcp", "MCP"],
+    ["agent execution", "AIエージェント実行"],
+    ["resource status", "リソース状態"],
+    ["target manifest", "対象マニフェスト"],
+    ["settings show", "設定確認"],
     ["product checks", "成果物チェック"],
     ["repository rename", "リポジトリ名変更"],
   ];
@@ -1907,14 +2046,162 @@ function localizedEnglishSnippet(text, fallbackKind = "summary") {
   return clip(parts.join(" "), 320);
 }
 
+function localizedDocumentSnippet(text, fallbackKind = "summary") {
+  const value = clip(clean(text), 360);
+  if (!value) {
+    return "";
+  }
+  if (locale !== "ja" || !looksEnglish(value)) {
+    return sentences(value, fallbackKind === "summary" ? 2 : 1);
+  }
+  const localized = localizedEnglishSnippet(value, fallbackKind);
+  if (/対象文書の現在状態|次に確認する内容/.test(localized)) {
+    return value;
+  }
+  return localized;
+}
+
+function localizedHandoffCurrent(currentText, resumeTarget, phase) {
+  const first = firstParagraph(currentText);
+  if (locale === "ja" && looksEnglish(first)) {
+    return uniqueParts(
+      localizedPhase(phaseSignal(first) || phase),
+      localizedKeywordSummary(first),
+    ).join(" ");
+  }
+  return uniqueParts(
+    localizedResumeTarget(resumeTarget),
+    localizedDocumentSnippet(first || currentText, "summary"),
+  ).join(" ");
+}
+
+function localizedHandoffPhrase(text) {
+  let value = clean(text);
+  if (locale !== "ja" || !looksEnglish(value)) {
+    return value;
+  }
+  const glossary = [
+    ["dashboard UI consumption", "ダッシュボードUIでの利用"],
+    ["localized report templates", "ローカライズされたレポートテンプレート"],
+    ["language settings foundation", "言語設定基盤"],
+    ["provider translation execution", "provider翻訳実行"],
+    ["parent-repository changes", "親リポジトリ変更"],
+    ["consumer-repository changes", "消費側リポジトリ変更"],
+    ["public package naming", "公開パッケージ名変更"],
+    ["npm publication", "npm公開"],
+    ["marketplace registration", "マーケットプレイス登録"],
+    ["MCP write/execute expansion", "MCP書き込み/実行権限の拡張"],
+    ["artifact-root migration", "アーティファクトルート移行"],
+    ["legacy-alias removal", "レガシー別名削除"],
+    ["provider", "provider"],
+    ["translation execution", "翻訳実行"],
+    ["repository changes", "リポジトリ変更"],
+    ["package naming", "パッケージ名変更"],
+    ["publication", "公開"],
+    ["registration", "登録"],
+    ["migration", "移行"],
+    ["removal", "削除"],
+  ];
+  for (const [needle, replacement] of glossary) {
+    value = value.replace(new RegExp(needle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi"), replacement);
+  }
+  return value
+    .replace(/\s*,\s*(?:and\s+)?/gi, "、")
+    .replace(/\s+or\s+/gi, "や")
+    .replace(/\s+and\s+/gi, "、")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function localizedApprovalBoundaryList(text) {
+  const value = clean(text).replace(/\s+and\s+/gi, ", ");
+  const items = value
+    .split(/\s*,\s*/)
+    .map(localizedHandoffPhrase)
+    .filter(Boolean);
+  return uniqueParts(...items).slice(0, 8).join(locale === "ja" ? "、" : ", ");
+}
+
+function localizedHandoffNextStep(nextText) {
+  const first = firstParagraph(nextText);
+  if (!first) {
+    return "";
+  }
+  if (locale !== "ja" || !looksEnglish(first)) {
+    return sentences(first, 1);
+  }
+  const approvedNext = first.match(/The next approved implementation can build on the (.+?), such as (.+?), but (.+?) remain separate approval-bound work\.?$/i);
+  if (approvedNext) {
+    const phase = (first.match(/\bPhase\s+[0-9]+(?:-[0-9]+)?[A-Za-z]*/i) || [])[0];
+    const foundation = localizedHandoffPhrase(approvedNext[1]);
+    const examples = localizedHandoffPhrase(approvedNext[2]);
+    const boundaries = localizedApprovalBoundaryList(approvedNext[3]);
+    return uniqueParts(
+      phase ? `${phase} の完了を前提に、次の承認済み実装では${foundation}を土台に${examples}を進められます。` : `次の承認済み実装では${foundation}を土台に${examples}を進められます。`,
+      boundaries ? `${boundaries}は別承認です。` : "",
+    ).join(" ");
+  }
+  return localizedEnglishSnippet(first, "action");
+}
+
+function localizedHandoffRestartNote(note) {
+  const value = clean(note);
+  if (!value) {
+    return "";
+  }
+  if (locale !== "ja" || !looksEnglish(value)) {
+    return value;
+  }
+  const lower = value.toLowerCase();
+  if (/publish.*npm|npm.*publish|marketplace|package naming|public package/.test(lower)) {
+    return "公開・配布・パッケージ名変更は承認済み範囲まで行いません";
+  }
+  if (/secret|credential|cookie|storage state|screenshot|trace|artifact|committed files|commit/.test(lower)) {
+    return "生成物、認証情報、シークレット類はコミットや外部送信に含めません";
+  }
+  if (/browser profile|oauth|login|storage state/.test(lower)) {
+    return "既存ブラウザプロファイルやログイン自動化は承認なしで使いません";
+  }
+  if (/product path|repository|avoid mixing|lesson context|target-specific/.test(lower)) {
+    return "対象リポジトリと文脈を混在させないようパスや境界を明示します";
+  }
+  if (/mcp|shell|cleanup|provider|api execution|write|execute|admin|remote bind|socket transport|external upload/.test(lower)) {
+    return "MCP、実行、外部送信、書き込み権限の拡張は別承認にします";
+  }
+  if (/model|vision|review/.test(lower)) {
+    return "モデル・レビュー関連の実行範囲は決定済み境界を維持します";
+  }
+  return localizedEnglishSnippet(value, "action");
+}
+
+function localizedHandoffRestartNotes(restartText) {
+  const notes = listItems(restartText)
+    .map(localizedHandoffRestartNote)
+    .filter(Boolean);
+  const unique = uniqueParts(...notes).slice(0, 4);
+  if (!unique.length) {
+    return "";
+  }
+  return locale === "ja"
+    ? `${unique.join("。")}。`
+    : `${unique.join(". ")}.`;
+}
+
+function localizedHandoffDetail(nextText, restartText) {
+  const nextSummary = localizedHandoffNextStep(nextText);
+  const restartSummary = localizedHandoffRestartNotes(restartText);
+  return nextSummary || restartSummary;
+}
+
 function label(kind) {
   const labels = {
     ja: {
-      current: "現在状態",
-      remaining: "残り作業",
+      current: "現在の状態",
+      remaining: "残りの作業",
       latestDone: "直近完了",
-      restart: "再開地点",
-      handoff: "引き継ぎ内容",
+      restart: "現在の状況",
+      handoff: "引継ぎ内容",
+      handoffMissing: "引継ぎ内容が見つかりません。",
       handoffReady: "次回引継ぎ可否",
       handoffReadyYes: "可能",
       handoffReadyReview: "要確認",
@@ -1927,13 +2214,20 @@ function label(kind) {
       phaseFailed: "失敗",
       noOpenItems: "未完了チェック項目は見つかりません",
       checked: "完了チェック",
+      requirements: "要件",
+      specification: "仕様",
+      implementationPlan: "実装計画",
+      implementationPlanAction: "計画上の次確認",
+      implementedContract: "実装済みの仕様",
+      scopeBoundary: "守る境界",
     },
     en: {
       current: "Current status",
       remaining: "Remaining work",
       latestDone: "Latest completed",
-      restart: "Restart point",
-      handoff: "Handoff state",
+      restart: "Current situation",
+      handoff: "Handoff content",
+      handoffMissing: "No handoff content found.",
       handoffReady: "Next handoff readiness",
       handoffReadyYes: "ready",
       handoffReadyReview: "needs review",
@@ -1946,6 +2240,12 @@ function label(kind) {
       phaseFailed: "failed",
       noOpenItems: "No open checklist item found",
       checked: "Checked items",
+      requirements: "Requirements",
+      specification: "Specification",
+      implementationPlan: "Implementation plan",
+      implementationPlanAction: "Plan checkpoint",
+      implementedContract: "Implemented contract",
+      scopeBoundary: "Scope boundary",
     },
   };
   return (labels[locale] || labels.en)[kind] || kind;
@@ -1992,18 +2292,64 @@ const sections = parseSections(markdown);
 const current = sectionText(sections, ["Current Status", "Current State", "Status", "Progress"]);
 const remaining = sectionText(sections, ["Remaining Work", "Next Step", "Next Steps"]);
 const next = sectionText(sections, ["Next Step", "Next Steps"]);
-const restart = sectionText(sections, ["Restart Notes", "How To Resume", "Next Step", "Next Steps"]);
+const restartNotes = sectionText(sections, ["Restart Notes", "Handoff Notes", "Resume Notes"]);
+const restart = sectionText(sections, ["How To Resume", "Next Step", "Next Steps"]);
 const decisions = sectionText(sections, ["How To Resume", "What Has Been Decided", "Current State", "Current Status"]);
 const progress = checkedProgress(remaining || current);
 const phase = phaseSignal(current);
-const latestTask = latestTaskRow(markdown);
-const resumeTarget = currentResumeTarget(markdown);
-const implementationPlanText = implementationPlanTextForDocument(file);
+const taskTrackerMarkdown = id === "taskTracker" ? markdown : readProductRelative(file, ["docs", "workflow", "TASK_TRACKER.md"]);
+const handoffMarkdown = id === "handoff" ? markdown : readProductRelative(file, ["docs", "workflow", "HANDOFF.md"]);
+const implementationPlanText = id === "implementationPlan" ? markdown : implementationPlanTextForDocument(file);
+const taskTrackerSections = parseSections(taskTrackerMarkdown || "");
+const handoffSections = parseSections(handoffMarkdown || "");
+const workflowCurrentText = uniqueParts(
+  sectionText(taskTrackerSections, ["Current Status", "Current State", "Status", "Progress"]),
+  sectionText(handoffSections, ["Current State", "Current Status", "Status", "Progress"]),
+  sectionText(handoffSections, ["Next Step", "Next Steps"]),
+).join(" ");
+const latestTask = latestTaskRow(taskTrackerMarkdown || markdown);
+const resumeTarget = currentResumeTarget(handoffMarkdown || markdown);
 const taskId = latestTask?.[0] || (resumeTarget.match(/\b[A-Za-z]+-[0-9]+\b/) || [])[0] || "";
 const planAligned = implementationPlanAligned(implementationPlanText, taskId, resumeTarget);
+const latestTaskTitle = latestTask?.[2] || "";
+const needles = contextNeedles(taskId, latestTaskTitle, resumeTarget, workflowCurrentText, current);
 
 let output = "";
-if (id === "taskTracker" && field === "summary") {
+if (id === "requirements" && field === "summary") {
+  const purpose = sectionText(sections, ["Purpose", "Goal", "Overview"]);
+  const outcomes = sectionText(sections, ["Required Outcomes", "Requirements", "Success Criteria"]);
+  const body = uniqueParts(sentences(purpose, 1), compactRelevantText(outcomes, needles, 2)).join(" ");
+  output = prefix("requirements", localizedDocumentSnippet(body || purpose || outcomes, "summary"));
+} else if (id === "requirements" && field === "action") {
+  const outcomes = sectionText(sections, ["Required Outcomes", "Requirements", "Success Criteria"]);
+  const nonGoals = sectionText(sections, ["Non-Goals", "Out of Scope", "Boundaries"]);
+  const body = compactRelevantText(nonGoals, needles, 2) || compactRelevantText(outcomes, needles, 2);
+  output = prefix("scopeBoundary", localizedDocumentSnippet(body, "action"));
+} else if (id === "specification" && field === "summary") {
+  const shape = sectionText(sections, ["Product Shape", "Overview", "Architecture"]);
+  const implemented = sectionText(sections, ["Current Implemented Slice", "Implemented Behavior", "Current Implementation"]);
+  const architecture = sectionText(sections, ["Planned Architecture", "Architecture"]);
+  const body = uniqueParts(sentences(shape, 1), compactRelevantText(implemented || architecture, needles, 2)).join(" ");
+  output = prefix("specification", localizedDocumentSnippet(body || shape || implemented || architecture, "summary"));
+} else if (id === "specification" && field === "action") {
+  const implemented = sectionText(sections, ["Current Implemented Slice", "Implemented Behavior", "Current Implementation"]);
+  const cliSurface = sectionText(sections, ["Planned CLI Surface", "CLI Surface", "API Surface"]);
+  const body = compactRelevantText(implemented || cliSurface, needles, 3);
+  output = prefix("implementedContract", localizedDocumentSnippet(body, "action"));
+} else if (id === "implementationPlan" && field === "summary") {
+  const latestPhase = latestPhaseBlock(markdown, needles);
+  const phasePurpose = phaseBlockField(latestPhase, "Purpose");
+  const phaseSummary = latestPhase
+    ? uniqueParts(localizedTaskTitle(latestPhase.heading), localizedDocumentSnippet(phasePurpose || latestPhase.lines.join(" "), "summary")).join(" / ")
+    : compactRelevantText(sectionText(sections, ["Phase Plan", "Implementation Plan", "Plan"]), needles, 2);
+  output = prefix("implementationPlan", phaseSummary);
+} else if (id === "implementationPlan" && field === "action") {
+  const latestPhase = latestPhaseBlock(markdown, needles);
+  const order = phaseBlockField(latestPhase, "Implementation order");
+  const recovery = phaseBlockField(latestPhase, "Recovery");
+  const body = order || recovery || compactRelevantText(sectionText(sections, ["Preconditions", "Phase Plan", "Verification"]), needles, 2);
+  output = prefix("implementationPlanAction", localizedDocumentSnippet(body, "action"));
+} else if (id === "taskTracker" && field === "summary") {
   if (latestTask) {
     const statusText = localizedTaskStatus(latestTask[1]);
     const titleText = localizedTaskTitle(latestTask[2]);
@@ -2013,20 +2359,13 @@ if (id === "taskTracker" && field === "summary") {
   }
 } else if (id === "taskTracker" && field === "action") {
   const open = uncheckedItems(remaining);
-  const body = open.length
-    ? open.slice(0, 3).join(" / ")
-    : latestTask && /zero remaining|no remaining/i.test(latestTask[3] || "")
-      ? localizedNoRemainingTask(taskId)
-      : `${label("noOpenItems")}${progress.total ? ` / ${label("checked")}: ${progress.checked}/${progress.total}` : ""}${next ? ` / ${localizedEnglishSnippet(next, "action")}` : ""}`;
+  const body = open.length ? open.slice(0, 3).join(" / ") : label("noOpenItems");
   output = prefix("remaining", body);
 } else if (id === "handoff" && field === "summary") {
-  output = prefix("restart", localizedResumeTarget(resumeTarget) || localizedPhase(phaseSignal(decisions)) || localizedEnglishSnippet(decisions, "summary"));
+  output = prefix("restart", localizedHandoffCurrent(current, resumeTarget, phase) || localizedPhase(phase) || localizedDocumentSnippet(current || next || restart || decisions, "summary"));
 } else if (id === "handoff" && field === "action") {
-  const completion = localizedCompletionLine(firstCompletionLineAfterResume(markdown, taskId), taskId);
-  const readiness = resumeTarget && /no\s+autonomous|no\s+remaining|残.*なし/i.test(resumeTarget)
-    ? [sentenceText(label("handoffReadyYes")), sentenceText(completion), sentenceText(planAligned ? label("implementationPlanAligned") : label("implementationPlanUnconfirmed"))].filter(Boolean).join(" ")
-    : [sentenceText(label("handoffReadyReview")), sentenceText(localizedEnglishSnippet(restart || next || decisions, "action"))].filter(Boolean).join(" ");
-  output = prefix("handoffReady", readiness);
+  const body = localizedHandoffDetail(next, restartNotes);
+  output = prefix("handoff", body || label("handoffMissing"));
 }
 
 if (output) {
@@ -2773,6 +3112,86 @@ const items = Array.isArray(data.evidence_summary?.items) ? data.evidence_summar
 for (const item of items) {
   const source = String(item?.source_id ?? "");
   if (!matches(source, prefix)) continue;
+  let status = normalize(item.status);
+  const required = item.required_in_context === true;
+  const freshness = String(item.freshness_state ?? "unknown");
+  const authority = String(item.authority ?? "unknown");
+  if (status === "passed" && freshness === "stale") {
+    status = "stale";
+  }
+  if (required && status === "passed" && (freshness !== "current" || authority !== "authoritative")) {
+    status = "not_run";
+  }
+  statuses.push(status);
+}
+if (!statuses.length) {
+  process.stdout.write(fallback);
+  process.exit(0);
+}
+statuses.sort((left, right) => (priority[left] ?? 99) - (priority[right] ?? 99));
+process.stdout.write(statuses[0]);
+NODE
+}
+
+dashboard_authority_axes_status() {
+  local authority_json="$1"
+  local fallback_status="$2"
+  shift 2
+  DASHBOARD_AUTHORITY_JSON="$authority_json" DASHBOARD_AXIS_FALLBACK="$fallback_status" DASHBOARD_AXIS_PREFIXES="$(IFS='|'; printf '%s' "$*")" node <<'NODE'
+const allowed = new Set([
+  "missing",
+  "ready",
+  "passed",
+  "failed",
+  "blocked",
+  "unknown",
+  "approval_required",
+  "optional",
+  "cached",
+  "not_run",
+  "stale",
+  "manual_required",
+]);
+const priority = {
+  failed: 0,
+  blocked: 1,
+  stale: 2,
+  not_run: 3,
+  unknown: 4,
+  manual_required: 5,
+  approval_required: 6,
+  missing: 7,
+  optional: 8,
+  cached: 9,
+  ready: 10,
+  passed: 11,
+};
+function normalize(value, fallback = "unknown") {
+  const text = String(value ?? fallback).trim() || fallback;
+  return allowed.has(text) ? text : "unknown";
+}
+function matches(source, prefix) {
+  return source === prefix || source.startsWith(`${prefix}.`);
+}
+let data = {};
+try {
+  data = JSON.parse(process.env.DASHBOARD_AUTHORITY_JSON || "{}");
+} catch (_error) {
+  data = {};
+}
+const prefixes = String(process.env.DASHBOARD_AXIS_PREFIXES || "").split("|").map((item) => item.trim()).filter(Boolean);
+const fallback = normalize(process.env.DASHBOARD_AXIS_FALLBACK, "unknown");
+const statuses = [];
+for (const blocker of Array.isArray(data.product_operation_blockers) ? data.product_operation_blockers : []) {
+  const source = String(blocker?.source ?? "");
+  if (prefixes.some((prefix) => matches(source, prefix))) {
+    statuses.push(normalize(blocker.status));
+  }
+}
+const items = Array.isArray(data.evidence_summary?.items) ? data.evidence_summary.items : [];
+for (const item of items) {
+  const source = String(item?.source_id ?? "");
+  if (!prefixes.some((prefix) => matches(source, prefix))) continue;
   let status = normalize(item.status);
   const required = item.required_in_context === true;
   const freshness = String(item.freshness_state ?? "unknown");
@@ -4194,7 +4613,7 @@ dashboard_repository_changes_json() {
   local menu_id="${1:-$SELECTED_MENU_ID}"
   local generated_at="${2:-$(dashboard_data_generated_at)}"
   local repo path_state git_state status branch head upstream main_target detached stale_reason
-  local staged_count="0" unstaged_count="0" untracked_count="0" ahead="0" behind="0" worktree_count="0"
+  local staged_count="0" unstaged_count="0" untracked_count="0" ahead="0" behind="0" branch_count="0" worktree_count="0"
   local -a changed_samples=()
   repo="$(dashboard_target_repository_root "$menu_id" 2>/dev/null || true)"
   path_state="$(dashboard_target_repository_path_state "$menu_id")"
@@ -4223,6 +4642,7 @@ dashboard_repository_changes_json() {
     if [[ -n "$upstream" ]]; then
       read -r ahead behind < <(git -C "$repo" rev-list --left-right --count HEAD...'@{u}' 2>/dev/null || printf '0 0')
     fi
+    branch_count="$(git -C "$repo" for-each-ref --format='%(refname:short)' refs/heads 2>/dev/null | awk 'NF { count += 1 } END { print count + 0 }')"
     worktree_count="$(git -C "$repo" worktree list --porcelain 2>/dev/null | awk '$1 == "worktree" { count += 1 } END { print count + 0 }')"
     if (( staged_count > 0 || unstaged_count > 0 || untracked_count > 0 )); then
       status="manual_required"
@@ -4265,8 +4685,8 @@ dashboard_repository_changes_json() {
   dashboard_json_string "$main_target"
   printf ',"detached":'
   dashboard_json_bool "$detached"
-  printf ',"staged_count":%d,"unstaged_count":%d,"untracked_count":%d,"ahead":%d,"behind":%d,"worktree_count":%d' \
-    "${staged_count:-0}" "${unstaged_count:-0}" "${untracked_count:-0}" "${ahead:-0}" "${behind:-0}" "${worktree_count:-0}"
+  printf ',"staged_count":%d,"unstaged_count":%d,"untracked_count":%d,"ahead":%d,"behind":%d,"branch_count":%d,"worktree_count":%d' \
+    "${staged_count:-0}" "${unstaged_count:-0}" "${untracked_count:-0}" "${ahead:-0}" "${behind:-0}" "${branch_count:-0}" "${worktree_count:-0}"
   printf ',"changed_role_counts":{"staged":%d,"unstaged":%d,"untracked":%d}' \
     "${staged_count:-0}" "${unstaged_count:-0}" "${untracked_count:-0}"
   printf ',"safe_changed_file_samples":'
@@ -6694,6 +7114,409 @@ dashboard_git_operation_detail() {
   printf '%s' "$default_detail"
 }
 
+dashboard_material_update_events_json() {
+  local menu_id="$1"
+  local workflow_context="$2"
+  local target_name="$3"
+  local authority_json="$4"
+  local repo
+  repo="$(dashboard_target_repository_root "$menu_id" 2>/dev/null || true)"
+  DASHBOARD_MATERIAL_REPO="$repo" \
+  DASHBOARD_MATERIAL_MENU_ID="$menu_id" \
+  DASHBOARD_MATERIAL_WORKFLOW_CONTEXT="$workflow_context" \
+  DASHBOARD_MATERIAL_TARGET_NAME="$target_name" \
+  DASHBOARD_MATERIAL_AUTHORITY_JSON="$authority_json" \
+node <<'NODE'
+const cp = require("node:child_process");
+const crypto = require("node:crypto");
+const fs = require("node:fs");
+
+const repo = process.env.DASHBOARD_MATERIAL_REPO || "";
+const menuId = process.env.DASHBOARD_MATERIAL_MENU_ID || "unknown";
+const workflowContext = process.env.DASHBOARD_MATERIAL_WORKFLOW_CONTEXT || "unknown";
+const targetName = process.env.DASHBOARD_MATERIAL_TARGET_NAME || "unknown";
+const events = [];
+
+function configuredInteger(name, fallback, minimum = 1, maximum = 5000) {
+  const parsed = Number.parseInt(process.env[name] || "", 10);
+  return Number.isFinite(parsed) && parsed >= minimum && parsed <= maximum ? parsed : fallback;
+}
+
+const materialEventLimit = configuredInteger("DASHBOARD_MATERIAL_EVENT_LIMIT", 160, 20, 500);
+const materialEventCategoryMinimum = configuredInteger("DASHBOARD_MATERIAL_EVENT_CATEGORY_MINIMUM", 5, 1, 20);
+const materialLedgerReadLimit = configuredInteger(
+  "DASHBOARD_MATERIAL_LEDGER_READ_LIMIT",
+  Math.max(materialEventLimit * 12, materialEventCategoryMinimum * 80, 400),
+  materialEventCategoryMinimum,
+  5000,
+);
+
+function clean(value, limit = 260) {
+  const text = String(value || "")
+    .replace(/\r/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  return text.length > limit ? `${text.slice(0, Math.max(0, limit - 3)).trim()}...` : text;
+}
+
+function safeId(value) {
+  const text = clean(value, 180)
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return text || `event-${crypto.createHash("sha256").update(String(value || "")).digest("hex").slice(0, 12)}`;
+}
+
+function isIsoLike(value) {
+  const date = new Date(value);
+  return Boolean(value) && !Number.isNaN(date.getTime());
+}
+
+function normalizeStatus(value) {
+  const status = clean(value).toLowerCase();
+  const allowed = new Set(["missing", "ready", "passed", "failed", "blocked", "unknown", "approval_required", "optional", "cached", "not_run", "stale", "manual_required", "not_applicable"]);
+  return allowed.has(status) ? status : "unknown";
+}
+
+function purposeCodeForEvent(sourceId, eventType) {
+  if (eventType === "git_commit") return "git_commit";
+  if (eventType === "git_merge") return "git_merge";
+  if (sourceId.startsWith("product.ci.pr")) return "ci_pr";
+  if (sourceId.startsWith("product.ci.main")) return "ci_main";
+  if (sourceId.startsWith("product.ci.github_actions")) return "ci_provider";
+  if (sourceId.startsWith("product.ci.")) return "ci_branch";
+  if (sourceId.startsWith("product.gates.tests")) return "local_tests";
+  if (sourceId.startsWith("product.gates.structure") || eventType === "structure_check") return "structure";
+  if (sourceId.startsWith("product.security.") || eventType === "security_check") return "security";
+  if (sourceId.startsWith("product.git.") || eventType === "git_check") return "git";
+  if (sourceId.startsWith("product.docs.") || sourceId.includes("document") || eventType === "document_sync") return "document_sync";
+  if (sourceId.startsWith("product.design_system.")) return "design_system";
+  if (eventType === "local_test") return "local_tests";
+  if (eventType === "ci_run") return "ci_branch";
+  if (eventType === "product_gate") return "product_gate";
+  return "material_update";
+}
+
+function addEvent(event) {
+  const occurredAt = clean(event.occurred_at);
+  if (!isIsoLike(occurredAt)) {
+    return;
+  }
+  const eventType = safeId(event.event_type || "material_update");
+  const sourceId = clean(event.source_id || eventType, 120);
+  const repositoryHead = clean(event.repository_head || "none", 80);
+  const summary = clean(event.summary || sourceId);
+  events.push({
+    event_id: safeId(event.event_id || `${eventType}-${occurredAt}-${sourceId}-${repositoryHead}-${summary}`),
+    event_type: eventType,
+    purpose_code: safeId(event.purpose_code || purposeCodeForEvent(sourceId, eventType)),
+    occurred_at: occurredAt,
+    source_id: sourceId,
+    status: normalizeStatus(event.status || "ready"),
+    repository_head: repositoryHead || "none",
+    summary,
+    command: clean(event.command || "not_applicable", 180) || "not_applicable",
+    detail_artifact_path: clean(event.detail_artifact_path || "not_collected", 220) || "not_collected",
+  });
+}
+
+function gitLogEvents() {
+  if (!repo || !fs.existsSync(repo)) {
+    return;
+  }
+  let output = "";
+  try {
+    output = cp.execFileSync("git", ["-C", repo, "log", "-5", "--date=iso-strict", "--pretty=format:%cI%x1f%H%x1f%s"], {
+      encoding: "utf8",
+      timeout: 3000,
+      stdio: ["ignore", "pipe", "ignore"],
+    });
+  } catch {
+    return;
+  }
+  for (const line of output.split(/\n/).filter(Boolean)) {
+    const [occurredAt, hash, ...subjectParts] = line.split("\x1f");
+    const summary = clean(subjectParts.join("\x1f"), 220);
+    if (!summary) {
+      continue;
+    }
+    const isMerge = /^Merge\b/i.test(summary);
+    addEvent({
+      event_type: isMerge ? "git_merge" : "git_commit",
+      occurred_at: occurredAt,
+      source_id: isMerge ? "product.git.merge" : "product.git.commit",
+      status: "ready",
+      repository_head: hash,
+      summary,
+      command: "not_applicable",
+      detail_artifact_path: "not_collected",
+    });
+  }
+}
+
+function parseAuthority() {
+  try {
+    return JSON.parse(process.env.DASHBOARD_MATERIAL_AUTHORITY_JSON || "{}");
+  } catch {
+    return {};
+  }
+}
+
+function eventTypeForSource(sourceId) {
+  if (sourceId.startsWith("product.gates.tests")) return "local_test";
+  if (sourceId.startsWith("product.gates.structure") || sourceId.startsWith("product.gates.control_center")) return "structure_check";
+  if (sourceId.startsWith("product.security.")) return "security_check";
+  if (sourceId.startsWith("product.ci.")) return "ci_run";
+  if (sourceId.startsWith("product.git.")) return "git_check";
+  if (sourceId.startsWith("product.docs.") || sourceId.includes("document")) return "document_sync";
+  return "product_gate";
+}
+
+function materialEventCategory(event) {
+  const sourceId = clean(event?.source_id, 120);
+  const eventType = clean(event?.event_type, 80);
+  if (eventType === "ci_run" || sourceId.startsWith("product.ci.")) return "ci";
+  if (
+    eventType === "local_test" ||
+    eventType === "structure_check" ||
+    eventType === "product_gate" ||
+    sourceId.startsWith("product.gates.") ||
+    sourceId.startsWith("product.design_system.")
+  ) {
+    return "tests";
+  }
+  if (eventType.startsWith("git_") || sourceId.startsWith("product.git.")) return "git";
+  if (eventType === "security_check" || sourceId.startsWith("product.security.")) return "security";
+  if (eventType === "document_sync" || sourceId.startsWith("product.docs.") || sourceId.includes("document")) return "documents";
+  return "other";
+}
+
+function materialEventDisplayGroupKey(event) {
+  const occurredAt = clean(event?.occurred_at, 40);
+  const date = occurredAt.slice(0, 10) || "unknown-date";
+  const command = clean(event?.command && event.command !== "not_applicable" ? event.command : event?.summary, 180) || "not_applicable";
+  return `${date}|${materialEventCategory(event)}|${clean(event?.event_type, 80)}|${command}`;
+}
+
+function materialEventDedupeKey(event) {
+  const command = clean(event?.command && event.command !== "not_applicable" ? event.command : event?.summary, 180) || "not_applicable";
+  return [
+    clean(event?.event_type, 80),
+    clean(event?.occurred_at, 40),
+    clean(event?.source_id, 120),
+    clean(event?.repository_head, 80),
+    command,
+    clean(event?.detail_artifact_path, 220),
+  ].join("|");
+}
+
+function materialEventStatusPreference(status) {
+  return {
+    passed: 3,
+    ready: 2,
+    cached: 1,
+  }[normalizeStatus(status)] || 0;
+}
+
+function statusRank(status) {
+  return {
+    blocked: 90,
+    failed: 80,
+    approval_required: 70,
+    manual_required: 60,
+    stale: 50,
+    missing: 45,
+    unknown: 40,
+    not_run: 30,
+    cached: 20,
+    optional: 15,
+    ready: 10,
+    passed: 10,
+    not_applicable: 0,
+  }[normalizeStatus(status)] ?? 40;
+}
+
+function evidenceEvents() {
+  const authority = parseAuthority();
+  const items = Array.isArray(authority?.evidence_summary?.items) ? authority.evidence_summary.items : [];
+  const grouped = new Map();
+  for (const item of items) {
+    const observedAt = clean(item?.observed_at);
+    if (!isIsoLike(observedAt)) {
+      continue;
+    }
+    const sourceId = clean(item?.source_id, 120);
+    const status = normalizeStatus(item?.status);
+    if (!sourceId || ["not_run", "not_applicable", "missing", "unknown"].includes(status)) {
+      continue;
+    }
+    const eventType = eventTypeForSource(sourceId);
+    const command = clean(item?.next_command || item?.required_command || "not_applicable", 180) || "not_applicable";
+    const key = `${eventType}|${observedAt}`;
+    const existing = grouped.get(key) || {
+      event_type: eventType,
+      occurred_at: observedAt,
+      source_ids: [],
+      status,
+      repository_head: clean(item?.product_head || "none", 80) || "none",
+      command,
+      detail_artifact_path: clean(item?.detail_artifact_path || "not_collected", 220) || "not_collected",
+    };
+    existing.source_ids.push(sourceId);
+    if (statusRank(status) > statusRank(existing.status)) {
+      existing.status = status;
+    }
+    if ((!existing.repository_head || existing.repository_head === "none") && item?.product_head) {
+      existing.repository_head = clean(item.product_head, 80);
+    }
+    if (existing.detail_artifact_path === "not_collected" && item?.detail_artifact_path) {
+      existing.detail_artifact_path = clean(item.detail_artifact_path, 220);
+    }
+    grouped.set(key, existing);
+  }
+  for (const groupedEvent of grouped.values()) {
+    const sourceIds = [...new Set(groupedEvent.source_ids)];
+    const command = groupedEvent.command && groupedEvent.command !== "not_applicable" ? groupedEvent.command : sourceIds[0];
+    addEvent({
+      event_type: groupedEvent.event_type,
+      occurred_at: groupedEvent.occurred_at,
+      source_id: sourceIds[0] || groupedEvent.event_type,
+      status: groupedEvent.status,
+      repository_head: groupedEvent.repository_head,
+      summary: sourceIds.length > 1 ? `${command} (${sourceIds.length} evidence items)` : command,
+      command: groupedEvent.command,
+      detail_artifact_path: groupedEvent.detail_artifact_path,
+    });
+  }
+}
+
+function safeRepoPath(relativePath) {
+  const artifactPath = clean(relativePath, 260);
+  if (!repo || !artifactPath || artifactPath === "not_collected" || pathIsUnsafe(artifactPath)) {
+    return "";
+  }
+  const resolved = require("node:path").resolve(repo, artifactPath);
+  const root = require("node:path").resolve(repo);
+  return resolved === root || resolved.startsWith(`${root}${require("node:path").sep}`) ? resolved : "";
+}
+
+function pathIsUnsafe(relativePath) {
+  const text = clean(relativePath, 260);
+  return !text || text.startsWith("/") || text.includes("\0") || text.split(/[\\/]+/).includes("..");
+}
+
+function evidenceDetail(artifactPath) {
+  const resolved = safeRepoPath(artifactPath);
+  if (!resolved || !fs.existsSync(resolved)) {
+    return {};
+  }
+  try {
+    const parsed = JSON.parse(fs.readFileSync(resolved, "utf8"));
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function ledgerEvents() {
+  const ledgerPath = safeRepoPath(".git/product-gate-evidence/ledger.jsonl");
+  if (!ledgerPath || !fs.existsSync(ledgerPath)) {
+    return;
+  }
+  let lines = [];
+  try {
+    lines = fs.readFileSync(ledgerPath, "utf8").split(/\n/).filter(Boolean);
+  } catch {
+    return;
+  }
+  for (const line of lines.slice(-materialLedgerReadLimit)) {
+    let row = {};
+    try {
+      row = JSON.parse(line);
+    } catch {
+      continue;
+    }
+    const sourceId = clean(row?.source_id, 120);
+    const observedAt = clean(row?.observed_at);
+    const status = normalizeStatus(row?.status);
+    if (!sourceId || !isIsoLike(observedAt) || ["not_run", "not_applicable", "missing", "unknown"].includes(status)) {
+      continue;
+    }
+    const detail = evidenceDetail(row?.detail_artifact_path);
+    const command = clean(detail?.next_command || row?.next_command || "not_applicable", 180) || "not_applicable";
+    addEvent({
+      event_id: row?.event_id,
+      event_type: eventTypeForSource(sourceId),
+      occurred_at: observedAt,
+      source_id: sourceId,
+      status,
+      repository_head: clean(row?.product_head || detail?.product_head || "none", 80) || "none",
+      summary: clean(detail?.safe_summary || detail?.reason || command || sourceId, 220),
+      command,
+      detail_artifact_path: clean(row?.detail_artifact_path || "not_collected", 220) || "not_collected",
+    });
+  }
+}
+
+function sortedUniqueMaterialEvents() {
+  const grouped = new Map();
+  for (const event of events) {
+    const key = materialEventDedupeKey(event);
+    const existing = grouped.get(key);
+    if (!existing) {
+      grouped.set(key, event);
+      continue;
+    }
+    if (
+      statusRank(event.status) > statusRank(existing.status) ||
+      (statusRank(event.status) === statusRank(existing.status) && materialEventStatusPreference(event.status) > materialEventStatusPreference(existing.status))
+    ) {
+      grouped.set(key, event);
+    }
+  }
+  return [...grouped.values()].sort((left, right) => new Date(right.occurred_at) - new Date(left.occurred_at));
+}
+
+function balancedMaterialEvents() {
+  const sorted = sortedUniqueMaterialEvents();
+  const selected = new Map();
+  const addSelected = (event) => {
+    selected.set(materialEventDedupeKey(event), event);
+  };
+  for (const category of ["tests", "ci", "git", "documents", "security"]) {
+    const seenDisplayGroups = new Set();
+    for (const event of sorted) {
+      if (materialEventCategory(event) !== category) {
+        continue;
+      }
+      addSelected(event);
+      seenDisplayGroups.add(materialEventDisplayGroupKey(event));
+      if (seenDisplayGroups.size >= materialEventCategoryMinimum) {
+        break;
+      }
+    }
+  }
+  for (const event of sorted) {
+    addSelected(event);
+    if (selected.size >= materialEventLimit) {
+      break;
+    }
+  }
+  return [...selected.values()]
+    .sort((left, right) => new Date(right.occurred_at) - new Date(left.occurred_at))
+    .slice(0, materialEventLimit);
+}
+
+gitLogEvents();
+ledgerEvents();
+evidenceEvents();
+
+const result = balancedMaterialEvents();
+
+process.stdout.write(JSON.stringify(result));
+NODE
+}
+
 git_operation_push_mode="$(dashboard_git_operation_effective_mode push)"
 git_operation_pr_mode="$(dashboard_git_operation_effective_mode pr)"
 git_operation_pr_ci_mode="$(dashboard_git_operation_effective_mode pr_ci)"
@@ -6787,8 +7610,9 @@ workflow_evidence_events=(
   "$(dashboard_json_workflow_evidence_event "ci-main" "$ci_event_source" "$(dashboard_source_observed_at "$ci_event_source" "$generated_at")" "$ci_event_head" "$ci_event_status" "$(dashboard_source_freshness_state "$ci_event_source" "$ci_event_status")" "$(dashboard_source_authority "$ci_event_source" "$ci_event_status")" "$(dashboard_source_detail_artifact_path "$ci_event_source" "$product_authority_event_path")" "Selected context CI evidence.")"
   "$(dashboard_json_workflow_evidence_event "security-gate" "$security_event_source" "$(dashboard_source_observed_at "$security_event_source" "$generated_at")" "$security_event_head" "$security_event_status" "$(dashboard_source_freshness_state "$security_event_source" "$security_event_status")" "$(dashboard_source_authority "$security_event_source" "$security_event_status")" "$(dashboard_source_detail_artifact_path "$security_event_source" "$product_security_event_path")" "Selected context security gate snapshot.")"
 )
+material_update_events_json="$(dashboard_material_update_events_json "$SELECTED_MENU_ID" "$SELECTED_WORKFLOW_CONTEXT" "$selected_target_repository_name" "$product_authority_json")"
 
-local_tests_status="$(dashboard_authority_axis_status "$product_authority_json" "product.tests" "not_run")"
+local_tests_status="$(dashboard_authority_axes_status "$product_authority_json" "not_run" "product.gates.tests" "product.tests")"
 dashboard_data_allowed_state "$local_tests_status" || local_tests_status="unknown"
 provider_visibility_status="$(dashboard_authority_axis_status "$product_authority_json" "product.ci.github_actions" "$ci_status")"
 dashboard_data_allowed_state "$provider_visibility_status" || provider_visibility_status="$ci_status"
@@ -6796,7 +7620,7 @@ ci_evidence_roles=(
   "$(dashboard_json_ci_evidence_role "branch_ci" "$(dashboard_source_status "product.ci.github_actions" "$ci_status")" "product.ci.github_actions" "$(dashboard_head_match_status "$(dashboard_source_product_head "product.ci.github_actions")" "$repository_changes_head")" "$(dashboard_source_authority "product.ci.github_actions" "$ci_status")" "$(dashboard_source_freshness_state "product.ci.github_actions" "$ci_status")" "Selected branch/provider CI evidence or manual review state." "$(dashboard_source_observed_at "product.ci.github_actions" "$generated_at")")"
   "$(dashboard_json_ci_evidence_role "pr_ci" "$(dashboard_source_status "product.ci.pr" "$(dashboard_git_operation_status pr_ci "$git_operation_pr_ci_mode" "$ci_status")")" "product.ci.pr" "$(dashboard_head_match_status "$(dashboard_source_product_head "product.ci.pr")" "$repository_changes_head")" "$(dashboard_source_authority "product.ci.pr" "$(dashboard_git_operation_status pr_ci "$git_operation_pr_ci_mode" "$ci_status")")" "$(dashboard_source_freshness_state "product.ci.pr" "$(dashboard_git_operation_status pr_ci "$git_operation_pr_ci_mode" "$ci_status")")" "Pull request CI evidence is separate from branch and main CI." "$(dashboard_source_observed_at "product.ci.pr" "$generated_at")")"
   "$(dashboard_json_ci_evidence_role "main_ci" "$(dashboard_source_status "product.ci.main" "$(dashboard_git_operation_status main_ci "$git_operation_main_ci_mode" "$ci_status")")" "product.ci.main" "$(dashboard_head_match_status "$(dashboard_source_product_head "product.ci.main")" "$repository_changes_head")" "$(dashboard_source_authority "product.ci.main" "$(dashboard_git_operation_status main_ci "$git_operation_main_ci_mode" "$ci_status")")" "$(dashboard_source_freshness_state "product.ci.main" "$(dashboard_git_operation_status main_ci "$git_operation_main_ci_mode" "$ci_status")")" "Main CI evidence is separate from PR and branch CI." "$(dashboard_source_observed_at "product.ci.main" "$generated_at")")"
-  "$(dashboard_json_ci_evidence_role "local_tests" "$local_tests_status" "product.tests" "unknown" "$(dashboard_status_authority "$local_tests_status")" "$(dashboard_status_freshness_state "$local_tests_status")" "Local test evidence is shown separately from remote CI." "$generated_at")"
+  "$(dashboard_json_ci_evidence_role "local_tests" "$local_tests_status" "product.gates.tests" "unknown" "$(dashboard_status_authority "$local_tests_status")" "$(dashboard_status_freshness_state "$local_tests_status")" "Local test evidence is shown separately from remote CI." "$(dashboard_source_observed_at "product.gates.tests" "$generated_at")")"
   "$(dashboard_json_ci_evidence_role "provider_visibility" "$(dashboard_source_status "product.ci.github_actions" "$provider_visibility_status")" "product.ci.github_actions" "$(dashboard_head_match_status "$(dashboard_source_product_head "product.ci.github_actions")" "$repository_changes_head")" "$(dashboard_source_authority "product.ci.github_actions" "$provider_visibility_status")" "$(dashboard_source_freshness_state "product.ci.github_actions" "$provider_visibility_status")" "Provider visibility is not the same as a passing CI run." "$(dashboard_source_observed_at "product.ci.github_actions" "$generated_at")")"
 )
 
@@ -6875,7 +7699,7 @@ ci_head_match_status="$ci_main_head_match"
 [[ "$ci_head_match_status" != "unknown" ]] || ci_head_match_status="$ci_branch_head_match"
 maintenance_ci_annotations=()
 
-product_structure_status="$(dashboard_authority_axis_status "$product_authority_json" "product.structure" "$product_authority_status")"
+product_structure_status="$(dashboard_authority_axes_status "$product_authority_json" "$product_authority_status" "product.gates.structure" "product.structure")"
 product_focused_status="$(dashboard_authority_axis_status "$product_authority_json" "product.focused" "optional")"
 product_local_artifacts_status="$(dashboard_source_status "product.security.local_artifacts" "$security_gate_status")"
 product_secrets_status="$(dashboard_source_status "product.security.secrets" "$security_gate_status")"
@@ -6893,8 +7717,8 @@ product_gate_status="$(
     "$ci_status"
 )"
 product_gate_layers=(
-  "$(dashboard_json_maintenance_sync_row "local_tests" "Local tests" "$local_tests_status" "product.tests" "$(dashboard_status_freshness_state "$local_tests_status")" "$(dashboard_status_authority "$local_tests_status")" "$generated_at" "Local test evidence is separated from remote CI evidence." "Review or rerun the selected product test evidence before relying on it." "$(dashboard_source_detail_artifact_path "product.tests" "$product_authority_event_path")" "high")"
-  "$(dashboard_json_maintenance_sync_row "structure" "Structure checks" "$product_structure_status" "product.structure" "$(dashboard_status_freshness_state "$product_structure_status")" "$(dashboard_status_authority "$product_structure_status")" "$(dashboard_source_observed_at "product.structure" "$generated_at")" "Repository structure evidence is grouped separately from tests and CI." "Review structure evidence if this layer is not ready." "$(dashboard_source_detail_artifact_path "product.structure" "$product_authority_event_path")" "medium")"
+  "$(dashboard_json_maintenance_sync_row "local_tests" "Local tests" "$local_tests_status" "product.gates.tests" "$(dashboard_status_freshness_state "$local_tests_status")" "$(dashboard_status_authority "$local_tests_status")" "$(dashboard_source_observed_at "product.gates.tests" "$generated_at")" "Local test evidence is separated from remote CI evidence." "Review or rerun the selected product test evidence before relying on it." "$(dashboard_source_detail_artifact_path "product.gates.tests" "$product_authority_event_path")" "high")"
+  "$(dashboard_json_maintenance_sync_row "structure" "Structure checks" "$product_structure_status" "product.gates.structure" "$(dashboard_status_freshness_state "$product_structure_status")" "$(dashboard_status_authority "$product_structure_status")" "$(dashboard_source_observed_at "product.gates.structure" "$generated_at")" "Repository structure evidence is grouped separately from tests and CI." "Review structure evidence if this layer is not ready." "$(dashboard_source_detail_artifact_path "product.gates.structure" "$product_authority_event_path")" "medium")"
   "$(dashboard_json_maintenance_sync_row "focused_checks" "Focused checks" "$product_focused_status" "product.focused" "$(dashboard_status_freshness_state "$product_focused_status")" "$(dashboard_status_authority "$product_focused_status")" "$(dashboard_source_observed_at "product.focused" "$generated_at")" "Product-specific focused checks are shown when the selected repository reports them." "Review focused product evidence before treating specialized checks as complete." "$(dashboard_source_detail_artifact_path "product.focused" "$product_authority_event_path")" "medium")"
   "$(dashboard_json_maintenance_sync_row "security" "Security checks" "$security_gate_status" "product.security" "$(dashboard_status_freshness_state "$security_gate_status")" "$(dashboard_status_authority "$security_gate_status")" "$(dashboard_source_observed_at "product.security.blockers" "$generated_at")" "Security evidence is grouped separately from functional product checks." "Open Safety Confirmation before risky operations." "$(dashboard_source_detail_artifact_path "product.security.blockers" "$product_security_event_path")" "high")"
   "$(dashboard_json_maintenance_sync_row "local_artifacts" "Local artifacts" "$product_local_artifacts_status" "product.security.local_artifacts" "$(dashboard_source_freshness_state "product.security.local_artifacts" "$product_local_artifacts_status")" "$(dashboard_source_authority "product.security.local_artifacts" "$product_local_artifacts_status")" "$(dashboard_source_observed_at "product.security.local_artifacts" "$generated_at")" "Raw or generated artifacts must not be mistaken for source readiness." "Review local artifact evidence before committing generated outputs." "$(dashboard_source_detail_artifact_path "product.security.local_artifacts" "$product_security_event_path")" "high")"
@@ -7403,6 +8227,9 @@ dashboard_json_raw_array "${workflow_recent_run_rows[@]}"
 printf ',\n'
 printf '    "workflow_evidence_events": '
 dashboard_json_raw_array "${workflow_evidence_events[@]}"
+printf ',\n'
+printf '    "material_update_events": '
+printf '%s' "$material_update_events_json"
 printf ',\n'
 printf '    "ci_evidence": '
 dashboard_json_raw_array "${ci_evidence_roles[@]}"

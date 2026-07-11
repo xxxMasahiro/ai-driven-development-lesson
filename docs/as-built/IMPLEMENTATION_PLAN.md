@@ -5138,3 +5138,60 @@ Verification plan:
 - Use Browser Debug CLI or TraceCue only for read-only final visual/content review artifacts.
 
 Stop and ask before provider dispatch, credentials, automatic apply, image generation, external product writes, Browser Debug CLI or TraceCue source edits, dashboard-triggered Git/CI mutations, dependency changes, push, merge, cleanup, or gate weakening.
+
+## Implemented Dashboard Control Center Workflow Activity History Implementation Plan
+
+SYNC-ID: dashboard_control_center_workflow_activity_history
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/DASHBOARD_DATA_SCHEMA.tsv,docs/design-system/dashboard-control-center/DESIGN_SYSTEM.md,docs/design-system/dashboard-control-center/tokens.json,docs/design-system/dashboard-control-center/components.json,dashboard-control-center/src/design-system.generated.css,dashboard-control-center/src/design-system.generated.js,tools/dashboard-data,tools/lib/dashboard_data.sh,vite.config.mjs,dashboard-control-center/src/App.jsx,dashboard-control-center/src/dashboardData.js,dashboard-control-center/src/i18n.js,dashboard-control-center/src/i18nCatalog.js,dashboard-control-center/src/styles.css,tests/fixtures/dashboard-control-center.json,tests/fixtures/dashboard-control-center-live-update.json,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/check_dashboard_bundle_contract.sh,tools/check_dashboard_design_system.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+User decision:
+
+- The user needs to decide what changed recently, what is verified, what remains uncertain or blocked, and what action is safe next for the selected repository.
+
+Implementation order:
+
+1. Keep the approved scope synchronized as `planned` across this contract and the five required documents before further runtime edits.
+2. Treat FrameCue path correction, current TraceCue selection, and workflow-pair wording alignment as a separate configuration unit; verify it through existing repository-registry and Dashboard-selection tests.
+3. Inventory the existing material-event implementation, preserve user-owned behavior, and extract reusable event collection or normalization code from the large inline `dashboard-data` block when extraction reduces duplication and improves direct testing.
+4. Repair owner-layer semantics so source status, authority, freshness, occurrence time, repository head, blocker count, and selected repository remain distinct and traceable.
+5. Remove paths that turn stale, unknown, not-run, or advisory evidence into ready state; keep blocker history filtering separate from current blocker truth.
+6. Replace browser command-regex purpose inference and Japanese-versus-English branches with structured purpose codes, shared locale keys, and standard locale formatting.
+7. Decide whether the compact locale catalog is maintained source or generated output; rename it or add a checked generator so its ownership is unambiguous.
+8. Align `DASHBOARD_DATA_SCHEMA.tsv`, validator behavior, fixtures, and producer output before finalizing React rendering.
+9. Keep the material-update history and current-position summary aligned with `DESIGN_SYSTEM.md`, `tokens.json`, and `components.json`; regenerate runtime design assets only through `tools/dashboard-design-system`.
+10. Update focused schema, data, i18n, and Playwright coverage, preserving prior decision, selected-context, evidence-detail, accessibility, and responsive-layout coverage under the new structure.
+11. Run focused verification first, inspect real desktop and mobile rendering, and repair failures without weakening checks.
+12. Add newly created runtime or test artifacts to this sync metadata, promote all five blocks to `implemented` only after focused checks pass, and then present the heavy release gate separately.
+
+Implementation outcome:
+
+- Preserved incomplete-evidence states, explicit blocker counts, event occurrence time, selected repository, and repository-head meaning from producer through browser rendering.
+- Added structured purpose codes and standard locale keys; removed command-string purpose inference and Japanese-versus-English runtime branches.
+- Classified `i18nCatalog.js` as maintained source and split it into a dedicated Vite chunk without raising the 500,000-byte bundle limit.
+- Kept the material-event collector in its single producer owner because no second caller or duplicated normalization path justified a separate executable; the shared shell JSON helper remains in `tools/lib/dashboard_data.sh`.
+- Added Vite and browser-data rejection for missing purpose codes, bounded event validation, stale-state presentation, explicit zero/count handling, and current-position de-duplication.
+- Corrected the FrameCue registry path, preserved TraceCue as the current free-development selection, and left both external repositories read-only.
+
+Verification plan:
+
+- Syntax: changed shell and JavaScript modules.
+- Producer contract: `tools/test_dashboard_schema.sh` and `tools/test_dashboard_data.sh`.
+- Locale contract: `tools/test_dashboard_i18n.sh` across the standard language list.
+- UI and responsive decision behavior: `tools/test_dashboard_control_center.sh` plus focused Playwright desktop/mobile inspection.
+- Design source-to-runtime: `tools/check_dashboard_design_system.sh`.
+- Registry configuration unit: existing product Git-usage, menu-prerequisite, repository-selection, and Dashboard data checks selected by `TEST_PLAN_MANIFEST.tsv`.
+- Document and workflow integrity: as-built, workflow-pair, repository-development checks, and `git diff --check`.
+
+Recovery:
+
+- Preserve the feature branch and original diff while making scoped edits; do not reset, discard, or overwrite user-owned changes.
+- If event extraction changes output, restore the last passing producer contract before continuing with presentation work.
+- If visual generation drifts, repair source tokens/components and regenerate; do not patch generated CSS or JS directly.
+- If registry alignment is not accepted by its focused tests, stop that configuration unit without weakening Dashboard selection behavior.
+
+Approval boundaries:
+
+- Runtime implementation begins only after this implementation plan is approved.
+- Heavy aggregate, full/no-cache, pre-commit, push, PR, merge, main CI, synchronization, and cleanup remain later approval-bound phases.

@@ -2695,3 +2695,31 @@ Acceptance requirements:
 Non-scope:
 
 - Do not implement provider API dispatch, automatic apply, image generation, external product writes, Browser Debug CLI or TraceCue source edits, credential storage, dependency changes, dashboard-triggered Git/CI mutation, push, merge, cleanup, or gate weakening.
+
+## Implemented Dashboard Control Center Workflow Activity History Requirements
+
+SYNC-ID: dashboard_control_center_workflow_activity_history
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/DASHBOARD_DATA_SCHEMA.tsv,docs/design-system/dashboard-control-center/DESIGN_SYSTEM.md,docs/design-system/dashboard-control-center/tokens.json,docs/design-system/dashboard-control-center/components.json,dashboard-control-center/src/design-system.generated.css,dashboard-control-center/src/design-system.generated.js,tools/dashboard-data,tools/lib/dashboard_data.sh,vite.config.mjs,dashboard-control-center/src/App.jsx,dashboard-control-center/src/dashboardData.js,dashboard-control-center/src/i18n.js,dashboard-control-center/src/i18nCatalog.js,dashboard-control-center/src/styles.css,tests/fixtures/dashboard-control-center.json,tests/fixtures/dashboard-control-center-live-update.json,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/check_dashboard_bundle_contract.sh,tools/check_dashboard_design_system.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+The Development Workflow page must help the user decide what changed recently, what was verified, what remains uncertain or blocked, and which action is safe next for the selected repository.
+The browser must render producer-owned material activity and status meaning without inferring operational truth from command text, repository names, timestamps, or display labels.
+
+Acceptance requirements:
+
+- Publish bounded material update events for real commits, merges, tests, CI, Security, document synchronization, and product-gate evidence while excluding observation refreshes and unsafe raw logs.
+- Keep event time, selected repository, source id, authority, freshness, repository head, safe command preview, and artifact reference traceable where applicable.
+- Preserve `unknown`, `stale`, `not_run`, `manual_required`, and other incomplete-evidence states; evidence presence alone must not convert them to `ready`.
+- Keep explicit blocker counts and blocker evidence visible without treating review-only freshness states as failures.
+- Show one chronological material-update surface and a concise current-position summary with distinct Git, tests, CI, worklog, and blocker responsibilities.
+- Collapse only genuinely adjacent duplicate test or CI display rows and apply display limits after grouping.
+- Use structured purpose codes and localization keys instead of browser-side command-string inference or Japanese-versus-English branches.
+- Support the repository standard language list without fixed product, repository, path, command, or language-specific runtime branches.
+- Keep Dashboard visual changes synchronized through the Design System source-to-runtime path and preserve read-only command and external-operation boundaries.
+- Add negative coverage for wrong repository, stale or unknown evidence shown as ready, lost blocker counts, unsafe event values, duplicate history, unsupported locale fallback, and removed legacy coverage without replacement.
+
+Non-scope:
+
+- Do not add provider dispatch, browser command execution, external product writes, dependency changes, generated activity, placeholder timestamps, automatic Git/CI execution, push, merge, cleanup, or gate weakening.
+- Do not treat the product repository registry path and current selection alignment as part of this feature contract; verify and commit that configuration alignment as a separate change unit.

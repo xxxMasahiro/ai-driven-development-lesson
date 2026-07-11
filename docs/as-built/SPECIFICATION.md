@@ -3058,3 +3058,32 @@ Generated CSS/JS are runtime artifacts produced from that source.
 
 The Browser Debug CLI or TraceCue review step uses only local read-only review commands and repository-owned artifacts.
 No external review tool repository files are modified.
+
+## Implemented Dashboard Control Center Workflow Activity History Specification
+
+SYNC-ID: dashboard_control_center_workflow_activity_history
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/DASHBOARD_DATA_SCHEMA.tsv,docs/design-system/dashboard-control-center/DESIGN_SYSTEM.md,docs/design-system/dashboard-control-center/tokens.json,docs/design-system/dashboard-control-center/components.json,dashboard-control-center/src/design-system.generated.css,dashboard-control-center/src/design-system.generated.js,tools/dashboard-data,tools/lib/dashboard_data.sh,vite.config.mjs,dashboard-control-center/src/App.jsx,dashboard-control-center/src/dashboardData.js,dashboard-control-center/src/i18n.js,dashboard-control-center/src/i18nCatalog.js,dashboard-control-center/src/styles.css,tests/fixtures/dashboard-control-center.json,tests/fixtures/dashboard-control-center-live-update.json,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/check_dashboard_bundle_contract.sh,tools/check_dashboard_design_system.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+`tools/dashboard-data` remains the owner of the selected-repository material activity projection.
+It emits `development.material_update_events[]` as a bounded, newest-first list derived from current repository Git history and structured product-authority evidence.
+Every event uses a stable event id, event type, purpose code, real occurrence time, source id, preserved evidence status, repository head where applicable, safe summary, display-only command preview, and safe artifact reference.
+
+The producer and validator reject absolute paths, traversal, secret-like values, raw logs, invalid timestamps, unsupported states, unbounded rows, and events whose selected repository context cannot be established.
+Refresh time is not work-event time, and snapshot polling does not create material history.
+
+`dashboardData.js` validates repository branch counts and the complete material event contract before the data reaches React.
+`App.jsx` renders structured event types and translation keys; it must not inspect command strings to invent test purpose or operational status.
+Review-only status remains visible as review state and does not become ready merely because a source row exists.
+Explicit blocker counts remain authoritative even when a separate history list excludes stale or unknown review rows.
+
+The Development Workflow layout contains a chronological update-history surface followed by the Design-System-backed current-position summary.
+The history surface shows up to ten material rows by default.
+Test and CI cards show up to five grouped display rows, with grouping applied before the display limit.
+Overview and detail roles remain separate: current position summarizes; history and technical detail explain the evidence chain.
+
+All visible fixed text uses the existing locale policy and standard language catalog.
+The compact locale catalog is maintained source named `i18nCatalog.js`; it is split into its own build chunk and is not represented as unavailable generated output.
+
+Product repository registry and selection alignment remains a separate configuration change unit using the existing registry owner tools and focused repository-selection checks.

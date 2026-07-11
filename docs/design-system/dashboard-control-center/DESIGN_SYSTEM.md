@@ -394,6 +394,35 @@ The generated design-system layer owns shared card and row density:
 Page CSS may keep layout grids, responsive stacking, semantic state colors, and page-specific column structure.
 It must not redefine repeated card or row padding one page at a time when the shared density tokens apply.
 
+The Development Workflow "Current Position And Progress" operational summary is a high-density judgment surface.
+It must use at most two columns on desktop-sized viewports and stack to one column on narrow viewports so task tracker, handoff, failures/blockers, Git, tests, and CI cards have enough room for readable summaries.
+Failure and blocker state belongs inside the failures/blockers card instead of a next-decision or always-visible blocker card.
+The failures/blockers card primary value must show the current unresolved count.
+Its detail rows may show up to five recent failure/block history items, including resolved rows, so users can see what was fixed without mistaking it for a remaining blocker.
+Review-only states such as stale or unknown must not be shown as failure/block history; they belong in their own Git, CI, test, safety, or evidence detail surfaces.
+Test and CI cards in this summary may show up to five recent material update history rows when available.
+Test history rows should start with the plain-language purpose and keep the underlying command as supporting detail.
+Consecutive repeated test and CI history rows with the same local display date, visible purpose, and command should collapse into one row with an occurrence count even when their displayed result labels or internal evidence sources differ.
+The five-row limit is applied after chronological adjacent-repeat grouping so the UI shows up to five display rows, not five raw events before grouping.
+CI history rows should show the CI scope, result, and underlying GitHub command or evidence reference.
+Review freshness states such as stale or unknown must not be printed as the leading result in test or CI history rows because the timestamp already communicates when the record was observed.
+Cards in this summary must share the same height within the summary grid so visual weight does not imply false priority.
+Detail-list labels inside the summary must remain slightly larger and heavier than microcopy so terms such as handoff readiness and status summary are scannable.
+Detail rows inside the summary must use a consistent readable label gutter across all cards so values do not sit too close to labels, and both label and value text must stay slightly larger than microcopy.
+Body values and explanatory copy inside the summary use lighter workflow body weights so long Japanese summaries read as body text rather than headings.
+Card icons in this summary use `--dcc-workflow-soft` and `--dcc-workflow-accent` by default instead of neutral black/gray.
+Card heading labels such as current resume target and task progress management must be slightly larger and heavier than microcopy so the section can be scanned without overpowering the card value.
+Those heading labels use the same workflow accent color as the Development Workflow page icon so the section reads as one coherent page surface.
+Status chips such as ready or in-progress sit directly beside the card heading label and may wrap only when horizontal space is constrained.
+The heading label and status chip group must align to the visual center of the card icon so the card header does not look top-heavy.
+This limit applies only to that workflow current-position summary; other operational summaries may keep their own page-specific column structure.
+
+Development Workflow material update history is a separate chronological row surface.
+It belongs directly below the workflow Git operation rail and before the Current Position And Progress summary, not inside that summary grid.
+The default workflow detail view may show up to ten recent material updates, with observed time first and the material action summary second.
+Timestamp labels stay on one line, use the same gray role as Current Position And Progress detail labels, and keep a 24px column gap plus 4px summary inline-start padding before the summary text.
+The workflow Git operation rail header uses the same visual rhythm as neighboring workflow section headers: a 34px icon column, a 20px icon, and a 10px gap before the heading text.
+
 ### Detail Surfaces
 
 Use a shared detail surface for cards, glossary terms, evidence rows, and source explanations.

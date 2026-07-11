@@ -2425,8 +2425,8 @@ Current State:
 - The implemented sync defines and ships the parent-side registry and selection contract for multiple external product repositories.
 - The lesson repository now has read-only parent-side registry state and resolver helpers for multiple external product repositories.
 - The current temporary free-development verification targets are:
-  - `frame-cue`: `/home/masahiro/projects/frame-cue`
-  - `browser-debug-cli`: `/home/masahiro/projects/agent-toolbox/browser-debug-cli`
+  - `frame-cue`: `/home/masahiro/projects/agent-toolbox/frame-cue`
+  - `trace-cue`: `/home/masahiro/projects/agent-toolbox/trace-cue`
 - `tools/product-repository-registry status|list|selected|verify` exists; `verify --context free-development --all` reports both temporary free-development repositories.
 - Dashboard data selection has focused coverage proving selected `browser-debug-cli` stays selected and does not leak `frame-cue` or `task-tracker-repository`.
 - Dashboard Control Center Playwright coverage now checks selected `browser-debug-cli` across overview, Repository Info, Documents, Update History, four overview cards, and live evidence detail rows.
@@ -2447,14 +2447,14 @@ Next Step:
 - Resume with `AGENTS.MD` and `skills/repository-development-workflow/SKILL.md`.
 - Future runtime implementation should continue only separately approved scopes, especially real PR/main CI run collectors if they become necessary.
 - Preserve the current rule that `ready` means the Dashboard can read the repository, while `stale` means the evidence exists but is not current for the product HEAD or freshness window.
-- Use `frame-cue` and `browser-debug-cli` as temporary verification targets only; do not make them permanent absolute test requirements.
+- Use the currently configured `frame-cue` and `trace-cue` repositories only as replaceable verification targets; historical Browser Debug CLI coverage remains test evidence, not a permanent registry requirement.
 - Before broader tests, run focused checks for the changed owner layer: registry verify, dashboard-data selected repository, design-system drift if UI/CSS changes, and targeted Playwright visual checks when dashboard layout changes.
 
 Recovery notes:
 
 - If sync metadata fails, make `SYNC-ID`, `STATUS`, `ARTIFACTS`, and `TESTS` match exactly across the contract and five synchronized documents.
 - If runtime implementation later mixes menu and repository selection again, stop and restore the `menu_id + repo_id` selection invariant before adding more labels.
-- If Browser Debug CLI cannot be selected without losing FrameCue, repair the registry model rather than special-casing either repository.
+- If one eligible repository cannot be selected without losing another, repair the registry model rather than special-casing either repository.
 - If Product Improvement or External Integration becomes selectable without an eligible selected target, treat it as a blocker for this sync.
 - If a Dashboard card shows only a broad category such as Git sync, CI evidence, product evidence, or safety confirmation, revise the producer first so users can judge the current operational state.
 - If repository selection commands become clickable browser actions, restore the read-only boundary and keep switching behind guarded CLI mutation unless a separate approved security design changes that boundary.
@@ -3057,3 +3057,26 @@ Restart context:
 Next safe action:
 
 - Continue from `repository-development-workflow` fast-loop implementation, then run focused checks and read-only Browser Debug CLI or TraceCue review before promoting this sync ID to implemented.
+
+## Implemented Dashboard Control Center Workflow Activity History Handoff
+
+SYNC-ID: dashboard_control_center_workflow_activity_history
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/DASHBOARD_DATA_SCHEMA.tsv,docs/design-system/dashboard-control-center/DESIGN_SYSTEM.md,docs/design-system/dashboard-control-center/tokens.json,docs/design-system/dashboard-control-center/components.json,dashboard-control-center/src/design-system.generated.css,dashboard-control-center/src/design-system.generated.js,tools/dashboard-data,tools/lib/dashboard_data.sh,vite.config.mjs,dashboard-control-center/src/App.jsx,dashboard-control-center/src/dashboardData.js,dashboard-control-center/src/i18n.js,dashboard-control-center/src/i18nCatalog.js,dashboard-control-center/src/styles.css,tests/fixtures/dashboard-control-center.json,tests/fixtures/dashboard-control-center-live-update.json,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/check_dashboard_bundle_contract.sh,tools/check_dashboard_design_system.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+Restart context:
+
+- The completed work remains on `codex/dashboard-workflow-history-completion`; `origin/main` remains at `ca8e22b` until the approval-bound Git phases begin.
+- The Development Workflow page now shows bounded material update history followed by a six-part current-position summary for handoff, task tracker, failures/blockers, Git, tests, and CI.
+- Producer and browser contracts preserve stale, unknown, not-run, manual-required, explicit blocker counts, occurrence times, repository heads, structured purpose codes, safe commands, and safe artifact references.
+- `i18nCatalog.js` is maintained source and is emitted as a separate Vite chunk; the bundle ceiling was not raised.
+- Missing purpose codes, unsafe or unbounded event values, executable mutation boundaries, duplicate ready rows, and stale-as-ready presentation have refusal coverage.
+- FrameCue resolves at `$HOME/projects/agent-toolbox/frame-cue`; TraceCue remains the selected free-development repository. Registry and selection fixture tests pass.
+- Read-only live external verification now reports FrameCue and TraceCue as scaffold `passed`, authority `ready`, blocker count `0`, evidence `passed`, Git `clean`, and Dashboard readiness `ready`. FrameCue is synchronized at `8463436f94cfd9e7fd55a734b35d741a61c5df34` with GitHub CI run `29169227010`; TraceCue is synchronized at `4c27dc34364ded67977fe7322e91294900e7285d` with GitHub CI run `29168001581`. The parent repository did not modify either product repository.
+- Focused results: Dashboard Playwright 32/32 passed; schema, data, i18n, Design System, bundle, product Git-usage, menu-prerequisite, repository-selection, and repository-development workflow checks passed.
+- Release proof: aggregate `test_lesson_repository.sh` passed, and the full/no-cache Git hook run passed all 58 checks with same-run final-gate evidence.
+
+Next safe action:
+
+- Commit and push the verified parent-repository branch, inspect PR CI, perform the approved merge, then verify main CI and local/remote synchronization. Cleanup remains limited to the parent repository.

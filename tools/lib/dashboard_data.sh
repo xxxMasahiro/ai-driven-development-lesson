@@ -711,6 +711,43 @@ dashboard_json_workflow_evidence_event() {
   printf '}'
 }
 
+dashboard_json_material_update_event() {
+  local event_id="$1"
+  local event_type="$2"
+  local purpose_code="$3"
+  local occurred_at="$4"
+  local source_id="$5"
+  local status="$6"
+  local repository_head="$7"
+  local summary="$8"
+  local command="$9"
+  local detail_artifact_path="${10}"
+
+  dashboard_data_validate_state "$status"
+
+  printf '{"event_id":'
+  dashboard_json_string "$event_id"
+  printf ',"event_type":'
+  dashboard_json_string "$event_type"
+  printf ',"purpose_code":'
+  dashboard_json_string "$purpose_code"
+  printf ',"occurred_at":'
+  dashboard_json_string "$occurred_at"
+  printf ',"source_id":'
+  dashboard_json_string "$source_id"
+  printf ',"status":'
+  dashboard_json_string "$status"
+  printf ',"repository_head":'
+  dashboard_json_string "$repository_head"
+  printf ',"summary":'
+  dashboard_json_string "$summary"
+  printf ',"command":'
+  dashboard_json_string "$command"
+  printf ',"detail_artifact_path":'
+  dashboard_json_string "$detail_artifact_path"
+  printf '}'
+}
+
 dashboard_json_ci_evidence_role() {
   local role="$1"
   local status="$2"
