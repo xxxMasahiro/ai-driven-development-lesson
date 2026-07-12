@@ -1716,6 +1716,7 @@ function situationRepositoryState(data, context, activeLiveStatus) {
     pathState: displayText(targetRepository.path_state || repositoryScope.path_state || context.target_repository?.path_state, ""),
     gitState: displayText(targetRepository.git_state || repositoryScope.git_state, ""),
     operationCount: asArray(gitActivity.operations).length,
+    branchCount: situationNumber(gitActivity.branches?.total_count ?? repositoryChanges.branch_count),
     worktreeCount: situationNumber(gitActivity.worktrees?.count ?? repositoryChanges.worktree_count),
     unusedBranchCount: situationNumber(gitActivity.branches?.unused_count),
   };
@@ -1764,7 +1765,7 @@ function situationLiveTestActivity(activeLiveStatus) {
 }
 
 function situationOperationNeedsAttention(operation) {
-  return !["ready", "passed", "not_applicable"].includes(normalizeState(operation?.status));
+  return isHardBlockerStatus(operation?.status);
 }
 
 function situationPrimaryGitOperation(gitActivity) {
@@ -1908,7 +1909,15 @@ function productAuthorityEvidenceTestArtifactSummary(item, t) {
 }
 
 function isHardBlockerStatus(status) {
-  return ["blocked", "failed", "missing", "not_run", "approval_required"].includes(normalizeState(status));
+  return ["blocked", "failed", "missing", "approval_required"].includes(normalizeState(status));
+}
+
+function workflowSurfaceStatus(status, options = {}) {
+  const state = normalizeState(status);
+  if (options.requireEvidence && !options.hasEvidence) {
+    return "missing";
+  }
+  return state;
 }
 
 function contextPrimaryBlocker(context) {
@@ -1955,13 +1964,13 @@ function situationBlockingRows(data, context, activeLiveStatus) {
   ];
   for (const [key, check] of objectEntries(activeLiveStatus?.checks || {})) {
     const count = situationNumber(check?.blocker_count);
-    if (count > 0) {
+    if (count > 0 || isHardBlockerStatus(check?.status)) {
       rows.push({
         source: displayText(check?.source_id || check?.current_item_id || key, key),
         status: check?.status || "blocked",
         reason: check?.reason || check?.summary,
         required_command: check?.required_command,
-        blocker_count: count,
+        blocker_count: count > 0 ? count : 1,
       });
     }
   }
@@ -1985,59 +1994,45 @@ function situationStatusDetail(label, status, t) {
 }
 
 function situationRepositorySummary(data, context, activeLiveStatus, t) {
+  const locale = operationalProgressLocale(data);
   const gitActivity = situationLiveGitActivity(activeLiveStatus);
   const repo = situationRepositoryState(data, context, activeLiveStatus);
   const gitEvidence = productAuthorityEvidence(data, context, ["product.git.worktree", "product.git.local_remote_sync", "product.git.upstream"]);
-  const localChanges = Math.max(repo.stagedCount + repo.unstagedCount, repo.dirtyCount) + repo.untrackedCount;
   const observedClean = situationRepositoryObservedClean(repo);
   const liveGit = situationCheck(activeLiveStatus, "git_sync");
   const primaryOperation = situationPrimaryGitOperation(gitActivity);
   const operationStatus = primaryOperation ? normalizeState(primaryOperation.status) : "";
   const rawStatus = normalizeState(gitActivity.status || liveGit?.status || (observedClean ? "ready" : "") || gitEvidence?.status || context.git_status || "unknown");
-  const status = operationStatus === "manual_required" ? "cached" : operationStatus || rawStatus;
-  const cleanText = (() => {
-    if (localChanges > 0) {
-      return `${t("overview.situation.gitWorkingChanges")} ${localChanges}`;
-    }
-    if (repo.behind > 0) {
-      return `${t("overview.current.gitRemotePending")} ${repo.behind}`;
-    }
-    if (repo.ahead > 0) {
-      return `${t("overview.current.gitPushPending")} ${repo.ahead}`;
-    }
-    if (observedClean) {
-      return t("overview.current.gitClean");
-    }
-    if (gitEvidence) {
-      return productAuthorityEvidenceSummary(gitEvidence, t);
-    }
-    if (primaryOperation && situationOperationNeedsAttention(primaryOperation)) {
-      return `${situationGitOperationLabel(primaryOperation, t)}: ${statusLabelForChip(primaryOperation.status, t)}`;
-    }
-    return t("overview.current.gitClean");
-  })();
-  const changeParts = [
-    repo.stagedCount ? `${t("overview.situation.staged")}: ${repo.stagedCount}` : "",
-    repo.unstagedCount ? `${t("overview.situation.unstaged")}: ${repo.unstagedCount}` : "",
-    repo.dirtyCount ? `${t("overview.situation.modified")}: ${repo.dirtyCount}` : "",
-    repo.untrackedCount ? `${t("overview.situation.untracked")}: ${repo.untrackedCount}` : "",
+  const status = operationStatus || rawStatus;
+  const surfaceStatus = workflowSurfaceStatus(status, {
+    requireEvidence: true,
+    hasEvidence: Boolean(repo.branch || repo.head || gitEvidence || liveGit),
+  });
+  const changeItems = [
+    repo.stagedCount ? { label: t("overview.situation.staged"), value: workflowCountText(repo.stagedCount, locale) } : null,
+    repo.unstagedCount ? { label: t("overview.situation.unstaged"), value: workflowCountText(repo.unstagedCount, locale) } : null,
+    repo.dirtyCount ? { label: t("overview.situation.modified"), value: workflowCountText(repo.dirtyCount, locale) } : null,
+    repo.untrackedCount ? { label: t("overview.situation.untracked"), value: workflowCountText(repo.untrackedCount, locale) } : null,
   ].filter(Boolean);
   const syncParts = [
     repo.ahead ? `${t("overview.situation.ahead")}: ${repo.ahead}` : "",
     repo.behind ? `${t("overview.situation.behind")}: ${repo.behind}` : "",
   ].filter(Boolean);
   const repositoryParts = [
-    repo.worktreeCount ? `${t("overview.situation.worktrees")}: ${repo.worktreeCount}` : "",
     repo.unusedBranchCount ? `${t("overview.situation.unusedBranches")}: ${repo.unusedBranchCount}` : "",
     situationGitOperationDetail(primaryOperation, t),
   ].filter(Boolean);
   const evidenceDetail = productAuthorityEvidenceDetail(gitEvidence, t);
   const observedTime = gitActivity.observed_at || activeLiveStatus?.generated_at ? situationObservedAt(gitActivity.observed_at, activeLiveStatus?.generated_at) : "";
+  const workingBranchCount = repo.branchCount || (repo.branch ? 1 : 0);
+  const gitWorktreeCount = repo.worktreeCount || (repo.branch || repo.head ? 1 : 0);
   const detailItems = [
     repo.branch ? { label: `${t("overview.fact.branch")}: `, value: uniqueDisplayParts(repo.branch, repo.upstream ? `${t("overview.situation.upstream")}: ${repo.upstream}` : "").join(" / ") } : null,
-    changeParts.length ? { label: t("overview.situation.changeBreakdown"), value: changeParts.join(" / ") } : null,
+    ...changeItems,
     syncParts.length ? { label: t("overview.situation.syncState"), value: syncParts.join(" / ") } : null,
     repo.head ? { label: t("overview.situation.head"), value: shortRevision(repo.head) } : null,
+    { label: t("workflow.currentPosition.workingBranches"), value: workflowCountText(workingBranchCount, locale) },
+    { label: t("workflow.currentPosition.gitWorktrees"), value: workflowCountText(gitWorktreeCount, locale) },
     observedTime ? { label: t("overview.situation.liveUpdated"), value: observedTime } : null,
     repositoryParts.length ? { label: t("overview.situation.repositoryFacts"), value: repositoryParts.join(" / ") } : null,
     evidenceDetail ? { label: t("overview.situation.savedEvidence"), value: evidenceDetail, technical: true } : null,
@@ -2046,38 +2041,47 @@ function situationRepositorySummary(data, context, activeLiveStatus, t) {
     id: "git",
     Icon: GitBranch,
     title: t("overview.situation.gitTitle"),
-    status,
-    value: cleanText,
+    status: surfaceStatus,
+    value: t("workflow.currentPosition.gitMeaning"),
     detail: detailItems.length ? "" : t("overview.fact.noEvidence"),
     detailItems,
     source: displayText(liveGit?.source_id || liveGit?.current_item_id || gitEvidence?.source_id || repo.gitState || repo.pathState, ""),
     command: situationFirstCommand(liveGit?.required_command, liveGit?.items?.[0]?.next_command, gitEvidence?.next_command),
-    chipLabel: primaryOperation && situationOperationNeedsAttention(primaryOperation) ? situationGitOperationLabel(primaryOperation, t) : statusLabelForChip(status, t),
+    chipLabel: primaryOperation && situationOperationNeedsAttention(primaryOperation) ? situationGitOperationLabel(primaryOperation, t) : statusLabelForChip(surfaceStatus, t),
   };
 }
 
+function workflowCountText(count, locale) {
+  const value = situationNumber(count);
+  try {
+    return new Intl.NumberFormat(locale || "en").format(value);
+  } catch {
+    return String(value);
+  }
+}
+
 function situationTestsSummary(data, context, activeLiveStatus, t) {
+  const locale = operationalProgressLocale(data);
   const testActivity = situationLiveTestActivity(activeLiveStatus);
   const localTests = situationCheck(activeLiveStatus, "local_tests");
+  const historyRows = workflowCategoryHistoryRows(data, "tests", t, locale, 5);
   const testEvidence = productAuthorityEvidence(data, context, ["product.gates.tests", "product.gates.product_gate", "product.gates.structure"]);
   const runningTests = runtimeOperationsForCategories(activeLiveStatus, ["test", "check", "build"]);
   const runningCount = situationNumber(testActivity.running_count) + runningTests.length;
   const latestCompleted = situationLatestTestRow(testActivity);
-  const activityStatus = normalizeState(testActivity.status || "");
+  const activityStatus = displayText(testActivity.status, "") ? normalizeState(testActivity.status) : "";
   const observed = situationObservedAt(testActivity.observed_at || localTests?.observed_at, activeLiveStatus?.generated_at);
   const itemCount = Math.max(asArray(localTests?.items).length, situationNumber(testActivity.completed_count));
   const hasTestEvidence = Boolean(runningCount || latestCompleted || observed || itemCount || overviewLiveLocalizedText(localTests?.summary, t) || testEvidence);
-  const rawLocalStatus = normalizeState(activityStatus || localTests?.status || testEvidence?.status || overviewLocalTestStatus(data.development?.product_authority || {}, context));
+  const activityStatusForSummary = activityStatus === "not_run" && (localTests || testEvidence) ? "" : activityStatus;
+  const rawLocalStatus = normalizeState(activityStatusForSummary || localTests?.status || testEvidence?.status || overviewLocalTestStatus(data.development?.product_authority || {}, context));
   const localStatus = hasTestEvidence ? rawLocalStatus : "unknown";
+  const surfaceStatus = runningCount ? "cached" : workflowSurfaceStatus(localStatus, {
+    requireEvidence: true,
+    hasEvidence: hasTestEvidence || Boolean(historyRows.length),
+  });
   const source = displayText(localTests?.source_id || localTests?.current_item_id || "", "");
-  const runningSummary = operationalPageOperationSummary(runningTests, t);
-  const latestSummary = latestCompleted
-    ? `${situationTestRowCategoryLabel(latestCompleted.category, t)}: ${statusLabelForChip(latestCompleted.status, t)}`
-    : "";
   const recordedTestSummary = productAuthorityEvidenceTestArtifactSummary(testEvidence, t);
-  const value = runningCount
-    ? `${t("overview.situation.runningNow")}: ${runningCount}`
-    : latestSummary || recordedTestSummary || overviewLiveLocalizedText(localTests?.summary, t) || productAuthorityEvidenceSummary(testEvidence, t) || t("overview.situation.testNoRecords");
   const detailParts = uniqueDisplayParts(
     runningCount ? `${t("overview.situation.runningCount")}: ${runningCount}` : "",
     latestCompleted?.command ? `${t("overview.situation.latestTest")}: ${latestCompleted.command}` : "",
@@ -2092,10 +2096,10 @@ function situationTestsSummary(data, context, activeLiveStatus, t) {
     id: "tests",
     Icon: CheckCircle2,
     title: t("overview.situation.testsTitle"),
-    status: runningCount ? "cached" : localStatus,
-    value: runningSummary || value,
-    detail: detailParts.join(" / ") || t("overview.situation.testNoRecords"),
-    detailItems: [
+    status: surfaceStatus,
+    value: workflowCategoryMeaningText("tests", t),
+    detail: historyRows[0]?.value || detailParts.join(" / ") || t("overview.situation.testNoRecords"),
+    detailItems: historyRows.length ? historyRows.map((row) => ({ label: row.label, value: row.value })) : [
       recordedTestSummary ? { label: t("overview.situation.testContent"), value: recordedTestSummary.replace(`${t("overview.situation.recordedTests")}: `, "") } : null,
       latestCompleted?.command ? { label: t("overview.situation.latestTest"), value: latestCompleted.command } : null,
       observed ? { label: t("overview.fact.lastChecked"), value: observed } : null,
@@ -2104,43 +2108,166 @@ function situationTestsSummary(data, context, activeLiveStatus, t) {
       localTests?.detail_code ? { label: t("overview.situation.detailCode"), value: displayKey(localTests.detail_code), technical: true } : null,
       testEvidence ? { label: t("overview.situation.savedEvidence"), value: productAuthorityEvidenceDetail(testEvidence, t), technical: true } : null,
     ].filter(Boolean),
-    source: source || displayText(testEvidence?.source_id, ""),
-    command: situationFirstCommand(localTests?.required_command, localTests?.items?.[0]?.next_command, testEvidence?.next_command),
-    chipLabel: runningCount ? t("overview.situation.runningNow") : statusLabelForChip(localStatus, t),
+    source: uniqueDisplayParts(...historyRows.map((row) => row.source), source || displayText(testEvidence?.source_id, "")).join(" / "),
+    command: situationFirstCommand(...historyRows.map((row) => row.command), localTests?.required_command, localTests?.items?.[0]?.next_command, testEvidence?.next_command),
+    chipLabel: runningCount ? t("overview.situation.runningNow") : statusLabelForChip(surfaceStatus, t),
   };
 }
 
 function situationCiSummary(data, context, activeLiveStatus, t) {
+  const locale = operationalProgressLocale(data);
   const ci = situationCheck(activeLiveStatus, "ci");
+  const historyRows = workflowCategoryHistoryRows(data, "ci", t, locale, 5);
   const ciEvidence = productAuthorityEvidence(data, context, ["product.ci.github_actions", "product.ci.main", "product.ci.pr"]);
   const observed = situationObservedAt(ci?.observed_at, activeLiveStatus?.generated_at);
   const workflowName = displayText(ci?.workflow_name, "");
   const runStatus = displayText(ci?.run_status || ci?.conclusion, "");
   const hasCiEvidence = Boolean((ci && (overviewLiveLocalizedText(ci.summary, t) || observed || workflowName || runStatus || asArray(ci.items).length)) || ciEvidence);
   const ciStatus = hasCiEvidence ? normalizeState(ci?.status || ciEvidence?.status || context.ci_status || data.development?.ci_status || "unknown") : "unknown";
+  const surfaceStatus = workflowSurfaceStatus(ciStatus, {
+    requireEvidence: true,
+    hasEvidence: hasCiEvidence || Boolean(historyRows.length),
+  });
   return {
     id: "ci",
     Icon: GitPullRequest,
     title: t("overview.situation.ciTitle"),
-    status: ciStatus,
-    value: overviewLiveLocalizedText(ci?.summary, t) || productAuthorityEvidenceSummary(ciEvidence, t) || statusLabelForChip(ciStatus, t),
-    detail: uniqueDisplayParts(
+    status: surfaceStatus,
+    value: workflowCategoryMeaningText("ci", t),
+    detail: historyRows[0]?.value || uniqueDisplayParts(
       workflowName ? `${t("overview.situation.workflowName")}: ${workflowName}` : "",
       runStatus ? `${t("overview.situation.runStatus")}: ${runStatus}` : "",
       observed ? `${t("overview.fact.lastChecked")}: ${observed}` : "",
       ci?.head_match_status ? `${t("overview.situation.headMatch")}: ${ci.head_match_status}` : "",
       productAuthorityEvidenceDetail(ciEvidence, t),
     ).join(" / ") || t("overview.fact.noEvidence"),
-    detailItems: [
+    detailItems: historyRows.length ? historyRows.map((row) => ({ label: row.label, value: row.value })) : [
       workflowName ? { label: t("overview.situation.workflowName"), value: workflowName } : null,
       runStatus ? { label: t("overview.situation.runStatus"), value: runStatus } : null,
       observed ? { label: t("overview.fact.lastChecked"), value: observed } : null,
       ci?.head_match_status ? { label: t("overview.situation.headMatch"), value: ci.head_match_status } : null,
       ciEvidence ? { label: t("overview.situation.savedEvidence"), value: productAuthorityEvidenceDetail(ciEvidence, t), technical: true } : null,
     ].filter(Boolean),
-    source: displayText(ci?.source_id || ci?.current_item_id || ciEvidence?.source_id || "", ""),
-    command: situationFirstCommand(ci?.required_command, ci?.items?.[0]?.next_command, ciEvidence?.next_command),
+    source: uniqueDisplayParts(...historyRows.map((row) => row.source), displayText(ci?.source_id || ci?.current_item_id || ciEvidence?.source_id || "", "")).join(" / "),
+    command: situationFirstCommand(...historyRows.map((row) => row.command), ci?.required_command, ci?.items?.[0]?.next_command, ciEvidence?.next_command),
   };
+}
+
+function workflowCategoryMeaningText(kind, t) {
+  if (kind === "tests") {
+    return t("workflow.currentPosition.testsMeaning");
+  }
+  if (kind === "ci") {
+    return t("workflow.currentPosition.ciMeaning");
+  }
+  return "";
+}
+
+function workflowEventPurposeLabel(event, t) {
+  const purposeCode = displayText(event?.purpose_code, "material_update");
+  const purposeKey = `workflow.currentPosition.purpose.${purposeCode.replaceAll("_", ".")}`;
+  const eventType = displayText(event?.event_type, "material_update");
+  const eventKeyByType = {
+    git_commit: "gitCommit",
+    git_merge: "gitMerge",
+    local_test: "localTest",
+    structure_check: "structureCheck",
+    security_check: "securityCheck",
+    git_check: "gitCheck",
+    ci_run: "ciRun",
+    document_sync: "documentSync",
+    product_gate: "productGate",
+    material_update: "materialUpdate",
+  };
+  const eventKey = eventKeyByType[eventType] || "materialUpdate";
+  return t(purposeKey, t(`workflow.currentPosition.event.${eventKey}`, sourcePresentationKey(event?.source_id, t) || t("workflow.currentPosition.event.materialUpdate")));
+}
+
+function workflowCategoryEventKind(event) {
+  const source = displayText(event?.source_id || event?.source, "");
+  const type = displayText(event?.event_type, "");
+  if (type === "ci_run" || source.startsWith("product.ci.")) {
+    return "ci";
+  }
+  if (
+    type === "local_test" ||
+    type === "structure_check" ||
+    type === "product_gate" ||
+    source.startsWith("product.gates.") ||
+    source.startsWith("product.design_system.")
+  ) {
+    return "tests";
+  }
+  return "";
+}
+
+function workflowHistoryGroupDate(value) {
+  const formatted = formatDashboardDateTime(value);
+  const match = displayText(formatted, "").match(/^\d{4}-\d{2}-\d{2}/);
+  return match ? match[0] : displayText(value, "");
+}
+
+function workflowCategoryHistoryRows(data, kind, t, locale, limit = 5) {
+  const rawEvents = asArray(data.development?.material_update_events)
+    .map((event) => ({
+      ...event,
+      key: workflowFailureSourceKey(event),
+      observed_at: workflowEventTimeValue(event),
+      status: normalizeState(event?.status || "unknown"),
+      kind: workflowCategoryEventKind(event),
+      command: displayText(event?.command || event?.summary, ""),
+    }))
+    .filter((event) => event.kind === kind && event.observed_at && event.key)
+    .sort((left, right) => workflowEventSortTime(right) - workflowEventSortTime(left));
+  const newerResolvedKeys = new Set();
+  const rows = [];
+  for (const event of rawEvents) {
+    const status = event.status;
+    const resolved = isHardBlockerStatus(status) && newerResolvedKeys.has(event.key);
+    const resultText = resolved
+      ? `${statusLabelForChip(status, t)} → ${workflowFailureBlockText("resolved", t, locale)}`
+      : ["passed", "failed", "blocked", "approval_required"].includes(status)
+        ? statusLabelForChip(status, t)
+        : "";
+    const purpose = workflowEventPurposeLabel(event, t);
+    const commandText = displayText(event.command, "") && event.command !== "not_applicable" ? event.command : displayText(event.summary, "");
+    rows.push({
+      key: `${event.key}|${event.observed_at}|${event.status}|${event.command}`,
+      label: formatDashboardDateTime(event.observed_at) || sourcePresentationKey(event.key, t),
+      value: uniqueDisplayParts(resultText ? `${resultText} ${purpose}` : purpose, commandText && commandText !== purpose ? commandText : "").join(" / "),
+      resultText,
+      purpose,
+      groupKey: `${workflowHistoryGroupDate(event.observed_at)}|${purpose}|${commandText || "not_applicable"}`,
+      source: event.key,
+      command: commandText,
+      observed_at: event.observed_at,
+      status,
+    });
+    if (["ready", "passed"].includes(status)) {
+      newerResolvedKeys.add(event.key);
+    }
+  }
+  const grouped = [];
+  const groupedByKey = new Map();
+  for (const row of rows) {
+    const groupKey = row.groupKey;
+    const existing = groupedByKey.get(groupKey);
+    if (existing) {
+      existing.count += 1;
+      if (!existing.resultText && row.resultText) {
+        existing.resultText = row.resultText;
+        existing.value = row.value;
+      }
+      continue;
+    }
+    const groupedRow = { ...row, groupKey, count: 1 };
+    groupedByKey.set(groupKey, groupedRow);
+    grouped.push(groupedRow);
+  }
+  return grouped.slice(0, limit).map((row) => ({
+    ...row,
+    value: row.count > 1 ? `${row.value} (${workflowFailureBlockText("occurrences", t, locale, row.count)})` : row.value,
+  }));
 }
 
 function situationBlockerSummary(data, context, activeLiveStatus, t) {
@@ -2183,7 +2310,7 @@ function situationCurrentWorkSummary(data, context, activeLiveStatus, t) {
   const contextValue = contextCurrentWorkValue(context, displayPolicy, t);
   const contextNextSafeAction = contextNextSafeActionText(context, t);
   const rawStatus = normalizeState(contextBlocker?.status || contextAction.status || decision.status || context.evidence_status || "unknown");
-  const status = rawStatus === "manual_required" && !contextBlocker ? "ready" : rawStatus;
+  const status = contextBlocker ? workflowSurfaceStatus(rawStatus) : "ready";
   const operationalDetail = uniqueDisplayParts(
     menu,
     agentWork?.detail,
@@ -2196,7 +2323,7 @@ function situationCurrentWorkSummary(data, context, activeLiveStatus, t) {
     id: "current-work",
     Icon: Compass,
     title: t("overview.situation.currentWorkTitle"),
-    status: agentWork ? "cached" : status,
+    status,
     value: agentWork?.value || contextValue || audienceBrief || reason || menu,
     detail: operationalDetail.join(" / ") || [menu, workflow, step].filter(Boolean).join(" / "),
     detailItems: [
@@ -2217,7 +2344,8 @@ function situationNextSafeSummary(data, context, activeLiveStatus, facts, t) {
   const blockerCommand = facts.map((fact) => fact.command).find(Boolean);
   const liveCommands = objectEntries(activeLiveStatus?.checks || {}).map(([, check]) => check?.required_command);
   const command = situationFirstCommand(blockerCommand, ...liveCommands, asArray(data.actions?.command_previews)[0]?.command_text);
-  const status = normalizeState(nextAction.status || data.summary?.primary_action?.status || "manual_required");
+  const rawStatus = normalizeState(nextAction.status || data.summary?.primary_action?.status || "ready");
+  const status = workflowSurfaceStatus(rawStatus);
   const detail = overviewLiveLocalizedText(nextAction.expected_result || nextAction.description, t);
   return {
     id: "next-safe",
@@ -2230,7 +2358,6 @@ function situationNextSafeSummary(data, context, activeLiveStatus, facts, t) {
       detail ? { label: t("overview.situation.expectedResult"), value: detail } : null,
       nextAction.target ? { label: t("overview.fact.target"), value: displayText(nextAction.target) } : null,
       nextAction.risk_level ? { label: t("field.risk"), value: t(`risk.${normalizeRisk(nextAction.risk_level)}`, normalizeRisk(nextAction.risk_level)) } : null,
-      command ? { label: t("overview.situation.command"), value: command, technical: true } : null,
     ].filter(Boolean),
     source: displayText(nextAction.source || nextAction.target || "", ""),
     command,
@@ -2284,7 +2411,7 @@ function operationalPageLabel(pageId, t) {
 
 function operationalPageIssueRows(rows) {
   return rows
-    .filter((row) => !["ready", "passed", "not_applicable"].includes(normalizeState(row.status)))
+    .filter((row) => isHardBlockerStatus(row.status))
     .sort((left, right) => (statePriority[normalizeState(left.status)] ?? 99) - (statePriority[normalizeState(right.status)] ?? 99));
 }
 
@@ -2509,6 +2636,480 @@ function operationalProgressFacts(data, context, activeLiveStatus, t) {
   ];
 }
 
+function workflowBriefText(card, field, t, locale) {
+  if (!card) {
+    return "";
+  }
+  const agentSummary = documentBriefAgentSummary(card, t, locale);
+  if (field === "summary") {
+    return agentSummary?.summary || documentBriefSummary(card, t, locale) || documentBriefTitle(card, t, locale);
+  }
+  if (field === "detail") {
+    return agentSummary?.detail || documentBriefAction(card, t, locale) || documentBriefSummary(card, t, locale);
+  }
+  return "";
+}
+
+function workflowCurrentPositionDocumentCards(data, context) {
+  return {
+    requirements: operationalProgressBriefCard(data, ["requirements", "requirement"], context),
+    specification: operationalProgressBriefCard(data, ["specification", "spec"], context),
+    implementationPlan: operationalProgressBriefCard(data, ["implementationPlan", "implementation-plan", "implementation_plan"], context),
+    taskTracker: operationalProgressBriefCard(data, ["taskTracker", "task-tracker", "task_tracker"], context),
+    handoff: operationalProgressBriefCard(data, ["handoff", "handOff", "hand-off"], context),
+  };
+}
+
+function workflowDetailLeadingLabel(value) {
+  const text = displayText(value, "");
+  const match = text.match(/^(.{2,40}?)[：:]\s*(.+)$/);
+  if (!match) {
+    return { label: "", value: text };
+  }
+  return {
+    label: displayText(match[1], ""),
+    value: displayText(match[2], ""),
+  };
+}
+
+function workflowDocumentDetailItem(card, value, t, options = {}) {
+  const text = displayText(value, "");
+  if (!card || !text) {
+    return null;
+  }
+  const leading = options.labelFromValue ? workflowDetailLeadingLabel(text) : { label: "", value: text };
+  return {
+    label: leading.label || documentBriefSourceLabel(card, t),
+    value: leading.value || text,
+  };
+}
+
+function workflowDocumentDetailItems(cards, specs, t, locale) {
+  const seen = new Set();
+  return specs
+    .map(([id, field, options]) => {
+      const card = cards[id];
+      const value = workflowBriefText(card, field, t, locale);
+      const item = workflowDocumentDetailItem(card, value, t, options || {});
+      if (!item) {
+        return null;
+      }
+      const key = `${item.label}|${item.value}`;
+      if (seen.has(key)) {
+        return null;
+      }
+      seen.add(key);
+      return item;
+    })
+    .filter(Boolean);
+}
+
+function workflowDocumentSources(...cards) {
+  const seen = new Set();
+  return cards
+    .flatMap((card) => asArray(card?.source_paths))
+    .map((source) => displayText(source, ""))
+    .filter((source) => {
+      if (!source || seen.has(source)) {
+        return false;
+      }
+      seen.add(source);
+      return true;
+    })
+    .join(" / ");
+}
+
+function workflowLooksClosed(...values) {
+  const text = values.map((value) => displayText(value, "")).join(" ");
+  return /no\s+autonomous|no\s+remaining|zero\s+remaining|残り.*(?:ありません|なし)|残実装.*(?:ありません|なし)/i.test(text);
+}
+
+function workflowStatusFromDocumentCard(card, fallback = "unknown") {
+  const status = normalizeState(card?.agent_summary?.status || card?.status || card?.freshness_state || fallback);
+  return workflowSurfaceStatus(status, {
+    requireEvidence: !card,
+    hasEvidence: Boolean(card),
+  });
+}
+
+function workflowHistoryCardStatus(rows) {
+  return situationWorstStatus(asArray(rows).map((row) => row?.status), "ready");
+}
+
+function workflowEventTimeValue(event) {
+  return displayText(event?.occurred_at || event?.observed_at || event?.time || event?.last_seen_at || event?.started_at, "");
+}
+
+function workflowEventSortTime(event) {
+  const date = new Date(workflowEventTimeValue(event));
+  return Number.isNaN(date.getTime()) ? 0 : date.getTime();
+}
+
+function workflowTimelineStatusText(status, t) {
+  const normalized = normalizeState(status);
+  return statusLabelForChip(normalized, t);
+}
+
+function workflowMaterialEventLabel(event, t) {
+  const label = workflowEventPurposeLabel(event, t);
+  return uniqueDisplayParts(label, displayText(event?.summary, "")).join(" / ");
+}
+
+function workflowTimelineEventValue(event, t) {
+  const status = workflowTimelineStatusText(event?.status, t);
+  const head = displayText(event?.repository_head, "");
+  const source = displayText(event?.source_id || event?.source, "");
+  return uniqueDisplayParts(
+    event.value,
+    status,
+    head ? `${t("maintenance.sync.head")}: ${shortRevision(head)}` : "",
+    source ? sourcePresentationKey(source, t) : "",
+  ).join(" / ");
+}
+
+function workflowTimelineEvents(data, t, limit = 5) {
+  const materialEvents = asArray(data.development?.material_update_events)
+    .map((event) => ({
+      id: displayText(event?.event_id, ""),
+      observed_at: workflowEventTimeValue(event),
+      status: event?.status,
+      source_id: event?.source_id,
+      repository_head: event?.repository_head,
+      command: event?.command,
+      value: workflowMaterialEventLabel(event, t),
+    }))
+    .filter((event) => displayText(event.value, ""));
+  const seen = new Set();
+  return materialEvents
+    .filter((event) => {
+      const key = [displayText(event.observed_at, ""), displayText(event.value, ""), normalizeState(event.status)].join("|");
+      if (seen.has(key)) {
+        return false;
+      }
+      seen.add(key);
+      return true;
+    })
+    .sort((left, right) => workflowEventSortTime(right) - workflowEventSortTime(left))
+    .slice(0, limit)
+    .map((event) => ({
+      ...event,
+      value: workflowTimelineEventValue(event, t),
+    }));
+}
+
+function workflowHistoryDetailItems(items, t, limit = 5) {
+  return asArray(items).slice(0, limit).map((item) => ({
+    label: formatDashboardDateTime(item.observed_at) || t("workflow.currentPosition.timeUnknown"),
+    value: item.value,
+  }));
+}
+
+function workflowCurrentPositionRoleDescription(kind, t) {
+  if (kind === "handoff") {
+    return t("workflow.currentPosition.handoffMeaning");
+  }
+  if (kind === "taskTracker") {
+    return t("workflow.currentPosition.taskTrackerMeaning");
+  }
+  return "";
+}
+
+function workflowFailureBlockText(kind, t, locale, count = 0) {
+  const keyByKind = {
+    count: "workflow.currentPosition.failure.count",
+    countLabel: "workflow.currentPosition.failure.countLabel",
+    countValue: "workflow.currentPosition.failure.countValue",
+    none: "workflow.currentPosition.failure.none",
+    noneDetail: "workflow.currentPosition.failure.noneDetail",
+    meaning: "workflow.currentPosition.failure.meaning",
+    item: "workflow.currentPosition.failure.item",
+    resolved: "workflow.currentPosition.failure.resolved",
+    unresolved: "workflow.currentPosition.failure.unresolved",
+    historyNone: "workflow.currentPosition.failure.historyNone",
+    occurrences: "workflow.currentPosition.failure.occurrences",
+  };
+  const key = keyByKind[kind];
+  if (!key) {
+    return "";
+  }
+  return t(key).replace("{count}", workflowCountText(count, locale));
+}
+
+function workflowFailureSourceKey(value) {
+  const source = displayText(value?.source_id || value?.source || value?.id || value?.label || "", "");
+  if (source) {
+    return source;
+  }
+  return displayText(value?.event_type || value?.title || "", "");
+}
+
+function workflowFailureBlockRows({ blockers, facts, partialFailures, t }) {
+  const rows = [
+    ...asArray(blockers).map((row) => {
+      const source = displayText(row?.source || row?.source_id || row?.id, "");
+      const value = overviewLiveLocalizedText(row?.reason || row?.summary || row?.detail, t) || statusLabelForChip(row?.status, t);
+      return {
+        label: source ? sourcePresentationKey(source, t) : t("workflow.currentPosition.activeBlockers"),
+        value,
+        status: row?.status || "blocked",
+        blockerCount: Math.max(1, situationNumber(row?.blocker_count || 1)),
+        source,
+        command: situationFirstCommand(row?.required_command, row?.next_command),
+      };
+    }),
+    ...asArray(partialFailures)
+      .filter((row) => isHardBlockerStatus(row?.status))
+      .map((row) => {
+        const source = displayText(row?.source || row?.source_id || row?.id, "");
+        return {
+          label: source ? sourcePresentationKey(source, t) : t("workflow.currentPosition.activeBlockers"),
+          value: overviewLiveLocalizedText(row?.reason || row?.summary || row?.detail, t) || statusLabelForChip(row?.status, t),
+          status: row?.status || "blocked",
+          source,
+          command: situationFirstCommand(row?.required_command, row?.next_command),
+        };
+      }),
+    ...asArray(facts)
+      .filter((fact) => isHardBlockerStatus(fact?.status))
+      .map((fact) => ({
+        label: fact.title,
+        value: uniqueDisplayParts(statusLabelForChip(fact.status, t), fact.value, fact.detail).join(" / "),
+        status: fact.status,
+        source: displayText(fact.source, ""),
+        command: displayText(fact.command, ""),
+      })),
+  ];
+  const seen = new Set();
+  return rows.filter((row) => {
+    const source = displayText(row.source, "");
+    const key = source
+      ? `${source}|${normalizeState(row.status)}`
+      : `${displayText(row.label, "")}|${displayText(row.value, "")}|${normalizeState(row.status)}`;
+    if (!displayText(row.value, "") || seen.has(key)) {
+      return false;
+    }
+    seen.add(key);
+    return true;
+  });
+}
+
+function workflowFailureHistoryRows(data, unresolvedRows, t, locale, limit = 5) {
+  const activeKeys = new Set(asArray(unresolvedRows).map(workflowFailureSourceKey).filter(Boolean));
+  const rawEvents = asArray(data.development?.material_update_events)
+    .map((event) => ({
+      ...event,
+      key: workflowFailureSourceKey(event),
+      observed_at: workflowEventTimeValue(event),
+      status: normalizeState(event?.status || "unknown"),
+      label: workflowMaterialEventLabel(event, t),
+    }))
+    .filter((event) => event.observed_at && event.key)
+    .sort((left, right) => workflowEventSortTime(right) - workflowEventSortTime(left));
+  const newerResolvedKeys = new Set();
+  const hardHistory = [];
+  for (const event of rawEvents) {
+    if (["ready", "passed", "not_applicable"].includes(event.status)) {
+      newerResolvedKeys.add(event.key);
+      continue;
+    }
+    if (!isHardBlockerStatus(event.status)) {
+      continue;
+    }
+    const resolved = newerResolvedKeys.has(event.key) && !activeKeys.has(event.key);
+    hardHistory.push({
+      key: `${event.key}|${event.observed_at}|${event.status}`,
+      label: formatDashboardDateTime(event.observed_at) || sourcePresentationKey(event.key, t),
+      value: uniqueDisplayParts(
+        `${sourcePresentationKey(event.key, t)}: ${event.label}`,
+        `${statusLabelForChip(event.status, t)} → ${workflowFailureBlockText(resolved ? "resolved" : "unresolved", t, locale)}`,
+      ).join(" / "),
+      source: event.key,
+    });
+  }
+  for (const row of asArray(unresolvedRows)) {
+    const key = workflowFailureSourceKey(row);
+    if (hardHistory.some((item) => item.source === key && item.value.includes(workflowFailureBlockText("unresolved", t, locale)))) {
+      continue;
+    }
+    hardHistory.unshift({
+      key: `current|${key}|${normalizeState(row.status)}`,
+      label: sourcePresentationKey(key, t) || displayText(row.label, "") || workflowFailureBlockText("item", t, locale),
+      value: uniqueDisplayParts(
+        displayText(row.value, ""),
+        `${statusLabelForChip(row.status, t)} → ${workflowFailureBlockText("unresolved", t, locale)}`,
+      ).join(" / "),
+      source: key,
+    });
+  }
+  const seen = new Set();
+  return hardHistory.filter((row) => {
+    if (seen.has(row.key)) {
+      return false;
+    }
+    seen.add(row.key);
+    return true;
+  }).slice(0, limit);
+}
+
+function workflowCurrentPositionFacts(data, context, activeLiveStatus, t) {
+  const locale = operationalProgressLocale(data);
+  const documentCards = workflowCurrentPositionDocumentCards(data, context);
+  const { requirements: requirementsCard, specification: specificationCard, implementationPlan: implementationPlanCard, taskTracker: taskTrackerCard, handoff: handoffCard } = documentCards;
+  const latestTask = workflowBriefText(taskTrackerCard, "summary", t, locale);
+  const taskDetail = workflowBriefText(taskTrackerCard, "detail", t, locale);
+  const resumeTarget = workflowBriefText(handoffCard, "summary", t, locale);
+  const resumeDetail = workflowBriefText(handoffCard, "detail", t, locale);
+  const documentSource = workflowDocumentSources(handoffCard, taskTrackerCard, requirementsCard, specificationCard, implementationPlanCard);
+  const handoffSource = workflowDocumentSources(handoffCard);
+  const currentTargetDetailItems = workflowDocumentDetailItems(documentCards, [
+    ["handoff", "summary", { labelFromValue: true }],
+    ["handoff", "detail", { labelFromValue: true }],
+  ], t, locale);
+  const latestCompletedDetailItems = workflowDocumentDetailItems(documentCards, [
+    ["taskTracker", "summary", { labelFromValue: true }],
+    ["taskTracker", "detail", { labelFromValue: true }],
+    ["handoff", "summary"],
+    ["implementationPlan", "detail"],
+  ], t, locale);
+  const closed = workflowLooksClosed(resumeTarget, resumeDetail, latestTask, taskDetail);
+  const blockers = situationBlockingRows(data, context, activeLiveStatus);
+  const repository = situationRepositorySummary(data, context, activeLiveStatus, t);
+  const tests = situationTestsSummary(data, context, activeLiveStatus, t);
+  const ci = situationCiSummary(data, context, activeLiveStatus, t);
+  const failureBlockRows = workflowFailureBlockRows({ blockers, facts: [repository, tests, ci], partialFailures: data.partial_failures, t });
+  const failureBlockCount = failureBlockRows.reduce((total, row) => total + Math.max(1, situationNumber(row?.blockerCount || 1)), 0);
+  const failureBlockHistoryRows = workflowFailureHistoryRows(data, failureBlockRows, t, locale, 5);
+  const failureBlockStatus = failureBlockRows.length ? situationWorstStatus(failureBlockRows.map((row) => row.status), "blocked") : "ready";
+  const failureBlockHistoryItems = failureBlockHistoryRows.length
+    ? failureBlockHistoryRows.map((row) => ({ label: row.label || workflowFailureBlockText("item", t, locale), value: row.value }))
+    : [{ value: workflowFailureBlockText("historyNone", t, locale), fullWidth: true }];
+  const failureBlockDetailItems = [
+    {
+      label: workflowFailureBlockText("countLabel", t, locale),
+      value: workflowFailureBlockText("countValue", t, locale, failureBlockCount),
+      layout: "standard",
+    },
+    ...failureBlockHistoryItems,
+  ];
+  const currentTargetValue = workflowCurrentPositionRoleDescription("handoff", t);
+  const latestCompletedValue = workflowCurrentPositionRoleDescription("taskTracker", t);
+  return [
+    {
+      id: "current-target",
+      Icon: Target,
+      title: t("workflow.currentPosition.currentTarget"),
+      status: workflowStatusFromDocumentCard(handoffCard, closed ? "ready" : context.evidence_status),
+      value: currentTargetValue,
+      detail: resumeDetail,
+      detailItems: currentTargetDetailItems,
+      source: handoffSource || asArray(handoffCard?.source_paths).join(" / "),
+      command: "",
+      chipLabel: closed ? t("workflow.currentPosition.closed") : "",
+    },
+    {
+      id: "latest-completed",
+      Icon: ListChecks,
+      title: t("workflow.currentPosition.latestCompleted"),
+      status: workflowStatusFromDocumentCard(taskTrackerCard, "ready"),
+      value: latestCompletedValue,
+      detail: taskDetail,
+      detailItems: latestCompletedDetailItems,
+      source: documentSource || asArray(taskTrackerCard?.source_paths).join(" / "),
+      command: "",
+    },
+    {
+      id: "failure-blocks",
+      Icon: AlertTriangle,
+      title: t("workflow.currentPosition.nextDecision"),
+      status: failureBlockStatus,
+      value: workflowFailureBlockText("meaning", t, locale),
+      detail: failureBlockHistoryRows[0]?.value || workflowFailureBlockText("noneDetail", t, locale),
+      detailItems: failureBlockDetailItems,
+      source: uniqueDisplayParts(...failureBlockRows.map((row) => row.source)).join(" / "),
+      command: situationFirstCommand(...failureBlockRows.map((row) => row.command)),
+    },
+    {
+      ...repository,
+      title: t("overview.progress.gitTitle"),
+    },
+    {
+      ...tests,
+      id: "tests",
+      title: t("overview.progress.testsTitle"),
+    },
+    {
+      ...ci,
+      id: "ci",
+      title: t("overview.progress.ciTitle"),
+    },
+  ];
+}
+
+function WorkflowCurrentPositionPanel({ data, context, liveStatus, t }) {
+  const activeLiveStatus = situationLiveStatusForContext(liveStatus, context);
+  const displayPolicy = displayDepthPolicyForData(data);
+  const facts = workflowCurrentPositionFacts(data, context, activeLiveStatus, t);
+  const repository = repositoryDisplayName(activeLiveStatus?.target_repository?.name || context?.target_repository?.name, t);
+  const freshness = situationFreshnessMeta(data, activeLiveStatus, t);
+  return (
+    <section className="operational-situation operational-situation--progress operational-situation--workflow" aria-labelledby="workflow-current-position-heading" data-workflow-current-position="true" data-dashboard-display-depth={displayPolicy.depth}>
+      <div className="operational-situation__header">
+        <span className="operational-situation__icon">
+          <ClipboardCheck aria-hidden="true" size={24} />
+        </span>
+        <div>
+          <h2 id="workflow-current-position-heading">{t("workflow.currentPosition.title")}</h2>
+        </div>
+        <div className="operational-situation__header-actions">
+          <AudienceModeBadge displayPolicy={displayPolicy} t={t} />
+        </div>
+      </div>
+      <div className="operational-situation__meta" aria-label={t("overview.progress.meta")}>
+        <span>{t("overview.fact.target")}: <strong>{repository}</strong></span>
+        <span>{t("overview.fact.workflow")}: <strong>{workflowContextLabel(context?.workflow_context, t)}</strong></span>
+        <span>{freshness.label}: <strong>{freshness.time}</strong></span>
+      </div>
+      <div className="operational-situation__grid">
+        {facts.map((fact) => (
+          <SituationFactCard key={fact.id} fact={fact} t={t} displayPolicy={displayPolicy} />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function WorkflowUpdateHistoryPanel({ data, t }) {
+  const displayPolicy = displayDepthPolicyForData(data);
+  const updateEvents = workflowTimelineEvents(data, t, 10);
+  const updateHistoryDetailItems = workflowHistoryDetailItems(updateEvents, t, 10);
+  const overallStatus = workflowHistoryCardStatus(updateEvents);
+  return (
+    <section className="workflow-update-history" aria-labelledby="workflow-update-history-heading" data-workflow-update-history="true" data-dashboard-display-depth={displayPolicy.depth}>
+      <div className="workflow-update-history__head">
+        <span className="workflow-update-history__icon">
+          <Clock aria-hidden="true" size={20} />
+        </span>
+        <div>
+          <h3 id="workflow-update-history-heading">{t("workflow.currentPosition.updateHistory")}</h3>
+        </div>
+        <StatusPill value={overallStatus} t={t} label={statusLabelForChip(overallStatus, t)} />
+      </div>
+      {updateHistoryDetailItems.length ? (
+        <dl className="workflow-update-history__list">
+          {updateHistoryDetailItems.map((item) => (
+            <div key={`${displayText(item.label, "")}:${displayText(item.value, "")}`}>
+              <dt>{item.label}</dt>
+              <dd>{item.value}</dd>
+            </div>
+          ))}
+        </dl>
+      ) : (
+        <p className="workflow-update-history__empty">{t("workflow.currentPosition.updateHistoryFallbackDetail")}</p>
+      )}
+    </section>
+  );
+}
+
 function OperationalPageDecisionSummary({ data, context, liveStatus, t, tone = "sidebar", pageId = "overview", keys = null }) {
   const displayPolicy = displayDepthPolicyForData(data);
   const activeLiveStatus = situationLiveStatusForContext(liveStatus, context);
@@ -2516,7 +3117,7 @@ function OperationalPageDecisionSummary({ data, context, liveStatus, t, tone = "
   const locale = operationalProgressLocale(data);
   const rows = liveEvidenceRows(activeLiveStatus, evidenceKeys, t, locale);
   const progressFacts = operationalProgressFacts(data, context, activeLiveStatus, t);
-  const overallStatus = situationWorstStatus([...rows.map((row) => row.status), ...progressFacts.map((fact) => fact.status)], "ready");
+  const overallStatus = situationWorstStatus([...rows.map((row) => workflowSurfaceStatus(row.status)), ...progressFacts.map((fact) => fact.status)], "ready");
   const repository = repositoryDisplayName(activeLiveStatus?.target_repository?.name || context?.target_repository?.name, t);
   const repositoryDetail = situationRepositoryMetaDetail(data, context, activeLiveStatus, t);
   const freshness = situationFreshnessMeta(data, activeLiveStatus, t);
@@ -2596,11 +3197,10 @@ function decisionToneForOperationalStatus(status) {
 function SituationFactCard({ fact, t, displayPolicy }) {
   const Icon = fact.Icon;
   const source = displayText(fact.source, "");
-  const command = displayText(fact.command, "");
   const showSource = source && !displayPolicy.isFriendly;
   const chipLabel = displayText(fact.chipLabel, "") || statusLabelForChip(fact.status, t);
   const sourceLabel = source.split(/\s*\/\s*/).map((item) => sourcePresentationKey(item, t)).filter(Boolean).join(" / ");
-  const detailItems = asArray(fact.detailItems).filter((item) => item && displayText(item.label, "") && displayText(item.value, "") && (!item.technical || displayPolicy.isTechnical));
+  const detailItems = asArray(fact.detailItems).filter((item) => item && (item.fullWidth || displayText(item.label, "")) && displayText(item.value, "") && (!item.technical || displayPolicy.isTechnical));
   return (
     <article className={`operational-situation__fact operational-situation__fact--${fact.id}`} data-operational-situation-fact={fact.id}>
       <div className="operational-situation__fact-head">
@@ -2616,25 +3216,22 @@ function SituationFactCard({ fact, t, displayPolicy }) {
       {detailItems.length ? (
         <dl className="operational-situation__detail-list">
           {detailItems.map((item) => (
-            <div key={`${displayText(item.label, "")}:${displayText(item.value, "")}`}>
-              <dt>{detailTermLabel(item.label)}</dt>
+            <div
+              key={`${displayText(item.label, "full")}:${displayText(item.value, "")}`}
+              data-detail-full-width={item.fullWidth ? "true" : undefined}
+              data-detail-layout={displayText(item.layout, "") || undefined}
+            >
+              {item.fullWidth ? null : <dt>{detailTermLabel(item.label)}</dt>}
               <dd>{item.value}</dd>
             </div>
           ))}
         </dl>
       ) : fact.detail ? <p>{fact.detail}</p> : null}
-      {showSource || command ? (
+      {showSource ? (
         <div className="operational-situation__evidence">
-          {showSource ? (
-            <span>
-              {t("overview.situation.source")}: {technicalChip(sourceLabel || source)}
-            </span>
-          ) : null}
-          {command ? (
-            <span>
-              {t("overview.situation.command")}: <CommandChip command={command} />
-            </span>
-          ) : null}
+          <span>
+            {t("overview.situation.source")}: {technicalChip(sourceLabel || source)}
+          </span>
         </div>
       ) : null}
     </article>
@@ -3135,11 +3732,10 @@ function snapshotEvidenceRowsForContext(context, keys, t) {
 function OperationalDetailDecisionCard({ fact, t, displayPolicy }) {
   const Icon = fact.Icon;
   const source = displayText(fact.source, "");
-  const command = displayText(fact.command, "");
   const showSource = source && displayPolicy.isTechnical;
   const chipLabel = displayText(fact.chipLabel, "") || statusLabelForChip(fact.status, t);
   const sourceLabel = source.split(/\s*\/\s*/).map((item) => sourcePresentationKey(item, t)).filter(Boolean).join(" / ");
-  const detailItems = asArray(fact.detailItems).filter((item) => item && displayText(item.label, "") && displayText(item.value, "") && (!item.technical || displayPolicy.isTechnical));
+  const detailItems = asArray(fact.detailItems).filter((item) => item && (item.fullWidth || displayText(item.label, "")) && displayText(item.value, "") && (!item.technical || displayPolicy.isTechnical));
   return (
     <article className={`operational-detail-card operational-detail-card--${fact.id}`} data-operational-detail-fact={fact.id}>
       <div className="operational-detail-card__head">
@@ -3155,25 +3751,22 @@ function OperationalDetailDecisionCard({ fact, t, displayPolicy }) {
       {detailItems.length ? (
         <dl className="operational-situation__detail-list">
           {detailItems.map((item) => (
-            <div key={`${displayText(item.label, "")}:${displayText(item.value, "")}`}>
-              <dt>{detailTermLabel(item.label)}</dt>
+            <div
+              key={`${displayText(item.label, "full")}:${displayText(item.value, "")}`}
+              data-detail-full-width={item.fullWidth ? "true" : undefined}
+              data-detail-layout={displayText(item.layout, "") || undefined}
+            >
+              {item.fullWidth ? null : <dt>{detailTermLabel(item.label)}</dt>}
               <dd>{item.value}</dd>
             </div>
           ))}
         </dl>
       ) : fact.detail ? <p>{fact.detail}</p> : null}
-      {showSource || command ? (
+      {showSource ? (
         <div className="operational-detail-card__evidence">
-          {showSource ? (
-            <span>
-              {t("overview.situation.source")}: {technicalChip(sourceLabel || source)}
-            </span>
-          ) : null}
-          {command ? (
-            <span>
-              {t("overview.situation.command")}: <CommandChip command={command} />
-            </span>
-          ) : null}
+          <span>
+            {t("overview.situation.source")}: {technicalChip(sourceLabel || source)}
+          </span>
         </div>
       ) : null}
     </article>
@@ -3193,11 +3786,10 @@ function OperationalDetailEvidenceQueue({ activeLiveStatus, context, keys, t, to
       </div>
       <div className="operational-detail-evidence__list">
         {visibleRows.length ? visibleRows.map((row) => {
-          const command = displayText(row.command, "");
-          const usableCommand = command && command !== "not_applicable" ? command : "";
+          const rowStatus = workflowSurfaceStatus(row.status);
           return (
             <article
-              className={`operational-detail-evidence__row operational-detail-evidence__row--${normalizeState(row.status)}`}
+              className={`operational-detail-evidence__row operational-detail-evidence__row--${rowStatus}`}
               key={row.id}
               data-operational-detail-evidence-key={row.key}
               data-evidence-source-id={row.sourceId || undefined}
@@ -3208,11 +3800,10 @@ function OperationalDetailEvidenceQueue({ activeLiveStatus, context, keys, t, to
                 <span>{row.target}{row.branch ? ` / ${row.branch}` : ""}</span>
               </div>
               <p>{row.summary}</p>
-              <StatusPill value={row.status} t={t} label={statusLabelForChip(row.status, t)} />
+              <StatusPill value={rowStatus} t={t} label={statusLabelForChip(rowStatus, t)} />
               <span>{row.observedAt || t("workflow.table.snapshotEvidence")}</span>
               <div className="operational-detail-evidence__reference">
                 {showTechnicalSource && row.sourceId ? technicalChip(row.sourceId) : null}
-                {usableCommand ? <CommandChip command={usableCommand} /> : null}
                 <InsightDetailButton
                   detail={liveEvidenceRowInsight(row, t)}
                   label={t("summary.viewDetails")}
@@ -3229,7 +3820,7 @@ function OperationalDetailEvidenceQueue({ activeLiveStatus, context, keys, t, to
               <span>{t("workflow.table.snapshotEvidence")}</span>
             </div>
             <p>{t("detail.operational.evidenceEmpty")}</p>
-            <StatusPill value="unknown" t={t} label={statusLabelForChip("unknown", t)} />
+            <StatusPill value="missing" t={t} label={statusLabelForChip("missing", t)} />
             <span>{t("workflow.table.snapshotEvidence")}</span>
             <div>{t("summary.none")}</div>
           </article>
@@ -3245,7 +3836,7 @@ function OperationalDetailDecisionPanel({ data, context, liveStatus, t, tone = "
   const displayPolicy = displayDepthPolicyForData(data);
   const locale = operationalProgressLocale(data);
   const evidenceRows = liveEvidenceRows(activeLiveStatus, keys, t, locale);
-  const overallStatus = situationWorstStatus([...facts.map((fact) => fact.status), ...evidenceRows.map((row) => row.status)], "ready");
+  const overallStatus = situationWorstStatus([...facts.map((fact) => fact.status), ...evidenceRows.map((row) => workflowSurfaceStatus(row.status))], "ready");
   const repository = repositoryDisplayName(activeLiveStatus?.target_repository?.name || context.target_repository?.name, t);
   const freshness = situationFreshnessMeta(data, activeLiveStatus, t);
   const headingId = `${pageId || tone}-operational-detail-heading`;
@@ -3542,70 +4133,6 @@ function CommonStatusPanel({ data, partialFailures, t }) {
       </div>
     </section>
   );
-}
-
-function WorkflowStatusCards({ data, t }) {
-  const context = selectedContextData(data);
-  const productAuthority = data.development?.product_authority || {};
-  const nextAction = nextActionShort(context, data, t);
-  const cards = [
-    { id: "git-sync", title: t("workflow.card.gitSync"), Icon: RefreshCw, status: context.git_status, value: workflowStatusLabel(context.git_status, t), detail: normalizeState(context.git_status) === "passed" || normalizeState(context.git_status) === "ready" ? t("workflow.card.gitSyncDetail") : t("workflow.card.gitSyncReviewDetail"), button: t("summary.viewDetails") },
-    { id: "ci", title: t("workflow.card.ci"), Icon: CheckCircle2, status: context.ci_status, value: workflowStatusLabel(context.ci_status, t), detail: normalizeState(context.ci_status) === "passed" || normalizeState(context.ci_status) === "ready" ? repositoryDisplayName(context.target_repository?.name, t) : t("workflow.card.ciReviewDetail"), button: t("summary.viewDetails") },
-    { id: "pr-merge", title: t("workflow.card.prMerge"), Icon: GitPullRequest, status: data.git_workflow?.approval_status, value: workflowStatusLabel(data.git_workflow?.approval_status, t), detail: t("workflow.card.prMergeDetail"), button: t("summary.viewDetails") },
-    { id: "product-evidence", title: t("workflow.card.productEvidence"), Icon: Folder, status: productAuthority.status || context.product_authority_status || "manual_required", value: productEvidenceStatusLabel(productAuthority, t), detail: productEvidenceDetail(productAuthority, t), button: t("workflow.card.collectEvidence") },
-    { id: "next-step", title: t("workflow.card.nextStep"), Icon: Flag, status: context.status || "ready", value: currentStepShortDisplay(context, t), detail: nextAction || currentStepDetailDisplay(context, t), button: workflowStepDetailLabel(context, t) },
-  ];
-  return (
-    <section className="workflow-card-grid" aria-label={t("workflow.currentEvidence")}>
-      {cards.map(({ id, title, Icon, value, detail, button, status }) => (
-        <article className={`workflow-mini-card workflow-mini-card--${id}`} key={id}>
-          <span className="workflow-mini-card__icon">
-            <Icon aria-hidden="true" size={24} />
-          </span>
-          <h3>{title}</h3>
-          <strong>{value}</strong>
-          <p>{detail}</p>
-          <InsightDetailButton
-            className="mini-card-button"
-            detail={workflowCardInsight(id, { title, value, detail, status }, context, data, t)}
-            label={button}
-            t={t}
-            tone="workflow"
-          />
-        </article>
-      ))}
-    </section>
-  );
-}
-
-function workflowCardInsight(id, card, context, data, t) {
-  const productAuthority = data.development?.product_authority || {};
-  const ciGuidancePoints = id === "product-evidence" ? productAuthorityCiGuidancePoints(productAuthority, t) : [];
-  return {
-    title: card.title,
-    eyebrow: t("workflow.detail.eyebrow"),
-    summary: card.detail,
-    where: t(`workflow.detail.${id}.where`, t("workflow.detail.default.where")),
-    why: t(`workflow.detail.${id}.why`, t("workflow.detail.default.why")),
-    action: ciGuidancePoints.length ? t("workflow.ciEvidence.action") : t(`workflow.detail.${id}.action`, t("workflow.detail.default.action")),
-    source: workflowCardSource(id, context, data, t),
-    status: card.status || "unknown",
-    statusLabel: card.value,
-    points: ciGuidancePoints,
-  };
-}
-
-function workflowCardSource(id, context, data, t) {
-  const rawTargetName = displayText(context.target_repository?.name, "");
-  const targetName = rawTargetName ? repositoryDisplayName(rawTargetName, t) : "";
-  const map = {
-    "git-sync": t("workflow.reference.gitSync"),
-    ci: t("workflow.reference.ci"),
-    "pr-merge": t("workflow.reference.selectedContext"),
-    "product-evidence": t("workflow.reference.productAuthority"),
-    "next-step": displayText(context.current_step_id, t("workflow.run.nextStep")),
-  };
-  return targetName ? `${map[id] || t("workflow.reference.selectedContext")} / ${targetName}` : map[id] || t("workflow.reference.selectedContext");
 }
 
 function WorkflowRecentTable({ rows: recentRows, data, t }) {
@@ -4857,6 +5384,7 @@ function liveEvidenceRows(activeLiveStatus, keys, t, locale = "") {
 }
 
 function liveEvidenceRowInsight(row, t) {
+  const status = workflowSurfaceStatus(row.status);
   const sourceParts = [
     row.sourceId ? sourcePresentationKey(row.sourceId, t) : "",
     row.currentItemId && row.currentItemId !== row.sourceId ? sourcePresentationKey(row.currentItemId, t) : "",
@@ -4872,8 +5400,8 @@ function liveEvidenceRowInsight(row, t) {
     why: row.reason,
     action: row.action,
     source: sourceParts.join(" / "),
-    status: row.status,
-    statusLabel: statusLabelForChip(row.status, t),
+    status,
+    statusLabel: statusLabelForChip(status, t),
     points: sourceParts,
   };
 }
@@ -4894,7 +5422,9 @@ function LiveEvidenceTable({ liveStatus, context, keys, title, headingId, t, ton
           <span>{t("workflow.table.time")}</span>
           <span>{t("workflow.table.reference")}</span>
         </div>
-        {rows.length ? rows.map((row) => (
+        {rows.length ? rows.map((row) => {
+          const rowStatus = workflowSurfaceStatus(row.status);
+          return (
           <article
             className={`mock-table-row mock-table-row--live-evidence mock-table-row--live-evidence-${tone}`}
             key={row.id}
@@ -4907,7 +5437,7 @@ function LiveEvidenceTable({ liveStatus, context, keys, title, headingId, t, ton
             <span data-label={t("workflow.table.target")}>{row.target}{row.branch ? ` / ${row.branch}` : ""}</span>
             <p data-label={t("workflow.table.detail")}>{row.summary}</p>
             <span className="mock-table-row__status" data-label={t("workflow.table.status")}>
-              <StatusPill value={row.status} t={t} label={statusLabelForChip(row.status, t)} />
+              <StatusPill value={rowStatus} t={t} label={statusLabelForChip(rowStatus, t)} />
             </span>
             <span data-label={t("workflow.table.time")}>{row.observedAt || t("workflow.table.snapshotEvidence")}</span>
             <span className="mock-table-row__reference" data-label={t("workflow.table.reference")}>
@@ -4920,7 +5450,8 @@ function LiveEvidenceTable({ liveStatus, context, keys, title, headingId, t, ton
               />
             </span>
           </article>
-        )) : (
+        );
+        }) : (
           <article className={`mock-table-row mock-table-row--live-evidence mock-table-row--live-evidence-${tone}`}>
             <strong data-label={t("workflow.table.type")}>{t("summary.none")}</strong>
             <span data-label={t("workflow.table.target")}>{repositoryDisplayName(context.target_repository?.name, t)}</span>
@@ -6610,38 +7141,14 @@ function StatusObjectCard({ id, value, t, Icon = CircleDashed }) {
 }
 
 function WorkflowSection({ development, gitWorkflow, data, locale, t, liveStatus }) {
-  const workflowItems = collectWorkflowItems({ development, gitWorkflow, t });
-  const reviewItems = workflowItems.filter((item) => isReviewState(item.state));
   const context = selectedContextData(data);
-  const activeLiveStatus = liveStatusForContext(liveStatus, context);
-  const step = currentStepNumber(context);
   return (
     <section className="view-surface view-surface--workflow" id="workflow" aria-labelledby="workflow-heading">
       <PageTitleHeader viewId="workflow" Icon={WorkflowCategoryIcon} title={t("workflow.title")} subtitle={t("workflow.description")} data={data} locale={locale} t={t} actionLabel={t("detail.refreshDisplayOnly")} headingId="workflow-heading" />
       <ContextSnapshotStrip data={data} t={t} locale={locale} variant="workflow" />
-      <OperationalPageSummaryStack data={data} context={context} liveStatus={liveStatus} pageId="workflow" tone="workflow" keys={["local_tests", "git_sync", "ci"]} t={t} />
-      <DetailDecisionSummary
-        tone="workflow"
-        t={t}
-        items={[
-          { Icon: Target, label: t("detail.checks"), valueLines: workflowDecisionValueLines(context, t), points: [t("detail.workflow.checksPoint.gitCi"), t("detail.workflow.checksPoint.prMerge"), t("detail.workflow.checksPoint.evidence")] },
-          { Icon: CheckCircle2, label: t("detail.currentJudgment"), value: reviewItems.length ? t("detail.judgment.needsReviewShort") : t("detail.judgment.readyShort"), detail: reviewItems.length ? t("detail.workflow.reviewDetail") : t("detail.workflow.noReviewDetail"), badge: statusSummaryBadge(reviewItems.length, t("detail.itemsNeedReview"), t), tone: reviewItems.length ? "warning" : "ready" },
-          { Icon: Eye, label: t("detail.mustReview"), value: t("detail.workflow.mustReview"), points: reviewItems.length ? workflowMustReviewPoints(t) : [t("detail.noRequiredReview")] },
-          { Icon: ArrowRightCircle, label: t("detail.nextSafeCheck"), value: step ? `${t("workflow.card.stepLabel")} ${step} ${t("detail.workflow.nextSafe")}` : t("detail.workflow.nextSafe"), detail: nextActionShort(context, data, t), cta: { href: "#lessons", label: workflowStepDetailLabel(context, t) } },
-        ]}
-      />
-      <OperationalDetailDecisionPanel data={data} context={context} liveStatus={liveStatus} t={t} tone="workflow" pageId="workflow" keys={["local_tests", "git_sync", "ci"]} />
       <GitOperationRail operations={development.git_operations} t={t} />
-      <WorkflowStatusCards data={data} t={t} />
-      <LiveEvidenceTable liveStatus={liveStatus} context={context} keys={["local_tests", "git_sync", "ci"]} title={t("detail.liveEvidence.workflowTitle")} headingId="workflow-live-evidence-heading" t={t} tone="workflow" locale={locale} />
-      <WorkflowRecentTable rows={development.recent_runs} data={data} t={t} />
-      <MockNotice
-        tone="workflow-warning"
-        Icon={AlertTriangle}
-        title={t("workflow.warning.title")}
-        detail={t("workflow.warning.detail")}
-        cta={{ href: "#maintenance", label: t("workflow.warning.cta") }}
-      />
+      <WorkflowUpdateHistoryPanel data={data} t={t} />
+      <WorkflowCurrentPositionPanel data={data} context={context} liveStatus={liveStatus} t={t} />
     </section>
   );
 }

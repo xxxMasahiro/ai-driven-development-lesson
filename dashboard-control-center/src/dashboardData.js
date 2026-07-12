@@ -1421,6 +1421,7 @@ function validateRepositoryChanges(development) {
       "untracked_count",
       "ahead",
       "behind",
+      "branch_count",
       "worktree_count",
       "changed_role_counts",
       "safe_changed_file_samples",
@@ -1440,7 +1441,7 @@ function validateRepositoryChanges(development) {
   if (typeof changes.detached !== "boolean") {
     throw new Error("dashboard repository changes detached must be boolean");
   }
-  for (const key of ["staged_count", "unstaged_count", "untracked_count", "ahead", "behind", "worktree_count"]) {
+  for (const key of ["staged_count", "unstaged_count", "untracked_count", "ahead", "behind", "branch_count", "worktree_count"]) {
     validateNonNegativeInteger(changes[key], `dashboard repository changes ${key}`);
   }
   const roleCounts = asObject(changes.changed_role_counts, "dashboard repository changes role counts");
@@ -1537,6 +1538,53 @@ function validateWorkflowEvidenceEvents(development) {
     }
     if (artifactPath !== "not_collected" && !safeScopedRelativePath(artifactPath)) {
       throw new Error(`dashboard workflow evidence event ${eventId} detail_artifact_path is unsafe`);
+    }
+  }
+}
+
+function validateMaterialUpdateEvents(development) {
+  if (development.material_update_events === undefined || development.material_update_events === null) {
+    return;
+  }
+  const events = asArray(development.material_update_events);
+  if (events.length > 500) {
+    throw new Error("dashboard material update events exceed the bounded limit");
+  }
+  const seen = new Set();
+  for (const event of events) {
+    if (!event || typeof event !== "object" || Array.isArray(event)) {
+      throw new Error("dashboard material update event must be an object");
+    }
+    assertAllowedKeys(
+      event,
+      new Set(["event_id", "event_type", "purpose_code", "occurred_at", "source_id", "status", "repository_head", "summary", "command", "detail_artifact_path"]),
+      "dashboard material update event",
+    );
+    for (const key of ["event_id", "event_type", "purpose_code", "occurred_at", "source_id", "status", "repository_head", "summary", "command", "detail_artifact_path"]) {
+      if (!displayText(event[key], "")) {
+        throw new Error(`dashboard material update event ${key} is missing`);
+      }
+    }
+    const eventId = displayText(event.event_id, "");
+    if (!/^[a-z0-9][a-z0-9._-]*$/.test(eventId) || !/^[a-z0-9][a-z0-9._-]*$/.test(displayText(event.event_type, "")) || !/^[a-z0-9][a-z0-9._-]*$/.test(displayText(event.purpose_code, ""))) {
+      throw new Error(`dashboard material update event identifiers are invalid: ${eventId}`);
+    }
+    if (seen.has(eventId)) {
+      throw new Error(`dashboard material update event is duplicated: ${eventId}`);
+    }
+    seen.add(eventId);
+    if (!ALLOWED_STATES.has(displayText(event.status, ""))) {
+      throw new Error(`dashboard material update event status is invalid: ${eventId}`);
+    }
+    if (Number.isNaN(new Date(displayText(event.occurred_at, "")).getTime())) {
+      throw new Error(`dashboard material update event occurred_at is invalid: ${eventId}`);
+    }
+    const artifactPath = displayText(event.detail_artifact_path, "");
+    if (artifactPath !== "not_collected" && !safeScopedRelativePath(artifactPath)) {
+      throw new Error(`dashboard material update event detail_artifact_path is unsafe: ${eventId}`);
+    }
+    if (displayText(event.summary, "").length > 260 || displayText(event.command, "").length > 180) {
+      throw new Error(`dashboard material update event display text is unbounded: ${eventId}`);
     }
   }
 }
@@ -3239,6 +3287,7 @@ export function validateDashboardData(data) {
   validateRepositoryChanges(data.development);
   validateRepositoryDevelopment(data.development);
   validateWorkflowEvidenceEvents(data.development);
+  validateMaterialUpdateEvents(data.development);
   validateCiEvidence(data.development);
   validateProductRepository(data.development);
   validateProductAuthority(data.development);

@@ -594,6 +594,44 @@ export function dashboardDataFile() {
   return resolvedFile;
 }
 
+function validateMaterialUpdateEvents(development) {
+  const events = development?.material_update_events;
+  if (events === undefined || events === null) {
+    return true;
+  }
+  if (!Array.isArray(events) || events.length > 500) {
+    return validationFailure("invalid_material_update_events_bound");
+  }
+  const allowedKeys = new Set(["event_id", "event_type", "purpose_code", "occurred_at", "source_id", "status", "repository_head", "summary", "command", "detail_artifact_path"]);
+  const seen = new Set();
+  for (const event of events) {
+    if (!isObject(event) || Object.keys(event).some((key) => !allowedKeys.has(key))) {
+      return validationFailure("invalid_material_update_event_shape");
+    }
+    if (
+      !safeIdPattern.test(String(event.event_id || "")) ||
+      !safeIdPattern.test(String(event.event_type || "")) ||
+      !safeIdPattern.test(String(event.purpose_code || "")) ||
+      seen.has(event.event_id) ||
+      !nonEmptyString(event.occurred_at) ||
+      Number.isNaN(new Date(event.occurred_at).getTime()) ||
+      !nonEmptyString(event.source_id) ||
+      !allowedStates.has(String(event.status || "")) ||
+      !nonEmptyString(event.repository_head) ||
+      !nonEmptyString(event.summary) ||
+      event.summary.length > 260 ||
+      !nonEmptyString(event.command) ||
+      event.command.length > 180 ||
+      !nonEmptyString(event.detail_artifact_path) ||
+      (event.detail_artifact_path !== "not_collected" && !safeRelativePath(event.detail_artifact_path))
+    ) {
+      return validationFailure(`invalid_material_update_event:${String(event.event_id || "missing")}`);
+    }
+    seen.add(event.event_id);
+  }
+  return true;
+}
+
 export function validateDashboardData(body) {
   lastDashboardDataValidationError = "";
   let data;
@@ -628,6 +666,9 @@ export function validateDashboardData(body) {
     if (!isObject(data[key])) {
       return validationFailure(`missing_object:${key}`);
     }
+  }
+  if (!validateMaterialUpdateEvents(data.development)) {
+    return false;
   }
   if (!["learning", "development", "maintenance", "unknown"].includes(String(data.summary.mode || ""))) {
     return validationFailure("invalid_summary_mode");
@@ -2047,19 +2088,24 @@ export default defineConfig({
               priority: 23,
             },
             {
+              name: "dashboard-i18n-catalog",
+              test: /dashboard-control-center[\\/]src[\\/]i18nCatalog\.js$/,
+              priority: 25,
+            },
+            {
               name: "dashboard-decision-summary",
               test: /dashboard-control-center[\\/]src[\\/]DecisionSummary\.jsx$/,
-              priority: 22,
+              priority: 21,
             },
             {
               name: "dashboard-context-runtime",
               test: /dashboard-control-center[\\/]src[\\/](dashboardContext|displayDepth)\.js$/,
-              priority: 21,
+              priority: 20,
             },
             {
               name: "dashboard-design-system",
               test: /dashboard-control-center[\\/]src[\\/]design-system\.generated\.js$/,
-              priority: 20,
+              priority: 19,
             },
             {
               name: "vendor",

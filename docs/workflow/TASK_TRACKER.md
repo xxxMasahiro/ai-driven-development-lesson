@@ -2937,3 +2937,37 @@ Current Status:
 Next Step:
 
 - Implement the contextual repair plan from the active repository-development-workflow fast loop, then run focused Dashboard Control Center checks and read-only Browser Debug CLI or TraceCue review.
+
+## Implemented Dashboard Control Center Workflow Activity History Work
+
+SYNC-ID: dashboard_control_center_workflow_activity_history
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/DASHBOARD_DATA_SCHEMA.tsv,docs/design-system/dashboard-control-center/DESIGN_SYSTEM.md,docs/design-system/dashboard-control-center/tokens.json,docs/design-system/dashboard-control-center/components.json,dashboard-control-center/src/design-system.generated.css,dashboard-control-center/src/design-system.generated.js,tools/dashboard-data,tools/lib/dashboard_data.sh,vite.config.mjs,dashboard-control-center/src/App.jsx,dashboard-control-center/src/dashboardData.js,dashboard-control-center/src/i18n.js,dashboard-control-center/src/i18nCatalog.js,dashboard-control-center/src/styles.css,tests/fixtures/dashboard-control-center.json,tests/fixtures/dashboard-control-center-live-update.json,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/check_dashboard_bundle_contract.sh,tools/check_dashboard_design_system.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+Current Status:
+
+- [x] Move the inherited dirty Dashboard work from `main` to a dedicated feature branch without discarding changes.
+- [x] Inventory producer, schema, React, i18n, Design System, generated runtime, registry, and workflow-document changes.
+- [x] Approve the decision-driven proposal and synchronize this planned sync ID before further runtime edits.
+- [x] Repair material-event owner-layer status, blocker, freshness, repository, and time semantics.
+- [x] Replace UI command inference and two-language branches with structured purpose and standard locale keys.
+- [x] Clarify `i18nCatalog.js` as maintained source and keep single-use material-event collection in its producer owner.
+- [x] Align schema, validators, React, Design System generation, and focused tests.
+- [x] Complete the separate FrameCue path, TraceCue selection, TASK_TRACKER, and HANDOFF configuration-alignment unit.
+- [x] Run focused verification and desktop/mobile Playwright review.
+- [x] Promote the sync ID to implemented after focused checks passed.
+- [x] Complete the approval-bound aggregate release gate and full/no-cache Git hook proof on the final implementation.
+
+Focused verification:
+
+- Dashboard Playwright: 32/32 passed, including desktop/mobile, stale-state, selected-context, unsafe-text, and locale coverage.
+- Dashboard schema, data, i18n, Design System, and bundle contracts passed; the largest JS chunk remained below 500,000 bytes.
+- Product Git-usage mode, menu prerequisite, and Dashboard repository-selection fixture tests passed.
+- Repository-development workflow checks and tests passed.
+- Aggregate `test_lesson_repository.sh` passed, and the full/no-cache Git hook run passed all 58 checks with same-run final-gate evidence.
+- Read-only live registry inspection now reports both products fully ready: FrameCue at `8463436f94cfd9e7fd55a734b35d741a61c5df34` with GitHub CI run `29169227010`, and TraceCue at `4c27dc34364ded67977fe7322e91294900e7285d` with GitHub CI run `29168001581`. Both have scaffold `passed`, authority `ready`, blocker count `0`, evidence `passed`, Git `clean`, and Dashboard readiness `ready`; the parent repository did not modify either product repository.
+
+Next Step:
+
+- Commit and push the verified parent-repository branch, complete PR CI and approved merge, then confirm main CI and local/remote synchronization without modifying TraceCue or FrameCue.

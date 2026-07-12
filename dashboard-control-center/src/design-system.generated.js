@@ -389,6 +389,34 @@ export const dashboardControlCenterDesignSystem = Object.freeze({
       "cssVariable": "--dcc-text",
       "value": "#111820",
       "role": "Primary readable UI text."
+    },
+    {
+      "type": "color",
+      "name": "workflow-accent",
+      "cssVariable": "--dcc-workflow-accent",
+      "value": "#0b7c80",
+      "role": "Readable teal accent for Development Workflow icons, labels, and action affordances."
+    },
+    {
+      "type": "typography",
+      "name": "workflow-body-font-weight",
+      "cssVariable": "--dcc-workflow-body-font-weight",
+      "value": "480",
+      "role": "Readable but light body text weight for Development Workflow summaries."
+    },
+    {
+      "type": "typography",
+      "name": "workflow-primary-font-weight",
+      "cssVariable": "--dcc-workflow-primary-font-weight",
+      "value": "540",
+      "role": "Moderate primary value weight for Development Workflow summaries; lighter than headings and chips."
+    },
+    {
+      "type": "color",
+      "name": "workflow-soft",
+      "cssVariable": "--dcc-workflow-soft",
+      "value": "#dff4f3",
+      "role": "Soft teal surface for Development Workflow icons and subtle workflow emphasis."
     }
   ],
   "components": [
@@ -468,6 +496,84 @@ export const dashboardControlCenterDesignSystem = Object.freeze({
         "Shared card padding and internal gaps are generated from the design-system source.",
         "Do not nest decorative cards inside decorative cards.",
         "Keep raw technical values secondary and copyable."
+      ]
+    },
+    {
+      "id": "workflow-current-position-summary",
+      "selectors": [
+        ".operational-situation--workflow[data-workflow-current-position=\"true\"]",
+        ".operational-situation--workflow[data-workflow-current-position=\"true\"] .operational-situation__grid",
+        ".operational-situation--workflow[data-workflow-current-position=\"true\"] .operational-situation__fact",
+        ".operational-situation--workflow[data-workflow-current-position=\"true\"] .operational-situation__fact-head > div",
+        ".operational-situation--workflow[data-workflow-current-position=\"true\"] .operational-situation__fact-icon",
+        ".operational-situation--workflow[data-workflow-current-position=\"true\"] .operational-situation__fact h3"
+      ],
+      "tokens": [
+        "--dcc-section-gap",
+        "--dcc-card-padding",
+        "--dcc-card-gap",
+        "--dcc-workflow-soft",
+        "--dcc-workflow-accent",
+        "--dcc-workflow-body-font-weight",
+        "--dcc-workflow-primary-font-weight"
+      ],
+      "contract": [
+        "Use this component for the Development Workflow Current Position And Progress summary.",
+        "The section-level Current Position And Progress heading uses the same heading typography as the workflow Git operation rail.",
+        "Desktop-sized viewports must show at most two columns so each judgment card has enough horizontal room.",
+        "Narrow viewports must stack the cards to one column.",
+        "Cards in this summary must share the same height within the summary grid.",
+        "The section-level Current Position And Progress header icon keeps the workflow accent color but does not use a filled background.",
+        "Default card icons in this summary use the workflow page soft and accent tokens instead of neutral black or gray.",
+        "Card heading labels in this summary remain slightly larger and heavier than microcopy so the current target, progress, failures/blockers, Git, test, and CI labels are scannable.",
+        "Card heading labels use the same workflow accent color as the Development Workflow page icon so the summary reads as one coherent page surface.",
+        "Body values and explanatory copy in this summary use lighter workflow body weights so long Japanese summaries do not look like headings.",
+        "Status chips in this summary sit immediately beside the card heading label and wrap only when space is constrained.",
+        "The heading label and status chip group aligns to the visual center of the card icon.",
+        "Detail rows in this summary use a consistent readable label gutter across all cards so values do not sit too close to labels, and both label and value text stay slightly larger than microcopy.",
+        "When this summary follows the workflow Git operation rail, keep at least one section gap between the two blocks.",
+        "The column limit is layout-only and must not remove task tracker, handoff, failures/blockers, Git, tests, or CI facts.",
+        "Failure and blocker state belongs inside the failures/blockers fact instead of a next-decision or always-visible blocker card.",
+        "The failures/blockers fact shows the current unresolved count as its primary value and up to five recent failure/block history rows as details.",
+        "Resolved history rows stay visible as resolved so users can understand what was fixed without confusing them with remaining blockers.",
+        "Review-only states such as stale or unknown must not be shown as failure/block history; they belong in their own Git, CI, test, safety, or evidence detail surfaces.",
+        "Test and CI facts show up to five recent history rows when material update events are available.",
+        "Test history rows should show the plain-language purpose first and preserve the underlying command as supporting detail.",
+        "Consecutive repeated test and CI history rows with the same local display date, visible purpose, and command should be collapsed into one row with an occurrence count even when their displayed result labels or internal evidence sources differ.",
+        "The test and CI fact primary value may show the display-row count and must make clear that the maximum display is five rows.",
+        "The five-row limit is applied after chronological adjacent-repeat grouping so the UI shows up to five display rows, not five raw events before grouping.",
+        "CI history rows should show the CI scope, result, and underlying GitHub command or evidence reference.",
+        "Review freshness states such as stale or unknown must not be printed as the leading result in test or CI history rows; the timestamp already communicates when the record was observed.",
+        "Material update history belongs outside this summary so it can use a dedicated chronological row layout."
+      ]
+    },
+    {
+      "id": "workflow-update-history",
+      "selectors": [
+        ".workflow-update-history",
+        ".workflow-update-history__head",
+        ".workflow-update-history__icon",
+        ".workflow-update-history__list",
+        ".workflow-update-history__list > div"
+      ],
+      "tokens": [
+        "--dcc-section-gap",
+        "--dcc-workflow-soft",
+        "--dcc-workflow-accent",
+        "--dcc-text"
+      ],
+      "contract": [
+        "Use this component for Development Workflow material update history.",
+        "Place it directly below the workflow Git operation rail and before the Current Position And Progress summary.",
+        "The section-level update-history header icon keeps the workflow accent color but does not use a filled background.",
+        "The update-history heading uses the same heading typography as the workflow Git operation rail.",
+        "Show chronological rows with observed time first and the material action summary second.",
+        "Render the update-history heading with black text while timestamp labels use the Current Position And Progress detail-label gray and summaries use the same dark detail-value color.",
+        "Timestamp labels, summaries, and the empty state use the same body typography and color roles as the Current Position And Progress detail rows.",
+        "Timestamp labels stay on one line.",
+        "The timestamp-to-summary spacing is part of the component contract: use a 24px column gap plus 4px summary inline-start padding so the update history reads close to the test and CI detail rows without crowding the timestamp.",
+        "The default Development Workflow view may show up to ten recent rows.",
+        "Do not place this component inside the Current Position And Progress card grid."
       ]
     },
     {

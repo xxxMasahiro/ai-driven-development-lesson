@@ -424,6 +424,7 @@ development	development.repository_changes.unstaged_count	implemented	integer	no
 development	development.repository_changes.untracked_count	implemented	integer	non-negative	dashboard-data	Repository change untracked count must be non-negative.
 development	development.repository_changes.ahead	implemented	integer	non-negative	dashboard-data	Repository change ahead count must be non-negative.
 development	development.repository_changes.behind	implemented	integer	non-negative	dashboard-data	Repository change behind count must be non-negative.
+development	development.repository_changes.branch_count	implemented	integer	non-negative	dashboard-data	Repository change local branch count must be non-negative.
 development	development.repository_changes.worktree_count	implemented	integer	non-negative	dashboard-data	Repository change worktree count must be non-negative.
 development	development.repository_changes.changed_role_counts	implemented	object	repository-change-counts	dashboard-data	Repository change role counts must separate staged, unstaged, and untracked counts.
 development	development.repository_changes.safe_changed_file_samples[]	implemented	array	relative-path-list	dashboard-data	Repository change samples must stay display-safe and bounded.
@@ -453,6 +454,17 @@ development	development.workflow_evidence_events[].freshness_state	implemented	e
 development	development.workflow_evidence_events[].authority	implemented	enum	authoritative|manual_required|advisory|not_collected	dashboard-data	Workflow event authority must use the evidence authority vocabulary.
 development	development.workflow_evidence_events[].detail_artifact_path	implemented	string	scoped-relative-path	dashboard-data	Workflow event artifact path must be safe and may be product-scoped.
 development	development.workflow_evidence_events[].summary	implemented	string	safe-text	dashboard-data	Workflow event summary must be non-empty display text.
+development	development.material_update_events[]	implemented	array	material-update-event-list	dashboard-data	Material update events must contain only user-meaningful changes such as commits, merges, test evidence, CI evidence, safety checks, Git checks, document sync, or product gates, not dashboard observation refreshes.
+development	development.material_update_events[].event_id	implemented	string	source-id	dashboard-data	Each material update event must expose a stable id.
+development	development.material_update_events[].event_type	implemented	string	source-id	dashboard-data	Each material update event must classify the actual update kind without hard-coded product names.
+development	development.material_update_events[].purpose_code	implemented	string	source-id	dashboard-data	Each material update event must expose a structured display-purpose code so the browser does not infer meaning from command text.
+development	development.material_update_events[].occurred_at	implemented	string	iso8601	dashboard-data	Each material update event must use the work event time rather than snapshot generated_at or repository observation time.
+development	development.material_update_events[].source_id	implemented	string	source-id	dashboard-data	Each material update event must identify the owner evidence, Git source, or product gate source.
+development	development.material_update_events[].status	implemented	enum	missing|ready|passed|failed|blocked|unknown|approval_required|optional|cached|not_run|stale|manual_required|not_applicable	dashboard-data	Each material update event status must use the shared state vocabulary.
+development	development.material_update_events[].repository_head	implemented	string	safe-text	dashboard-data	Each material update event may identify the repository revision associated with the event.
+development	development.material_update_events[].summary	implemented	string	safe-text	dashboard-data	Each material update event must describe what changed or what command evidence was recorded without raw logs or secrets.
+development	development.material_update_events[].command	implemented	string	command-preview-or-not_applicable	dashboard-data	Each material update event may expose the display-only command associated with recorded evidence.
+development	development.material_update_events[].detail_artifact_path	implemented	string	scoped-relative-path-or-not_collected	dashboard-data	Each material update event may link to a safe detail artifact reference without exposing raw local data.
 development	development.ci_evidence[]	implemented	array	ci-evidence-role-list	dashboard-data	CI evidence roles must separate branch, PR, main, local tests, and provider visibility.
 development	development.ci_evidence[].role	implemented	enum	branch_ci|pr_ci|main_ci|local_tests|provider_visibility	dashboard-data	CI evidence role must identify which confidence signal is represented.
 development	development.ci_evidence[].status	implemented	enum	missing|ready|passed|failed|blocked|unknown|approval_required|optional|cached|not_run|stale|manual_required|not_applicable	dashboard-data	CI evidence role status must use the shared state vocabulary.

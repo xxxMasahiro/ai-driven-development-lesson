@@ -786,7 +786,7 @@ if (!['configured', 'missing', 'not_applicable', 'unknown'].includes(repositoryC
 if (typeof repositoryChanges.detached !== 'boolean') {
   fail('repository_changes.detached must be boolean');
 }
-for (const field of ['staged_count', 'unstaged_count', 'untracked_count', 'ahead', 'behind', 'worktree_count']) {
+for (const field of ['staged_count', 'unstaged_count', 'untracked_count', 'ahead', 'behind', 'branch_count', 'worktree_count']) {
   if (!Number.isInteger(repositoryChanges[field]) || repositoryChanges[field] < 0) {
     fail(`repository_changes ${field} must be a non-negative integer`);
   }
@@ -865,6 +865,33 @@ for (const event of workflowEvidenceEvents) {
 for (const eventId of ['repository-observation', 'repository-index-drift', 'git-sync', 'ci-main', 'security-gate']) {
   if (!workflowEventIds.has(eventId)) {
     fail(`missing workflow evidence event: ${eventId}`);
+  }
+}
+
+const materialUpdateEvents = requireField('development.material_update_events');
+if (!Array.isArray(materialUpdateEvents) || materialUpdateEvents.length > 500) {
+  fail('development.material_update_events must be a bounded array');
+}
+const materialEventIds = new Set();
+for (const event of materialUpdateEvents) {
+  if (!event || typeof event !== 'object' || Array.isArray(event)) {
+    fail('material update event must be an object');
+  }
+  for (const field of ['event_id', 'event_type', 'purpose_code', 'occurred_at', 'source_id', 'status', 'repository_head', 'summary', 'command', 'detail_artifact_path']) {
+    requireTextObjectField(event, field, 'development.material_update_events');
+  }
+  if (!/^[a-z0-9][a-z0-9._-]*$/.test(event.event_id) || !/^[a-z0-9][a-z0-9._-]*$/.test(event.event_type) || !/^[a-z0-9][a-z0-9._-]*$/.test(event.purpose_code)) {
+    fail(`material update event identifiers must be safe: ${event.event_id}`);
+  }
+  if (materialEventIds.has(event.event_id)) {
+    fail(`duplicate material update event id: ${event.event_id}`);
+  }
+  materialEventIds.add(event.event_id);
+  if (!allowedStates.has(event.status) || Number.isNaN(new Date(event.occurred_at).getTime())) {
+    fail(`material update event state or time is invalid: ${event.event_id}`);
+  }
+  if (event.detail_artifact_path !== 'not_collected' && !isSafeScopedPath(event.detail_artifact_path)) {
+    fail(`material update event artifact path must be safe: ${event.event_id}`);
   }
 }
 

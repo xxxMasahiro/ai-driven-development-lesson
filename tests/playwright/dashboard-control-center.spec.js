@@ -156,7 +156,7 @@ function dashboardLiveStatusFixture(options = {}) {
         risk_level: ["failed", "blocked"].includes(options.localTestsStatus) ? "high" : "low",
         required_command: localTestItems[0]?.next_command || "not_applicable",
         current_item_id: localTestItems[0]?.source_id || "product.gates.tests",
-        blocker_count: Number(options.localTestBlockerCount || 1),
+        blocker_count: Number(options.localTestBlockerCount ?? 1),
         items: localTestItems,
       },
       git_sync: {
@@ -191,7 +191,7 @@ function dashboardLiveStatusFixture(options = {}) {
         next_action: "Open workflow details to inspect the CI run, branch, and collection reason.",
         detail_page: "#workflow",
         freshness_state: options.ciObservedAt && options.ciObservedAt !== "not_collected" ? "current" : "not_collected",
-        authority: options.runId ? "advisory" : "not_collected",
+        authority: options.ciAuthority || (options.runId ? "advisory" : "not_collected"),
         risk_level: ["failed", "blocked"].includes(options.ciStatus) ? "high" : "medium",
         required_command: "not_applicable",
         current_item_id: "product_ci_live",
@@ -212,7 +212,7 @@ function dashboardLiveStatusFixture(options = {}) {
         detail_code: options.securityDetailCode || "security_blockers_present",
         source_id: "product.security.local_artifacts",
         summary: defaultSecurityItems[0].summary,
-        reason: Number(options.securityBlockerCount || 3) ? `${Number(options.securityBlockerCount || 3)} safety blocker(s) need review.` : "Safety evidence is current for the selected repository.",
+        reason: Number(options.securityBlockerCount ?? 3) ? `${Number(options.securityBlockerCount ?? 3)} safety blocker(s) need review.` : "Safety evidence is current for the selected repository.",
         next_action: "Open safety details to inspect blockers, approvals, and dangerous-operation guards.",
         detail_page: "#safety",
         freshness_state: options.securityObservedAt && options.securityObservedAt !== "not_collected" ? "current" : "not_collected",
@@ -220,7 +220,7 @@ function dashboardLiveStatusFixture(options = {}) {
         risk_level: ["failed", "blocked"].includes(options.securityStatus) ? "high" : "medium",
         required_command: defaultSecurityItems[0].next_command,
         current_item_id: "product.security.local_artifacts",
-        blocker_count: Number(options.securityBlockerCount || 3),
+        blocker_count: Number(options.securityBlockerCount ?? 3),
         items: options.securityItems || defaultSecurityItems,
       },
     },
@@ -1470,6 +1470,32 @@ test.describe("English dashboard control center", () => {
     addDesignSystemRepositoryScope(sourceBoundaryFixture);
     addDesignStudioProposalWorkflowFixture(sourceBoundaryFixture);
     addProducerDecisionPages(sourceBoundaryFixture);
+    sourceBoundaryFixture.development.material_update_events = [
+      {
+        event_id: "local-tests-stale",
+        event_type: "local_test",
+        purpose_code: "local_tests",
+        occurred_at: "2026-06-05T00:02:00Z",
+        source_id: "product.gates.tests",
+        status: "stale",
+        repository_head: "abcdef123456",
+        summary: "Focused test evidence needs refresh.",
+        command: "npm test",
+        detail_artifact_path: "not_collected",
+      },
+      {
+        event_id: "git-commit-ready",
+        event_type: "git_commit",
+        purpose_code: "git_commit",
+        occurred_at: "2026-06-05T00:01:00Z",
+        source_id: "product.git.commit",
+        status: "passed",
+        repository_head: "abcdef123456",
+        summary: "Recorded the current implementation commit.",
+        command: "not_applicable",
+        detail_artifact_path: "not_collected",
+      },
+    ];
     sourceBoundaryFixture.development.product_authority.evidence_summary.items.push({
       source_id: "product.ci.main",
       context: "product-improvement",
@@ -1539,9 +1565,9 @@ test.describe("English dashboard control center", () => {
     await expect(situationBoard.locator("[data-operational-situation-fact]")).toHaveCount(6);
     await expect(situationBoard.locator("[data-operational-situation-fact='current-work']")).toContainText("STEP 1-14 Practical lesson");
     await expect(situationBoard.locator("[data-operational-situation-fact='blockers']")).toContainText("6 blocker(s)");
-    await expect(situationBoard.locator("[data-operational-situation-fact='git']")).toContainText("Worktree is clean");
+    await expect(situationBoard.locator("[data-operational-situation-fact='git']")).toContainText("Shows commit history, working branches, and current worktree state.");
     await expect(situationBoard.locator("[data-operational-situation-fact='git']")).toContainText("Branch: main");
-    await expect(situationBoard.locator("[data-operational-situation-fact='next-safe']")).toContainText("./tools/product-repository-authority status --json");
+    await expect(situationBoard.locator("[data-operational-situation-fact='next-safe']")).toContainText("Review role assignment");
     await expect(page.locator(".common-status-card--git .common-status-op")).toHaveCount(4);
     await expect(page.locator(".common-status-card--git .common-status-op", { hasText: "Merge" })).toContainText("Allowed");
     await expectCenteredSvg(page.locator(".common-status-card--git .common-status-op__label"));
@@ -1609,7 +1635,6 @@ test.describe("English dashboard control center", () => {
     await navigation.getByRole("link", { name: /Development Workflow/ }).click();
     await expect(page.getByRole("heading", { name: "Development Workflow" })).toBeVisible();
     await expectCenteredSvg(page.locator(".page-title__icon"));
-    await expectCenteredSvg(page.locator(".decision-summary__icon"));
     const workflowHeaderStyle = await page.locator("#workflow .page-title").evaluate((element) => {
       const style = window.getComputedStyle(element);
       return {
@@ -1621,39 +1646,21 @@ test.describe("English dashboard control center", () => {
     expect(workflowHeaderStyle.boxShadow).not.toBe("none");
     await expect(page.locator(".operation-chip")).toHaveCount(6);
     await expect(page.locator(".operation-chip", { hasText: "Merge" })).toContainText("Allowed");
-    await expect(page.locator(".workflow-mini-card")).toHaveCount(5);
-    await expectCenteredSvg(page.locator(".workflow-mini-card__icon"));
-    const workflowProducerDecision = page.locator("#workflow .decision-summary--workflow").first();
-    await expect(workflowProducerDecision).toContainText("producer.workflow");
-    await expect(workflowProducerDecision).toContainText("#workflow");
-    const workflowOperationalDetail = page.locator("[data-operational-detail-decisions='workflow']");
-    await expect(workflowOperationalDetail).toContainText("Operational detail decisions");
-    await expect(workflowOperationalDetail.locator("[data-operational-detail-fact]")).toHaveCount(5);
-    await expect(workflowOperationalDetail.locator("[data-operational-detail-fact='git']")).toContainText("Worktree is clean");
-    await expect(workflowOperationalDetail.locator("[data-operational-detail-fact='next-safe']")).toContainText("./tools/product-repository-authority status --json");
-    await expect(workflowOperationalDetail.locator("[data-operational-detail-evidence-key='git_sync']")).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Git Sync" })).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Product Evidence" })).toBeVisible();
-    await page.locator(".workflow-mini-card--product-evidence").getByRole("button", { name: /Check collection/ }).click();
-    await expect(page.locator(".insight-detail-modal")).toContainText("Suggested CI evidence check");
-    await expect(page.locator(".insight-detail-modal")).toContainText("display only");
-    await expect(page.locator(".insight-detail-modal")).toContainText("tools/product-gate-evidence ci-runs product-improvement 3600");
-    await page.locator(".insight-detail-modal__close").click();
-    await expect(page.locator(".insight-detail-modal")).toHaveCount(0);
-    await page.locator(".workflow-mini-card", { hasText: "Git Sync" }).getByRole("button", { name: /View details/ }).click();
-    await expect(page.locator(".insight-detail-modal")).toContainText("Workflow detail");
-    await expect(page.locator(".insight-detail-modal")).toContainText("Why it matters");
-    await expect(page.locator(".insight-detail-modal")).toContainText("Next safe action");
-    await expect(page.locator(".insight-detail-modal")).not.toContainText("detail.nextSafeAction");
-    await page.locator(".insight-detail-modal__close").click();
-    await expect(page.locator(".insight-detail-modal")).toHaveCount(0);
-    await expect(page.getByRole("heading", { name: "Current workflow evidence" })).toBeVisible();
+    const workflowHistory = page.locator("[data-workflow-update-history='true']");
+    await expect(workflowHistory).toContainText("Update history");
+    await expect(workflowHistory).toContainText("Local test check");
+    await expect(workflowHistory).toContainText("Focused test evidence needs refresh.");
+    await expect(workflowHistory.locator(".status")).toHaveAttribute("data-state", "stale");
+    const workflowCurrentPosition = page.locator("[data-workflow-current-position='true']");
+    await expect(workflowCurrentPosition).toContainText("Current Position And Progress");
+    await expect(workflowCurrentPosition).toContainText("task-tracker-repository");
+    await expect(workflowCurrentPosition.locator("[data-operational-situation-fact]")).toHaveCount(6);
+    await expect(workflowCurrentPosition.locator("[data-operational-situation-fact='git']")).toContainText("Shows commit history, working branches, and current worktree state.");
+    await expect(workflowCurrentPosition.locator("[data-operational-situation-fact='tests']")).toContainText("Checks whether the changes work as expected.");
+    await expect(workflowCurrentPosition.locator("[data-operational-situation-fact='ci']")).toContainText("Runs the same checks automatically outside the local machine.");
+    await expect(workflowCurrentPosition.locator("[data-operational-situation-fact='failure-blocks']")).toContainText("Failures and blockers");
     await expect(page.getByText(/Development\.Product Repository/)).toHaveCount(0);
     await expect(page.getByText("development.git.sync.status")).toHaveCount(0);
-    await expect(page.locator(".mock-table-row--workflow")).toHaveCount(5);
-    await page.locator(".mock-table-row--workflow").first().getByRole("button", { name: /CI evidence/ }).click();
-    await expect(page.locator(".insight-detail-modal")).toContainText("CI status evidence");
-    await page.locator(".insight-detail-modal__close").click();
 
     await navigation.getByRole("link", { name: /Maintenance Sync/ }).click();
     await expect(page.getByRole("heading", { name: "Maintenance Sync" })).toBeVisible();
@@ -2447,17 +2454,12 @@ test.describe("English dashboard control center", () => {
     await navigation.getByRole("link", { name: "Development Workflow", exact: true }).click();
     await expect(page.locator("#workflow .context-strip")).toContainText(freeRepoName);
     await expect(page.locator("#workflow")).toContainText(/Free development workflow/i);
-    const workflowOperationalDetail = page.locator("[data-operational-detail-decisions='workflow']");
-    await expect(workflowOperationalDetail).toContainText(freeRepoName);
-    await expect(workflowOperationalDetail.locator("[data-operational-detail-fact='git']")).not.toContainText("task-tracker-repository");
-    await expect(page.locator("#workflow .mock-table-row--workflow")).toHaveCount(5);
-    await expect(page.locator("#workflow .mock-table-row--workflow", { hasText: /Repository observation/i })).toBeVisible();
-    await expect(page.locator("#workflow .mock-table-row--workflow", { hasText: /Repository index drift/i })).toBeVisible();
+    const workflowCurrentPosition = page.locator("[data-workflow-current-position='true']");
+    await expect(workflowCurrentPosition).toContainText(freeRepoName);
+    await expect(workflowCurrentPosition.locator("[data-operational-situation-fact='git']")).not.toContainText("task-tracker-repository");
+    await expect(workflowCurrentPosition.locator("[data-operational-situation-fact]")).toHaveCount(6);
+    await expect(page.locator("[data-workflow-update-history='true']")).toBeVisible();
     await expect(page.locator("#workflow")).not.toContainText("task-tracker-repository");
-    const workflowHeaderFontSize = await page.locator("#workflow .mock-table__head--workflow").evaluate((element) => Number.parseFloat(window.getComputedStyle(element).fontSize));
-    expect(workflowHeaderFontSize).toBeGreaterThanOrEqual(13);
-    const workflowTargets = await page.locator("#workflow .mock-table-row--workflow [data-label='Target / branch']").allTextContents();
-    expect(workflowTargets).toEqual(Array(5).fill(freeRepoName));
 
     await repositoryNavigation.getByRole("link", { name: "Repository Info", exact: true }).click();
     await expect(page.locator("#repository-info")).toContainText(freeRepoName);
@@ -2645,13 +2647,13 @@ test.describe("English dashboard control center", () => {
     const situationBoard = page.locator("[data-operational-situation='true']");
     await expect(situationBoard).toContainText("Live observation");
     await expect(situationBoard.locator("[data-operational-situation-fact='current-work']")).toContainText("Free Development");
-    await expect(situationBoard.locator("[data-operational-situation-fact='blockers']")).toContainText("6 blocker(s)");
-    await expect(situationBoard.locator("[data-operational-situation-fact='git']")).toContainText("Working changes 3");
+    await expect(situationBoard.locator("[data-operational-situation-fact='blockers']")).toContainText("5 blocker(s)");
+    await expect(situationBoard.locator("[data-operational-situation-fact='git']")).toContainText("Modified: 3");
     await expect(situationBoard.locator("[data-operational-situation-fact='git']")).toContainText("Branch: main");
-    await expect(situationBoard.locator("[data-operational-situation-fact='tests']")).toContainText("Product local tests");
-    await expect(situationBoard.locator("[data-operational-situation-fact='tests']")).toContainText("Completed: 5");
-    await expect(situationBoard.locator("[data-operational-situation-fact='ci']")).toContainText("CI");
-    await expect(situationBoard.locator("[data-operational-situation-fact='next-safe']")).toContainText("./tools/product-repository-authority status --json");
+    await expect(situationBoard.locator("[data-operational-situation-fact='tests']")).toContainText("Checks whether the changes work as expected.");
+    await expect(situationBoard.locator("[data-operational-situation-fact='tests'] .status")).toHaveAttribute("data-state", "passed");
+    await expect(situationBoard.locator("[data-operational-situation-fact='ci']")).toContainText("Runs the same checks automatically outside the local machine.");
+    await expect(situationBoard.locator("[data-operational-situation-fact='next-safe']")).toContainText("Review selected context");
 
     const localTestsCard = page.locator("[data-overview-status-card='workflow']");
     const gitCard = page.locator("[data-overview-status-card='git']");
@@ -2673,18 +2675,12 @@ test.describe("English dashboard control center", () => {
 
     const navigation = page.getByRole("navigation", { name: "Dashboard categories" });
     await navigation.getByRole("link", { name: "Development Workflow", exact: true }).click();
-    const workflowOperationalDetail = page.locator("[data-operational-detail-decisions='workflow']");
-    await expect(workflowOperationalDetail.locator("[data-operational-detail-fact='git']")).toContainText("Working changes 3");
-    await expect(workflowOperationalDetail.locator("[data-operational-detail-evidence-key='local_tests'][data-evidence-source-id='product.tests.unit']")).toBeVisible();
-    await expect(workflowOperationalDetail.locator("[data-operational-detail-evidence-key='git_sync'][data-evidence-source-id='product.git.worktree']")).toBeVisible();
-    await expect(workflowOperationalDetail.locator("[data-operational-detail-evidence-key='ci'][data-evidence-source-id='product_ci_live']")).toBeVisible();
-    await expect(page.locator("#workflow .mock-table-row--live-evidence[data-evidence-source-id='product.tests.unit']")).toBeVisible();
-    await expect(page.locator("#workflow .mock-table-row--live-evidence[data-evidence-source-id='product.git.worktree']")).toBeVisible();
-    await expect(page.locator("#workflow .mock-table-row--live-evidence[data-evidence-source-id='product_ci_live']")).toBeVisible();
-    await page.locator("#workflow .mock-table-row--live-evidence[data-evidence-source-id='product.tests.unit']").getByRole("button", { name: "View details" }).click();
-    await expect(page.locator(".insight-detail-modal")).toContainText("Unit test");
-    await expect(page.locator(".insight-detail-modal")).toContainText("npm test");
-    await page.locator(".insight-detail-modal__close").click();
+    const workflowCurrentPosition = page.locator("[data-workflow-current-position='true']");
+    await expect(workflowCurrentPosition).toContainText("frame-cue");
+    await expect(workflowCurrentPosition.locator("[data-operational-situation-fact='git']")).toContainText("Modified: 3");
+    await expect(workflowCurrentPosition.locator("[data-operational-situation-fact='tests'] .status")).toHaveAttribute("data-state", "passed");
+    await expect(workflowCurrentPosition.locator("[data-operational-situation-fact='ci'] .status")).toHaveAttribute("data-state", "manual_required");
+    await expect(workflowCurrentPosition.locator("[data-operational-situation-fact='failure-blocks']")).toContainText("5");
 
     await navigation.getByRole("link", { name: "Safety Actions", exact: true }).click();
     const safetyOperationalDetail = page.locator("[data-operational-detail-decisions='safety']");
@@ -2713,7 +2709,7 @@ test.describe("English dashboard control center", () => {
 
     const navigation = page.getByRole("navigation", { name: "Dashboard categories" });
     await navigation.getByRole("link", { name: "Development Workflow", exact: true }).click();
-    await expect(page.locator("[data-operational-detail-decisions='workflow']")).toContainText("Saved snapshot fallback");
+    await expect(page.locator("[data-workflow-current-position='true']")).toContainText("Saved snapshot fallback");
   });
 
   test("renders context-scoped detail pages from saved context when selected menu snapshot is unavailable", async ({ page }) => {
@@ -2758,10 +2754,9 @@ test.describe("English dashboard control center", () => {
     await expect(page.locator(".context-switch-holding")).toHaveCount(0);
     await expect(page.locator("#workflow")).toContainText("Free Development");
     await expect(page.locator("#workflow .context-strip")).toContainText("frame-cue");
-    await expect(page.locator("[data-operational-detail-decisions='workflow']")).toContainText("frame-cue");
-    await expect(page.locator("[data-operational-detail-evidence-key='git_sync']")).toBeVisible();
-    await expect(page.locator(".mock-table-row--workflow")).toHaveCount(5);
-    await expect(page.locator(".mock-table-row--workflow [data-label='Target / branch']")).toHaveText(Array(5).fill("frame-cue"));
+    await expect(page.locator("[data-workflow-current-position='true']")).toContainText("frame-cue");
+    await expect(page.locator("[data-workflow-current-position='true'] [data-operational-situation-fact]")).toHaveCount(6);
+    await expect(page.locator("[data-workflow-update-history='true']")).toBeVisible();
     await expect(page.locator("main")).not.toContainText("task-tracker-repository");
   });
 
@@ -3171,7 +3166,12 @@ test.describe("English dashboard control center", () => {
 
     for (const target of ["Lessons", "Development Workflow", "Maintenance Sync", "Safety Actions"]) {
       await openMobileNavLink(page, target);
-      await expect(page.getByLabel("Detail page decision summary")).toBeVisible();
+      if (target === "Development Workflow") {
+        await expect(page.locator("[data-workflow-current-position='true']")).toBeVisible();
+        await expect(page.locator("[data-workflow-update-history='true']")).toBeVisible();
+      } else {
+        await expect(page.getByLabel("Detail page decision summary")).toBeVisible();
+      }
       const hasDetailOverflow = await page.locator(".app-shell").evaluate((element) => element.scrollWidth > element.clientWidth);
       expect(hasDetailOverflow).toBe(false);
     }
@@ -3275,6 +3275,7 @@ test.describe("English dashboard control center", () => {
       [readyWorkflow.selected_context.menu_id]: readyWorkflow.selected_context,
     };
     readyWorkflow.partial_failures = [];
+    readyWorkflow.summary.blocking_items = [];
     readyWorkflow.summary.category_metrics.workflow = {
       ...readyWorkflow.summary.category_metrics.workflow,
       healthy: 8,
@@ -3314,11 +3315,34 @@ test.describe("English dashboard control center", () => {
 
     await page.unroute(dashboardDataRoutePattern);
     await routeDashboardDataPayload(page, readyWorkflow);
+    await page.unroute(dashboardLiveStatusRoutePattern);
+    await routeDashboardLiveStatus(page, dashboardLiveStatusFixture({
+      localTestsStatus: "passed",
+      localTestsObservedAt: "2026-06-05T00:04:00Z",
+      localTestBlockerCount: 0,
+      localTestItems: [{ source_id: "product.tests.unit", category: "behavior", kind: "unit_test", status: "passed", observed_at: "2026-06-05T00:04:00Z" }],
+      gitStatus: "passed",
+      ciStatus: "passed",
+      ciObservedAt: "2026-06-05T00:04:00Z",
+      runId: "1001",
+      runStatus: "completed",
+      ciAuthority: "authoritative",
+      headMatchStatus: "matched",
+      securityStatus: "passed",
+      securityObservedAt: "2026-06-05T00:04:00Z",
+      securityBlockerCount: 0,
+    }));
     await page.goto("http://lesson.local/dashboard-control-center/index.html#workflow");
 
-    await expect(page.locator(".decision-summary--workflow")).toContainText("Ready");
-    await expect(page.locator(".workflow-mini-card")).toHaveCount(5);
-    await expect(page.locator(".mock-table-row--workflow")).toHaveCount(5);
+    const workflowCurrentPosition = page.locator("[data-workflow-current-position='true']");
+    const failureBlocks = workflowCurrentPosition.locator("[data-operational-situation-fact='failure-blocks']");
+    await expect(workflowCurrentPosition.locator("[data-operational-situation-fact='git'] .status")).toHaveAttribute("data-state", "passed");
+    await expect(workflowCurrentPosition.locator("[data-operational-situation-fact='tests'] .status")).toHaveAttribute("data-state", "passed");
+    await expect(workflowCurrentPosition.locator("[data-operational-situation-fact='ci'] .status")).toHaveAttribute("data-state", "passed");
+    await expect(failureBlocks.locator(".status")).toHaveAttribute("data-state", "ready");
+    await expect(failureBlocks).toContainText("0");
+    await expect(workflowCurrentPosition.locator("[data-operational-situation-fact]")).toHaveCount(6);
+    await expect(page.locator("[data-workflow-update-history='true']")).toBeVisible();
   });
 });
 
@@ -3351,10 +3375,10 @@ test.describe("Japanese dashboard control center", () => {
     await expect(page.getByRole("heading", { name: "応用レッスン" })).toBeVisible();
 
     await navigation.getByRole("link", { name: /開発ワークフロー/ }).click();
-    await expect(page.getByLabel("詳細ページ判断サマリー")).toBeVisible();
-    await expect(page.locator(".workflow-mini-card")).toHaveCount(5);
+    await expect(page.locator("[data-workflow-current-position='true']")).toContainText("現在地と進捗");
+    await expect(page.locator("[data-workflow-current-position='true'] [data-operational-situation-fact]")).toHaveCount(6);
+    await expect(page.locator("[data-workflow-update-history='true']")).toContainText("更新履歴");
     await expect(page.locator(".operation-chip", { hasText: "Merge" })).toContainText("許可");
-    await expect(page.getByRole("heading", { name: "Product Evidence" })).toBeVisible();
     await expect(page.getByText(/Development\.Product Repository/)).toHaveCount(0);
 
     await page.getByRole("navigation", { name: "リポジトリ" }).getByRole("link", { name: /ドキュメント/ }).click();
