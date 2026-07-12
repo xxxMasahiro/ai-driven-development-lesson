@@ -134,6 +134,23 @@
         "docs/workflow/REPOSITORY_DOCUMENT_SYNC.md",
         "docs/workflow/REPOSITORY_DOCUMENT_SYNC_POLICY.json"
       ]
+    },
+    "development_instruction_governance": {
+      "all_of": [
+        "AGENTS.MD",
+        "docs/workflow/INSTRUCTION_MEMORY.md",
+        "docs/workflow/DEVELOPMENT_INSTRUCTION_POLICY.tsv",
+        "docs/workflow/DEVELOPMENT_AUTONOMY_WORKFLOW.tsv",
+        "docs/workflow/REPOSITORY_DEVELOPMENT_WORKFLOW.tsv",
+        "docs/workflow/REPOSITORY_DEVELOPMENT_RUNNER_POLICY.tsv",
+        "learning/REPOSITORY_DEVELOPMENT_APPROVALS.tsv",
+        "docs/workflow/PRODUCT_REPOSITORY_STRUCTURE.tsv",
+        "free-development/FREE_DEVELOPMENT_MODE.md",
+        "templates/TEMPLATES.md",
+        "guides/DOCUMENT_MAP.md",
+        "docs/workflow/REPOSITORY_DOCUMENT_SYNC.md",
+        "docs/workflow/REPOSITORY_DOCUMENT_SYNC_POLICY.json"
+      ]
     }
   },
   "rules": [
@@ -199,6 +216,36 @@
         ]
       },
       "required_groups": ["lesson_1_7"]
+    },
+    {
+      "id": "development-instruction-governance",
+      "description": "Development instruction resolution and A-F autonomy changes update the complete parent authority, as-built, Security, verification, and CI contract.",
+      "trigger": {
+        "any_of": [
+          "docs/workflow/DEVELOPMENT_INSTRUCTION_POLICY.tsv",
+          "docs/workflow/DEVELOPMENT_AUTONOMY_WORKFLOW.tsv",
+          "docs/workflow/INSTRUCTION_MEMORY.md",
+          "docs/workflow/REPOSITORY_DEVELOPMENT_WORKFLOW.tsv",
+          "docs/workflow/REPOSITORY_DEVELOPMENT_RUNNER_POLICY.tsv",
+          "learning/REPOSITORY_DEVELOPMENT_APPROVALS.tsv",
+          "skills/repository-development-workflow/**",
+          "skills/product-development-workflow/**",
+          "tools/development-instruction",
+          "tools/lib/development_instruction.mjs",
+          "tools/lib/development_instruction.sh",
+          "tools/check_development_instruction.sh",
+          "tools/test_development_instruction.mjs",
+          "tools/test_development_instruction.sh"
+        ]
+      },
+      "required_groups": [
+        "as_built_core",
+        "verification",
+        "security",
+        "ci_hooks",
+        "development_instruction_governance"
+      ],
+      "cannot_be_exempted": true
     },
     {
       "id": "lesson-1-14",

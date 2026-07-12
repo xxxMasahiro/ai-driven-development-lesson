@@ -53,6 +53,7 @@ case "$COMMAND" in
     lesson_menu_require_settings "External Integration"
     product_workflow_git_usage_repository_boundary_gate external-integration
     lesson_product_profile_require 6 "External Integration"
+    product_workflow_git_usage_instruction_gate external-integration
     cat <<'PROMPT'
 External Integration start prompt:
 

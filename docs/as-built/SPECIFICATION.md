@@ -3170,3 +3170,52 @@ TESTS: tools/check_repository_document_sync.sh,tools/test_repository_document_sy
 The CI `repository-document-sync` job checks out full parent history, validates policy and rejection tests, then selects the GitHub event range. The final gate requires its result. The job has read-only contents permission and must contain no product authority call, dependency installation, browser execution, Dashboard generation, or external lookup.
 
 `.githooks/pre-push` is early local feedback only. It reads the standard pre-push ref tuple, skips deletions/non-branch refs, uses exact remote ranges for existing branches, uses the complete local head tree for first pushes, and never fetches.
+
+## Implemented Development Instruction Resolution And Autonomy Specification
+
+SYNC-ID: parent_instruction_memory_fallback_authority
+STATUS: implemented
+ARTIFACTS: AGENTS.MD,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/INSTRUCTION_MEMORY.md,docs/workflow/DEVELOPMENT_INSTRUCTION_POLICY.tsv,docs/workflow/DEVELOPMENT_AUTONOMY_WORKFLOW.tsv,docs/workflow/PRODUCT_REPOSITORY_STRUCTURE.tsv,free-development/FREE_DEVELOPMENT_MODE.md,templates/TEMPLATES.md,guides/DOCUMENT_MAP.md,tools/lib/development_instruction.mjs,tools/lib/development_instruction.sh,tools/development-instruction,tools/check_development_instruction.sh,tools/test_development_instruction.mjs,tools/test_development_instruction.sh,tools/lib/product_workflow_git_usage.sh,tools/free-development,tools/product-improvement,tools/external-integration,skills/product-development-workflow/SKILL.md,skills/product-development-workflow/references/product-development.md,docs/workflow/REPOSITORY_DOCUMENT_SYNC.md,docs/workflow/REPOSITORY_DOCUMENT_SYNC_POLICY.json,tools/lib/repository_document_sync.mjs,tools/test_repository_document_sync.mjs,docs/workflow/SAFEFLOW_SECURITY_BACKFILL.tsv,docs/workflow/PRODUCT_SECURITY_POLICY.tsv,docs/workflow/TEST_PLAN_MANIFEST.tsv,docs/workflow/GIT_HOOK_CHECKS.tsv,docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv,docs/workflow/GIT_HOOK_RECOMMENDATION_PATHS.tsv,docs/workflow/FINAL_GATE_EXECUTION_POLICY.tsv,docs/workflow/FINAL_GATE_CI_GRAPH.tsv,docs/workflow/FINAL_GATE_GAP_COMMANDS.tsv,docs/workflow/FINAL_GATE_COVERAGE.tsv,tools/test_lesson_repository.sh,.github/workflows/ci.yml,.github/workflows/lesson14-ci.yml,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/check_development_instruction.sh,tools/test_development_instruction.sh,tools/test_product_git_usage_modes.sh,tools/test_product_scaffold_check.sh,tools/test_menu_prerequisites.sh,tools/test_repository_document_sync.sh,tools/check_security_invariants.sh,tools/test_security_invariants.sh,tools/check_test_plan_coverage.sh,tools/test_test_plan.sh,tools/test_git_hooks.sh,tools/test_git_hooks_parallel.sh,tools/test_ci_composition.sh,tools/check_ci_workflow_structure.sh,tools/check_agents_skills.sh,tools/test_docs_tour.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh
+
+`DEVELOPMENT_INSTRUCTION_POLICY.tsv` owns locators, eligible workflow kinds,
+target scopes, supported instruction versions, bounded size, local/parent
+paths, workflow-skill selection, product operation-mode requirements, and Git
+settings locators. `DEVELOPMENT_AUTONOMY_WORKFLOW.tsv` owns the A-F order,
+repository-phase mapping, write scope, approval mode, continuation mode, Git
+policy, and stop conditions.
+
+Resolution joins `WORKFLOW_CONTEXT_MAP.tsv` and
+`MENU_PRODUCT_PROFILE_POLICY.tsv` by menu number. Lesson kinds return
+`not_applicable`. Maintenance resolves the parent target. Workflow kinds
+resolve only the selected registered product target and require a valid
+`parent_managed` operation mode. The resolver verifies Git top-level identity,
+safe configured relative paths, regular non-symlink files, bounded bytes,
+strict UTF-8, no NUL, stable file identity while reading, unique A-F headings,
+and supported declared versions. Only an `ENOENT` local-path result activates
+the parent fallback.
+
+The parent profile additionally requires its declared version and stable
+workflow-rule anchors. Existing versionless local documents use a compatibility
+profile and may contain additional headings; they still must contain exactly
+one A-F heading each. Resolution output exposes safe relative source identity,
+digest, target kind, context/menu IDs, workflow skill, stage mapping, and Git
+applicability without exposing an absolute repository path or raw instruction
+content.
+
+SYNC-ID: parent_development_autonomy_activation
+STATUS: implemented
+ARTIFACTS: AGENTS.MD,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/INSTRUCTION_MEMORY.md,docs/workflow/DEVELOPMENT_INSTRUCTION_POLICY.tsv,docs/workflow/DEVELOPMENT_AUTONOMY_WORKFLOW.tsv,docs/workflow/REPOSITORY_DEVELOPMENT_WORKFLOW.tsv,docs/workflow/REPOSITORY_DEVELOPMENT_RUNNER_POLICY.tsv,learning/REPOSITORY_DEVELOPMENT_APPROVALS.tsv,docs/workflow/GIT_WORKFLOW_POLICY.tsv,learning/GIT_WORKFLOW_SETTINGS.tsv,docs/workflow/PRODUCT_WORKFLOW_GIT_USAGE_POLICY.tsv,learning/PRODUCT_WORKFLOW_GIT_USAGE_SETTINGS.tsv,tools/lib/repository_development_workflow.sh,tools/lib/repository_development_runner.sh,tools/repository-development-workflow,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh,skills/repository-development-workflow/SKILL.md,skills/repository-development-workflow/references/repository-development.md,tools/lib/development_instruction.mjs,tools/development-instruction,tools/lib/product_workflow_git_usage.sh,skills/product-development-workflow/SKILL.md,docs/workflow/REPOSITORY_DOCUMENT_SYNC.md,docs/workflow/REPOSITORY_DOCUMENT_SYNC_POLICY.json,docs/workflow/SAFEFLOW_SECURITY_BACKFILL.tsv,docs/workflow/PRODUCT_SECURITY_POLICY.tsv,docs/workflow/TEST_PLAN_MANIFEST.tsv,docs/workflow/GIT_HOOK_CHECKS.tsv,docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv,docs/workflow/GIT_HOOK_RECOMMENDATION_PATHS.tsv,docs/workflow/FINAL_GATE_EXECUTION_POLICY.tsv,docs/workflow/FINAL_GATE_CI_GRAPH.tsv,docs/workflow/FINAL_GATE_GAP_COMMANDS.tsv,docs/workflow/FINAL_GATE_COVERAGE.tsv,tools/test_lesson_repository.sh,.github/workflows/ci.yml,.github/workflows/lesson14-ci.yml,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/check_development_instruction.sh,tools/test_development_instruction.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh,tools/test_product_git_usage_modes.sh,tools/test_menu_prerequisites.sh,tools/check_security_invariants.sh,tools/test_security_invariants.sh,tools/check_test_plan_coverage.sh,tools/test_test_plan.sh,tools/test_git_hooks.sh,tools/test_git_hooks_parallel.sh,tools/test_ci_composition.sh,tools/check_ci_workflow_structure.sh,tools/check_agents_skills.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh
+
+The repository CLI will project A-F through the existing phase policy. Runtime
+phase order and approval expectation will be data-derived rather than encoded
+as duplicate shell case tables. Legacy phase commands and `--approved` remain
+accepted. A task-scope identifier is evidence of the active request, not a
+persistent approval cache or cross-run release proof.
+
+For D, applicable actions are calculated from task scope, target kind,
+operation mode, product Git usage mode, automation level, and each saved action
+setting. `none`, `local`, `remote_sync`, and `ci` keep their existing meanings.
+Normal eligible actions may be autonomous; destructive/history/credential/
+secret/external-send/admin/scope-expansion actions remain non-automatic.

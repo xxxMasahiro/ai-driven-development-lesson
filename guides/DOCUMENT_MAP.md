@@ -97,6 +97,9 @@ The workflow documents live in `docs/workflow/`.
 | `docs/workflow/GIT_HOOK_RECOMMENDATION_PATHS.tsv` | Which changed files should make the agent recommend local `full --no-cache` verification |
 | `docs/workflow/REPOSITORY_DOCUMENT_SYNC.md` | How parent PR/push changes require category-relevant document updates without scanning child repositories |
 | `docs/workflow/REPOSITORY_DOCUMENT_SYNC_POLICY.json` | Machine-readable parent path classifications and required document groups |
+| `docs/workflow/INSTRUCTION_MEMORY.md` | Parent A-F development fallback used only when an eligible target has no valid local instruction-memory file |
+| `docs/workflow/DEVELOPMENT_INSTRUCTION_POLICY.tsv` | Local-first resolution, eligibility, version, path, operation-mode, and Settings locators |
+| `docs/workflow/DEVELOPMENT_AUTONOMY_WORKFLOW.tsv` | Data-driven A-F stage mapping, write scope, continuation, Git policy, and stop conditions |
 | `learning/GIT_HOOK_SETTINGS.tsv` | The current local Git hook mode selected for this workspace |
 
 These two files should be treated as a pair.
@@ -109,6 +112,11 @@ The pair helps answer:
 - What should happen next?
 - What should a future agent know before continuing?
 - Which Git checks run automatically before commit?
+
+Instruction-memory priority is deliberately one-way: a valid target-local file
+owns its procedure; only exact absence can select the parent fallback. The
+resolver does not merge both documents, does not repair a child by writing a
+copy, and does not apply to structured lesson workflow kinds.
 
 ## Memory Documents
 

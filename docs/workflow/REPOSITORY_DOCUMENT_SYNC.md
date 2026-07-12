@@ -26,11 +26,23 @@ authority. Its additive rules distinguish:
 - semantic CI execution ownership, provider-result proof, and direct-argv final gaps;
 - security, external sending, MCP, browser execution, and evidence boundaries;
 - the as-built trio and TASK_TRACKER/HANDOFF workflow pair.
+- local-first development instruction resolution and the A-F autonomy overlay.
 
 Multiple matching rules add requirements; a weaker rule cannot remove a
 security or verification requirement. The existing
 `AS_BUILT_SYNC_CONTRACT.tsv` remains the feature-level implementation registry.
 This range gate does not replace its metadata and semantic consistency checks.
+
+Development-instruction governance has its own immutable rule. Changes to the
+parent fallback, resolver policy, A-F mapping, repository workflow integration,
+or standalone checker must update the as-built authorities, Security,
+verification/CI catalogs, and instruction governance together. The checker
+rejects removal of this rule, removal of a protected trigger, or reduction of
+its required groups.
+
+This rule remains parent-only. CI validates the parent source and isolated
+temporary product fixtures; it does not resolve the live product registry,
+open a selected child repository, or copy an instruction file to a child.
 
 ## Range And Change Semantics
 

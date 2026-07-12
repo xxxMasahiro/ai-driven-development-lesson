@@ -129,6 +129,7 @@ ops/INTEGRATION_MANIFEST.tsv       外部連携の場合
 EXTERNAL_INTEGRATION_SECURITY.md   外部連携の場合
 .githooks/                         product側でGit hooksを使う場合
 .env.example                       環境変数が必要な場合のみ
+docs/workflow/INSTRUCTION_MEMORY.md 既存の製品固有A-F手順が必要な場合のみ。親フォールバックから自動生成・上書きしない
 ```
 
 ## LEARNING_TASK_TRACKER.md

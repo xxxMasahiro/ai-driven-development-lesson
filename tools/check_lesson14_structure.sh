@@ -31,6 +31,9 @@ required_files=(
   "$(lesson_doc_relpath handoff)"
   "$(lesson_doc_relpath developer_memory)"
   "docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv"
+  "docs/workflow/DEVELOPMENT_INSTRUCTION_POLICY.tsv"
+  "docs/workflow/DEVELOPMENT_AUTONOMY_WORKFLOW.tsv"
+  "docs/workflow/INSTRUCTION_MEMORY.md"
   "docs/workflow/GIT_WORKFLOW_POLICY.tsv"
   "docs/workflow/GIT_HOOKS_POLICY.tsv"
   "docs/workflow/GIT_HOOK_CHECKS.tsv"
@@ -95,6 +98,9 @@ required_files=(
   "tools/check_git_sync.sh"
   "tools/check_ci_status.sh"
   "tools/check_agents_skills.sh"
+  "tools/check_development_instruction.sh"
+  "tools/development-instruction"
+  "tools/test_development_instruction.sh"
   "tools/check_as_built_docs.sh"
   "tools/check_as_built_sync_contract.sh"
   "tools/check_workflow_pair_sync.sh"
@@ -128,6 +134,9 @@ required_files=(
 )
 
 executable_files=(
+  "tools/check_development_instruction.sh"
+  "tools/development-instruction"
+  "tools/test_development_instruction.sh"
   "tools/lesson14"
   "tools/lesson-context"
   "tools/roadmap"

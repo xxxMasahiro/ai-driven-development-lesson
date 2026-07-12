@@ -53,6 +53,7 @@ case "$COMMAND" in
     lesson_menu_require_settings "Product Improvement"
     product_workflow_git_usage_repository_boundary_gate product-improvement
     lesson_product_profile_require 5 "Product Improvement"
+    product_workflow_git_usage_instruction_gate product-improvement
     cat <<'PROMPT'
 Product Improvement start prompt:
 

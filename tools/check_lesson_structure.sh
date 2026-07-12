@@ -29,6 +29,9 @@ required_files=(
   "docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv"
   "docs/workflow/REPOSITORY_DOCUMENT_SYNC.md"
   "docs/workflow/REPOSITORY_DOCUMENT_SYNC_POLICY.json"
+  "docs/workflow/DEVELOPMENT_INSTRUCTION_POLICY.tsv"
+  "docs/workflow/DEVELOPMENT_AUTONOMY_WORKFLOW.tsv"
+  "docs/workflow/INSTRUCTION_MEMORY.md"
   "docs/workflow/SAFEFLOW_SECURITY_BACKFILL.tsv"
   "docs/workflow/PRODUCT_SECURITY_POLICY.tsv"
   "docs/workflow/GIT_WORKFLOW_POLICY.tsv"
@@ -74,6 +77,8 @@ required_files=(
   "tools/check_repository_boundary.sh"
   "tools/check_repository_document_sync.sh"
   "tools/check_repository_document_sync.mjs"
+  "tools/check_development_instruction.sh"
+  "tools/development-instruction"
   "tools/check_agents_skills.sh"
   "tools/check_as_built_docs.sh"
   "tools/check_as_built_sync_contract.sh"
@@ -106,6 +111,8 @@ required_files=(
   "tools/test_security_invariants.sh"
   "tools/test_repository_document_sync.sh"
   "tools/test_repository_document_sync.mjs"
+  "tools/test_development_instruction.sh"
+  "tools/test_development_instruction.mjs"
   "tools/test_git_workflow_policy.sh"
   "tools/test_git_hooks.sh"
   "docs/workflow/GIT_HOOK_RECOMMENDATION_PATHS.tsv"
@@ -135,6 +142,8 @@ required_files=(
   "tools/lib/fixture_copy.sh"
   "tools/lib/security_invariants.sh"
   "tools/lib/repository_document_sync.mjs"
+  "tools/lib/development_instruction.mjs"
+  "tools/lib/development_instruction.sh"
   "tools/lib/product_security.sh"
   "tools/lib/product_repository_authority.sh"
   "tools/lesson"
@@ -174,7 +183,7 @@ for file in "${misplaced_files[@]}"; do
   fi
 done
 
-for script in "tools/check_lesson_structure.sh" "tools/check_document_organization.sh" "tools/check_learner_display.sh" "tools/check_repository_boundary.sh" "tools/check_agents_skills.sh" "tools/check_as_built_docs.sh" "tools/check_as_built_sync_contract.sh" "tools/check_test_plan_coverage.sh" "tools/check_security_invariants.sh" "tools/fixture-copy" "tools/check_workflow_pair_sync.sh" "tools/check_review_protocol.sh" "tools/check_developer_memory_requirements.sh" "tools/list_non_english_docs.sh" "tools/test_lesson.sh" "tools/test_lesson_repository.sh" "tools/test_lesson_context.sh" "tools/test_product_gate_tools.sh" "tools/product-launch-check" "tools/test_product_launch_check.sh" "tools/product-scaffold-check" "tools/test_product_scaffold_check.sh" "tools/product-repository-authority" "tools/product-repository-mode" "tools/product-repository-registry" "tools/test_product_repository_mode.sh" "tools/product-profile" "tools/product-repository-cleanup" "tools/test_product_repository_cleanup.sh" "tools/test_product_repository_authority.sh" "tools/test_product_security.sh" "tools/test_menu_prerequisites.sh" "tools/test_docs_tour.sh" "tools/test_as_built_sync_contract.sh" "tools/test_test_plan.sh" "tools/test_fixture_copy.sh" "tools/test_security_invariants.sh" "tools/test_git_workflow_policy.sh" "tools/test_git_hooks.sh" "tools/test_lesson_start_position.sh" "tools/test_lesson_playwright.sh" "tools/test_dashboard_schema.sh" "tools/test_dashboard_data.sh" "tools/test_dashboard_control_center.sh" "tools/free-development" "tools/product-improvement" "tools/product-security" "tools/external-integration" "tools/team-development" "tools/menu" "tools/as-built-sync" "tools/test-plan" "tools/git-workflow" "tools/git-hooks" "tools/docs-tour" "tools/dashboard" "tools/dashboard-data" "tools/dashboard-control-center" "tools/illustrations" "tools/lesson" "tools/lesson-context" "tools/learn"; do
+for script in "tools/check_lesson_structure.sh" "tools/check_document_organization.sh" "tools/check_learner_display.sh" "tools/check_repository_boundary.sh" "tools/check_agents_skills.sh" "tools/check_as_built_docs.sh" "tools/check_as_built_sync_contract.sh" "tools/check_test_plan_coverage.sh" "tools/check_security_invariants.sh" "tools/check_development_instruction.sh" "tools/development-instruction" "tools/test_development_instruction.sh" "tools/fixture-copy" "tools/check_workflow_pair_sync.sh" "tools/check_review_protocol.sh" "tools/check_developer_memory_requirements.sh" "tools/list_non_english_docs.sh" "tools/test_lesson.sh" "tools/test_lesson_repository.sh" "tools/test_lesson_context.sh" "tools/test_product_gate_tools.sh" "tools/product-launch-check" "tools/test_product_launch_check.sh" "tools/product-scaffold-check" "tools/test_product_scaffold_check.sh" "tools/product-repository-authority" "tools/product-repository-mode" "tools/product-repository-registry" "tools/test_product_repository_mode.sh" "tools/product-profile" "tools/product-repository-cleanup" "tools/test_product_repository_cleanup.sh" "tools/test_product_repository_authority.sh" "tools/test_product_security.sh" "tools/test_menu_prerequisites.sh" "tools/test_docs_tour.sh" "tools/test_as_built_sync_contract.sh" "tools/test_test_plan.sh" "tools/test_fixture_copy.sh" "tools/test_security_invariants.sh" "tools/test_git_workflow_policy.sh" "tools/test_git_hooks.sh" "tools/test_lesson_start_position.sh" "tools/test_lesson_playwright.sh" "tools/test_dashboard_schema.sh" "tools/test_dashboard_data.sh" "tools/test_dashboard_control_center.sh" "tools/free-development" "tools/product-improvement" "tools/product-security" "tools/external-integration" "tools/team-development" "tools/menu" "tools/as-built-sync" "tools/test-plan" "tools/git-workflow" "tools/git-hooks" "tools/docs-tour" "tools/dashboard" "tools/dashboard-data" "tools/dashboard-control-center" "tools/illustrations" "tools/lesson" "tools/lesson-context" "tools/learn"; do
   if [[ ! -x "$ROOT/$script" ]]; then
     printf 'not executable: %s\n' "$script" >&2
     missing=1

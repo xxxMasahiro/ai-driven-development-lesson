@@ -1,8 +1,8 @@
 # phase_id	approval_scope	required	default_state	description
 context_triage	read_repository_context	false	not_required	Read-only context gathering does not require a separate approval beyond the developer request.
-proposal	present_structured_proposal	false	not_required	Proposal writing remains read-only and stops before protected synchronization.
-implementation_plan	synchronize_planned_documents	true	not_granted	Developer approval is required before syncing planned requirements, specification, plan, tracker, and handoff.
-fast_loop	implement_runtime_changes	true	not_granted	Developer approval is required before runtime implementation, especially owner-layer, hook, CI, or skill changes.
+proposal	present_structured_proposal	false	not_required	Proposal writing is read-only and may continue inside the current task scope when no stop condition applies.
+implementation_plan	synchronize_planned_documents	false	not_required	The current developer-requested task scope authorizes planned document synchronization without a separate phase prompt.
+fast_loop	implement_runtime_changes	false	not_required	The current task scope authorizes scoped runtime implementation; destructive work and scope expansion remain separate stop conditions.
 mid_tests	run_medium_verification	false	not_required	Focused and medium checks may run when required by the changed scope.
-release_gate	run_release_proof_and_pr_ci	true	not_granted	Heavy aggregate proof, PR CI, and merge preparation require the release-gate phase or explicit developer approval.
-main_sync_cleanup	merge_main_sync_and_cleanup	true	not_granted	Merge, main CI waiting, local/remote sync, and any cleanup execution require explicit developer approval.
+release_gate	run_release_proof_and_pr_ci	false	not_required	Required proof and normal Git integration may proceed when task scope and saved action settings allow; failed CI and unsafe operations still stop.
+main_sync_cleanup	merge_main_sync_and_cleanup	false	not_required	Eligible merge, main CI monitoring, and sync follow task scope and Settings; destructive cleanup always remains approval-bound.

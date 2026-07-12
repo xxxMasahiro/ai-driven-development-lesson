@@ -44,11 +44,11 @@ cat >"$APPROVALS_FILE" <<'DOC'
 # phase_id	approval_scope	required	default_state	description
 context_triage	read_repository_context	false	not_required	Test approval.
 proposal	present_structured_proposal	false	not_required	Test approval.
-implementation_plan	synchronize_planned_documents	true	not_granted	Test approval.
-fast_loop	implement_runtime_changes	true	not_granted	Test approval.
+implementation_plan	synchronize_planned_documents	false	not_required	Test approval.
+fast_loop	implement_runtime_changes	false	not_required	Test approval.
 mid_tests	run_medium_verification	false	not_required	Test approval.
-release_gate	run_release_proof_and_pr_ci	true	not_granted	Test approval.
-main_sync_cleanup	merge_main_sync_and_cleanup	true	not_granted	Test approval.
+release_gate	run_release_proof_and_pr_ci	false	not_required	Test approval.
+main_sync_cleanup	merge_main_sync_and_cleanup	false	not_required	Test approval.
 DOC
 
 write_valid_approvals() {
@@ -56,11 +56,11 @@ write_valid_approvals() {
 # phase_id	approval_scope	required	default_state	description
 context_triage	read_repository_context	false	not_required	Test approval.
 proposal	present_structured_proposal	false	not_required	Test approval.
-implementation_plan	synchronize_planned_documents	true	not_granted	Test approval.
-fast_loop	implement_runtime_changes	true	not_granted	Test approval.
+implementation_plan	synchronize_planned_documents	false	not_required	Test approval.
+fast_loop	implement_runtime_changes	false	not_required	Test approval.
 mid_tests	run_medium_verification	false	not_required	Test approval.
-release_gate	run_release_proof_and_pr_ci	true	not_granted	Test approval.
-main_sync_cleanup	merge_main_sync_and_cleanup	true	not_granted	Test approval.
+release_gate	run_release_proof_and_pr_ci	false	not_required	Test approval.
+main_sync_cleanup	merge_main_sync_and_cleanup	false	not_required	Test approval.
 DOC
 }
 
@@ -69,11 +69,11 @@ write_valid_runner_policy() {
 # phase_id	order	execution_mode	executable_check_sets	record_required	reuse_allowed	approval_required	release_policy	destructive_execution	stop_policy
 context_triage	1	plan_only	none	false	false	false	no_release_proof	false	plan_first
 proposal	2	plan_only	none	false	false	false	no_release_proof	false	plan_first
-implementation_plan	3	plan_only	none	false	false	true	no_release_proof	false	docs_sync_only
-fast_loop	4	local_checks	recommended|required	true	true	true	no_release_proof	false	scoped_runtime_only
+implementation_plan	3	plan_only	none	false	false	false	no_release_proof	false	docs_sync_only
+fast_loop	4	local_checks	recommended|required	true	true	false	no_release_proof	false	scoped_runtime_only
 mid_tests	5	local_checks	recommended|required	true	true	false	no_release_proof	false	medium_verification
-release_gate	6	plan_only	none	false	false	true	strict_release_proof	false	owner_release_gate_only
-main_sync_cleanup	7	plan_only	none	false	false	true	strict_main_sync_proof	false	approval_bound_cleanup_only
+release_gate	6	plan_only	none	false	false	false	strict_release_proof	false	owner_release_gate_only
+main_sync_cleanup	7	plan_only	none	false	false	false	strict_main_sync_proof	false	task_scope_sync_and_approval_bound_destructive_cleanup
 DOC
 }
 
@@ -88,7 +88,7 @@ implementation_plan	3	Prepare plan.	approved_proposal	docs_planned_sync	check_as
 fast_loop	4	Implement focused scope.	approved_plan	scoped_runtime_files	quick_pass|check_agents_skills	quick_pass	local_only	approval_before_AGENTS_hooks_ci_or_destructive_changes	plan_only	security_regression
 mid_tests	5	Run medium checks.	implemented_scope	test_outputs_only	quick_pass|check_ci_workflow_structure	quick_pass	local_required_ci_not_yet	approval_before_heavy_gate_if_not_requested	plan_only	repeated_failure_3
 release_gate	6	Release proof.	docs_synced	evidence_only	test_lesson_repository	check_as_built_sync_contract|check_as_built_docs|check_workflow_pair_sync|check_lesson_structure|check_lesson14_structure|check_agents_skills|test_lesson_repository	pr_ci_required|full_hooks_required|pre_commit_required	developer_approval_before_push_merge	plan_only	ci_failure
-main_sync_cleanup	7	Main sync cleanup.	pr_ci_passed	git_state_and_cleanup_only_after_approval	check_as_built_sync_contract|check_as_built_docs|test_lesson_repository	check_as_built_sync_contract|check_as_built_docs|test_lesson_repository	merge_required|main_ci_required|local_remote_sync_required	explicit_approval_required_for_merge_sync_cleanup	approval_bound_plan_only_until_confirmed	main_ci_failure
+main_sync_cleanup	7	Main sync cleanup.	pr_ci_passed|task_scope|settings_intersection	git_state_and_normal_sync_only	check_as_built_sync_contract|check_as_built_docs|test_lesson_repository	check_as_built_sync_contract|check_as_built_docs|test_lesson_repository	merge_required|main_ci_required|local_remote_sync_required	task_scope_and_settings_for_merge_sync|explicit_approval_for_destructive_cleanup	destructive_cleanup_plan_only_until_confirmed	main_ci_failure
 DOC
 }
 
@@ -120,14 +120,12 @@ run_workflow gate --phase release_gate | grep 'does not prove listed checks pass
 run_workflow detect | grep 'Detected phase:' >/dev/null
 run_workflow plan-run --phase fast_loop --check-set required | grep 'quick_pass: ./tools/repository-development-workflow check' >/dev/null
 run_workflow run --phase fast_loop --check-set required | grep 'Runner dry-run only' >/dev/null
-expect_failure runner_needs_approval run_workflow run --phase fast_loop --check-set required --execute
-grep 'requires --approved' "$TMP_DIR/runner_needs_approval.out" >/dev/null
-run_workflow run --phase fast_loop --check-set required --execute --approved | grep 'Runner execution passed for phase fast_loop' >/dev/null
+run_workflow run --phase fast_loop --check-set required --execute | grep 'Runner execution passed for phase fast_loop' >/dev/null
 run_workflow status --runs | grep 'quick_pass' >/dev/null
 run_workflow next --phase fast_loop | grep 'next phase is mid_tests' >/dev/null
 run_workflow run --phase fast_loop --check-set required --execute --approved | grep 'reuse: quick_pass' >/dev/null
 printf 'bbbb\n' >"$FINGERPRINT_REPO/input.txt"
-content_change_output="$(run_workflow run --phase fast_loop --check-set required --execute --approved)"
+content_change_output="$(run_workflow run --phase fast_loop --check-set required --execute)"
 grep 'run: quick_pass' <<<"$content_change_output" >/dev/null
 if grep -Fq 'reuse: quick_pass' <<<"$content_change_output"; then
   printf 'repository runner reused a pass after dirty file content changed without a status-name change\n' >&2
@@ -166,7 +164,7 @@ write_valid_policy
 awk 'BEGIN { FS = OFS = "\t" } $1 == "main_sync_cleanup" { $10 = "plan_only" } { print }' "$POLICY_FILE" >"$TMP_DIR/no-cleanup-approval.tsv"
 mv "$TMP_DIR/no-cleanup-approval.tsv" "$POLICY_FILE"
 expect_failure no_cleanup_approval run_workflow check
-grep 'main_sync_cleanup cleanup behavior must remain approval-bound' "$TMP_DIR/no_cleanup_approval.out" >/dev/null
+grep 'main_sync_cleanup destructive cleanup must remain plan-only' "$TMP_DIR/no_cleanup_approval.out" >/dev/null
 
 write_valid_policy
 awk 'BEGIN { FS = OFS = "\t" } $1 == "fast_loop" { $7 = "missing_check" } { print }' "$POLICY_FILE" >"$TMP_DIR/unknown-check.tsv"
@@ -184,13 +182,13 @@ write_valid_policy
 awk 'BEGIN { FS = OFS = "\t" } $1 == "proposal" { $2 = "7" } { print }' "$POLICY_FILE" >"$TMP_DIR/order.tsv"
 mv "$TMP_DIR/order.tsv" "$POLICY_FILE"
 expect_failure invalid_order run_workflow check
-grep 'invalid order for phase proposal: expected 2, got 7' "$TMP_DIR/invalid_order.out" >/dev/null
+grep 'duplicate repository development phase order: 7' "$TMP_DIR/invalid_order.out" >/dev/null
 
 write_valid_policy
 awk 'BEGIN { FS = OFS = "\t" } $1 == "proposal" { next } { print }' "$POLICY_FILE" >"$TMP_DIR/missing-phase.tsv"
 mv "$TMP_DIR/missing-phase.tsv" "$POLICY_FILE"
 expect_failure missing_phase run_workflow check
-grep 'missing repository development phase: proposal' "$TMP_DIR/missing_phase.out" >/dev/null
+grep 'missing repository development phase order: 2' "$TMP_DIR/missing_phase.out" >/dev/null
 
 write_valid_policy
 awk 'BEGIN { FS = OFS = "\t" } $1 == "proposal" { print $1, $2, $3; next } { print }' "$POLICY_FILE" >"$TMP_DIR/malformed.tsv"
@@ -212,13 +210,13 @@ expect_failure duplicate_approval run_workflow check
 grep 'duplicate repository development approval phase: context_triage' "$TMP_DIR/duplicate_approval.out" >/dev/null
 
 write_valid_policy
-awk 'BEGIN { FS = OFS = "\t" } $1 == "main_sync_cleanup" { $3 = "false"; $4 = "not_required" } { print }' "$APPROVALS_FILE" >"$TMP_DIR/weakened-approval.tsv"
+awk 'BEGIN { FS = OFS = "\t" } $1 == "main_sync_cleanup" { $3 = "true"; $4 = "not_granted" } { print }' "$APPROVALS_FILE" >"$TMP_DIR/weakened-approval.tsv"
 mv "$TMP_DIR/weakened-approval.tsv" "$APPROVALS_FILE"
 expect_failure weakened_approval run_workflow check
-grep 'invalid approval required value for main_sync_cleanup: expected true, got false' "$TMP_DIR/weakened_approval.out" >/dev/null
+grep 'invalid runner approval_required for main_sync_cleanup: expected true, got false' "$TMP_DIR/weakened_approval.out" >/dev/null
 
 write_valid_policy
-awk 'BEGIN { FS = OFS = "\t" } $1 == "fast_loop" { $4 = "not_required" } { print }' "$APPROVALS_FILE" >"$TMP_DIR/unsafe-approval-default.tsv"
+awk 'BEGIN { FS = OFS = "\t" } $1 == "fast_loop" { $3 = "true"; $4 = "not_required" } { print }' "$APPROVALS_FILE" >"$TMP_DIR/unsafe-approval-default.tsv"
 mv "$TMP_DIR/unsafe-approval-default.tsv" "$APPROVALS_FILE"
 expect_failure unsafe_approval_default run_workflow check
 grep 'invalid approval default state for fast_loop: expected not_granted, got not_required' "$TMP_DIR/unsafe_approval_default.out" >/dev/null
@@ -236,10 +234,10 @@ expect_failure runner_destructive run_workflow check
 grep 'runner destructive execution must remain false for phase fast_loop' "$TMP_DIR/runner_destructive.out" >/dev/null
 
 write_valid_policy
-awk 'BEGIN { FS = OFS = "\t" } $1 == "fast_loop" { $7 = "false" } { print }' "$RUNNER_POLICY_FILE" >"$TMP_DIR/runner-approval.tsv"
+awk 'BEGIN { FS = OFS = "\t" } $1 == "fast_loop" { $7 = "true" } { print }' "$RUNNER_POLICY_FILE" >"$TMP_DIR/runner-approval.tsv"
 mv "$TMP_DIR/runner-approval.tsv" "$RUNNER_POLICY_FILE"
 expect_failure runner_weakened_approval run_workflow check
-grep 'invalid runner approval_required for fast_loop: expected true, got false' "$TMP_DIR/runner_weakened_approval.out" >/dev/null
+grep 'invalid runner approval_required for fast_loop: expected false, got true' "$TMP_DIR/runner_weakened_approval.out" >/dev/null
 
 write_valid_policy
 awk 'BEGIN { FS = OFS = "\t" } $1 == "fast_loop" { next } { print }' "$RUNNER_POLICY_FILE" >"$TMP_DIR/runner-missing-phase.tsv"
