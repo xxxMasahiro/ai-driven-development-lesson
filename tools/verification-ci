@@ -1,0 +1,77 @@
+#!/usr/bin/env node
+
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+import {
+  createCiProof,
+  loadCiComposition,
+  loadGapCommands,
+  runCiOwner,
+  runFallback,
+  runGapCommands,
+  validateCiComposition,
+  verifyConfiguredFinalProof,
+  verifyCiProof,
+} from './lib/ci_composition.mjs';
+import { loadExecutionPolicy, VerificationError } from './lib/verification_core.mjs';
+
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+
+function parse(argv) {
+  const command = argv.shift();
+  const options = { root: process.env.LESSON_ROOT || ROOT, jobs: 4 };
+  for (let index = 0; index < argv.length; index += 1) {
+    const arg = argv[index];
+    if (['--root', '--policy', '--graph', '--workflow', '--job', '--results-json', '--output', '--file', '--jobs'].includes(arg)) {
+      if (index + 1 >= argv.length) throw new VerificationError('CI_CLI', `${arg} requires a value`);
+      options[arg.slice(2).replace('-', '')] = argv[index + 1];
+      index += 1;
+      continue;
+    }
+    throw new VerificationError('CI_CLI', `unknown verification-ci option: ${arg}`);
+  }
+  options.jobs = Number(options.jobs);
+  if (!Number.isSafeInteger(options.jobs) || options.jobs <= 0) throw new VerificationError('CI_CLI', '--jobs must be a positive integer');
+  return { command, options };
+}
+
+try {
+  const { command, options } = parse(process.argv.slice(2));
+  const commandOnly = ['validate-gaps', 'run-gaps', 'fallback'].includes(command);
+  const composition = commandOnly
+    ? { root: path.resolve(options.root), policy: await loadExecutionPolicy({ root: options.root, policyPath: options.policy }) }
+    : await loadCiComposition({ root: options.root, policyPath: options.policy, graphPath: options.graph });
+  if (command === 'check') {
+    const errors = validateCiComposition(composition);
+    if (errors.length) throw new VerificationError('CI_GRAPH_INVALID', errors.join('\n'));
+    process.stdout.write('CI composition graph check passed.\n');
+  } else if (command === 'run-job') {
+    const result = await runCiOwner({ composition, workflowId: options.workflow, jobId: options.job, jobs: options.jobs });
+    if (result.run.output) process.stdout.write(result.run.output);
+    process.stdout.write(`CI composed owner passed: ${options.workflow}/${options.job} (${result.plan.executionCount} executions).\n`);
+  } else if (command === 'proof') {
+    const proof = await createCiProof({ composition, workflowId: options.workflow, jobId: options.job, resultsJson: options.resultsjson || process.env.CI_COMPOSED_RESULTS_JSON, output: options.output });
+    process.stdout.write(`CI composed proof passed: ${proof.workflow_id}/${proof.source_job}.\n`);
+  } else if (command === 'verify-proof') {
+    await verifyCiProof({ composition, file: options.file, workflowId: options.workflow, jobId: options.job });
+    process.stdout.write('CI composed proof verification passed.\n');
+  } else if (command === 'verify-final-proof') {
+    await verifyConfiguredFinalProof({ composition, file: options.file });
+    process.stdout.write('CI composed final proof verification passed.\n');
+  } else if (command === 'validate-gaps') {
+    await loadGapCommands({ composition });
+    process.stdout.write('CI final-gap argv validation passed.\n');
+  } else if (command === 'run-gaps') {
+    const result = await runGapCommands({ composition });
+    for (const row of result.rows) process.stdout.write(`final-gate gap run: ${row.id}\n`);
+  } else if (command === 'fallback') {
+    const run = await runFallback({ composition });
+    if (run.output) process.stdout.write(run.output);
+  } else {
+    throw new VerificationError('CI_CLI', `unknown verification-ci command: ${command ?? 'missing'}`);
+  }
+} catch (error) {
+  process.stderr.write(`${error instanceof VerificationError ? `${error.code}: ${error.message}` : error?.stack ?? error}\n`);
+  process.exitCode = 1;
+}

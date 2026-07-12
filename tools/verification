@@ -1,0 +1,227 @@
+#!/usr/bin/env node
+
+import { execFileSync } from 'node:child_process';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+import {
+  VerificationError,
+  canonicalCommandDigest,
+  commandsEquivalent,
+  computeVerificationPolicyFingerprint,
+  fingerprintRepository,
+  loadCompatibilityCatalog,
+  loadEvidenceSchema,
+  loadExecutionPolicy,
+  parseCommandIdentity,
+  recordEvidenceV2,
+  verificationDigest,
+  verifyEvidenceV2,
+} from './lib/verification_core.mjs';
+
+const DEFAULT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+
+function usage() {
+  process.stderr.write(`Usage:
+  ./tools/verification status [--root <path>] [--policy <path>]
+  ./tools/verification fingerprint [--root <path>] [--input <relative-path>...]
+  ./tools/verification command-digest (--command <identity> | --argv-json <json>)
+  ./tools/verification equivalent --left-json <json> --right-json <json>
+  ./tools/verification evidence <record|verify> <id> --subject <id> (--command <identity> | --argv-json <json>) [options]
+
+Evidence options:
+  --root <path> --policy <path> --schema <path> --evidence-dir <path>
+  --input <relative-path> --scope <scope> --event <event> --ref <ref>
+  --workflow <id> --run-id <id> --run-attempt <number> --source-job <id>
+  --environment-profile <id> --policy-fingerprint <digest>
+  --toolchain-fingerprint <digest> --result-digest <digest>
+  --artifact-lineage-digest <digest>
+`);
+}
+
+function takeValue(args, index, option) {
+  if (index + 1 >= args.length) throw new VerificationError('CLI_ARGUMENT', `${option} requires a value`);
+  return args[index + 1];
+}
+
+function parseOptions(args) {
+  const options = { inputs: [] };
+  for (let index = 0; index < args.length; index += 1) {
+    const option = args[index];
+    switch (option) {
+      case '--root':
+      case '--policy':
+      case '--schema':
+      case '--evidence-dir':
+      case '--command':
+      case '--argv-json':
+      case '--subject':
+      case '--scope':
+      case '--event':
+      case '--ref':
+      case '--workflow':
+      case '--run-id':
+      case '--run-attempt':
+      case '--source-job':
+      case '--environment-profile':
+      case '--policy-fingerprint':
+      case '--toolchain-fingerprint':
+      case '--result-digest':
+      case '--artifact-lineage-digest':
+      case '--left-json':
+      case '--right-json': {
+        const key = option.slice(2).replaceAll('-', '_');
+        options[key] = takeValue(args, index, option);
+        index += 1;
+        break;
+      }
+      case '--input':
+        options.inputs.push(takeValue(args, index, option));
+        index += 1;
+        break;
+      default:
+        throw new VerificationError('CLI_ARGUMENT', `Unknown option: ${option}`);
+    }
+  }
+  return options;
+}
+
+function parseArgv(options) {
+  if (options.command && options.argv_json) throw new VerificationError('CLI_ARGUMENT', 'Use either --command or --argv-json');
+  if (options.command) return parseCommandIdentity(options.command);
+  if (options.argv_json) {
+    let value;
+    try {
+      value = JSON.parse(options.argv_json);
+    } catch {
+      throw new VerificationError('CLI_ARGUMENT', '--argv-json must be valid JSON');
+    }
+    canonicalCommandDigest(value);
+    return value;
+  }
+  throw new VerificationError('CLI_ARGUMENT', 'A command identity or argv JSON value is required');
+}
+
+function gitPath(root, name) {
+  const value = execFileSync('git', ['-C', root, 'rev-parse', '--git-path', name], { encoding: 'utf8' }).trim();
+  return path.resolve(root, value);
+}
+
+function evidenceDirectory(root, options) {
+  if (options.evidence_dir) return path.resolve(options.evidence_dir);
+  if (process.env.VERIFICATION_EVIDENCE_V2_DIR) return path.resolve(process.env.VERIFICATION_EVIDENCE_V2_DIR);
+  if (process.env.CI_EVIDENCE_DIR) return path.resolve(process.env.CI_EVIDENCE_DIR, 'v2');
+  return gitPath(root, 'verification-evidence-v2');
+}
+
+function defaultContext(options) {
+  const event = options.event ?? process.env.GITHUB_EVENT_NAME ?? 'local';
+  const scope = options.scope ?? process.env.VERIFICATION_SCOPE ?? (event === 'pull_request' ? 'pull-request' : event === 'push' ? 'push' : 'local');
+  const attempt = options.run_attempt ?? process.env.GITHUB_RUN_ATTEMPT ?? '1';
+  const githubRun = process.env.GITHUB_RUN_ID;
+  return {
+    scope,
+    eventName: event,
+    ref: options.ref ?? process.env.GITHUB_REF ?? 'local',
+    workflow: options.workflow ?? process.env.GITHUB_WORKFLOW ?? 'local',
+    runId: options.run_id ?? process.env.CI_EVIDENCE_RUN_ID ?? (githubRun ? `${githubRun}-${attempt}` : `local-${process.pid}`),
+    runAttempt: attempt,
+    sourceJob: options.source_job ?? process.env.CI_EVIDENCE_SOURCE_JOB ?? process.env.GITHUB_JOB ?? 'local',
+  };
+}
+
+async function evidenceContext(id, options) {
+  if (!options.subject) throw new VerificationError('CLI_ARGUMENT', '--subject is required');
+  const root = path.resolve(options.root ?? DEFAULT_ROOT);
+  const policy = await loadExecutionPolicy({ root, policyPath: options.policy });
+  const schema = await loadEvidenceSchema({ root, schemaPath: options.schema });
+  const catalog = await loadCompatibilityCatalog({ root, policy });
+  const policyFingerprint =
+    options.policy_fingerprint ?? (await computeVerificationPolicyFingerprint({ policy, schema, catalog }));
+  return {
+    root,
+    policyPath: policy.file,
+    schemaPath: schema.file,
+    evidenceDir: evidenceDirectory(root, options),
+    evidenceId: id,
+    subjectId: options.subject,
+    argv: parseArgv(options),
+    environmentProfile: options.environment_profile ?? 'default',
+    inputPaths: options.inputs,
+    policyFingerprint,
+    toolchainFingerprint:
+      options.toolchain_fingerprint ??
+      verificationDigest({ runtime: 'node', version: process.version, platform: process.platform, architecture: process.arch }),
+    resultDigest: options.result_digest ?? verificationDigest({ status: 'success', exitCode: 0 }),
+    artifactLineageDigest: options.artifact_lineage_digest ?? verificationDigest({ lineage: 'none' }),
+    ...defaultContext(options),
+  };
+}
+
+async function main() {
+  const args = process.argv.slice(2);
+  const command = args.shift();
+  if (!command || command === '--help' || command === '-h' || command === 'help') {
+    usage();
+    return command ? 0 : 1;
+  }
+  if (command === 'status') {
+    const options = parseOptions(args);
+    const root = path.resolve(options.root ?? DEFAULT_ROOT);
+    const policy = await loadExecutionPolicy({ root, policyPath: options.policy });
+    const schema = await loadEvidenceSchema({ root, schemaPath: options.schema });
+    const catalog = await loadCompatibilityCatalog({ root, policy });
+    const policyFingerprint = await computeVerificationPolicyFingerprint({ policy, schema, catalog });
+    process.stdout.write(`${JSON.stringify({
+      schema_version: policy.settings.get('schema_version'),
+      activation_mode: policy.settings.get('activation_mode'),
+      evidence_authority: policy.settings.get('v2_evidence_authority'),
+      policy_fingerprint: policyFingerprint,
+      counts: catalog.counts,
+    }, null, 2)}\n`);
+    return 0;
+  }
+  if (command === 'fingerprint') {
+    const options = parseOptions(args);
+    const result = await fingerprintRepository({ root: options.root ?? DEFAULT_ROOT, inputPaths: options.inputs });
+    process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
+    return 0;
+  }
+  if (command === 'command-digest') {
+    const options = parseOptions(args);
+    process.stdout.write(`${canonicalCommandDigest(parseArgv(options), options.environment_profile ?? 'default')}\n`);
+    return 0;
+  }
+  if (command === 'equivalent') {
+    const options = parseOptions(args);
+    if (!options.left_json || !options.right_json) throw new VerificationError('CLI_ARGUMENT', 'Both JSON values are required');
+    const result = commandsEquivalent(JSON.parse(options.left_json), JSON.parse(options.right_json));
+    process.stdout.write(`${JSON.stringify(result)}\n`);
+    return result.equivalent ? 0 : 1;
+  }
+  if (command === 'evidence') {
+    const operation = args.shift();
+    const id = args.shift();
+    if (!['record', 'verify'].includes(operation) || !id) throw new VerificationError('CLI_ARGUMENT', 'Evidence operation and id are required');
+    const options = parseOptions(args);
+    const context = await evidenceContext(id, options);
+    const result = operation === 'record' ? await recordEvidenceV2(context) : await verifyEvidenceV2(context);
+    process.stdout.write(`${operation === 'record' ? 'recorded' : 'verified'} version 2 evidence: ${result.receipt.evidence_id}\n`);
+    return 0;
+  }
+  throw new VerificationError('CLI_ARGUMENT', `Unknown command: ${command}`);
+}
+
+main()
+  .then((code) => {
+    process.exitCode = code;
+  })
+  .catch((error) => {
+    if (error instanceof VerificationError) {
+      process.stderr.write(`${error.code}: ${error.message}\n`);
+      process.exitCode = 1;
+      return;
+    }
+    process.stderr.write(`${error?.stack ?? error}\n`);
+    process.exitCode = 1;
+  });

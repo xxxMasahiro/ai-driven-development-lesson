@@ -1,0 +1,28 @@
+# field	required	classification	description
+schema_version	true	public-metadata	Evidence schema version; version 2 records use 2.0.0.
+marker	true	public-metadata	Exact marker identifying a version 2 verification receipt.
+evidence_id	true	public-metadata	Stable logical evidence identifier.
+attempt_key	true	digest	Digest of scope, event/ref, HEAD, run attempt, subject, and input fingerprint.
+status	true	public-metadata	Only success may satisfy a required check.
+scope	true	public-metadata	Validated execution scope such as local, pull-request, or push.
+event_name	true	public-metadata	Validated event identifier without event payload data.
+ref	true	public-metadata	Validated ref identity; credentials and URLs are forbidden.
+head_sha	true	public-metadata	Full repository commit identity or the explicit unknown sentinel.
+workflow	true	public-metadata	Workflow identity supplied by the provider adapter.
+run_id	true	public-metadata	Execution-run identity supplied by the local or CI adapter.
+run_attempt	true	public-metadata	Validated positive attempt number.
+source_job	true	public-metadata	Single producer job or local owner identity.
+subject_id	true	public-metadata	Stable logical check identifier.
+repository_fingerprint	true	digest	Digest-bound repository identity without recording a repository URL or absolute path.
+command_digest	true	digest	Digest of the canonical executable and argument array.
+input_fingerprint	true	digest	Content fingerprint covering tracked, index, worktree, and non-ignored untracked inputs.
+policy_fingerprint	true	digest	Digest of the effective verification policies.
+worktree_state	true	public-metadata	Clean, dirty, or unknown; unknown cannot be reused.
+toolchain_fingerprint	true	digest	Digest of configured toolchain identities and versions.
+result_digest	true	digest	Digest of the normalized result metadata, never raw output.
+artifact_lineage_digest	true	digest	Digest binding declared outputs and upstream receipts; none is represented by a stable sentinel.
+created_at	true	public-metadata	UTC creation timestamp used for diagnostics, not for identity matching.
+raw_log	false	forbidden	Raw command output must not be stored in authoritative evidence.
+environment_dump	false	forbidden	Environment-variable dumps must not be stored in evidence.
+secret_value	false	forbidden	Secrets, tokens, keys, credentials, and secret-like values are forbidden.
+absolute_path	false	forbidden	Host-specific absolute paths are forbidden.

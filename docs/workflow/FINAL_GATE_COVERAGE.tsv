@@ -15,10 +15,10 @@ as_built_evidence_run_sync_contract_check	hook	check_as_built_sync_contract	Aggr
 ./tools/check_repository_development_workflow.sh	hook	check_repository_development_workflow	Aggregate repository development workflow coverage is provided by the matching Git hook row.
 ./tools/check_repository_document_sync.sh	hook	check_repository_document_sync	Aggregate parent document-sync policy coverage is provided by the matching Git hook row.
 ./tools/check_dashboard_design_system.sh	hook	check_dashboard_design_system	Aggregate Dashboard design-system coverage is provided by the matching Git hook row.
-./tools/check_dashboard_bundle_contract.sh	hook	check_dashboard_bundle_contract	Aggregate Dashboard bundle-size and chunk-warning coverage is provided by the matching Git hook row.
 ./tools/test_dashboard_design_studio_events.sh	hook	test_dashboard_design_studio_events	Aggregate Design Studio event runner/store coverage is provided by the matching Git hook row.
 ./tools/test_docs_tour.sh	hook	test_docs_tour	Aggregate documentation tour coverage is provided by the matching Git hook row.
 ./tools/test_as_built_sync_contract.sh	hook	test_as_built_sync_contract	Aggregate sync-contract regression coverage is provided by the matching Git hook row.
+./tools/test_as_built_single_pass.sh	hook	test_as_built_single_pass	Aggregate single-pass as-built coverage is provided by the matching Git hook row.
 ./tools/test_test_plan.sh	hook	test_test_plan	Aggregate test-plan regression coverage is provided by the matching Git hook row.
 ./tools/test_repository_development_workflow.sh	hook	test_repository_development_workflow	Aggregate repository development workflow regression coverage is provided by the matching Git hook row.
 ./tools/test_repository_document_sync.sh	hook	test_repository_document_sync	Aggregate parent document-sync rejection coverage is provided by the matching Git hook row.
@@ -32,6 +32,10 @@ as_built_evidence_run_sync_contract_check	hook	check_as_built_sync_contract	Aggr
 ./tools/test_git_hooks_parallel.sh	hook	test_git_hooks_parallel	Aggregate Git hooks parallel coverage is provided by the matching Git hook row.
 ./tools/test_fixture_copy.sh	hook	test_fixture_copy	Aggregate fixture-copy coverage is provided by the matching Git hook row.
 ./tools/test_ci_evidence.sh	hook	test_ci_evidence	Aggregate CI evidence coverage is provided by the matching Git hook row.
+./tools/test_verification_foundation.sh	hook	test_verification_foundation	Aggregate verification foundation coverage is provided by the matching Git hook row.
+./tools/test_verification_runner.sh	hook	test_verification_runner	Aggregate scheduler and cancellation coverage is provided by the matching Git hook row.
+./tools/test_verification_git_hooks.sh	hook	test_verification_git_hooks	Aggregate exact-once hook adapter coverage is provided by the matching Git hook row.
+./tools/test_dashboard_same_run_verification.sh	hook	test_dashboard_same_run_verification	Aggregate Dashboard manifest and receipt refusal coverage is provided by the matching Git hook row.
 ./tools/test_ci_timing.sh	hook	test_ci_timing	Aggregate CI timing coverage is provided by the matching Git hook row.
 ./tools/test_dashboard_schema.sh	hook	test_dashboard_schema	Aggregate dashboard schema coverage is provided by the matching Git hook row.
 ./tools/test_dashboard_data.sh	hook	test_dashboard_data	Aggregate dashboard data coverage is provided by the matching Git hook row.
@@ -43,6 +47,7 @@ as_built_evidence_run_sync_contract_check	hook	check_as_built_sync_contract	Aggr
 ./tools/test_dashboard_control_center.sh	hook	test_dashboard_control_center	Aggregate dashboard control-center browser coverage is provided by the matching Git hook row.
 ./tools/test_ci_final_gate.sh	hook	test_ci_final_gate	Aggregate CI final gate coverage is provided by the matching Git hook row.
 ./tools/test_ci_pipeline_acceleration.sh	hook	test_ci_pipeline_acceleration	Aggregate CI pipeline acceleration coverage is provided by the matching Git hook row.
+./tools/test_ci_composition.sh	hook	test_ci_composition	Aggregate semantic CI graph and proof refusal coverage is provided by the matching Git hook row.
 ./tools/check_ci_workflow_structure.sh	hook	check_ci_workflow_structure	Aggregate CI workflow structure coverage is provided by the matching Git hook row.
 ./tools/menu	gap	menu_status	Aggregate menu rendering coverage is provided by a final-gap command.
 ./tools/dashboard all	gap	dashboard_all	Aggregate dashboard rendering coverage is provided by a final-gap command.

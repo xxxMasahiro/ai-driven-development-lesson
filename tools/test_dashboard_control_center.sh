@@ -2,6 +2,28 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+RUN_MODE="owner"
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --static-only)
+      RUN_MODE="static"
+      ;;
+    --legacy-full)
+      RUN_MODE="legacy"
+      ;;
+    *)
+      printf 'Unknown dashboard control-center test option: %s\n' "$1" >&2
+      exit 1
+      ;;
+  esac
+  shift
+done
+
+if [[ "$RUN_MODE" == "owner" ]]; then
+  exec "$ROOT/tools/dashboard-verification" run
+fi
+
 TMP_DIR="$(mktemp -d)"
 PIDS=()
 CLEANUP_FILES=()
@@ -833,7 +855,13 @@ if search_guard "fetch\\([\"'](\\./)?tools/" "$ROOT/dashboard-control-center/src
   exit 1
 fi
 
-(cd "$ROOT" && npm run dashboard:build >/dev/null)
-(cd "$ROOT" && PLAYWRIGHT_WORKERS=1 npm run test:dashboard-control-center)
+if [[ "$RUN_MODE" == "legacy" ]]; then
+  (cd "$ROOT" && npm run dashboard:build >/dev/null)
+  (cd "$ROOT" && PLAYWRIGHT_WORKERS=1 npm run test:dashboard-control-center)
+fi
 
-printf 'Dashboard control-center tests passed.\n'
+if [[ "$RUN_MODE" == "static" ]]; then
+  printf 'Dashboard control-center static tests passed.\n'
+else
+  printf 'Dashboard control-center tests passed.\n'
+fi

@@ -61,6 +61,7 @@ jobs:
           bash -n tools/test_lesson_playwright.sh
           bash -n tools/test_docs_tour.sh
           bash -n tools/test_as_built_sync_contract.sh
+          bash -n tools/test_as_built_single_pass.sh
           bash -n tools/test_test_plan.sh
           bash -n tools/test_repository_development_workflow.sh
           bash -n tools/test_security_invariants.sh
@@ -72,6 +73,10 @@ jobs:
           bash -n tools/test_git_hooks_parallel.sh
           bash -n tools/test_fixture_copy.sh
           bash -n tools/test_ci_evidence.sh
+          bash -n tools/test_verification_foundation.sh
+          bash -n tools/test_verification_runner.sh
+          bash -n tools/test_verification_git_hooks.sh
+          bash -n tools/test_dashboard_same_run_verification.sh
           bash -n tools/test_ci_timing.sh
           bash -n tools/test_dashboard_schema.sh
           bash -n tools/test_dashboard_data.sh
@@ -126,33 +131,28 @@ jobs:
           bash -n tools/external-integration
           bash -n tools/product-improvement
           bash -n tools/lesson-context
+          node --check tools/lib/verification_core.mjs
+          node --check tools/verification
+          node --check tools/test_verification_foundation.mjs
+          node --check tools/lib/as_built_index.mjs
+          node --check tools/check_as_built_sync_contract.mjs
+          node --check tools/test_as_built_single_pass.mjs
+          node --check tools/lib/verification_runner.mjs
+          node --check tools/lib/verification_git_hooks.mjs
+          node --check tools/verification-runner
+          node --check tools/test_verification_runner.mjs
+          node --check tools/lib/dashboard_verification.mjs
+          node --check tools/check_dashboard_bundle_contract.mjs
+          node --check tools/dashboard-verification
+          node --check tools/test_dashboard_same_run_verification.mjs
+          node --check tools/lib/ci_composition.mjs
+          node --check tools/verification-ci
+          node --check tools/test_ci_composition.mjs
 
   lesson14-structure-sync:
     runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Existing lesson checks
-        run: |
-          ./tools/check_lesson_structure.sh
-          ./tools/check_document_organization.sh
-          ./tools/check_learner_display.sh
-          ./tools/check_repository_boundary.sh
-          ./tools/check_agents_skills.sh
-          ./tools/check_as_built_docs.sh
-          ./tools/check_as_built_sync_contract.sh
-          ./tools/check_test_plan_coverage.sh
-          ./tools/check_security_invariants.sh
-          ./tools/check_repository_development_workflow.sh
-
-      - name: Lesson14 structure and sync
-        run: |
-          ./tools/check_lesson14_structure.sh
-          ./tools/check_lesson14_sync.sh
-
-  policy-regression-tests:
-    runs-on: ubuntu-latest
+    needs:
+      - syntax-checks
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -161,36 +161,44 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version: "20"
-          cache: npm
 
-      - name: Install dashboard dependencies
-        run: npm ci
+      - name: Composed Lesson14 structure owners
+        run: ./tools/verification-ci run-job --workflow lesson14 --job lesson14-structure-sync --jobs 2
 
-      - name: Policy and workflow regressions
-        run: |
-          ./tools/check_test_plan_coverage.sh
-          ./tools/check_security_invariants.sh
-          ./tools/test_repository_development_workflow.sh
-          ./tools/check_ci_workflow_structure.sh
-          ./tools/test_ci_pipeline_acceleration.sh
-          ./tools/test_ci_timing.sh
-          ./tools/test_lesson_context.sh
-          ./tools/test_menu_prerequisites.sh
-          ./tools/test_dashboard_settings.sh
-          ./tools/test_dashboard_data_product_repository_selection.sh
-          ./tools/check_dashboard_bundle_contract.sh
-          ./tools/test_dashboard_browser_debug_manifest.sh
-          ./tools/test_dashboard_design_studio_events.sh
-          printf 'Lesson14 CI keeps the policy-regression-tests job context; common policy regressions are provided by CI / policy-regression-tests for the same commit.\n'
-
-  lesson14-cli-tests:
+  policy-regression-tests:
     runs-on: ubuntu-latest
+    needs:
+      - syntax-checks
+      - lesson14-structure-sync
     steps:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Lesson14 CLI regression
-        run: ./tools/test_lesson14.sh
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: "20"
+
+      - name: Policy compatibility proof
+        env:
+          CI_COMPOSED_RESULTS_JSON: '{"syntax-checks":"${{ needs.syntax-checks.result }}","lesson14-structure-sync":"${{ needs.lesson14-structure-sync.result }}"}'
+        run: ./tools/verification-ci proof --workflow lesson14 --job policy-regression-tests
+
+  lesson14-cli-tests:
+    runs-on: ubuntu-latest
+    needs:
+      - syntax-checks
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: "20"
+
+      - name: Composed Lesson14 CLI owner
+        run: ./tools/verification-ci run-job --workflow lesson14 --job lesson14-cli-tests --jobs 1
 
   playwright-tests:
     runs-on: ubuntu-latest
@@ -202,12 +210,15 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Shared Playwright coverage compatibility gate
-        run: |
-          ./tools/check_lesson14_structure.sh
-          ./tools/check_lesson14_sync.sh
-          ./tools/check_ci_workflow_structure.sh
-          printf 'Lesson14 CI keeps the playwright-tests job context; browser coverage is provided by CI / playwright-tests for the same commit.\n'
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: "20"
+
+      - name: Shared Playwright coverage compatibility proof
+        env:
+          CI_COMPOSED_RESULTS_JSON: '{"syntax-checks":"${{ needs.syntax-checks.result }}","lesson14-structure-sync":"${{ needs.lesson14-structure-sync.result }}","policy-regression-tests":"${{ needs.policy-regression-tests.result }}"}'
+        run: ./tools/verification-ci proof --workflow lesson14 --job playwright-tests
 
   lesson14-final-gate:
     runs-on: ubuntu-latest
@@ -220,13 +231,15 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Lesson14 final verification
-        run: |
-          ./tools/check_lesson14_structure.sh
-          ./tools/check_lesson14_sync.sh
-          ./tools/test_lesson_start_position.sh
-          ./tools/test_lesson14.sh
-          ./tools/check_ci_workflow_structure.sh
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: "20"
+
+      - name: Lesson14 final compatibility proof
+        env:
+          CI_COMPOSED_RESULTS_JSON: '{"syntax-checks":"${{ needs.syntax-checks.result }}","lesson14-structure-sync":"${{ needs.lesson14-structure-sync.result }}","policy-regression-tests":"${{ needs.policy-regression-tests.result }}","lesson14-cli-tests":"${{ needs.lesson14-cli-tests.result }}"}'
+        run: ./tools/verification-ci proof --workflow lesson14 --job lesson14-final-gate
 
   aggregate-and-full-hooks:
     runs-on: ubuntu-latest
@@ -243,10 +256,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Compatibility aggregate and full-hooks gate
-        run: |
-          ./tools/check_lesson14_structure.sh
-          ./tools/check_lesson14_sync.sh
-          ./tools/test_lesson_start_position.sh
-          ./tools/check_ci_workflow_structure.sh
-          printf 'Lesson14 CI keeps the aggregate-and-full-hooks compatibility context; common coverage marker: %s\n' "$CI_COMMON_COVERAGE_SOURCE"
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: "20"
+
+      - name: Compatibility aggregate and full-hooks proof
+        env:
+          CI_COMPOSED_RESULTS_JSON: '{"syntax-checks":"${{ needs.syntax-checks.result }}","lesson14-structure-sync":"${{ needs.lesson14-structure-sync.result }}","policy-regression-tests":"${{ needs.policy-regression-tests.result }}","lesson14-cli-tests":"${{ needs.lesson14-cli-tests.result }}","playwright-tests":"${{ needs.playwright-tests.result }}","lesson14-final-gate":"${{ needs.lesson14-final-gate.result }}"}'
+        run: ./tools/verification-ci proof --workflow lesson14 --job aggregate-and-full-hooks

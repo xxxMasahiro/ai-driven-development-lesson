@@ -104,6 +104,9 @@ STEP 1-14: 実践レッスン: index-14-days.md
 24. 親リポジトリの文書同期は変更差分と変更種別で機械的に検査する。
     `docs/workflow/REPOSITORY_DOCUMENT_SYNC_POLICY.json` を親専用の分類正本とし、PRはmerge-baseからhead、pushはbeforeからafter、初回pushはheadの全追跡ファイルを同期単位にします。通常CIは親リポジトリの差分だけを読み、登録された子リポジトリを巡回、テスト、変更しません。rename元と変更先は分類対象ですが、同期済み証拠にできるのは削除されていない変更先だけです。削除文書、rename元、`SESSION_MEMORY.md`、生成物、無視対象成果物は同期済み証拠にしません。複数分類の要件は加算し、セキュリティ、外部送信、MCP、ブラウザ実行、証跡・評価境界の変更では親のSecurityとVerification正本を追加要求します。CIを最終強制とし、pre-push hookはリポジトリローカルの早期確認に限定します。
 
+25. ローカルとCIの検証は、同じ論理検査を同一実行内で一度だけ所有する。
+    `docs/workflow/FINAL_GATE_EXECUTION_POLICY.tsv` と `docs/workflow/FINAL_GATE_CI_GRAPH.tsv` を検証構成の正本とし、既存チェックID、必須workflow/job context、push/pull_request trigger、失敗伝播を維持します。所有者のない検査、重複所有、未分類実行、別HEAD・別ポリシー・別テスト入力の証跡、shell評価を必要とするgap/fallback commandは拒否します。終端jobはprovider結果と同一実行proofを検証し、共通suiteを再実行しません。永続的な検証結果cache、workflow間の結果流用、登録済み子リポジトリの巡回は引き続き禁止します。
+
 ## ドキュメントルート
 
 | 用途 | 入口 |
@@ -126,6 +129,7 @@ STEP 1-14: 実践レッスン: index-14-days.md
 | Gitワークフロー設定 | `docs/workflow/GIT_WORKFLOW_POLICY.tsv`、`learning/GIT_WORKFLOW_SETTINGS.tsv` |
 | 成果物ワークフローGit利用設定 | `docs/workflow/PRODUCT_WORKFLOW_GIT_USAGE_POLICY.tsv`、`learning/PRODUCT_WORKFLOW_GIT_USAGE_SETTINGS.tsv` |
 | Git hooks設定 | `docs/workflow/GIT_HOOKS_POLICY.tsv`、`docs/workflow/GIT_HOOK_CHECKS.tsv`、`learning/GIT_HOOK_SETTINGS.tsv` |
+| ローカル/CI検証構成 | `docs/workflow/FINAL_GATE_EXECUTION_POLICY.tsv`、`docs/workflow/FINAL_GATE_CI_GRAPH.tsv`、`docs/workflow/FINAL_GATE_COVERAGE.tsv` |
 | Security guard方針 | `docs/workflow/SAFEFLOW_SECURITY_BACKFILL.tsv`、`docs/workflow/PRODUCT_SECURITY_POLICY.tsv`、`learning/context/WORKFLOW_CONTEXT_MAP.tsv` |
 | Dashboard Control Center デザインシステム | `docs/design-system/dashboard-control-center/DESIGN_SYSTEM.md`、`docs/design-system/dashboard-control-center/tokens.json`、`docs/design-system/dashboard-control-center/components.json` |
 | 成果物文書雛形 | `templates/TEMPLATES.md` |
@@ -156,6 +160,7 @@ STEP 1-14: 実践レッスン: index-14-days.md
 | TASK_TRACKER/HANDOFFを同期したい | `ai-driven-task-tracker-scenario.md`、`lesson/SYNC_GATES_14_DAYS.tsv` | `skills/worklog-doc-sync/SKILL.md`、`skills/lesson-sync-gate/SKILL.md` | 更新案、同期チェック、通過 |
 | 3文書とTASK_TRACKER/HANDOFFの同期契約を確認したい | `docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv`、`docs/as-built/REQUIREMENTS.md`、`docs/as-built/SPECIFICATION.md`、`docs/as-built/IMPLEMENTATION_PLAN.md`、`docs/workflow/TASK_TRACKER.md`、`docs/workflow/HANDOFF.md` | なし | `./tools/as-built-sync status`、`./tools/check_as_built_sync_contract.sh` |
 | 親リポジトリの変更差分と必要文書の同期を確認したい | `docs/workflow/REPOSITORY_DOCUMENT_SYNC.md`、`docs/workflow/REPOSITORY_DOCUMENT_SYNC_POLICY.json` | `skills/repository-development-workflow/SKILL.md` | `./tools/check_repository_document_sync.sh`、`./tools/test_repository_document_sync.sh`、`node tools/check_repository_document_sync.mjs --worktree` |
+| ローカル/CI検証の所有者・並列化・証跡を確認したい | `docs/workflow/FINAL_GATE_EXECUTION_POLICY.tsv`、`docs/workflow/FINAL_GATE_CI_GRAPH.tsv`、`docs/workflow/GIT_HOOK_CHECKS.tsv` | `skills/repository-development-workflow/SKILL.md` | `./tools/verification-ci check`、`./tools/test_ci_composition.sh`、`./tools/verification-runner git-hooks --mode full --jobs 4 --no-cache --dry-run` |
 | Playwright E2Eを扱う | `prompts/PROMPTS_14_DAYS.md` Step 10/14からStep 11/14 | `skills/lesson-sync-gate/SKILL.md` | ローカルE2E、CI、失敗復旧 |
 | サブエージェントで精査する | `playbooks/AGENT_PLAYBOOK_14_DAYS.md` Step 12/14 | `skills/lesson-sync-gate/SKILL.md` | レビュー、テスト、同期確認 |
 | スキル/MCPを体験する | `prompts/PROMPTS_14_DAYS.md` Step 13/14 | `skills/lesson14-facilitator/SKILL.md` | 最小構成で実施 |
@@ -196,11 +201,13 @@ skills/worklog-doc-sync/SKILL.md
 ./tools/check_as_built_docs.sh
 ./tools/check_as_built_sync_contract.sh
 ./tools/check_repository_document_sync.sh
+./tools/verification-ci check
 ./tools/check_security_invariants.sh
 ./tools/as-built-sync status
 ./tools/test_docs_tour.sh
 ./tools/test_as_built_sync_contract.sh
 ./tools/test_repository_document_sync.sh
+./tools/test_ci_composition.sh
 ./tools/test_security_invariants.sh
 ./tools/test_git_workflow_policy.sh
 ./tools/test_git_hooks.sh

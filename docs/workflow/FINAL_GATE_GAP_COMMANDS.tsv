@@ -1,16 +1,16 @@
-# command_id	command	description
-menu_status	./tools/menu >/dev/null	Confirm the menu command still renders.
-dashboard_all	./tools/dashboard all >/dev/null	Confirm the dashboard command still renders every section.
-dashboard_data	./tools/dashboard-data >/dev/null	Confirm the dashboard data JSON command still renders.
-as_built_sync_status	./tools/as-built-sync status >/dev/null	Confirm the as-built sync status view remains available.
-repository_development_workflow_status	./tools/repository-development-workflow status >/dev/null	Confirm the repository development workflow status view remains available.
-illustrations_list	./tools/illustrations list >/dev/null	Confirm the illustration index remains readable.
-git_hooks_status	./tools/git-hooks status >/dev/null	Confirm the Git hooks status view remains available.
-resource_guard_status	./tools/resource-guard status >/dev/null	Confirm the resource guard status view remains available.
-resource_guard_summary	./tools/resource-guard summary >/dev/null	Confirm the learner-friendly resource summary remains available.
-resource_guard_summary_short	./tools/resource-guard summary --short >/dev/null	Confirm the short resource summary remains available.
-product_improvement_status	./tools/product-improvement status >/dev/null	Confirm product improvement workflow status remains available.
-external_integration_status	./tools/external-integration status >/dev/null	Confirm external integration workflow status remains available.
-product_repository_cleanup_status	./tools/product-repository-cleanup status >/dev/null	Confirm product repository cleanup status remains available.
-git_workflow_status	./tools/git-workflow status >/dev/null	Confirm Git workflow status remains available.
-git_workflow_cleanup_plan	./tools/git-workflow cleanup-plan >/dev/null	Confirm Git workflow cleanup planning remains available.
+# command_id	argv	output	description
+menu_status	["./tools/menu"]	discard	Confirm the menu command still renders.
+dashboard_all	["./tools/dashboard","all"]	discard	Confirm the dashboard command still renders every section.
+dashboard_data	["./tools/dashboard-data"]	discard	Confirm the dashboard data JSON command still renders.
+as_built_sync_status	["./tools/as-built-sync","status"]	discard	Confirm the as-built sync status view remains available.
+repository_development_workflow_status	["./tools/repository-development-workflow","status"]	discard	Confirm the repository development workflow status view remains available.
+illustrations_list	["./tools/illustrations","list"]	discard	Confirm the illustration index remains readable.
+git_hooks_status	["./tools/git-hooks","status"]	discard	Confirm the Git hooks status view remains available.
+resource_guard_status	["./tools/resource-guard","status"]	discard	Confirm the resource guard status view remains available.
+resource_guard_summary	["./tools/resource-guard","summary"]	discard	Confirm the learner-friendly resource summary remains available.
+resource_guard_summary_short	["./tools/resource-guard","summary","--short"]	discard	Confirm the short resource summary remains available.
+product_improvement_status	["./tools/product-improvement","status"]	discard	Confirm product improvement workflow status remains available.
+external_integration_status	["./tools/external-integration","status"]	discard	Confirm external integration workflow status remains available.
+product_repository_cleanup_status	["./tools/product-repository-cleanup","status"]	discard	Confirm product repository cleanup status remains available.
+git_workflow_status	["./tools/git-workflow","status"]	discard	Confirm Git workflow status remains available.
+git_workflow_cleanup_plan	["./tools/git-workflow","cleanup-plan"]	discard	Confirm Git workflow cleanup planning remains available.

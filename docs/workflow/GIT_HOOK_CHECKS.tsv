@@ -20,6 +20,7 @@ check_dashboard_bundle_contract	full|fast	./tools/check_dashboard_bundle_contrac
 test_dashboard_design_studio_events	full|fast	./tools/test_dashboard_design_studio_events.sh	Run Dashboard Design Studio local event runner/store regression tests.
 test_docs_tour	full|fast	./tools/test_docs_tour.sh	Run documentation tour regression tests.
 test_as_built_sync_contract	full|fast	./tools/test_as_built_sync_contract.sh	Run sync-contract regression tests.
+test_as_built_single_pass	full|fast	./tools/test_as_built_single_pass.sh	Run indexed/legacy parity, mutation refusal, and configured performance regression tests.
 test_test_plan	full|fast	./tools/test_test_plan.sh	Run observe-only test-plan regression tests.
 test_repository_development_workflow	full|fast	./tools/test_repository_development_workflow.sh	Run repository development workflow regression tests.
 test_repository_document_sync	full|fast	./tools/test_repository_document_sync.sh	Run parent range, classification, rename, deletion, exclusion, and external-nonaccess document-sync tests.
@@ -33,6 +34,10 @@ test_resource_cleanup	full|fast	./tools/test_resource_cleanup.sh	Run resource gu
 test_git_hooks_parallel	full|fast	./tools/test_git_hooks_parallel.sh	Run Git hooks parallel execution regression tests.
 test_fixture_copy	full|fast	./tools/test_fixture_copy.sh	Run lightweight fixture-copy regression tests.
 test_ci_evidence	full|fast	./tools/test_ci_evidence.sh	Run same-run CI evidence regression tests.
+test_verification_foundation	full|fast	./tools/test_verification_foundation.sh	Run policy, command identity, content fingerprint, and version 2 evidence rejection tests.
+test_verification_runner	full|fast	./tools/test_verification_runner.sh	Run rolling scheduler, lock, timeout, output-bound, cancellation, and process-tree refusal tests.
+test_verification_git_hooks	full|fast	./tools/test_verification_git_hooks.sh	Run exact-once hook planning, repository-mutation refusal, final suppression, and rollback tests.
+test_dashboard_same_run_verification	full|fast	./tools/test_dashboard_same_run_verification.sh	Run Dashboard build-manifest, browser-receipt, mutation, symlink, and lock refusal tests.
 test_ci_timing	full|fast	./tools/test_ci_timing.sh	Run CI timing report and proposal regression tests.
 test_dashboard_schema	full|fast	./tools/test_dashboard_schema.sh	Run dashboard control-center schema regression tests.
 test_dashboard_data	full|fast	./tools/test_dashboard_data.sh	Run dashboard control-center JSON data regression tests.
@@ -44,6 +49,7 @@ test_dashboard_i18n	full|fast	./tools/test_dashboard_i18n.sh	Run dashboard local
 test_dashboard_control_center	full|fast	./tools/test_dashboard_control_center.sh	Run dashboard control-center React/Vite regression tests.
 test_ci_final_gate	full|fast	./tools/test_ci_final_gate.sh	Run same-run final-gate regression tests.
 test_ci_pipeline_acceleration	full|fast	./tools/test_ci_pipeline_acceleration.sh	Run full pipeline CI acceleration regression tests.
+test_ci_composition	full|fast	./tools/test_ci_composition.sh	Run semantic CI graph, exact-owner, proof, and direct-argv refusal tests.
 check_ci_workflow_structure	full|fast	./tools/check_ci_workflow_structure.sh	Validate required CI workflow job splitting and final gates.
 test_menu_prerequisites	full|fast	./tools/test_menu_prerequisites.sh	Run menu prerequisite regression tests.
 test_product_gate_tools	full|fast	./tools/test_product_gate_tools.sh	Run product gate regression tests.

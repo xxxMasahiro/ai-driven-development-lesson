@@ -1,0 +1,17 @@
+# workflow_id	workflow_file	workflow_name	coverage_scope	job_id	role	needs	selector	description
+main	.github/workflows/ci.yml	CI	full	syntax-checks	auxiliary	none	{}	Preserve the required syntax context without owning compatibility executions.
+main	.github/workflows/ci.yml	CI	full	repository-document-sync	owner	syntax-checks	{"include":["check_repository_document_sync","test_repository_document_sync"]}	Own parent-only document-sync policy and rejection checks before provider range validation.
+main	.github/workflows/ci.yml	CI	full	structure-docs-checks	owner	syntax-checks	{"groups":["structure","sync"],"exclude":["check_repository_document_sync"]}	Own read-only structure and synchronized-document compatibility executions.
+main	.github/workflows/ci.yml	CI	full	policy-regression-tests	owner	syntax-checks	{"groups":["regression"],"exclude":["test_repository_document_sync"]}	Own isolated non-browser regression compatibility executions.
+main	.github/workflows/ci.yml	CI	full	lesson-cli-tests	owner	syntax-checks	{"groups":["lesson-cli"]}	Own lesson CLI fixture executions.
+main	.github/workflows/ci.yml	CI	full	playwright-tests	owner	syntax-checks	{"kinds":["heavy"]}	Own serial browser and Dashboard build validation.
+main	.github/workflows/ci.yml	CI	full	lesson-aggregate	proof	syntax-checks,repository-document-sync,structure-docs-checks,policy-regression-tests,lesson-cli-tests,playwright-tests	{}	Prove every distributed main-CI owner result without rerunning the aggregate.
+main	.github/workflows/ci.yml	CI	full	git-hooks-full-no-cache	proof	lesson-aggregate	{}	Preserve the required full-hooks context as a proof-only terminal job.
+main	.github/workflows/ci.yml	CI	full	final-gate	final	lesson-aggregate,git-hooks-full-no-cache,repository-document-sync	{"kinds":["final-gate"]}	Verify composed proof and execute final gap commands once.
+lesson14	.github/workflows/lesson14-ci.yml	Lesson14 CI	compatibility	syntax-checks	auxiliary	none	{}	Preserve the required Lesson14 syntax context.
+lesson14	.github/workflows/lesson14-ci.yml	Lesson14 CI	compatibility	lesson14-structure-sync	owner	syntax-checks	{"include":["check_lesson14_structure","check_lesson14_sync"]}	Own Lesson14-specific structure and synchronization checks.
+lesson14	.github/workflows/lesson14-ci.yml	Lesson14 CI	compatibility	policy-regression-tests	proof	syntax-checks,lesson14-structure-sync	{}	Preserve the policy context as a semantic compatibility proof.
+lesson14	.github/workflows/lesson14-ci.yml	Lesson14 CI	compatibility	lesson14-cli-tests	owner	syntax-checks	{"include":["test_lesson14"]}	Own the Lesson14 CLI regression.
+lesson14	.github/workflows/lesson14-ci.yml	Lesson14 CI	compatibility	playwright-tests	proof	syntax-checks,lesson14-structure-sync,policy-regression-tests	{}	Preserve browser context while main CI owns common browser execution.
+lesson14	.github/workflows/lesson14-ci.yml	Lesson14 CI	compatibility	lesson14-final-gate	proof	syntax-checks,lesson14-structure-sync,policy-regression-tests,lesson14-cli-tests	{}	Prove Lesson14-specific prerequisite results.
+lesson14	.github/workflows/lesson14-ci.yml	Lesson14 CI	compatibility	aggregate-and-full-hooks	proof	syntax-checks,lesson14-structure-sync,policy-regression-tests,lesson14-cli-tests,playwright-tests,lesson14-final-gate	{}	Preserve the aggregate/full-hooks compatibility context without common-suite reruns.

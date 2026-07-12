@@ -88,6 +88,7 @@ WORKFLOW_PAIR_SINGLE_FILE_REASON="aggregate test may run while remediation docum
 ./tools/illustrations list >/dev/null
 ./tools/test_docs_tour.sh
 ./tools/test_as_built_sync_contract.sh
+./tools/test_as_built_single_pass.sh
 ./tools/test_test_plan.sh
 ./tools/test_repository_development_workflow.sh
 ./tools/check_repository_document_sync.sh
@@ -106,6 +107,10 @@ WORKFLOW_PAIR_SINGLE_FILE_REASON="aggregate test may run while remediation docum
 ./tools/test_fixture_copy.sh
 ./tools/test_lesson_context.sh
 ./tools/test_ci_evidence.sh
+./tools/test_verification_foundation.sh
+./tools/test_verification_runner.sh
+./tools/test_verification_git_hooks.sh
+./tools/test_dashboard_same_run_verification.sh
 ./tools/test_ci_timing.sh
 ./tools/dashboard-data >/dev/null
 ./tools/test_dashboard_schema.sh
@@ -115,10 +120,10 @@ WORKFLOW_PAIR_SINGLE_FILE_REASON="aggregate test may run while remediation docum
 ./tools/test_dashboard_browser_debug_manifest.sh
 ./tools/test_dashboard_settings.sh
 ./tools/test_dashboard_i18n.sh
-./tools/check_dashboard_bundle_contract.sh
 ./tools/test_dashboard_control_center.sh
 ./tools/test_ci_final_gate.sh
 ./tools/test_ci_pipeline_acceleration.sh
+./tools/test_ci_composition.sh
 ./tools/check_ci_workflow_structure.sh
 ./tools/product-improvement status >/dev/null
 ./tools/external-integration status >/dev/null

@@ -1,5 +1,77 @@
 # IMPLEMENTATION_PLAN.md
 
+## CI Composed Validation Activation Implementation Plan
+
+1. Add semantic graph, exact-owner, proof-receipt, unsafe-command, and compatibility-context refusal tests.
+2. Implement the provider-neutral CI graph loader, selector planner, owner runner, and proof adapter.
+3. Move final-gap and fallback commands to policy-owned argument arrays.
+4. Replace duplicate main-CI aggregate/full-hook executions with distributed owners and proof-only terminal jobs.
+5. Preserve Lesson14 contexts with Lesson14-specific or proof-only work, then verify and promote the sync ID.
+
+SYNC-ID: ci_composed_validation_activation
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/FINAL_GATE_EXECUTION_POLICY.tsv,docs/workflow/FINAL_GATE_CI_GRAPH.tsv,docs/workflow/FINAL_GATE_GAP_COMMANDS.tsv,docs/workflow/FINAL_GATE_COVERAGE.tsv,docs/workflow/TEST_PLAN_MANIFEST.tsv,docs/workflow/GIT_HOOK_CHECKS.tsv,docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv,docs/workflow/SAFEFLOW_SECURITY_BACKFILL.tsv,docs/workflow/PRODUCT_SECURITY_POLICY.tsv,tools/lib/verification_core.mjs,tools/lib/as_built_index.mjs,tools/lib/ci_composition.mjs,tools/verification-ci,tools/ci-final-gate,tools/check_ci_workflow_structure.sh,tools/test_ci_pipeline_acceleration.sh,tools/check_repository_development_workflow.sh,tools/test_ci_final_gate.sh,tools/test_ci_composition.mjs,tools/test_ci_composition.sh,tools/test_verification_git_hooks.sh,tools/test_lesson_repository.sh,.github/workflows/ci.yml,.github/workflows/lesson14-ci.yml,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_ci_composition.sh,tools/test_ci_final_gate.sh,tools/test_ci_pipeline_acceleration.sh,tools/check_ci_workflow_structure.sh,tools/test_verification_foundation.sh,tools/test_verification_git_hooks.sh,tools/test_ci_evidence.sh,tools/test_git_hooks.sh,tools/test_git_hooks_parallel.sh,tools/test_as_built_single_pass.sh,tools/test_as_built_sync_contract.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh,tools/check_test_plan_coverage.sh,tools/test_test_plan.sh,tools/check_security_invariants.sh,tools/test_security_invariants.sh,tools/test_dashboard_control_center.sh,tools/test_lesson_playwright.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh
+
+## Dashboard Control Center Same-Run Validation Implementation Plan
+
+1. Add rejection-first manifest and same-run lineage tests.
+2. Move build/browser verification values into the execution policy.
+3. Implement the generic build-manifest and browser-receipt owner.
+4. Preserve strict standalone wrappers and declare safe composed relationships.
+5. Complete focused and browser verification, then promote the sync ID.
+
+SYNC-ID: dashboard_control_center_same_run_validation
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/FINAL_GATE_EXECUTION_POLICY.tsv,docs/workflow/TEST_PLAN_MANIFEST.tsv,docs/workflow/GIT_HOOK_CHECKS.tsv,docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv,docs/workflow/FINAL_GATE_COVERAGE.tsv,docs/workflow/SAFEFLOW_SECURITY_BACKFILL.tsv,docs/workflow/PRODUCT_SECURITY_POLICY.tsv,tools/lib/dashboard_verification.mjs,tools/check_dashboard_bundle_contract.mjs,tools/check_dashboard_bundle_contract.sh,tools/dashboard-verification,tools/test_dashboard_control_center.sh,tools/test_dashboard_same_run_verification.mjs,tools/test_dashboard_same_run_verification.sh,tools/test_verification_runner.mjs,tools/test_lesson_repository.sh,tools/test_ci_pipeline_acceleration.sh,.github/workflows/ci.yml,.github/workflows/lesson14-ci.yml,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_dashboard_same_run_verification.sh,tools/check_dashboard_bundle_contract.sh,tools/test_dashboard_control_center.sh,tools/test_verification_runner.sh,tools/test_verification_foundation.sh,tools/test_verification_git_hooks.sh,tools/test_git_hooks.sh,tools/test_git_hooks_parallel.sh,tools/check_test_plan_coverage.sh,tools/test_test_plan.sh,tools/check_security_invariants.sh,tools/test_security_invariants.sh,tools/test_ci_pipeline_acceleration.sh,tools/check_ci_workflow_structure.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh
+
+## Local Exact-Once Verification Implementation Plan
+
+1. Add rejection-first scheduler tests for rolling concurrency, deterministic replay, locks, timeouts, failure cancellation, process-tree cleanup, unsafe commands, duplicate providers, repository mutation, and final-gate ordering.
+2. Move fixture exclusions and local executor values into the shared execution policy while retaining the current values.
+3. Implement the generic scheduler, Git-hook adapter, shared full-run fingerprint, and batched version 1/version 2 receipt writers.
+4. Add relationship validation and activate only the proven as-built documents-to-sync-contract provision.
+5. Classify every compatibility hook explicitly; keep settings mutation serial and browser/build work heavy.
+6. Compare legacy and composed plans in shadow tests, then select the composed runner for full/no-cache only.
+7. Run focused runner, hook, evidence, final-gate, fixture, resource, test-plan, workflow, and document-sync checks before promotion.
+
+SYNC-ID: verification_local_exact_once_activation
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/FINAL_GATE_EXECUTION_POLICY.tsv,docs/workflow/TEST_PLAN_MANIFEST.tsv,docs/workflow/GIT_HOOK_CHECKS.tsv,docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv,docs/workflow/GIT_HOOK_RECOMMENDATION_PATHS.tsv,docs/workflow/FINAL_GATE_COVERAGE.tsv,docs/workflow/SAFEFLOW_SECURITY_BACKFILL.tsv,docs/workflow/PRODUCT_SECURITY_POLICY.tsv,tools/lib/verification_core.mjs,tools/lib/verification_runner.mjs,tools/lib/verification_git_hooks.mjs,tools/verification-runner,tools/git-hooks,tools/lib/ci_evidence.sh,tools/lib/fixture_copy.sh,tools/test_verification_runner.mjs,tools/test_verification_runner.sh,tools/test_verification_git_hooks.sh,tools/test_git_hooks_parallel.sh,tools/test_fixture_copy.sh,tools/test_ci_final_gate.sh,tools/lib/repository_development_runner.sh,tools/test_repository_development_workflow.sh,tools/test_lesson_repository.sh,tools/test_ci_pipeline_acceleration.sh,.github/workflows/ci.yml,.github/workflows/lesson14-ci.yml,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_verification_runner.sh,tools/test_verification_git_hooks.sh,tools/test_git_hooks.sh,tools/test_git_hooks_parallel.sh,tools/test_fixture_copy.sh,tools/test_ci_evidence.sh,tools/test_ci_final_gate.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh,tools/check_security_invariants.sh,tools/test_security_invariants.sh,tools/check_test_plan_coverage.sh,tools/test_test_plan.sh,tools/test_ci_pipeline_acceleration.sh,tools/check_ci_workflow_structure.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh
+
+## As-Built Single-Pass Validation Implementation Plan
+
+1. Add fixtures proving strict parity for valid state and rejection of missing blocks, mixed status, extra/missing artifacts and tests, unknown IDs, inactive wiring, malformed rows, and input mutation.
+2. Implement a pure index loader with configurable root, contract, document, and wiring locators.
+3. Implement a strict coordinator that runs document topics and synchronization metadata from one index and emits two distinct same-session results.
+4. Keep the existing standalone entrypoints and output contract, using the new owner implementation with a policy-controlled legacy rollback.
+5. Add the standalone regression to the Test Plan, aggregate test, Git hooks, final coverage, and CI syntax/regression paths.
+6. Compare normalized old/new fixture outcomes and measure valid-repository execution before promotion.
+
+SYNC-ID: as_built_single_pass_validation
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/FINAL_GATE_EXECUTION_POLICY.tsv,docs/workflow/TEST_PLAN_MANIFEST.tsv,docs/workflow/GIT_HOOK_CHECKS.tsv,docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv,docs/workflow/GIT_HOOK_RECOMMENDATION_PATHS.tsv,docs/workflow/FINAL_GATE_COVERAGE.tsv,tools/lib/verification_core.mjs,tools/lib/as_built_index.mjs,tools/check_as_built_sync_contract.mjs,tools/check_as_built_sync_contract.sh,tools/as-built-sync,tools/test_as_built_single_pass.mjs,tools/test_as_built_single_pass.sh,tools/test_lesson_repository.sh,tools/test_ci_pipeline_acceleration.sh,.github/workflows/ci.yml,.github/workflows/lesson14-ci.yml,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/test_as_built_sync_contract.sh,tools/test_as_built_single_pass.sh,tools/check_test_plan_coverage.sh,tools/test_test_plan.sh,tools/test_git_hooks.sh,tools/test_git_hooks_parallel.sh,tools/test_ci_final_gate.sh,tools/test_ci_pipeline_acceleration.sh,tools/check_ci_workflow_structure.sh,tools/check_workflow_pair_sync.sh
+
+## Verification Composition Foundation Implementation Plan
+
+1. Add rejection tests for malformed policy, unsafe arguments, duplicate IDs, cycles, content-only dirty changes, untracked files, symbolic-link changes, duplicate receipt claims, provenance mismatch, forbidden evidence fields, and absolute-path leakage.
+2. Implement pure standard-library modules for policy loading, canonical command identity, repository content fingerprinting, version 2 receipts, and equivalence decisions.
+3. Add a standalone CLI so the same core is callable by focused tests, Git hooks, CI adapters, and later composed runners.
+4. Add version 2 recording beside existing version 1 evidence in `record-only` mode without changing current pass/fail decisions.
+5. Compare dynamically derived compatibility counts and command identities with the existing hook and final-gate sources; do not encode observed counts as constants.
+6. Run focused evidence, final-gate, security, test-plan, document-sync, and repository-workflow checks.
+7. Promote this sync ID only after rejection tests and legacy compatibility checks pass. Roll back by selecting `legacy`; do not delete version 1 evidence or existing entrypoints.
+
+The next slices remain inactive until this foundation is implemented: single-pass as-built validation, local exact-once execution, same-run Dashboard build/browser validation, and composed CI activation.
+
+SYNC-ID: verification_composition_foundation
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/FINAL_GATE_EXECUTION_POLICY.tsv,docs/workflow/FINAL_GATE_EVIDENCE_SCHEMA.tsv,docs/workflow/TEST_PLAN_MANIFEST.tsv,docs/workflow/GIT_HOOK_CHECKS.tsv,docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv,docs/workflow/GIT_HOOK_RECOMMENDATION_PATHS.tsv,docs/workflow/FINAL_GATE_COVERAGE.tsv,docs/workflow/SAFEFLOW_SECURITY_BACKFILL.tsv,docs/workflow/PRODUCT_SECURITY_POLICY.tsv,tools/lib/verification_core.mjs,tools/verification,tools/lib/ci_evidence.sh,tools/test_verification_foundation.mjs,tools/test_verification_foundation.sh,tools/test_ci_evidence.sh,tools/test_ci_pipeline_acceleration.sh,tools/test_lesson_repository.sh,.github/workflows/ci.yml,.github/workflows/lesson14-ci.yml,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_verification_foundation.sh,tools/test_ci_evidence.sh,tools/test_ci_final_gate.sh,tools/test_ci_pipeline_acceleration.sh,tools/check_security_invariants.sh,tools/test_security_invariants.sh,tools/check_test_plan_coverage.sh,tools/test_test_plan.sh,tools/test_git_hooks.sh,tools/check_ci_workflow_structure.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh
+
 ## Implemented Plan
 
 1. Record developer feedback in `docs/memory/DEVELOPER_MEMORY.md`.

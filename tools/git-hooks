@@ -153,6 +153,40 @@ case "$cmd" in
         fi
         ;;
     esac
+    if [[ "$mode" == "full" && "$no_cache" == "true" ]]; then
+      execution_policy_file="${GIT_HOOKS_EXECUTION_POLICY_FILE:-$ROOT/docs/workflow/FINAL_GATE_EXECUTION_POLICY.tsv}"
+      execution_engine="${GIT_HOOKS_EXECUTION_ENGINE:-}"
+      if [[ -z "$execution_engine" ]]; then
+        execution_engine="$(awk -F '\t' '$1 == "setting" && $2 == "local_hook_execution_engine" { print $3; found = 1; exit } END { if (!found) exit 1 }' "$execution_policy_file")" || {
+          printf 'Git hooks execution-engine policy is missing.\n' >&2
+          exit 1
+        }
+      fi
+      case "$execution_engine" in
+        enforce)
+          exec node "$ROOT/tools/verification-runner" git-hooks \
+            --mode "$mode" \
+            --jobs "$worker_count" \
+            --no-cache \
+            --root "$(git_hooks_git_root)" \
+            --policy "$execution_policy_file"
+          ;;
+        shadow)
+          node "$ROOT/tools/verification-runner" git-hooks \
+            --mode "$mode" \
+            --jobs "$worker_count" \
+            --no-cache \
+            --dry-run \
+            --root "$(git_hooks_git_root)" \
+            --policy "$execution_policy_file" >/dev/null
+          ;;
+        legacy) ;;
+        *)
+          printf 'Invalid Git hooks execution engine: %s\n' "$execution_engine" >&2
+          exit 1
+          ;;
+      esac
+    fi
     git_hooks_run_checks_parallel "$mode" "$no_cache" "$worker_count"
     ;;
   help|--help|-h)

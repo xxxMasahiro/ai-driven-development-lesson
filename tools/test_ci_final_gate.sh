@@ -3,7 +3,14 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TMP_DIR="$(mktemp -d)"
-trap 'rm -rf "$TMP_DIR"' EXIT
+cleanup() {
+  if [[ "${TEST_KEEP_TMP:-0}" == "1" ]]; then
+    printf 'Preserved CI final-gate fixture: %s\n' "$TMP_DIR" >&2
+  else
+    rm -rf "$TMP_DIR"
+  fi
+}
+trap cleanup EXIT
 
 TEST_REPO="$TMP_DIR/repo"
 POLICY_FILE="$TMP_DIR/git-hooks-policy.tsv"
@@ -65,9 +72,9 @@ write_counter_script "$TMP_DIR/gap_short.sh" "$GAP_SHORT_COUNT"
 write_counter_script "$TMP_DIR/fallback.sh" "$FALLBACK_COUNT"
 
 cat >"$GAP_FILE" <<EOF
-# command_id	command	description
-gap_check	$TMP_DIR/gap.sh	Final gap fixture command.
-gap_short_check	$TMP_DIR/gap_short.sh	Final gap fixture command with an extra aggregate option.
+# command_id	argv	output	description
+gap_check	["$TMP_DIR/gap.sh"]	discard	Final gap fixture command.
+gap_short_check	["$TMP_DIR/gap_short.sh"]	discard	Final gap fixture command with an extra aggregate option.
 EOF
 
 cat >"$AGGREGATE_FILE" <<'EOF'
@@ -91,7 +98,7 @@ cat >"$CHECKS_FILE" <<EOF
 # check_id	modes	command	description
 check_a	full	$TMP_DIR/check_a.sh	First fixture check.
 check_b	full	$TMP_DIR/check_b.sh	Second fixture check.
-ci_final_gate	full	CI_FINAL_GATE_GAP_COMMANDS_FILE=$GAP_FILE CI_FINAL_GATE_COVERAGE_FILE=$COVERAGE_FILE CI_FINAL_GATE_AGGREGATE_FILE=$AGGREGATE_FILE CI_FINAL_GATE_FALLBACK_COMMAND=$TMP_DIR/fallback.sh $ROOT/tools/ci-final-gate	Final gate fixture.
+ci_final_gate	full	$ROOT/tools/ci-final-gate	Final gate fixture.
 EOF
 
 cat >"$GROUPS_FILE" <<'EOF'
@@ -112,6 +119,8 @@ run_git_hooks() {
   CI_FINAL_GATE_GAP_COMMANDS_FILE="$GAP_FILE" \
   CI_FINAL_GATE_COVERAGE_FILE="$COVERAGE_FILE" \
   CI_FINAL_GATE_AGGREGATE_FILE="$AGGREGATE_FILE" \
+  VERIFICATION_EVIDENCE_SCHEMA_FILE="$ROOT/docs/workflow/FINAL_GATE_EVIDENCE_SCHEMA.tsv" \
+  VERIFICATION_EXECUTION_POLICY_FILE="$ROOT/docs/workflow/FINAL_GATE_EXECUTION_POLICY.tsv" \
   RESOURCE_GUARD_SKIP_LOCAL_CHECK="1" \
   "$ROOT/tools/git-hooks" "$@"
 }
@@ -129,7 +138,8 @@ run_final_gate() {
   CI_FINAL_GATE_GAP_COMMANDS_FILE="$GAP_FILE" \
   CI_FINAL_GATE_COVERAGE_FILE="$COVERAGE_FILE" \
   CI_FINAL_GATE_AGGREGATE_FILE="$AGGREGATE_FILE" \
-  CI_FINAL_GATE_FALLBACK_COMMAND="$TMP_DIR/fallback.sh" \
+  CI_FINAL_GATE_FALLBACK_ARGV_JSON="[\"$TMP_DIR/fallback.sh\"]" \
+  VERIFICATION_EXECUTION_POLICY_FILE="$ROOT/docs/workflow/FINAL_GATE_EXECUTION_POLICY.tsv" \
   "$ROOT/tools/ci-final-gate" "$@"
 }
 
@@ -180,8 +190,8 @@ gap_only_output="$(run_final_gate --gap-only)"
 [[ "$gap_only_output" == *"CI final gate gap-only coverage and commands passed."* ]]
 
 cat >"$GAP_FILE" <<'EOF'
-# command_id	command	description
-malformed_gap		Malformed gap command must fail closed.
+# command_id	argv	output	description
+malformed_gap		inherit	Malformed gap command must fail closed.
 EOF
 if run_final_gate --gap-only >/dev/null 2>&1; then
   printf 'malformed final-gate gap row passed unexpectedly\n' >&2

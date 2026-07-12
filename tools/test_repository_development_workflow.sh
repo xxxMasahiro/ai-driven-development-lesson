@@ -10,6 +10,16 @@ RUNNER_POLICY_FILE="$TMP_DIR/repository-development-runner-policy.tsv"
 APPROVALS_FILE="$TMP_DIR/repository-development-approvals.tsv"
 CHECKS_FILE="$TMP_DIR/git-hook-checks.tsv"
 RUNNER_RECORDS_DIR="$TMP_DIR/repository-development-runs"
+FINGERPRINT_REPO="$TMP_DIR/fingerprint-repo"
+
+mkdir -p "$FINGERPRINT_REPO"
+git -C "$FINGERPRINT_REPO" init -q
+git -C "$FINGERPRINT_REPO" config user.name "Repository Workflow Fingerprint Test"
+git -C "$FINGERPRINT_REPO" config user.email "repository-workflow@example.invalid"
+printf 'base\n' >"$FINGERPRINT_REPO/input.txt"
+git -C "$FINGERPRINT_REPO" add input.txt
+git -C "$FINGERPRINT_REPO" commit -q -m fixture
+printf 'aaaa\n' >"$FINGERPRINT_REPO/input.txt"
 
 cat >"$CHECKS_FILE" <<'DOC'
 # check_id	modes	command	description
@@ -87,6 +97,7 @@ run_workflow() {
   REPOSITORY_DEVELOPMENT_RUNNER_POLICY_FILE="$RUNNER_POLICY_FILE" \
   REPOSITORY_DEVELOPMENT_APPROVALS_FILE="$APPROVALS_FILE" \
   REPOSITORY_DEVELOPMENT_RUNNER_RECORDS_DIR="$RUNNER_RECORDS_DIR" \
+  REPOSITORY_DEVELOPMENT_FINGERPRINT_ROOT="$FINGERPRINT_REPO" \
   GIT_HOOKS_CHECKS_FILE="$CHECKS_FILE" \
   "$ROOT/tools/repository-development-workflow" "$@"
 }
@@ -115,6 +126,13 @@ run_workflow run --phase fast_loop --check-set required --execute --approved | g
 run_workflow status --runs | grep 'quick_pass' >/dev/null
 run_workflow next --phase fast_loop | grep 'next phase is mid_tests' >/dev/null
 run_workflow run --phase fast_loop --check-set required --execute --approved | grep 'reuse: quick_pass' >/dev/null
+printf 'bbbb\n' >"$FINGERPRINT_REPO/input.txt"
+content_change_output="$(run_workflow run --phase fast_loop --check-set required --execute --approved)"
+grep 'run: quick_pass' <<<"$content_change_output" >/dev/null
+if grep -Fq 'reuse: quick_pass' <<<"$content_change_output"; then
+  printf 'repository runner reused a pass after dirty file content changed without a status-name change\n' >&2
+  exit 1
+fi
 run_workflow record --phase mid_tests --check-id quick_pass --result pass --exit-status 0 | grep 'Runner record written' >/dev/null
 run_workflow status --runs | grep 'mid_tests' >/dev/null
 expect_failure release_plan_only run_workflow run --phase release_gate --check-set required --execute --approved
