@@ -16,8 +16,8 @@ import {
   verifyBuildManifest,
   withDashboardRunLock,
 } from './lib/dashboard_verification.mjs';
+import { createDashboardViteRuntimeConfiguration } from './lib/dashboard_vite_runtime.mjs';
 import { VerificationError } from './lib/verification_core.mjs';
-import viteConfiguration from '../vite.config.mjs';
 
 function expectCode(code) {
   return (error) => error instanceof VerificationError && error.code === code;
@@ -74,11 +74,15 @@ async function fixture() {
 }
 
 test('Vite mutable cache stays outside the configured application source root', () => {
-  assert.equal(typeof viteConfiguration.cacheDir, 'string');
-  const applicationRoot = path.resolve(viteConfiguration.root);
-  const cacheRoot = path.resolve(viteConfiguration.cacheDir);
-  const relative = path.relative(applicationRoot, cacheRoot);
+  const applicationRoot = path.resolve('dashboard-control-center');
+  const runtimeRoot = path.resolve('.dashboard-control-center');
+  const configuration = createDashboardViteRuntimeConfiguration({ sourceRoot: applicationRoot, runtimeRoot });
+  const relative = path.relative(applicationRoot, configuration.cacheDir);
   assert.equal(relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative)), false);
+  assert.throws(
+    () => createDashboardViteRuntimeConfiguration({ sourceRoot: applicationRoot, runtimeRoot: path.join(applicationRoot, '.runtime') }),
+    (error) => error?.code === 'DASHBOARD_VITE_CACHE_BOUNDARY',
+  );
 });
 
 test('one build inventory produces an exact manifest and bundle inspection', async () => {

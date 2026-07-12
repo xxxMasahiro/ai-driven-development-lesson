@@ -35,7 +35,7 @@ as_built_evidence_run_sync_contract_check	hook	check_as_built_sync_contract	Aggr
 ./tools/test_verification_foundation.sh	hook	test_verification_foundation	Aggregate verification foundation coverage is provided by the matching Git hook row.
 ./tools/test_verification_runner.sh	hook	test_verification_runner	Aggregate scheduler and cancellation coverage is provided by the matching Git hook row.
 ./tools/test_verification_git_hooks.sh	hook	test_verification_git_hooks	Aggregate exact-once hook adapter coverage is provided by the matching Git hook row.
-./tools/test_dashboard_same_run_verification.sh	hook	test_dashboard_same_run_verification	Aggregate Dashboard manifest, receipt, and mutable-cache-boundary refusal coverage is provided by the matching Git hook row.
+./tools/test_dashboard_same_run_verification.sh	hook	test_dashboard_same_run_verification	Aggregate Dashboard manifest, receipt, shared runtime-helper, and mutable-cache-boundary refusal coverage is provided by the matching Git hook row.
 ./tools/test_ci_timing.sh	hook	test_ci_timing	Aggregate CI timing coverage is provided by the matching Git hook row.
 ./tools/test_dashboard_schema.sh	hook	test_dashboard_schema	Aggregate dashboard schema coverage is provided by the matching Git hook row.
 ./tools/test_dashboard_data.sh	hook	test_dashboard_data	Aggregate dashboard data coverage is provided by the matching Git hook row.

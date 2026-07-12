@@ -8,11 +8,12 @@ import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 
 import { DASHBOARD_LOCALE_CODES } from "./dashboard-control-center/src/localePolicy.js";
+import { createDashboardViteRuntimeConfiguration } from "./tools/lib/dashboard_vite_runtime.mjs";
 
 const repoRoot = path.dirname(fileURLToPath(import.meta.url));
 const appRoot = path.join(repoRoot, "dashboard-control-center");
 const runtimeRoot = path.join(repoRoot, ".dashboard-control-center");
-const viteCacheRoot = path.join(runtimeRoot, "vite-cache");
+const viteRuntimeConfiguration = createDashboardViteRuntimeConfiguration({ sourceRoot: appRoot, runtimeRoot });
 const dashboardDataToolPath = path.join(repoRoot, "tools", "dashboard-data");
 const settingsToolPath = path.join(repoRoot, "tools", "dashboard-settings");
 const designSystemToolPath = path.join(repoRoot, "tools", "dashboard-design-system");
@@ -2060,7 +2061,7 @@ function dashboardDataFilePlugin() {
 export default defineConfig({
   root: appRoot,
   base: "./",
-  cacheDir: viteCacheRoot,
+  ...viteRuntimeConfiguration,
   plugins: [react(), dashboardDataFilePlugin()],
   build: {
     outDir: path.join(repoRoot, "dist/dashboard-control-center"),
