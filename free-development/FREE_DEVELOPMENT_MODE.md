@@ -24,6 +24,9 @@ Use the same workflow learned in the lesson:
 12. Run local tests and product safety checks.
 13. Push, remote-sync, and confirm CI only when the selected product mode and Git workflow action settings make those phases applicable.
 14. Update documentation before considering the work complete.
+15. Resolve `docs/workflow/INSTRUCTION_MEMORY.md` through the shared parent
+    policy. A valid product-local file takes priority; exact absence may use the
+    parent fallback only for an explicitly selected parent-managed repository.
 
 ## Technology Choice Support
 
@@ -59,7 +62,10 @@ Use Dashboard Settings as the source of truth for whether Git, remote sync, and 
 Use the standard product repository scaffold: docs/product/, docs/workflow/, docs/memory/, ops/, skills/, tools/, src/, and tests/.
 Keep product-local skills and tools minimal, product-scoped, and reusable so the product can run document, structure, security, and test checks from inside its own repository.
 Declare the actual entrypoint, source, and test authorities in ops/PRODUCT_MANIFEST.tsv so the dashboard and gates can read them without guessing the stack.
-Ask for approval before each major workflow transition.
+Follow the resolved instruction-memory procedure. When the parent fallback is
+active, normal transitions inside the current requested task scope do not need
+separate approval; destructive operations, credentials, external authority,
+unowned changes, failed-CI merge, or scope expansion still stop.
 ```
 
 ## Completion Gate
@@ -71,6 +77,10 @@ Free Development Mode work is ready only when these checks pass:
 ```
 
 `./tools/free-development gate` reads the product workflow Git usage mode from Dashboard Settings:
+
+The gate also resolves instruction memory read-only. It never generates or
+copies `INSTRUCTION_MEMORY.md` into the selected product repository. A present
+but invalid local file is a blocker and is not treated as missing.
 
 - `none`: product workspace, canonical documents, scaffold authority, product security, and required local checks are still required; Git, remote sync, and CI are not applicable.
 - `local`: local Git worktree and local Git safety checks are required; remote sync and CI are not applicable.

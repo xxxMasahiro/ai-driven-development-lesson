@@ -1,0 +1,102 @@
+#!/usr/bin/env node
+
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import {
+  DevelopmentInstructionError,
+  formatDevelopmentInstruction,
+  resolveDevelopmentInstruction,
+} from './lib/development_instruction.mjs';
+
+const DEFAULT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+
+function usage() {
+  process.stdout.write([
+    'Usage:',
+    '  ./tools/development-instruction check',
+    '  ./tools/development-instruction status --target parent [--stage <A-F>] [--scope-id <safe-id>] [--json]',
+    '  ./tools/development-instruction status --context <context-id> [--repo <selected-repository>] [--stage <A-F>] [--scope-id <safe-id>] [--json]',
+    '',
+  ].join('\n'));
+}
+
+function parseArgs(argv) {
+  const options = { command: argv[0] || 'status', root: DEFAULT_ROOT, json: false };
+  for (let index = 1; index < argv.length; index += 1) {
+    const arg = argv[index];
+    if (arg === '--json') {
+      options.json = true;
+      continue;
+    }
+    if (['--root', '--policy', '--context', '--target', '--repo', '--stage', '--scope-id'].includes(arg)) {
+      if (index + 1 >= argv.length) throw new DevelopmentInstructionError('CLI', arg + ' requires a value.');
+      const key = {
+        '--root': 'root',
+        '--policy': 'policyPath',
+        '--context': 'contextId',
+        '--target': 'targetKind',
+        '--repo': 'repo',
+        '--stage': 'stage',
+        '--scope-id': 'scopeId',
+      }[arg];
+      options[key] = argv[index + 1];
+      index += 1;
+      continue;
+    }
+    if (arg === '-h' || arg === '--help') {
+      options.command = 'help';
+      continue;
+    }
+    throw new DevelopmentInstructionError('CLI', 'Unknown development instruction option: ' + arg);
+  }
+  return options;
+}
+
+function main() {
+  const options = parseArgs(process.argv.slice(2));
+  if (options.command === 'help') {
+    usage();
+    return 0;
+  }
+  if (!['check', 'status', 'resolve'].includes(options.command)) {
+    usage();
+    throw new DevelopmentInstructionError('CLI', 'Unknown development instruction command: ' + options.command);
+  }
+  if (options.command === 'check') {
+    if (options.contextId || options.repo || options.targetKind || options.stage || options.scopeId) {
+      throw new DevelopmentInstructionError('CLI', 'check does not accept target, context, repository, stage, or scope options.');
+    }
+    const result = resolveDevelopmentInstruction({
+      root: options.root,
+      policyPath: options.policyPath,
+      targetKind: 'parent',
+    });
+    if (result.status !== 'ready') throw new DevelopmentInstructionError('CHECK', 'Parent development instruction is not ready.');
+    process.stdout.write('Development instruction check passed.\n');
+    return 0;
+  }
+  if (!options.targetKind && !options.contextId) {
+    throw new DevelopmentInstructionError('CLI', 'status requires --target parent or --context <context-id>.');
+  }
+  if (options.targetKind && options.targetKind !== 'parent') {
+    throw new DevelopmentInstructionError('CLI', '--target currently accepts only the configured parent target.');
+  }
+  if (options.targetKind && options.contextId) {
+    throw new DevelopmentInstructionError('CLI', '--target and --context are mutually exclusive.');
+  }
+  const result = resolveDevelopmentInstruction(options);
+  process.stdout.write(options.json ? JSON.stringify(result) + '\n' : formatDevelopmentInstruction(result));
+  return 0;
+}
+
+try {
+  process.exitCode = main();
+} catch (error) {
+  if (error instanceof DevelopmentInstructionError) {
+    process.stderr.write('Development instruction error [' + error.code + ']: ' + error.message + '\n');
+    process.exitCode = 1;
+  } else {
+    process.stderr.write(String(error?.stack || error) + '\n');
+    process.exitCode = 1;
+  }
+}

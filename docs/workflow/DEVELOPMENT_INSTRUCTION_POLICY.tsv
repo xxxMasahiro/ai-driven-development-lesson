@@ -1,0 +1,32 @@
+# key	value	description
+schema_version	1.0.0	Version of the parent development-instruction resolver contract.
+activation_mode	enforce	Rollout mode; enforce is active after local-priority, refusal, compatibility, and parent-only CI ownership checks passed in the implementation cycle.
+parent_instruction_path	docs/workflow/INSTRUCTION_MEMORY.md	Parent fallback document resolved inside the lesson repository.
+local_instruction_path	docs/workflow/INSTRUCTION_MEMORY.md	Canonical target-local instruction document; an existing valid file has procedural priority over the parent fallback.
+autonomy_workflow_path	docs/workflow/DEVELOPMENT_AUTONOMY_WORKFLOW.tsv	Data-driven A-F stage mapping and continuation policy.
+repository_workflow_path	docs/workflow/REPOSITORY_DEVELOPMENT_WORKFLOW.tsv	Existing seven-phase repository workflow authority referenced by the A-F overlay.
+workflow_context_map_path	learning/context/WORKFLOW_CONTEXT_MAP.tsv	Context kind and menu-number authority used instead of fixed menu branches.
+menu_profile_policy_path	docs/workflow/MENU_PRODUCT_PROFILE_POLICY.tsv	Menu-id and target-scope authority joined to the context map by menu number.
+product_registry_path	learning/PRODUCT_REPOSITORY_REGISTRY.tsv	Selected product repository registry authority.
+product_selection_path	learning/PRODUCT_REPOSITORY_SELECTION.tsv	Selected product repository per development context.
+product_operation_mode_path	ops/PRODUCT_OPERATION_MODE.tsv	Target-local operation-mode authority required before parent fallback may govern a product repository.
+product_agents_path	AGENTS.MD	Target-local invariant entry required before a product instruction source is resolved.
+product_git_usage_policy_path	docs/workflow/PRODUCT_WORKFLOW_GIT_USAGE_POLICY.tsv	Product Git-mode policy used to calculate the maximum applicable D stage.
+product_git_usage_settings_path	learning/PRODUCT_WORKFLOW_GIT_USAGE_SETTINGS.tsv	Saved product Git-mode setting used before policy defaults.
+git_workflow_policy_path	docs/workflow/GIT_WORKFLOW_POLICY.tsv	Action-policy defaults and allowed values for normal Git/GitHub work.
+git_workflow_settings_path	learning/GIT_WORKFLOW_SETTINGS.tsv	Saved Git/GitHub action settings intersected with task scope and product mode.
+parent_workflow_kinds	maintenance	Workflow kinds eligible for the parent-repository fallback.
+product_workflow_kinds	workflow	Workflow kinds eligible for selected product-repository fallback.
+parent_profile_scope	lesson	Menu profile scope required for the parent repository target.
+product_profile_scope	product	Menu profile scope required for product repository targets.
+parent_workflow_skill	repository-development-workflow	Repo-local workflow skill selected for lesson-repository development.
+product_workflow_skill	product-development-workflow	Product-local workflow skill selected for external product development.
+required_product_operation_mode	parent_managed	Only a ready parent-managed product repository may use the parent fallback.
+required_product_managed_flag	true	Companion operation-mode flag required for parent-managed fallback.
+supported_instruction_versions	versionless|1.0.0	Existing versionless local documents use the compatibility profile; declared unknown versions fail closed.
+parent_instruction_version	1.0.0	Strict version required from the parent fallback document.
+required_stages	A|B|C|D|E|F	Required unique second-level workflow headings.
+required_parent_anchors	workflow-rule:changeability|workflow-rule:ecosystem-reuse-generality|workflow-rule:no-unrelated-tradeoff|workflow-rule:verification-orchestration|workflow-rule:workflow-evidence	Strict anchors required only from the parent fallback profile.
+maximum_instruction_bytes	131072	Maximum bounded instruction document size.
+maximum_scope_id_length	96	Maximum safe task-scope identifier length accepted as runtime authorization evidence.
+parent_git_usage_mode	ci	Maximum Git/CI applicability for the lesson repository before action settings narrow it.

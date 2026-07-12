@@ -22,6 +22,10 @@ It supports `AGENTS.MD`; it does not replace AGENTS.MD, `worklog-doc-sync`, `les
    - target product repository
    - product profile and security context
    - product-local scaffold, including `skills/`, `tools/`, `docs/workflow/SECURITY.md`, and `docs/workflow/VERIFICATION.md`
+   - resolved instruction memory: a valid target-local
+     `docs/workflow/INSTRUCTION_MEMORY.md` first, otherwise the parent fallback
+     only when the selected repository is parent-managed and the local path is
+     exactly absent
 4. Classify the request:
    - Free Development
    - Product Improvement
@@ -46,6 +50,8 @@ It supports `AGENTS.MD`; it does not replace AGENTS.MD, `worklog-doc-sync`, `les
 - `none` means Git/CI is not applicable; it does not mean no checks.
 - Product workspace boundary, canonical product documents, scaffold checks, product-security checks, secret handling, external-integration approvals, and required local tests remain applicable.
 - Product-local skills and tools are part of the standard product scaffold. Keep them product-scoped and minimal; do not copy lesson-repository development automation wholesale into product repositories.
+- Never merge, generate, or overwrite product-local instruction memory from the
+  parent fallback. A present invalid local file is a blocker, not an absence.
 - External Integration must include external-service, API, OAuth, webhook, credential, and secret-handling boundaries before implementation.
 - Destructive operations, product repository deletion, remote deletion, OAuth, credentials, secrets, and external-service authority changes need explicit developer approval.
 - Do not add one-off branches for one product stack, exact phrase, menu, language, or special case.

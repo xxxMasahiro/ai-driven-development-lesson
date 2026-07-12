@@ -2,6 +2,9 @@
 
 The workflow source of truth is `docs/workflow/REPOSITORY_DEVELOPMENT_WORKFLOW.tsv`.
 The owner-layer helpers are `tools/lib/repository_development_workflow.sh` and `tools/repository-development-workflow`.
+The A-F instruction overlay is resolved by `tools/development-instruction` from
+`DEVELOPMENT_INSTRUCTION_POLICY.tsv` and
+`DEVELOPMENT_AUTONOMY_WORKFLOW.tsv`.
 
 ## Phases
 
@@ -22,7 +25,8 @@ The owner-layer helpers are `tools/lib/repository_development_workflow.sh` and `
 ./tools/repository-development-workflow gate --phase release_gate
 ./tools/repository-development-workflow detect
 ./tools/repository-development-workflow plan-run --phase fast_loop --check-set required
-./tools/repository-development-workflow run --phase fast_loop --check-set required --execute --approved
+./tools/repository-development-workflow run --phase fast_loop --check-set required --execute
+./tools/repository-development-workflow instruction --stage D --scope-id <safe-task-scope-id>
 ./tools/repository-development-workflow status --runs
 ./tools/repository-development-workflow next --phase fast_loop
 ./tools/repository-development-workflow check
@@ -31,7 +35,10 @@ The owner-layer helpers are `tools/lib/repository_development_workflow.sh` and `
 The workflow command explains required and recommended checks.
 The Runner can dry-run every phase and can execute only policy-allowed non-destructive local checks for phases such as `fast_loop` and `mid_tests`.
 It records phase, check, command, result, repository HEAD, policy fingerprint, input fingerprint, and working-tree summary in the local ignored `.repository-development-runs/` directory.
-It does not run push, merge, remote sync, main CI waiting, deletion, cleanup, arbitrary shell, dashboard mutation, credential handling, or release-proof shortcuts.
+It does not run push, merge, remote sync, main CI waiting, deletion, cleanup,
+arbitrary shell, dashboard mutation, credential handling, or release-proof
+shortcuts. The instruction projection reports which normal D actions are
+eligible; their owner tools and required evidence remain authoritative.
 
 ## Ownership Boundaries
 
@@ -46,13 +53,26 @@ Fast-loop checks can keep implementation moving, but they are not proof for rele
 Runner records may be reused only for fast-loop or medium local decisions when HEAD, policy fingerprint, and input fingerprint match.
 They must not be reused as release proof.
 
-## Approval Boundaries
+## Task Scope And Approval Boundaries
+
+The current developer-requested task scope may carry normal A-D work through
+document sync, implementation, required checks, and the configured Git/CI route
+without per-phase prompts. Existing target-local instruction memory remains
+procedurally authoritative when present. The parent fallback is selected only
+on exact absence and never creates task scope by itself.
 
 Stop and ask before:
 
 - Editing AGENTS.MD beyond already-approved scope.
 - Editing pre-commit, CI, final-gate coverage, or hook policy in a way not documented for the active sync ID.
-- Running push, merge, main CI waiting, local/remote sync, branch deletion, worktree deletion, product repository deletion, remote deletion, or other destructive operations.
+- History rewrite, branch/worktree/product/remote deletion, credentials,
+  secrets, OAuth, external authority changes, administrative bypass, or other
+  destructive operations.
+- Merging failed or unknown required CI, acting on unowned dirty changes, or
+  expanding beyond the current task scope.
 - Weakening existing gates, removing required checks, changing STEP 1-7 or STEP 1-14 behavior, changing repo-local skill ownership, or accepting an existing-feature tradeoff.
 
-Cleanup is plan-only by default. Convert any cleanup execution into an approval-bound plan unless explicit developer approval exists.
+Destructive cleanup is plan-only by default. Normal merge, main CI monitoring,
+and synchronization follow task scope plus saved Settings; convert destructive
+cleanup execution into an approval-bound plan unless explicit developer
+approval exists.

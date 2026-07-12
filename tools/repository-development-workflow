@@ -8,6 +8,8 @@ source "$ROOT/tools/lib/lesson_common.sh"
 source "$ROOT/tools/lib/repository_development_workflow.sh"
 # shellcheck source=tools/lib/repository_development_runner.sh
 source "$ROOT/tools/lib/repository_development_runner.sh"
+# shellcheck source=tools/lib/development_instruction.sh
+source "$ROOT/tools/lib/development_instruction.sh"
 
 usage() {
   cat <<'USAGE'
@@ -23,6 +25,7 @@ Usage:
   ./tools/repository-development-workflow record --phase <phase_id> --check-id <check_id> --result pass|fail|skipped --exit-status <n>
   ./tools/repository-development-workflow next --phase <phase_id>
   ./tools/repository-development-workflow status --runs [--phase <phase_id>]
+  ./tools/repository-development-workflow instruction --stage <A-F> [--scope-id <safe-id>] [--json]
   ./tools/repository-development-workflow check
 USAGE
 }
@@ -36,6 +39,9 @@ use_reuse=true
 check_id=""
 result=""
 exit_status=""
+instruction_stage=""
+scope_id=""
+json=false
 cmd="${1:-status}"
 shift || true
 
@@ -62,6 +68,26 @@ while [[ $# -gt 0 ]]; do
           ;;
       esac
       shift 2
+      ;;
+    --stage)
+      [[ $# -ge 2 ]] || {
+        printf -- '--stage requires a value.\n' >&2
+        exit 1
+      }
+      instruction_stage="$2"
+      shift 2
+      ;;
+    --scope-id)
+      [[ $# -ge 2 ]] || {
+        printf -- '--scope-id requires a value.\n' >&2
+        exit 1
+      }
+      scope_id="$2"
+      shift 2
+      ;;
+    --json)
+      json=true
+      shift
       ;;
     --runs)
       runs=true
@@ -115,6 +141,11 @@ while [[ $# -gt 0 ]]; do
 done
 
 case "$cmd" in
+  help|--help|-h) ;;
+  *) "$ROOT/tools/development-instruction" check >/dev/null ;;
+esac
+
+case "$cmd" in
   status)
     repository_development_validate_policy
     repository_development_runner_validate_policy
@@ -124,6 +155,8 @@ case "$cmd" in
     printf 'Runner policy file: %s\n' "$(repository_development_runner_policy_file)"
     printf 'Selected phase: %s\n' "$phase"
     repository_development_print_phase "$phase"
+    printf '\n'
+    development_instruction_status_parent "" ""
     if [[ "$runs" == "true" ]]; then
       repository_development_runner_print_records
     fi
@@ -137,7 +170,7 @@ case "$cmd" in
     repository_development_validate_policy
     repository_development_runner_validate_policy
     repository_development_print_phase "$phase"
-    printf 'Plan status: policy-backed; follow document sync and approval boundaries before writing.\n'
+    printf 'Plan status: policy-backed; follow document sync, task scope, Settings, and stop conditions before writing.\n'
     ;;
   guidance)
     repository_development_validate_policy
@@ -175,9 +208,20 @@ case "$cmd" in
   next)
     repository_development_runner_print_next "$phase"
     ;;
+  instruction)
+    if [[ -z "$instruction_stage" ]]; then
+      printf 'instruction requires --stage <A-F>.\n' >&2
+      exit 1
+    fi
+    instruction_args=(status --target parent --stage "$instruction_stage")
+    [[ -z "$scope_id" ]] || instruction_args+=(--scope-id "$scope_id")
+    [[ "$json" != "true" ]] || instruction_args+=(--json)
+    "$ROOT/tools/development-instruction" "${instruction_args[@]}"
+    ;;
   check)
     repository_development_validate_policy
     repository_development_runner_validate_policy
+    "$ROOT/tools/development-instruction" check >/dev/null
     printf 'Repository development workflow check passed.\n'
     ;;
   help|--help|-h)

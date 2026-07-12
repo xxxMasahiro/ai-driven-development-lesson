@@ -107,6 +107,9 @@ STEP 1-14: 実践レッスン: index-14-days.md
 25. ローカルとCIの検証は、同じ論理検査を同一実行内で一度だけ所有する。
     `docs/workflow/FINAL_GATE_EXECUTION_POLICY.tsv` と `docs/workflow/FINAL_GATE_CI_GRAPH.tsv` を検証構成の正本とし、既存チェックID、必須workflow/job context、push/pull_request trigger、失敗伝播を維持します。所有者のない検査、重複所有、未分類実行、別HEAD・別ポリシー・別テスト入力の証跡、shell評価を必要とするgap/fallback commandは拒否します。終端jobはprovider結果と同一実行proofを検証し、共通suiteを再実行しません。永続的な検証結果cache、workflow間の結果流用、登録済み子リポジトリの巡回は引き続き禁止します。
 
+26. 開発関連メニューの instruction memory はローカル優先・欠落時のみ親フォールバックで解決する。
+    `docs/workflow/DEVELOPMENT_INSTRUCTION_POLICY.tsv` と `docs/workflow/DEVELOPMENT_AUTONOMY_WORKFLOW.tsv` を正本とし、workflow context と menu profile をデータで結合して対象を決めます。教材 workflow kind は対象外です。親リポジトリまたは明示選択された `parent_managed` 成果物リポジトリだけを対象とし、対象側の有効な `docs/workflow/INSTRUCTION_MEMORY.md` が存在すれば、その手順を親より優先します。親フォールバックを使えるのはローカルパスが正確に存在しない場合だけです。無効、読取不能、symlink、範囲外、巨大、不正UTF-8/NUL、A-F欠落・重複、未対応versionはblockし、親文書とのmerge、子へのcopy・生成・上書きを行いません。親フォールバックのA-Fは既存7 phaseのoverlayであり、現在のtask scope、operation mode、Git usage mode、Git Settings、安全停止条件を越える権限やrelease proofを作りません。通常CIは親と隔離fixtureだけを検証し、登録済み子リポジトリを巡回しません。
+
 ## ドキュメントルート
 
 | 用途 | 入口 |
@@ -127,6 +130,7 @@ STEP 1-14: 実践レッスン: index-14-days.md
 | STEP 1-14同期ゲート | `lesson/SYNC_GATES_14_DAYS.tsv` |
 | STEP 1-14ヘルプデスク | `learning/HELP_DESK.md` |
 | Gitワークフロー設定 | `docs/workflow/GIT_WORKFLOW_POLICY.tsv`、`learning/GIT_WORKFLOW_SETTINGS.tsv` |
+| 開発 instruction memory | `docs/workflow/INSTRUCTION_MEMORY.md`、`docs/workflow/DEVELOPMENT_INSTRUCTION_POLICY.tsv`、`docs/workflow/DEVELOPMENT_AUTONOMY_WORKFLOW.tsv` |
 | 成果物ワークフローGit利用設定 | `docs/workflow/PRODUCT_WORKFLOW_GIT_USAGE_POLICY.tsv`、`learning/PRODUCT_WORKFLOW_GIT_USAGE_SETTINGS.tsv` |
 | Git hooks設定 | `docs/workflow/GIT_HOOKS_POLICY.tsv`、`docs/workflow/GIT_HOOK_CHECKS.tsv`、`learning/GIT_HOOK_SETTINGS.tsv` |
 | ローカル/CI検証構成 | `docs/workflow/FINAL_GATE_EXECUTION_POLICY.tsv`、`docs/workflow/FINAL_GATE_CI_GRAPH.tsv`、`docs/workflow/FINAL_GATE_COVERAGE.tsv` |
@@ -169,7 +173,7 @@ STEP 1-14: 実践レッスン: index-14-days.md
 | 成果物リポジトリを削除したい | `docs/as-built/SPECIFICATION.md` の product repository cleanup、`docs/workflow/HANDOFF.md` | なし | `./tools/product-repository-cleanup status`、`./tools/product-repository-cleanup plan`、必要時のみ `local --confirm` または `remote --confirm` |
 | 外部連携へ発展させたい | `free-development/FREE_DEVELOPMENT_MODE.md`、`prompts/PROMPTS_14_DAYS.md` Step 13/14 | `skills/product-development-workflow/SKILL.md`、`skills/lesson14-facilitator/SKILL.md`、`skills/worklog-doc-sync/SKILL.md` | 自由開発または既存成果物の要件・仕様から連携設計 |
 | product-securityを確認したい | `docs/workflow/PRODUCT_SECURITY_POLICY.tsv`、`learning/context/WORKFLOW_CONTEXT_MAP.tsv` | なし | `./tools/product-security status`、`./tools/product-security advise`、`./tools/product-security check`、`./tools/product-security gate` |
-| 教材リポジトリ開発の提案・計画・実装を進めたい | `docs/workflow/REPOSITORY_DEVELOPMENT_WORKFLOW.tsv`、`docs/memory/DEVELOPER_MEMORY.md`、`docs/memory/SESSION_MEMORY.md` | `skills/repository-development-workflow/SKILL.md` | `./tools/repository-development-workflow status`、`./tools/check_repository_development_workflow.sh` |
+| 教材リポジトリ開発の提案・計画・実装を進めたい | `docs/workflow/INSTRUCTION_MEMORY.md`、`docs/workflow/DEVELOPMENT_INSTRUCTION_POLICY.tsv`、`docs/workflow/DEVELOPMENT_AUTONOMY_WORKFLOW.tsv`、`docs/workflow/REPOSITORY_DEVELOPMENT_WORKFLOW.tsv`、`docs/memory/DEVELOPER_MEMORY.md`、`docs/memory/SESSION_MEMORY.md` | `skills/repository-development-workflow/SKILL.md` | `./tools/development-instruction check`、`./tools/repository-development-workflow status`、`./tools/check_repository_development_workflow.sh` |
 | 教材そのものを改善したい | `docs/memory/DEVELOPER_MEMORY.md`、`docs/workflow/TASK_TRACKER.md`、`docs/workflow/HANDOFF.md` | `skills/repository-development-workflow/SKILL.md`、`skills/lesson-sync-gate/SKILL.md` | `./tools/dashboard all`、各種チェック |
 | `3. 応用レッスン` でチーム開発とDockerを学びたい | `advanced/TEAM_DEVELOPMENT_DOCKER.md` | `skills/lesson-sync-gate/SKILL.md`、`skills/worklog-doc-sync/SKILL.md` | `./tools/team-development start --confirm`、`./tools/team-development gate` |
 
@@ -201,12 +205,14 @@ skills/worklog-doc-sync/SKILL.md
 ./tools/check_as_built_docs.sh
 ./tools/check_as_built_sync_contract.sh
 ./tools/check_repository_document_sync.sh
+./tools/check_development_instruction.sh
 ./tools/verification-ci check
 ./tools/check_security_invariants.sh
 ./tools/as-built-sync status
 ./tools/test_docs_tour.sh
 ./tools/test_as_built_sync_contract.sh
 ./tools/test_repository_document_sync.sh
+./tools/test_development_instruction.sh
 ./tools/test_ci_composition.sh
 ./tools/test_security_invariants.sh
 ./tools/test_git_workflow_policy.sh

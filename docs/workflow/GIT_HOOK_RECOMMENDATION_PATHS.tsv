@@ -49,5 +49,10 @@ tools/product-security	full-no-cache	Product security gate changes affect produc
 tools/product-gate-evidence-bootstrap	full-no-cache	Product gate evidence bootstrap changes affect external product evidence producer installation.
 tools/lib/security_invariants.sh	full-no-cache	Security guard helper changes affect mechanical security validation.
 tools/lib/product_security.sh	full-no-cache	Product security helper changes affect product workflow verification.
+docs/workflow/DEVELOPMENT_INSTRUCTION_POLICY.tsv	full-no-cache	Instruction authority, local-priority, target eligibility, and Settings locator changes need CI-equivalent verification.
+docs/workflow/DEVELOPMENT_AUTONOMY_WORKFLOW.tsv	full-no-cache	A-F phase, write-scope, continuation, Git, or stop-condition changes need CI-equivalent verification.
+docs/workflow/INSTRUCTION_MEMORY.md	full-no-cache	Parent fallback instruction changes affect autonomous development authority.
+tools/lib/development_instruction.mjs	full-no-cache	Safe resolver changes affect path, file, selection, mode, scope, and output boundaries.
+tools/development-instruction	full-no-cache	Standalone instruction CLI changes affect parent and product workflow routing.
 tools/check_*.sh	full-no-cache	Checker changes affect mechanical verification behavior.
 tools/test_*.sh	full-no-cache	Regression-test changes affect aggregate and CI verification behavior.
