@@ -3183,3 +3183,31 @@ Restart context:
 - The dedicated main-CI job is standard-library-only, parallel, read-only, and a final-gate prerequisite. Lesson14 CI does not duplicate it.
 - `.githooks/pre-push` is optional local feedback and never fetches; CI remains final authority.
 - External repositories remain read-only. The remaining work is verification, Git/GitHub integration, main synchronization, and TraceCue PC/mobile browser review.
+
+## Parent Development Instruction Fallback And Autonomy Handoff
+
+SYNC-ID: parent_instruction_memory_fallback_authority
+STATUS: implemented
+ARTIFACTS: AGENTS.MD,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/INSTRUCTION_MEMORY.md,docs/workflow/DEVELOPMENT_INSTRUCTION_POLICY.tsv,docs/workflow/DEVELOPMENT_AUTONOMY_WORKFLOW.tsv,docs/workflow/PRODUCT_REPOSITORY_STRUCTURE.tsv,free-development/FREE_DEVELOPMENT_MODE.md,templates/TEMPLATES.md,guides/DOCUMENT_MAP.md,tools/lib/development_instruction.mjs,tools/lib/development_instruction.sh,tools/development-instruction,tools/check_development_instruction.sh,tools/test_development_instruction.mjs,tools/test_development_instruction.sh,tools/lib/product_workflow_git_usage.sh,tools/free-development,tools/product-improvement,tools/external-integration,skills/product-development-workflow/SKILL.md,skills/product-development-workflow/references/product-development.md,docs/workflow/REPOSITORY_DOCUMENT_SYNC.md,docs/workflow/REPOSITORY_DOCUMENT_SYNC_POLICY.json,tools/lib/repository_document_sync.mjs,tools/test_repository_document_sync.mjs,docs/workflow/SAFEFLOW_SECURITY_BACKFILL.tsv,docs/workflow/PRODUCT_SECURITY_POLICY.tsv,docs/workflow/TEST_PLAN_MANIFEST.tsv,docs/workflow/GIT_HOOK_CHECKS.tsv,docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv,docs/workflow/GIT_HOOK_RECOMMENDATION_PATHS.tsv,docs/workflow/FINAL_GATE_EXECUTION_POLICY.tsv,docs/workflow/FINAL_GATE_CI_GRAPH.tsv,docs/workflow/FINAL_GATE_GAP_COMMANDS.tsv,docs/workflow/FINAL_GATE_COVERAGE.tsv,tools/test_lesson_repository.sh,.github/workflows/ci.yml,.github/workflows/lesson14-ci.yml,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/check_development_instruction.sh,tools/test_development_instruction.sh,tools/test_product_git_usage_modes.sh,tools/test_product_scaffold_check.sh,tools/test_menu_prerequisites.sh,tools/test_repository_document_sync.sh,tools/check_security_invariants.sh,tools/test_security_invariants.sh,tools/check_test_plan_coverage.sh,tools/test_test_plan.sh,tools/test_git_hooks.sh,tools/test_git_hooks_parallel.sh,tools/test_ci_composition.sh,tools/check_ci_workflow_structure.sh,tools/check_agents_skills.sh,tools/test_docs_tour.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh
+
+The implemented change adds a parent fallback for eligible development
+contexts only. A valid child-local `INSTRUCTION_MEMORY.md` remains authoritative
+inside the instruction-memory layer. Exact absence may use the parent fallback;
+every other local-file error blocks. Context/menu policy, selection, operation
+mode, and Git top-level identity must agree before a product target is read.
+Lesson contexts remain outside this feature.
+
+SYNC-ID: parent_development_autonomy_activation
+STATUS: implemented
+ARTIFACTS: AGENTS.MD,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/INSTRUCTION_MEMORY.md,docs/workflow/DEVELOPMENT_INSTRUCTION_POLICY.tsv,docs/workflow/DEVELOPMENT_AUTONOMY_WORKFLOW.tsv,docs/workflow/REPOSITORY_DEVELOPMENT_WORKFLOW.tsv,docs/workflow/REPOSITORY_DEVELOPMENT_RUNNER_POLICY.tsv,learning/REPOSITORY_DEVELOPMENT_APPROVALS.tsv,docs/workflow/GIT_WORKFLOW_POLICY.tsv,learning/GIT_WORKFLOW_SETTINGS.tsv,docs/workflow/PRODUCT_WORKFLOW_GIT_USAGE_POLICY.tsv,learning/PRODUCT_WORKFLOW_GIT_USAGE_SETTINGS.tsv,tools/lib/repository_development_workflow.sh,tools/lib/repository_development_runner.sh,tools/repository-development-workflow,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh,skills/repository-development-workflow/SKILL.md,skills/repository-development-workflow/references/repository-development.md,tools/lib/development_instruction.mjs,tools/development-instruction,tools/lib/product_workflow_git_usage.sh,skills/product-development-workflow/SKILL.md,docs/workflow/REPOSITORY_DOCUMENT_SYNC.md,docs/workflow/REPOSITORY_DOCUMENT_SYNC_POLICY.json,docs/workflow/SAFEFLOW_SECURITY_BACKFILL.tsv,docs/workflow/PRODUCT_SECURITY_POLICY.tsv,docs/workflow/TEST_PLAN_MANIFEST.tsv,docs/workflow/GIT_HOOK_CHECKS.tsv,docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv,docs/workflow/GIT_HOOK_RECOMMENDATION_PATHS.tsv,docs/workflow/FINAL_GATE_EXECUTION_POLICY.tsv,docs/workflow/FINAL_GATE_CI_GRAPH.tsv,docs/workflow/FINAL_GATE_GAP_COMMANDS.tsv,docs/workflow/FINAL_GATE_COVERAGE.tsv,tools/test_lesson_repository.sh,.github/workflows/ci.yml,.github/workflows/lesson14-ci.yml,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/check_development_instruction.sh,tools/test_development_instruction.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh,tools/test_product_git_usage_modes.sh,tools/test_menu_prerequisites.sh,tools/check_security_invariants.sh,tools/test_security_invariants.sh,tools/check_test_plan_coverage.sh,tools/test_test_plan.sh,tools/test_git_hooks.sh,tools/test_git_hooks_parallel.sh,tools/test_ci_composition.sh,tools/check_ci_workflow_structure.sh,tools/check_agents_skills.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh
+
+A-F is projected over the existing seven repository phases. C/D require
+the current requested task scope and Settings intersection. E/F remain plan-only
+and cannot authorize a new C. The resolver, repository/product adapters,
+verification and Security ownership, and enforce activation are complete. The
+next safe action is to finish release proof and the configured Git/CI route.
+Stop on unowned dirty state, invalid local
+instruction memory, selection/mode mismatch, scope expansion, destructive or
+credential work, repeated identical failure, or failed/unknown required CI.

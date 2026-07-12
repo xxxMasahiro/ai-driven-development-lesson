@@ -44,6 +44,12 @@ test('policy is parent-scoped, bounded, self-protected, and uses a small glob la
   const weakenedSelf = structuredClone(policy);
   weakenedSelf.rules.find((rule) => rule.id === 'document-sync-governance').required_groups = ['document_sync_governance'];
   assert.throws(() => validateRepositoryDocumentSyncPolicy(weakenedSelf), /missing required group/);
+  const missingInstructionRule = structuredClone(policy);
+  missingInstructionRule.rules = missingInstructionRule.rules.filter((rule) => rule.id !== 'development-instruction-governance');
+  assert.throws(() => validateRepositoryDocumentSyncPolicy(missingInstructionRule), /development-instruction protection rule/);
+  const weakenedInstructionRule = structuredClone(policy);
+  weakenedInstructionRule.rules.find((rule) => rule.id === 'development-instruction-governance').required_groups = ['development_instruction_governance'];
+  assert.throws(() => validateRepositoryDocumentSyncPolicy(weakenedInstructionRule), /development-instruction protection rule is missing required group/);
 });
 
 test('parent categories require only their own authorities while rules add requirements', () => {
@@ -60,6 +66,15 @@ test('parent categories require only their own authorities while rules add requi
   const scaffold = evaluateRepositoryDocumentSync(policy, asRecords(['templates/TEMPLATES.md']));
   assert.ok(scaffold.required_groups.includes('product_scaffold_template'));
   assert.equal(evaluateRepositoryDocumentSync(policy, asRecords(['templates/TEMPLATES.md', ...groupPaths('product_scaffold_template')])).status, 'pass');
+});
+
+test('development instruction governance is additive, cannot be exempted, and parent-only', () => {
+  const result = evaluateRepositoryDocumentSync(policy, asRecords(['tools/development-instruction']));
+  for (const group of ['as_built_core', 'verification', 'security', 'ci_hooks', 'development_instruction_governance']) {
+    assert.ok(result.required_groups.includes(group), group);
+  }
+  assert.equal(result.matched_rules.find((rule) => rule.id === 'development-instruction-governance').cannot_be_exempted, true);
+  assert.equal(policy.external_repository_access, false);
 });
 
 test('dashboard data and design authorities remain separate', () => {

@@ -9,17 +9,36 @@ const MAX_PATTERN_LENGTH = 512;
 const MAX_RECORDS = 20000;
 const MAX_POLICY_BYTES = 512 * 1024;
 const STATUS_KINDS = new Set(['A', 'C', 'D', 'M', 'R', 'T', 'U', 'X']);
-const SELF_RULE_ID = 'document-sync-governance';
-const SELF_GROUPS = new Set(['as_built_core', 'verification', 'security', 'ci_hooks', 'document_sync_governance']);
-const SELF_PATHS = new Set([
-  'AGENTS.MD',
-  'docs/workflow/REPOSITORY_DOCUMENT_SYNC.md',
-  'docs/workflow/REPOSITORY_DOCUMENT_SYNC_POLICY.json',
-  'tools/check_repository_document_sync.mjs',
-  'tools/check_ci_workflow_structure.sh',
-  'tools/lib/repository_document_sync.mjs',
-  'tools/test_repository_document_sync.mjs'
-]);
+const IMMUTABLE_RULES = [
+  {
+    id: 'document-sync-governance',
+    label: 'self-protection',
+    groups: new Set(['as_built_core', 'verification', 'security', 'ci_hooks', 'document_sync_governance']),
+    paths: new Set([
+      'AGENTS.MD',
+      'docs/workflow/REPOSITORY_DOCUMENT_SYNC.md',
+      'docs/workflow/REPOSITORY_DOCUMENT_SYNC_POLICY.json',
+      'tools/check_repository_document_sync.mjs',
+      'tools/check_ci_workflow_structure.sh',
+      'tools/lib/repository_document_sync.mjs',
+      'tools/test_repository_document_sync.mjs'
+    ])
+  },
+  {
+    id: 'development-instruction-governance',
+    label: 'development-instruction protection',
+    groups: new Set(['as_built_core', 'verification', 'security', 'ci_hooks', 'development_instruction_governance']),
+    paths: new Set([
+      'docs/workflow/DEVELOPMENT_INSTRUCTION_POLICY.tsv',
+      'docs/workflow/DEVELOPMENT_AUTONOMY_WORKFLOW.tsv',
+      'docs/workflow/INSTRUCTION_MEMORY.md',
+      'tools/development-instruction',
+      'tools/lib/development_instruction.mjs',
+      'tools/check_development_instruction.sh',
+      'tools/test_development_instruction.mjs'
+    ])
+  }
+];
 
 function assertObject(value, label) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(`${label} must be an object.`);
@@ -127,10 +146,12 @@ export function validateRepositoryDocumentSyncPolicy(policy) {
     if (rule.cannot_be_exempted !== undefined && typeof rule.cannot_be_exempted !== 'boolean') throw new Error(`rules.${rule.id}.cannot_be_exempted must be boolean.`);
   }
   if (patternCounter.count > MAX_PATTERNS) throw new Error(`Policy exceeds the ${MAX_PATTERNS} pattern limit.`);
-  const selfRule = policy.rules.find((rule) => rule.id === SELF_RULE_ID);
-  if (!selfRule || selfRule.cannot_be_exempted !== true) throw new Error(`Immutable self-protection rule is missing or exemptible: ${SELF_RULE_ID}.`);
-  for (const group of SELF_GROUPS) if (!selfRule.required_groups.includes(group)) throw new Error(`Self-protection rule is missing required group: ${group}.`);
-  for (const pathname of SELF_PATHS) if (!(selfRule.trigger.any_of ?? []).includes(pathname)) throw new Error(`Self-protection rule is missing protected path: ${pathname}.`);
+  for (const immutable of IMMUTABLE_RULES) {
+    const rule = policy.rules.find((candidate) => candidate.id === immutable.id);
+    if (!rule || rule.cannot_be_exempted !== true) throw new Error(`Immutable ${immutable.label} rule is missing or exemptible: ${immutable.id}.`);
+    for (const group of immutable.groups) if (!rule.required_groups.includes(group)) throw new Error(`${immutable.label} rule is missing required group: ${group}.`);
+    for (const pathname of immutable.paths) if (!(rule.trigger.any_of ?? []).includes(pathname)) throw new Error(`${immutable.label} rule is missing protected path: ${pathname}.`);
+  }
   return policy;
 }
 

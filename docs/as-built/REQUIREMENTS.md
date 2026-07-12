@@ -2821,3 +2821,46 @@ The parent repository must reject missing category-relevant document updates ove
 - Reject session memory, generated output, deleted paths, rename sources, malformed paths/status, symlinked policy files, oversized policy/input collections, and weakened self-protection as synchronization evidence.
 - Preserve the existing AS_BUILT sync registry, static document checks, lesson gates, product-local CI, and child-repository authority as separate owner layers.
 - Keep the CI job standard-library-only and parallel; it must not install dependencies, start browsers, generate Dashboard data, use `gh`, or traverse external products.
+
+## Implemented Parent Development Instruction Fallback Requirements
+
+SYNC-ID: parent_instruction_memory_fallback_authority
+STATUS: implemented
+ARTIFACTS: AGENTS.MD,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/INSTRUCTION_MEMORY.md,docs/workflow/DEVELOPMENT_INSTRUCTION_POLICY.tsv,docs/workflow/DEVELOPMENT_AUTONOMY_WORKFLOW.tsv,docs/workflow/PRODUCT_REPOSITORY_STRUCTURE.tsv,free-development/FREE_DEVELOPMENT_MODE.md,templates/TEMPLATES.md,guides/DOCUMENT_MAP.md,tools/lib/development_instruction.mjs,tools/lib/development_instruction.sh,tools/development-instruction,tools/check_development_instruction.sh,tools/test_development_instruction.mjs,tools/test_development_instruction.sh,tools/lib/product_workflow_git_usage.sh,tools/free-development,tools/product-improvement,tools/external-integration,skills/product-development-workflow/SKILL.md,skills/product-development-workflow/references/product-development.md,docs/workflow/REPOSITORY_DOCUMENT_SYNC.md,docs/workflow/REPOSITORY_DOCUMENT_SYNC_POLICY.json,tools/lib/repository_document_sync.mjs,tools/test_repository_document_sync.mjs,docs/workflow/SAFEFLOW_SECURITY_BACKFILL.tsv,docs/workflow/PRODUCT_SECURITY_POLICY.tsv,docs/workflow/TEST_PLAN_MANIFEST.tsv,docs/workflow/GIT_HOOK_CHECKS.tsv,docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv,docs/workflow/GIT_HOOK_RECOMMENDATION_PATHS.tsv,docs/workflow/FINAL_GATE_EXECUTION_POLICY.tsv,docs/workflow/FINAL_GATE_CI_GRAPH.tsv,docs/workflow/FINAL_GATE_GAP_COMMANDS.tsv,docs/workflow/FINAL_GATE_COVERAGE.tsv,tools/test_lesson_repository.sh,.github/workflows/ci.yml,.github/workflows/lesson14-ci.yml,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/check_development_instruction.sh,tools/test_development_instruction.sh,tools/test_product_git_usage_modes.sh,tools/test_product_scaffold_check.sh,tools/test_menu_prerequisites.sh,tools/test_repository_document_sync.sh,tools/check_security_invariants.sh,tools/test_security_invariants.sh,tools/check_test_plan_coverage.sh,tools/test_test_plan.sh,tools/test_git_hooks.sh,tools/test_git_hooks_parallel.sh,tools/test_ci_composition.sh,tools/check_ci_workflow_structure.sh,tools/check_agents_skills.sh,tools/test_docs_tour.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh
+
+Development-related parent and selected product-repository workflows need one
+safe instruction-memory resolution contract without copying a parent document
+into every child repository.
+
+- A valid target-local instruction memory has procedural priority; the parent
+  fallback is used only when the configured local path is exactly absent.
+- Invalid, unreadable, oversized, symlinked, path-escaping, malformed, or
+  unsupported local instruction memory blocks resolution and never falls back.
+- Lesson workflow kinds are not applicable. Product fallback is limited to an
+  explicitly selected, ready, parent-managed repository.
+- Eligibility and paths are joined from context, menu, registry, selection,
+  operation-mode, and policy data without product-name, repository-name, URL,
+  checkout-path, or menu-label branches.
+- Parent CI validates isolated fixtures and the parent source only; it never
+  traverses registered product repositories.
+
+SYNC-ID: parent_development_autonomy_activation
+STATUS: implemented
+ARTIFACTS: AGENTS.MD,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/INSTRUCTION_MEMORY.md,docs/workflow/DEVELOPMENT_INSTRUCTION_POLICY.tsv,docs/workflow/DEVELOPMENT_AUTONOMY_WORKFLOW.tsv,docs/workflow/REPOSITORY_DEVELOPMENT_WORKFLOW.tsv,docs/workflow/REPOSITORY_DEVELOPMENT_RUNNER_POLICY.tsv,learning/REPOSITORY_DEVELOPMENT_APPROVALS.tsv,docs/workflow/GIT_WORKFLOW_POLICY.tsv,learning/GIT_WORKFLOW_SETTINGS.tsv,docs/workflow/PRODUCT_WORKFLOW_GIT_USAGE_POLICY.tsv,learning/PRODUCT_WORKFLOW_GIT_USAGE_SETTINGS.tsv,tools/lib/repository_development_workflow.sh,tools/lib/repository_development_runner.sh,tools/repository-development-workflow,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh,skills/repository-development-workflow/SKILL.md,skills/repository-development-workflow/references/repository-development.md,tools/lib/development_instruction.mjs,tools/development-instruction,tools/lib/product_workflow_git_usage.sh,skills/product-development-workflow/SKILL.md,docs/workflow/REPOSITORY_DOCUMENT_SYNC.md,docs/workflow/REPOSITORY_DOCUMENT_SYNC_POLICY.json,docs/workflow/SAFEFLOW_SECURITY_BACKFILL.tsv,docs/workflow/PRODUCT_SECURITY_POLICY.tsv,docs/workflow/TEST_PLAN_MANIFEST.tsv,docs/workflow/GIT_HOOK_CHECKS.tsv,docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv,docs/workflow/GIT_HOOK_RECOMMENDATION_PATHS.tsv,docs/workflow/FINAL_GATE_EXECUTION_POLICY.tsv,docs/workflow/FINAL_GATE_CI_GRAPH.tsv,docs/workflow/FINAL_GATE_GAP_COMMANDS.tsv,docs/workflow/FINAL_GATE_COVERAGE.tsv,tools/test_lesson_repository.sh,.github/workflows/ci.yml,.github/workflows/lesson14-ci.yml,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/check_development_instruction.sh,tools/test_development_instruction.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh,tools/test_product_git_usage_modes.sh,tools/test_menu_prerequisites.sh,tools/check_security_invariants.sh,tools/test_security_invariants.sh,tools/check_test_plan_coverage.sh,tools/test_test_plan.sh,tools/test_git_hooks.sh,tools/test_git_hooks_parallel.sh,tools/test_ci_composition.sh,tools/check_ci_workflow_structure.sh,tools/check_agents_skills.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh
+
+The parent fallback must support an autonomous A-F development cycle while
+preserving repository workflow phases and all safety authorities.
+
+- A-F is an overlay: it maps to, but does not replace, the existing seven
+  repository-development phases and release proof.
+- Normal C/D work proceeds only inside the current requested task scope and is
+  narrowed by operation mode, product Git mode, and saved Git action settings.
+- E/F are plan-only. A new implementation scope cannot enter C solely because
+  the fallback document exists.
+- Destructive operations, history rewrite, credentials, secrets, OAuth,
+  external sending, administrative bypass, unowned dirty state, failed-CI
+  merge, and material scope expansion always stop.
+- Existing local instruction memories retain their own approval procedure; the
+  parent fallback cannot silently weaken or merge with them.

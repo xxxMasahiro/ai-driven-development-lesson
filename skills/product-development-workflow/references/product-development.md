@@ -23,6 +23,9 @@ Read these sources before deciding how far the agent may proceed:
 - Product profile and repository boundary data for the selected menu.
 - Product security policy and external integration approval context.
 - Product-local scaffold policy, including `skills/`, `tools/`, `docs/workflow/SECURITY.md`, `docs/workflow/VERIFICATION.md`, and `ops/REPOSITORY_INDEX.json`.
+- `tools/development-instruction status --context <context>` for local-first,
+  absence-only parent fallback resolution. The output is safe metadata and does
+  not write or copy a file into the product repository.
 
 The skill must never treat its own wording as stronger than these settings.
 
@@ -111,6 +114,11 @@ Workflow action display values are:
 - `自動`: the saved Settings value is treated as prior approval, and the action may run without another confirmation after every required condition passes.
 
 Even when `自動` is selected, the agent must still stop for destructive operations, secrets, credentials, OAuth, external-service authority changes, unsafe CI states, missing checks, or any existing-feature tradeoff.
+
+An existing product-local instruction memory controls its own A-F approval
+procedure. Parent autonomy applies only when the local path is exactly absent;
+invalid, unreadable, symlinked, malformed, or unsupported local content fails
+closed without fallback.
 
 ## Recovery
 

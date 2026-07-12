@@ -15,6 +15,7 @@ Use this skill for this repository's own development. It supports `AGENTS.MD`; i
 ```bash
 ./tools/repository-development-workflow status
 ./tools/repository-development-workflow list
+./tools/repository-development-workflow instruction --stage A
 ```
 
 3. Choose the current phase from `docs/workflow/REPOSITORY_DEVELOPMENT_WORKFLOW.tsv`:
@@ -22,12 +23,14 @@ Use this skill for this repository's own development. It supports `AGENTS.MD`; i
 4. For detailed steps, read `references/repository-development.md`.
 5. Use `./tools/repository-development-workflow guidance --phase <phase_id>` before selecting checks.
 6. Use `./tools/repository-development-workflow gate --phase <phase_id>` before moving to a stricter phase.
-7. Use the runner dry-run before local execution:
+7. Resolve the A-F overlay for the current task. The parent fallback maps A-F
+   onto the existing seven phases; it does not replace their checks or release
+   proof. Use the runner dry-run before local execution:
 
 ```bash
 ./tools/repository-development-workflow detect
 ./tools/repository-development-workflow plan-run --phase fast_loop --check-set required
-./tools/repository-development-workflow run --phase fast_loop --check-set required --execute --approved
+./tools/repository-development-workflow run --phase fast_loop --check-set required --execute
 ./tools/repository-development-workflow status --runs
 ./tools/repository-development-workflow next --phase fast_loop
 ```
@@ -41,9 +44,12 @@ Use this skill for this repository's own development. It supports `AGENTS.MD`; i
 - STEP 1-7, STEP 1-14, existing CI, existing checks, existing document routes, repo-local skills, and security gates remain authoritative.
 - Fast implementation loops do not replace release proof.
 - Runner records can support fast-loop and medium-test decisions only when fingerprints match; they are not release proof.
-- `plan-run` is the default safe path. `run --phase ... --execute` is limited to allowed non-destructive local checks and still needs `--approved` for approval-bound phases.
+- `plan-run` is the default safe path. `run --phase ... --execute` is limited to allowed non-destructive local checks. The legacy `--approved` flag remains accepted but is not a separate requirement for normal work already inside the current developer-requested task scope.
 - New checks must be standalone and aggregate-callable.
-- Destructive cleanup, push, merge, main CI waiting, and local/remote sync are approval-bound.
+- Normal commit, push, PR/CI, eligible merge, main CI monitoring, and sync are
+  narrowed by task scope and saved Git settings. Destructive cleanup, history
+  rewrite, credentials, external authority, failed-CI merge, and scope
+  expansion remain explicit stop conditions.
 - Do not add fixed one-off branches for one product stack, phrase, menu, or case.
 
 ## Validation
@@ -53,6 +59,8 @@ Use the standalone check first:
 ```bash
 ./tools/check_repository_development_workflow.sh
 ./tools/test_repository_development_workflow.sh
+./tools/check_development_instruction.sh
+./tools/test_development_instruction.sh
 ```
 
 Then use the workflow's recommended or required checks for the current phase. Release closure remains governed by the existing aggregate, full hooks, CI, and sync gates.

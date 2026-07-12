@@ -32,6 +32,7 @@ jobs:
           bash -n tools/lib/as_built_evidence.sh
           bash -n tools/lib/test_plan.sh
           bash -n tools/lib/repository_development_workflow.sh
+          bash -n tools/lib/development_instruction.sh
           bash -n tools/lib/fixture_copy.sh
           bash -n tools/lib/security_invariants.sh
           bash -n tools/lib/product_security.sh
@@ -55,6 +56,7 @@ jobs:
           bash -n tools/check_review_protocol.sh
           bash -n tools/check_developer_memory_requirements.sh
           bash -n tools/check_repository_development_workflow.sh
+          bash -n tools/check_development_instruction.sh
           bash -n tools/check_dashboard_design_system.sh
           bash -n tools/check_dashboard_bundle_contract.sh
           bash -n tools/check_ci_workflow_structure.sh
@@ -64,6 +66,7 @@ jobs:
           bash -n tools/test_as_built_single_pass.sh
           bash -n tools/test_test_plan.sh
           bash -n tools/test_repository_development_workflow.sh
+          bash -n tools/test_development_instruction.sh
           bash -n tools/test_security_invariants.sh
           bash -n tools/test_git_workflow_policy.sh
           bash -n tools/test_git_hooks.sh
@@ -119,6 +122,9 @@ jobs:
           bash -n tools/as-built-sync
           bash -n tools/test-plan
           bash -n tools/repository-development-workflow
+          node --check tools/development-instruction
+          node --check tools/lib/development_instruction.mjs
+          node --check tools/test_development_instruction.mjs
           bash -n tools/git-workflow
           bash -n tools/git-hooks
           bash -n tools/resource-guard

@@ -110,6 +110,10 @@ show_status() {
   printf 'Workflow docs: %s, %s\n' \
     "$(file_presence docs/workflow/TASK_TRACKER.md)" \
     "$(file_presence docs/workflow/HANDOFF.md)"
+  printf 'Development instruction: %s, %s, %s\n' \
+    "$(file_presence docs/workflow/INSTRUCTION_MEMORY.md)" \
+    "$(file_presence docs/workflow/DEVELOPMENT_INSTRUCTION_POLICY.tsv)" \
+    "$(file_presence docs/workflow/DEVELOPMENT_AUTONOMY_WORKFLOW.tsv)"
   printf 'Git hook policy: %s, %s, %s, %s\n' \
     "$(file_presence docs/workflow/GIT_HOOKS_POLICY.tsv)" \
     "$(file_presence docs/workflow/GIT_HOOK_CHECKS.tsv)" \
@@ -124,6 +128,8 @@ show_status() {
   printf '%s\n' '- product-side AGENTS.MD: product repository rulebook; legacy AGENT.md is a migration target'
   printf '%s\n' '- docs/as-built/: requirements, specification, and implementation plan'
   printf '%s\n' '- docs/workflow/: TASK_TRACKER and HANDOFF paired work state'
+  printf '%s\n' '- docs/workflow/INSTRUCTION_MEMORY.md: local-missing development fallback; target-local instruction memory remains first'
+  printf '%s\n' '- DEVELOPMENT_INSTRUCTION_POLICY.tsv and DEVELOPMENT_AUTONOMY_WORKFLOW.tsv: safe resolution and A-F mapping'
   printf '%s\n' '- docs/workflow/GIT_HOOKS_POLICY.tsv and GIT_HOOK_CHECKS.tsv: what pre-commit checks run'
   printf '%s\n' '- docs/workflow/GIT_HOOK_RECOMMENDATION_PATHS.tsv: when local full/no-cache verification is recommended'
   printf '%s\n' '- learning/GIT_HOOK_SETTINGS.tsv: current local Git hook mode'
@@ -205,6 +211,9 @@ show_workflow() {
   printf '%s\n' '- docs/workflow/GIT_HOOK_CHECKS.tsv: checks included in each Git hook mode'
   printf '%s\n' '- docs/workflow/GIT_HOOK_RECOMMENDATION_PATHS.tsv: changed files that recommend local full/no-cache verification'
   printf '%s\n' '- learning/GIT_HOOK_SETTINGS.tsv: current local Git hook mode setting'
+  printf '%s\n' '- docs/workflow/INSTRUCTION_MEMORY.md: parent fallback for eligible development contexts only'
+  printf '%s\n' '- docs/workflow/DEVELOPMENT_INSTRUCTION_POLICY.tsv: local-first, exact-absence, target, mode, and Settings authority'
+  printf '%s\n' '- docs/workflow/DEVELOPMENT_AUTONOMY_WORKFLOW.tsv: A-F phase overlay and stop conditions'
   printf '\n'
   sync_status 'tools/check_workflow_pair_sync.sh' 'TASK_TRACKER/HANDOFF pair'
   printf '\nCopy-paste prompt:\n'

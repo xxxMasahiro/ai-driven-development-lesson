@@ -210,8 +210,11 @@ repository_development_runner_policy_fingerprint() {
     for file in \
       "$(repository_development_workflow_file)" \
       "$(repository_development_runner_policy_file)" \
-      "$(repository_development_approvals_file)" \
-      "$(repository_development_checks_file)"; do
+	      "$(repository_development_approvals_file)" \
+	      "$(repository_development_checks_file)" \
+	      "${LESSON_ROOT}/docs/workflow/DEVELOPMENT_INSTRUCTION_POLICY.tsv" \
+	      "${LESSON_ROOT}/docs/workflow/DEVELOPMENT_AUTONOMY_WORKFLOW.tsv" \
+	      "${LESSON_ROOT}/docs/workflow/INSTRUCTION_MEMORY.md"; do
       printf 'FILE\t%s\n' "$file"
       if [[ -f "$file" ]]; then
         if command -v sha256sum >/dev/null 2>&1; then

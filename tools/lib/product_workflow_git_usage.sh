@@ -16,6 +16,11 @@ if ! declare -F product_repository_registry_root_for_menu >/dev/null 2>&1; then
   source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/product_repository_registry.sh"
 fi
 
+if ! declare -F development_instruction_gate_product >/dev/null 2>&1; then
+  # shellcheck source=development_instruction.sh
+  source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/development_instruction.sh"
+fi
+
 product_workflow_git_usage_policy_file() {
   printf '%s\n' "${PRODUCT_WORKFLOW_GIT_USAGE_POLICY_FILE:-$LESSON_ROOT/docs/workflow/PRODUCT_WORKFLOW_GIT_USAGE_POLICY.tsv}"
 }
@@ -331,7 +336,7 @@ product_workflow_git_usage_gate_plan_row() {
 product_workflow_git_usage_gate_plan() {
   local context="$1"
   local product_type="${2:-all}"
-  local mode git_requirement ci_requirement scaffold_command authority_command security_command git_command ci_command boundary_command repo repo_arg
+  local mode git_requirement ci_requirement instruction_requirement instruction_command scaffold_command authority_command security_command git_command ci_command boundary_command repo repo_arg
   mode="$(product_workflow_git_usage_mode_for_context "$context")"
   repo="$(product_workflow_git_usage_repository_root_for_context "$context" 2>/dev/null || true)"
   repo_arg=""
@@ -340,8 +345,12 @@ product_workflow_git_usage_gate_plan() {
   ci_requirement="$(product_workflow_git_usage_requirement_for_axis "$mode" ci)"
   if product_repository_registry_has_rows; then
     boundary_command="./tools/product-repository-registry selected $context"
+    instruction_requirement="required"
+    instruction_command="./tools/development-instruction status --context $context"
   else
     boundary_command="./tools/check_repository_boundary.sh --product-workspace-required"
+    instruction_requirement="not_applicable"
+    instruction_command="not_applicable"
   fi
   if product_workflow_git_usage_requires_git_worktree "$mode"; then
     security_command="./tools/product-security gate --context $context"
@@ -363,6 +372,7 @@ product_workflow_git_usage_gate_plan() {
   printf '# context\tmode\tgate_id\trequirement\tcommand\tdescription\n'
   product_workflow_git_usage_gate_plan_row "$context" "$mode" "repository_boundary" "required" "$boundary_command" "Confirm the product target path matches the selected Git usage mode."
   product_workflow_git_usage_gate_plan_row "$context" "$mode" "operation_mode" "required" "./tools/product-repository-mode check$repo_arg" "Confirm product AGENTS.MD and ops/PRODUCT_OPERATION_MODE.tsv are ready."
+  product_workflow_git_usage_gate_plan_row "$context" "$mode" "instruction_memory" "$instruction_requirement" "$instruction_command" "Resolve a valid target-local instruction memory or the parent fallback only for an explicitly selected parent-managed repository."
   product_workflow_git_usage_gate_plan_row "$context" "$mode" "scaffold" "required" "$scaffold_command" "Validate product-local docs, manifests, skills, tools, and source/test authorities."
   product_workflow_git_usage_gate_plan_row "$context" "$mode" "authority" "required" "$authority_command" "Read product manifests and evidence with the selected Git/CI applicability."
   product_workflow_git_usage_gate_plan_row "$context" "$mode" "security" "required" "$security_command" "Run product security checks with matching Git applicability."
@@ -449,6 +459,17 @@ product_workflow_git_usage_security_gate() {
   fi
 }
 
+product_workflow_git_usage_instruction_gate() {
+  local context="$1"
+  local repo
+  if ! product_repository_registry_has_rows; then
+    printf 'Development instruction gate: not applicable without an explicit product repository selection.\n'
+    return 0
+  fi
+  repo="$(product_workflow_git_usage_repository_root_for_context "$context")" || return 1
+  development_instruction_gate_product "$context" "$repo"
+}
+
 product_workflow_git_usage_git_ci_gate() {
   local context="$1"
   local mode repo
@@ -477,6 +498,7 @@ product_workflow_git_usage_gate() {
   repo="$(product_workflow_git_usage_repository_root_for_context "$context")" || return 1
   product_workflow_git_usage_repository_boundary_gate "$context"
   product_workflow_git_usage_operation_mode_gate "$repo"
+  product_workflow_git_usage_instruction_gate "$context"
   product_workflow_git_usage_scaffold_gate "$context" "$product_type"
   product_workflow_git_usage_authority_gate "$context" "$product_type"
   product_workflow_git_usage_security_gate "$context"

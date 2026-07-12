@@ -26,15 +26,33 @@ repository_development_trim() {
 }
 
 repository_development_expected_phases() {
-  cat <<'PHASES'
-1	context_triage
-2	proposal
-3	implementation_plan
-4	fast_loop
-5	mid_tests
-6	release_gate
-7	main_sync_cleanup
-PHASES
+  repository_development_policy_rows | awk -F '\t' '
+    $2 !~ /^[1-9][0-9]*$/ {
+      printf "invalid repository development phase order for %s: %s\n", $1, $2 > "/dev/stderr"
+      invalid = 1
+      next
+    }
+    seen[$2] {
+      printf "duplicate repository development phase order: %s\n", $2 > "/dev/stderr"
+      invalid = 1
+      next
+    }
+    {
+      seen[$2] = $1
+      if ($2 > max) max = $2
+    }
+    END {
+      for (order = 1; order <= max; order++) {
+        if (!(order in seen)) {
+          printf "missing repository development phase order: %d\n", order > "/dev/stderr"
+          invalid = 1
+        } else {
+          printf "%d\t%s\n", order, seen[order]
+        }
+      }
+      exit invalid ? 1 : 0
+    }
+  '
 }
 
 repository_development_expected_order_for() {
@@ -48,17 +66,15 @@ repository_development_phase_exists() {
 
 repository_development_expected_approval_required_for() {
   local phase_id="$1"
-  case "$phase_id" in
-    context_triage|proposal|mid_tests)
-      printf 'false\n'
-      ;;
-    implementation_plan|fast_loop|release_gate|main_sync_cleanup)
-      printf 'true\n'
-      ;;
-    *)
-      return 1
-      ;;
-  esac
+  awk -F '\t' -v phase_id="$phase_id" '
+    /^[[:space:]]*$/ { next }
+    $1 ~ /^#/ { next }
+    $1 == phase_id { count += 1; value = $3 }
+    END {
+      if (count == 1 && (value == "true" || value == "false")) print value
+      else exit 1
+    }
+  ' "$(repository_development_approvals_file)"
 }
 
 repository_development_list_contains_token() {
@@ -166,7 +182,7 @@ repository_development_validate_approvals() {
   local approvals_file
   local missing=0
   local phase_id approval_scope required default_state description extra
-  local expected_required expected_phase expected_default
+  local expected_phase expected_default
   declare -A seen=()
   approvals_file="$(repository_development_approvals_file)"
 
@@ -195,16 +211,7 @@ repository_development_validate_approvals() {
     seen[$phase_id]=1
     case "$required" in true|false) ;; *) printf 'invalid approval required value for %s: %s\n' "$phase_id" "$required" >&2; missing=1 ;; esac
     case "$default_state" in not_required|not_granted) ;; *) printf 'invalid approval default state for %s: %s\n' "$phase_id" "$default_state" >&2; missing=1 ;; esac
-    expected_required="$(repository_development_expected_approval_required_for "$phase_id")" || {
-      printf 'unknown expected approval phase: %s\n' "$phase_id" >&2
-      missing=1
-      continue
-    }
-    if [[ "$required" != "$expected_required" ]]; then
-      printf 'invalid approval required value for %s: expected %s, got %s\n' "$phase_id" "$expected_required" "$required" >&2
-      missing=1
-    fi
-    if [[ "$expected_required" == "true" ]]; then
+    if [[ "$required" == "true" ]]; then
       expected_default="not_granted"
     else
       expected_default="not_required"
@@ -229,9 +236,10 @@ repository_development_validate_policy() {
   local policy_file checks_file
   local missing=0
   local row phase_id order purpose required_inputs allowed_writes recommended_checks required_checks git_ci_expectations approval_requirements cleanup_behavior stop_conditions
-  local expected_order expected_phase
+  local expected_phase max_order=0
   local -a policy_rows=()
   declare -A seen=()
+  declare -A seen_order=()
 
   policy_file="$(repository_development_workflow_file)"
   checks_file="$(repository_development_checks_file)"
@@ -254,8 +262,8 @@ repository_development_validate_policy() {
       missing=1
       continue
     fi
-    if ! repository_development_phase_exists "$phase_id"; then
-      printf 'unknown repository development phase: %s\n' "$phase_id" >&2
+    if [[ ! "$phase_id" =~ ^[a-z0-9][a-z0-9._:-]*$ ]]; then
+      printf 'invalid repository development phase id: %s\n' "$phase_id" >&2
       missing=1
       continue
     fi
@@ -264,14 +272,26 @@ repository_development_validate_policy() {
       missing=1
     fi
     seen[$phase_id]=1
-    expected_order="$(repository_development_expected_order_for "$phase_id")"
-    if [[ "$order" != "$expected_order" ]]; then
-      printf 'invalid order for phase %s: expected %s, got %s\n' "$phase_id" "$expected_order" "$order" >&2
+    if [[ ! "$order" =~ ^[1-9][0-9]*$ ]]; then
+      printf 'invalid order for phase %s: %s\n' "$phase_id" "$order" >&2
       missing=1
+    elif [[ -n "${seen_order[$order]+set}" ]]; then
+      printf 'duplicate repository development phase order: %s\n' "$order" >&2
+      missing=1
+    else
+      seen_order[$order]="$phase_id"
+      (( order > max_order )) && max_order="$order"
     fi
     repository_development_validate_check_list "recommended_checks" "$recommended_checks" "$phase_id" || missing=1
     repository_development_validate_check_list "required_checks" "$required_checks" "$phase_id" || missing=1
     repository_development_reject_destructive_text "$phase_id fields" "$row" || missing=1
+  done
+
+  for ((order = 1; order <= max_order; order++)); do
+    if [[ -z "${seen_order[$order]+set}" ]]; then
+      printf 'missing repository development phase order: %s\n' "$order" >&2
+      missing=1
+    fi
   done
 
   while IFS=$'\t' read -r _order expected_phase; do
@@ -305,12 +325,16 @@ repository_development_validate_policy() {
     printf 'main_sync_cleanup must require local/remote sync.\n' >&2
     missing=1
   fi
-  if ! repository_development_list_contains_token "$(repository_development_field_for_phase main_sync_cleanup 9 2>/dev/null || true)" "explicit_approval_required_for_merge_sync_cleanup"; then
-    printf 'main_sync_cleanup must require explicit approval for merge, sync, and cleanup.\n' >&2
+  if ! repository_development_list_contains_token "$(repository_development_field_for_phase main_sync_cleanup 9 2>/dev/null || true)" "task_scope_and_settings_for_merge_sync"; then
+    printf 'main_sync_cleanup must require task scope and Settings for normal merge and sync.\n' >&2
     missing=1
   fi
-  if ! repository_development_list_contains_token "$(repository_development_field_for_phase main_sync_cleanup 10 2>/dev/null || true)" "approval_bound_plan_only_until_confirmed"; then
-    printf 'main_sync_cleanup cleanup behavior must remain approval-bound plan-only until confirmed.\n' >&2
+  if ! repository_development_list_contains_token "$(repository_development_field_for_phase main_sync_cleanup 9 2>/dev/null || true)" "explicit_approval_for_destructive_cleanup"; then
+    printf 'main_sync_cleanup must require explicit approval for destructive cleanup.\n' >&2
+    missing=1
+  fi
+  if ! repository_development_list_contains_token "$(repository_development_field_for_phase main_sync_cleanup 10 2>/dev/null || true)" "destructive_cleanup_plan_only_until_confirmed"; then
+    printf 'main_sync_cleanup destructive cleanup must remain plan-only until confirmed.\n' >&2
     missing=1
   fi
 
@@ -363,7 +387,7 @@ repository_development_print_guidance() {
       printf 'Release gate: run aggregate/full proof and PR CI before merge.\n'
       ;;
     main_sync_cleanup)
-      printf 'Main sync cleanup: merge, main CI, local/remote sync, and cleanup execution require explicit developer approval.\n'
+      printf 'Main sync cleanup: normal merge, main CI, and sync follow task scope plus Settings; destructive cleanup still requires explicit approval.\n'
       ;;
   esac
 }
