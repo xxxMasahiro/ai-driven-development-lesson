@@ -106,7 +106,7 @@ require_policy_row "docs/workflow/TEST_PLAN_MANIFEST.tsv" '^tools/repository-dev
 require_policy_row "docs/workflow/TEST_PLAN_MANIFEST.tsv" '^tools/check_repository_development_workflow.sh\t' "test-plan check row"
 require_policy_row "docs/workflow/TEST_PLAN_MANIFEST.tsv" '^tools/test_repository_development_workflow.sh\t' "test-plan test row"
 require_policy_row "docs/workflow/TEST_PLAN_MANIFEST.tsv" '^skills/repository-development-workflow/\t' "test-plan skill row"
-require_policy_row "docs/workflow/FINAL_GATE_GAP_COMMANDS.tsv" '^repository_development_workflow_status\t[.]/tools/repository-development-workflow status >/dev/null\t' "final-gate status gap command"
+require_policy_row "docs/workflow/FINAL_GATE_GAP_COMMANDS.tsv" '^repository_development_workflow_status\t.*repository-development-workflow.*status.*\tdiscard\t' "final-gate status gap command"
 require_policy_row "docs/workflow/FINAL_GATE_COVERAGE.tsv" '^[.]/tools/check_repository_development_workflow.sh\t' "final-gate check coverage"
 require_policy_row "docs/workflow/FINAL_GATE_COVERAGE.tsv" '^[.]/tools/test_repository_development_workflow.sh\t' "final-gate test coverage"
 require_policy_row "docs/workflow/FINAL_GATE_COVERAGE.tsv" '^[.]/tools/repository-development-workflow status\tgap\trepository_development_workflow_status\t' "final-gate status coverage"
@@ -114,10 +114,10 @@ require_policy_row "docs/workflow/FINAL_GATE_COVERAGE.tsv" '^[.]/tools/repositor
 require_pattern "tools/test_lesson_repository.sh" '\./tools/check_repository_development_workflow\.sh' "aggregate check wiring"
 require_pattern "tools/test_lesson_repository.sh" '\./tools/test_repository_development_workflow\.sh' "aggregate test wiring"
 require_pattern ".github/workflows/ci.yml" 'bash -n tools/lib/repository_development_workflow\.sh' "main CI syntax helper"
-require_pattern ".github/workflows/ci.yml" '\./tools/test_repository_development_workflow\.sh' "main CI regression"
+require_pattern ".github/workflows/ci.yml" '\./tools/verification-ci run-job --workflow main --job policy-regression-tests' "main CI composed regression owner"
 require_pattern ".github/workflows/lesson14-ci.yml" 'bash -n tools/lib/repository_development_workflow\.sh' "lesson14 CI syntax helper"
-require_pattern ".github/workflows/lesson14-ci.yml" '\./tools/test_repository_development_workflow\.sh' "lesson14 CI regression"
-require_pattern "tools/check_ci_workflow_structure.sh" 'tools/test_repository_development_workflow\.sh' "CI structure guard"
+require_pattern ".github/workflows/lesson14-ci.yml" '\./tools/verification-ci proof --workflow lesson14 --job policy-regression-tests' "lesson14 CI compatibility proof"
+require_pattern "tools/check_ci_workflow_structure.sh" 'verification-ci.*check' "CI semantic structure guard"
 
 if ./tools/repository-development-workflow guidance --phase main_sync_cleanup | grep -Eq '(^|[[:space:]])rm[[:space:]]+-rf|git[[:space:]]+branch[[:space:]]+-D|git[[:space:]]+worktree[[:space:]]+remove|git[[:space:]]+push[[:space:]]+--delete|gh[[:space:]]+pr[[:space:]]+merge'; then
   report_missing "workflow guidance contains direct destructive cleanup or merge command"

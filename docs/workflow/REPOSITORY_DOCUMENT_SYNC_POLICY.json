@@ -120,6 +120,9 @@
         "docs/workflow/TEST_PLAN_MANIFEST.tsv",
         "docs/workflow/GIT_HOOK_CHECKS.tsv",
         "docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv",
+        "docs/workflow/FINAL_GATE_EXECUTION_POLICY.tsv",
+        "docs/workflow/FINAL_GATE_CI_GRAPH.tsv",
+        "docs/workflow/FINAL_GATE_GAP_COMMANDS.tsv",
         "docs/workflow/FINAL_GATE_COVERAGE.tsv",
         "docs/workflow/TASK_TRACKER.md",
         "docs/workflow/HANDOFF.md"
@@ -306,8 +309,12 @@
           "docs/workflow/TEST_PLAN_MANIFEST.tsv",
           "tools/ci-*.sh",
           "tools/ci-*",
+          "tools/verification-ci",
+          "tools/verification-runner",
           "tools/git-hooks",
           "tools/lib/ci_*.sh",
+          "tools/lib/ci_*.mjs",
+          "tools/lib/verification_*.mjs",
           "tools/lib/git_hooks_policy.sh"
         ]
       },
@@ -329,6 +336,9 @@
           "tools/lib/*browser*",
           "tools/*evidence*",
           "tools/lib/*evidence*",
+          "tools/*verification*",
+          "tools/lib/*verification*",
+          "tools/lib/ci_composition.mjs",
           "tools/external-integration"
         ]
       },

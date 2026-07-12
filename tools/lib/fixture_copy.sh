@@ -1,30 +1,31 @@
 #!/usr/bin/env bash
 
+FIXTURE_COPY_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+fixture_copy_policy_file() {
+  printf '%s\n' "${FIXTURE_COPY_POLICY_FILE:-$FIXTURE_COPY_LIB_DIR/../../docs/workflow/FINAL_GATE_EXECUTION_POLICY.tsv}"
+}
+
 fixture_copy_default_excludes() {
-  cat <<'EOF'
-./.git
-*/.git
-./node_modules
-*/node_modules
-./playwright-report
-*/playwright-report
-./test-results
-*/test-results
-./.git/pre-commit-cache
-*/.git/pre-commit-cache
-./tmp/resource-guard
-*/tmp/resource-guard
-./.cache
-*/.cache
-./.pytest_cache
-*/.pytest_cache
-./coverage
-*/coverage
-./dist
-*/dist
-./build
-*/build
-EOF
+  local policy_file raw
+  policy_file="$(fixture_copy_policy_file)"
+  if [[ ! -f "$policy_file" || -L "$policy_file" ]]; then
+    printf 'Fixture copy policy is missing or unsafe: %s\n' "$policy_file" >&2
+    return 1
+  fi
+  raw="$(awk -F '\t' '$1 == "input_profile" && $2 == "fixture_excludes" { print $3; found = 1; exit } END { if (!found) exit 1 }' "$policy_file")" || {
+    printf 'Fixture copy exclusion profile is missing: %s\n' "$policy_file" >&2
+    return 1
+  }
+  node -e '
+    let values;
+    try { values = JSON.parse(process.argv[1]); } catch { process.exit(2); }
+    if (!Array.isArray(values) || values.length === 0 || values.some((value) => typeof value !== "string" || !value || value.includes("\0") || value.includes("\n"))) process.exit(2);
+    for (const value of values) process.stdout.write(`${value}\n`);
+  ' "$raw" || {
+    printf 'Fixture copy exclusion profile is invalid: %s\n' "$policy_file" >&2
+    return 1
+  }
 }
 
 fixture_copy_repo() {
@@ -33,6 +34,7 @@ fixture_copy_repo() {
   local exclude
   local source_real
   local target_real
+  local excludes_text
   local -a tar_excludes=()
 
   if [[ ! -d "$source" ]]; then
@@ -72,10 +74,11 @@ fixture_copy_repo() {
     mkdir -p "$target"
   fi
 
+  excludes_text="$(fixture_copy_default_excludes)" || return 1
   while IFS= read -r exclude; do
     [[ -n "$exclude" ]] || continue
     tar_excludes+=("--exclude=$exclude")
-  done < <(fixture_copy_default_excludes)
+  done <<<"$excludes_text"
 
   (
     cd "$source"

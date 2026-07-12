@@ -33,23 +33,7 @@ aggregate_file() {
 }
 
 validate_gap_commands() {
-  local file
-  local invalid=0
-  file="$(gap_commands_file)"
-  [[ -f "$file" ]] || {
-    printf 'Final-gate gap command file is missing: %s\n' "$file" >&2
-    return 1
-  }
-  while IFS=$'\t' read -r command_id command description extra; do
-    [[ -n "${command_id:-}" ]] || continue
-    [[ "$command_id" != \#* ]] || continue
-    if [[ -n "${extra:-}" || -z "${command:-}" || -z "${description:-}" ]]; then
-      printf 'Malformed final-gate gap command row for command: %s\n' "${command_id:-unknown}" >&2
-      invalid=1
-      continue
-    fi
-  done <"$file"
-  [[ "$invalid" -eq 0 ]]
+  CI_FINAL_GATE_GAP_COMMANDS_FILE="$(gap_commands_file)" "$ROOT/tools/verification-ci" validate-gaps >/dev/null
 }
 
 aggregate_requirements() {
@@ -180,15 +164,7 @@ validate_aggregate_coverage() {
 }
 
 run_gap_commands() {
-  local file command_id command description
-  validate_gap_commands || return 1
-  file="$(gap_commands_file)"
-  while IFS=$'\t' read -r command_id command description _extra; do
-    [[ -n "${command_id:-}" ]] || continue
-    [[ "$command_id" != \#* ]] || continue
-    printf 'final-gate gap run: %s\n' "$command_id"
-    (cd "$LESSON_ROOT" && bash -c "$command")
-  done <"$file"
+  CI_FINAL_GATE_GAP_COMMANDS_FILE="$(gap_commands_file)" "$ROOT/tools/verification-ci" run-gaps
 }
 
 verify_git_hook_evidence() {
@@ -213,10 +189,12 @@ verify_git_hook_evidence() {
 }
 
 fallback_aggregate() {
-  local fallback_command
-  fallback_command="${CI_FINAL_GATE_FALLBACK_COMMAND:-./tools/test_lesson_repository.sh --use-evidence --write-evidence}"
-  printf 'final-gate fallback: %s\n' "$fallback_command"
-  (cd "$LESSON_ROOT" && bash -c "$fallback_command")
+  if [[ -n "${CI_FINAL_GATE_FALLBACK_COMMAND:-}" ]]; then
+    printf 'CI_FINAL_GATE_FALLBACK_COMMAND is unsafe; use CI_FINAL_GATE_FALLBACK_ARGV_JSON.\n' >&2
+    return 1
+  fi
+  printf 'final-gate fallback: policy argv\n'
+  "$ROOT/tools/verification-ci" fallback
 }
 
 gap_only="false"
@@ -245,6 +223,13 @@ if [[ "$gap_only" == "true" ]]; then
 fi
 
 validate_aggregate_coverage
+
+if [[ -n "${CI_COMPOSED_PROOF_FILE:-}" ]]; then
+  "$ROOT/tools/verification-ci" verify-final-proof --file "$CI_COMPOSED_PROOF_FILE"
+  run_gap_commands
+  printf 'CI final gate passed with composed provider proof.\n'
+  exit 0
+fi
 
 if verify_git_hook_evidence; then
   run_gap_commands

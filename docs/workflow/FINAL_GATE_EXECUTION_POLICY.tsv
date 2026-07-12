@@ -1,0 +1,57 @@
+# row_type	key	value	description
+setting	schema_version	1.0.0	Version of the repository verification composition policy.
+setting	activation_mode	record-only	Allowed rollout values are legacy, record-only, shadow, and enforce; changing the value requires synchronized verification evidence.
+setting	command_execution	argv	Commands are represented and spawned as argument arrays instead of evaluated shell text.
+setting	unknown_state_policy	fail-closed	Missing, malformed, ambiguous, or stale configuration and evidence cannot satisfy a required check.
+setting	cross_workflow_reuse	disabled	Verification evidence is not reused between independent workflow runs.
+setting	persistent_result_cache	disabled	Release verification results are not cached across commits, refs, repositories, users, or workflow runs.
+setting	cancellation_grace_seconds	5	Grace period before a cancelled child process group is forcefully terminated; callers may override through validated policy input.
+setting	default_timeout_seconds	900	Default per-subject timeout; subject profiles may provide a validated override.
+setting	default_parallel_jobs	auto	The resource-policy adapter derives the effective worker count.
+setting	legacy_evidence_write	true	Version 1 evidence remains additive during migration and is not removed by this implementation cycle.
+setting	v2_evidence_authority	record-only	Version 2 evidence is recorded and compared before it is allowed to become authoritative.
+setting	as_built_validation_engine	single-pass	As-built synchronization validation uses the run-local indexed owner and may roll back to legacy through an explicit adapter override.
+setting	as_built_max_validation_ms	5000	Configured local regression ceiling for one valid indexed synchronization-contract pass.
+setting	local_hook_execution_engine	enforce	Full/no-cache hook execution uses the composed runner; guarded legacy and shadow adapter overrides remain available.
+setting	local_composed_scope	full-no-cache	Composed activation is limited to full mode with no-cache semantics.
+setting	local_max_log_bytes	8388608	Maximum combined stdout/stderr bytes retained for one composed subject.
+setting	fixture_snapshot_mode	archive	Fixture copies use an isolated archive stream when filesystem copy-on-write capability is not declared.
+setting	fixture_hardlinks	disabled	Fixture snapshots must not use hardlinks that allow source and target mutation to cross boundaries.
+setting	dashboard_validation_engine	same-run	Dashboard bundle and browser validation use one policy-backed owner; legacy remains an explicit rollback adapter.
+setting	ci_composition_engine	enforce	Main CI uses the semantic graph and exact-owner runner; legacy workflows remain recoverable through version control.
+setting	ci_proof_marker	ci-composed-proof-v1	Marker required on provider-result proof receipts.
+setting	ci_proof_schema_version	1.0.0	Schema version for composed CI proof receipts.
+setting	ci_final_proof_workflow	main	Configured workflow identity whose proof may satisfy the composed final gate.
+setting	ci_final_proof_job	lesson-aggregate	Configured proof-producing job identity accepted by the composed final gate.
+setting	ci_gap_timeout_seconds	300	Per-command timeout for direct-argv final-gap and fallback execution.
+setting	ci_gap_max_log_bytes	8388608	Maximum captured output for one direct-argv final-gap or fallback command.
+locator	hook_checks	{"env":"GIT_HOOKS_CHECKS_FILE","default":"docs/workflow/GIT_HOOK_CHECKS.tsv"}	Centralized locator for the compatibility hook catalog.
+locator	hook_parallel_groups	{"env":"GIT_HOOKS_PARALLEL_GROUPS_FILE","default":"docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv"}	Centralized locator for execution classifications.
+locator	final_gate_coverage	{"env":"CI_FINAL_GATE_COVERAGE_FILE","default":"docs/workflow/FINAL_GATE_COVERAGE.tsv"}	Centralized locator for aggregate coverage mappings.
+locator	final_gate_gap_commands	{"env":"CI_FINAL_GATE_GAP_COMMANDS_FILE","default":"docs/workflow/FINAL_GATE_GAP_COMMANDS.tsv"}	Centralized locator for gap commands.
+locator	evidence_schema	{"env":"VERIFICATION_EVIDENCE_SCHEMA_FILE","default":"docs/workflow/FINAL_GATE_EVIDENCE_SCHEMA.tsv"}	Centralized locator for version 2 evidence validation.
+locator	as_built_contract	{"env":"AS_BUILT_SYNC_CONTRACT_FILE","default":"docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv"}	Centralized locator for the as-built synchronization contract.
+locator	dashboard_verification_runtime	{"env":"DASHBOARD_VERIFICATION_RUNTIME_DIR","default":".dashboard-control-center/verification"}	Repository-local ignored runtime parent for same-run Dashboard manifests and locks.
+setting	dashboard_vite_cache_runtime	.dashboard-control-center/vite-cache	Repository-local ignored Vite cache outside the immutable Dashboard source and configuration inventory.
+locator	ci_composition_graph	{"env":"CI_COMPOSITION_GRAPH_FILE","default":"docs/workflow/FINAL_GATE_CI_GRAPH.tsv"}	Provider-neutral exact-owner CI graph authority.
+argv	dashboard_build	["npm","run","dashboard:build"]	Canonical Dashboard production-build command.
+argv	dashboard_control_center_static	["./tools/test_dashboard_control_center.sh","--static-only"]	Canonical non-browser Control Center validation command.
+argv	dashboard_control_center_browser	["tools/playwright-env","test","tests/playwright/dashboard-control-center.spec.js","--reporter=json"]	Canonical serial Control Center browser command with machine-readable output.
+argv	ci_final_gate_fallback	["./tools/test_lesson_repository.sh","--use-evidence","--write-evidence"]	Canonical aggregate fallback command executed without a shell.
+input_profile	as_built_documents	["docs/as-built/REQUIREMENTS.md","docs/as-built/SPECIFICATION.md","docs/as-built/IMPLEMENTATION_PLAN.md","docs/workflow/TASK_TRACKER.md","docs/workflow/HANDOFF.md"]	Canonical synchronized documents consumed by the indexed owner.
+input_profile	as_built_wiring	["tools/test_lesson_repository.sh",".githooks/pre-commit",".github/workflows/ci.yml",".github/workflows/lesson14-ci.yml"]	Compatibility wiring surfaces consumed by the indexed owner.
+input_profile	fixture_excludes	["./.git","*/.git","./node_modules","*/node_modules","./playwright-report","*/playwright-report","./test-results","*/test-results","./.git/pre-commit-cache","*/.git/pre-commit-cache","./tmp/resource-guard","*/tmp/resource-guard","./.cache","*/.cache","./.pytest_cache","*/.pytest_cache","./coverage","*/coverage","./dist","*/dist","./build","*/build"]	Policy-owned fixture exclusions migrated without changing current copy behavior.
+input_profile	dashboard_build_inputs	["dashboard-control-center","vite.config.mjs","package.json","package-lock.json","tools/check_dashboard_bundle_contract.mjs","tools/lib/dashboard_vite_runtime.mjs","tools/lib/dashboard_verification.mjs","docs/workflow/FINAL_GATE_EXECUTION_POLICY.tsv"]	Exact source/config inventory bound to a Dashboard build manifest, including the fail-closed mutable-runtime boundary helper.
+input_profile	dashboard_browser_inputs	["tests/playwright/dashboard-control-center.spec.js","tests/fixtures","playwright.config.js","tools/playwright-env","tools/test_dashboard_control_center.sh","tools/dashboard-verification","tools/lib/dashboard_verification.mjs","package.json","package-lock.json","docs/workflow/FINAL_GATE_EXECUTION_POLICY.tsv"]	Exact test/config inventory bound to a Dashboard browser receipt.
+output_profile	dashboard_bundle	{"manifest_marker":"dashboard-verification-v1","schema_version":"1.0.0","output_path":"dist/dashboard-control-center","assets_path":"assets","package_manifest":"package.json","vite_config":"vite.config.mjs","expected_package_scripts":{"dashboard:build":"vite build","dashboard:build-check":"node ./tools/check_dashboard_bundle_contract.mjs"},"vite_markers":["codeSplitting","react-vendor","icons-vendor","dashboard-data-runtime","dashboard-i18n","dashboard-design-system"],"warning_limit_pattern":"chunkSizeWarningLimit\\s*:\\s*(\\d+)","max_warning_limit":500,"js_suffix":".js","entry_pattern":"^index-[A-Za-z0-9_-]+\\.js$","required_chunk_prefixes":["react-vendor-","icons-vendor-","dashboard-data-runtime-","dashboard-i18n-","dashboard-design-system-"],"minimum_js_chunks":2,"max_js_bytes":500000,"max_entry_js_bytes":300000,"forbidden_asset_patterns":["from\\s*[\\\"'](?:\\.\\.\\/)*test-results\\/","from\\s*[\\\"'](?:\\.\\.\\/)*\\.repository-development-runs\\/"],"build_warning_patterns":["Some chunks are larger","chunk size limit"]}	Dashboard output paths, package/Vite contracts, chunk inventory, limits, and forbidden build patterns.
+resource_profile	dashboard_validation	{"workers":1,"timeout_seconds":900,"cancellation_grace_seconds":5,"max_log_bytes":33554432,"max_input_file_bytes":33554432,"max_output_file_bytes":33554432}	Serial browser worker, timeout, cancellation, and bounded input/output values for one Dashboard owner.
+resource_profile	local_task_overrides	{"test_dashboard_settings":{"locks":["repository-settings"]},"check_dashboard_bundle_contract":{"locks":["dashboard-build"]},"test_dashboard_control_center":{"locks":["dashboard-build","browser"]},"test_lesson_playwright":{"locks":["browser"]}}	Task-specific resource locks owned by policy rather than runner conditionals.
+source	hook_catalog	hook_checks	Compatibility checks are adapted from the existing hook catalog instead of duplicated in runtime code.
+source	parallel_catalog	hook_parallel_groups	Execution classifications are adapted from the existing parallel-group policy.
+source	coverage_catalog	final_gate_coverage	Aggregate requirements remain governed by the existing coverage authority.
+source	gap_catalog	final_gate_gap_commands	Gap commands remain governed by the existing gap authority.
+relationship	check_as_built_docs	check_as_built_sync_contract	The strict as-built documents owner includes the synchronization-contract check and may emit both receipts in one orchestrated run.
+relationship	test_dashboard_control_center	check_dashboard_bundle_contract	The same-run Control Center owner builds and inspects the exact Dashboard bundle before browser validation.
+relationship	test_dashboard_control_center	check_dashboard_design_system	The same-run Control Center owner executes the existing design-system drift check in its static phase.
+relationship	test_dashboard_control_center	test_dashboard_i18n	The same-run Control Center owner executes the existing locale regression in its static phase.
+relationship	test_dashboard_control_center	test_dashboard_settings	The same-run Control Center owner executes the existing settings regression in its isolated static phase.

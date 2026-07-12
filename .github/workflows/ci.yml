@@ -18,6 +18,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: "20"
+
       - name: Shell syntax
         run: |
           bash -n .githooks/pre-commit
@@ -57,6 +62,7 @@ jobs:
           bash -n tools/test_lesson_playwright.sh
           bash -n tools/test_docs_tour.sh
           bash -n tools/test_as_built_sync_contract.sh
+          bash -n tools/test_as_built_single_pass.sh
           bash -n tools/test_test_plan.sh
           bash -n tools/test_repository_development_workflow.sh
           bash -n tools/test_security_invariants.sh
@@ -68,6 +74,10 @@ jobs:
           bash -n tools/test_git_hooks_parallel.sh
           bash -n tools/test_fixture_copy.sh
           bash -n tools/test_ci_evidence.sh
+          bash -n tools/test_verification_foundation.sh
+          bash -n tools/test_verification_runner.sh
+          bash -n tools/test_verification_git_hooks.sh
+          bash -n tools/test_dashboard_same_run_verification.sh
           bash -n tools/test_ci_timing.sh
           bash -n tools/test_dashboard_schema.sh
           bash -n tools/test_dashboard_data.sh
@@ -127,9 +137,28 @@ jobs:
           node --check tools/lib/repository_document_sync.mjs
           node --check tools/check_repository_document_sync.mjs
           node --check tools/test_repository_document_sync.mjs
+          node --check tools/lib/verification_core.mjs
+          node --check tools/verification
+          node --check tools/test_verification_foundation.mjs
+          node --check tools/lib/as_built_index.mjs
+          node --check tools/check_as_built_sync_contract.mjs
+          node --check tools/test_as_built_single_pass.mjs
+          node --check tools/lib/verification_runner.mjs
+          node --check tools/lib/verification_git_hooks.mjs
+          node --check tools/verification-runner
+          node --check tools/test_verification_runner.mjs
+          node --check tools/lib/dashboard_verification.mjs
+          node --check tools/check_dashboard_bundle_contract.mjs
+          node --check tools/dashboard-verification
+          node --check tools/test_dashboard_same_run_verification.mjs
+          node --check tools/lib/ci_composition.mjs
+          node --check tools/verification-ci
+          node --check tools/test_ci_composition.mjs
 
   repository-document-sync:
     runs-on: ubuntu-latest
+    needs:
+      - syntax-checks
     timeout-minutes: 5
     permissions:
       contents: read
@@ -145,9 +174,7 @@ jobs:
           node-version: "20"
 
       - name: Validate parent document-sync policy and rejection tests
-        run: |
-          ./tools/check_repository_document_sync.sh
-          ./tools/test_repository_document_sync.sh
+        run: ./tools/verification-ci run-job --workflow main --job repository-document-sync --jobs 2
 
       - name: Check pull request document synchronization
         if: github.event_name == 'pull_request'
@@ -163,67 +190,8 @@ jobs:
 
   structure-docs-checks:
     runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Lesson and document structure
-        run: |
-          ./tools/check_lesson_structure.sh
-          ./tools/check_lesson14_sync.sh
-          ./tools/check_document_organization.sh
-          ./tools/check_learner_display.sh
-          ./tools/check_agents_skills.sh
-          ./tools/check_as_built_docs.sh
-          ./tools/check_as_built_sync_contract.sh
-          ./tools/check_test_plan_coverage.sh
-          ./tools/check_security_invariants.sh
-          ./tools/check_workflow_pair_sync.sh
-          ./tools/check_review_protocol.sh
-          ./tools/check_developer_memory_requirements.sh
-          ./tools/check_repository_development_workflow.sh
-          ./tools/check_dashboard_design_system.sh
-
-      - name: Repository boundary
-        run: ./tools/check_repository_boundary.sh
-
-      - name: Lesson commands
-        run: |
-          ./tools/lesson 現在地
-          ./tools/lesson 一覧
-          ./tools/learn 現在地
-          ./tools/lesson-context status
-
-      - name: Regression checks
-        run: |
-          set -euo pipefail
-          work="$(mktemp -d)"
-          source ./tools/lib/fixture_copy.sh
-          fixture_copy_repo . "$work/lesson"
-
-          cd "$work/lesson"
-          ./tools/lesson 通過 day1.mode "future step" >/tmp/future.out 2>&1 && exit 1 || true
-          ./tools/lesson 通過 setup.index >/tmp/empty-pass.out 2>&1 && exit 1 || true
-          ./tools/lesson 学習モード A
-          ./tools/lesson 表示言語 ja
-          ./tools/lesson 開発言語 ja
-          source ./tools/lib/lesson_common.sh
-          product_repo="$(lesson_product_repo_root)"
-          mkdir -p "$product_repo"
-          git -C "$product_repo" init -q
-          ./tools/product-profile set --menu 1 --accept-recommended --confirm
-          ./tools/lesson 通過 setup.index "設定から体験開発へ進む順番を確認した"
-          ./tools/lesson 現在地 | grep './tools/lesson 開始 setup.github-login'
-          ./tools/lesson 通過 setup.github-login "github-loginでGitHub接続を確認した"
-          ./tools/lesson 現在地 | grep './tools/lesson 開始 day1.mode'
-          ./tools/product-repository-cleanup plan | grep 'Nothing is deleted by the plan command.'
-
-          cd "$work/lesson"
-          mkdir "$(awk -F '\t' '$1 == "product_repo_name" { print $2 }' lesson/LESSON_CONFIG.tsv)"
-          ./tools/check_lesson_structure.sh >/tmp/nested.out 2>&1 && exit 1 || true
-
-  policy-regression-tests:
-    runs-on: ubuntu-latest
+    needs:
+      - syntax-checks
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -232,63 +200,41 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version: "20"
-          cache: npm
 
-      - name: Install dashboard dependencies
-        run: npm ci
+      - name: Composed structure and document owners
+        run: ./tools/verification-ci run-job --workflow main --job structure-docs-checks --jobs 4
 
-      - name: Policy and workflow regressions
-        run: |
-          ./tools/test_docs_tour.sh
-          ./tools/test_as_built_sync_contract.sh
-          ./tools/test_test_plan.sh
-          ./tools/test_repository_development_workflow.sh
-          ./tools/test_repository_document_sync.sh
-          ./tools/test_security_invariants.sh
-          ./tools/test_git_workflow_policy.sh
-          ./tools/test_git_hooks.sh
-          ./tools/test_resource_guard.sh
-          ./tools/test_resource_guard_summary.sh
-          ./tools/test_resource_cleanup.sh
-          ./tools/test_git_hooks_parallel.sh
-          ./tools/test_fixture_copy.sh
-          ./tools/test_lesson_context.sh
-          ./tools/test_ci_evidence.sh
-          ./tools/test_ci_timing.sh
-          ./tools/test_dashboard_schema.sh
-          ./tools/test_dashboard_data.sh
-          ./tools/test_dashboard_data_product_repository_selection.sh
-          ./tools/test_dashboard_settings.sh
-          ./tools/test_dashboard_i18n.sh
-          ./tools/check_dashboard_bundle_contract.sh
-          ./tools/test_dashboard_browser_debug_manifest.sh
-          ./tools/test_dashboard_design_studio_events.sh
-          ./tools/test_ci_final_gate.sh
-          ./tools/test_ci_pipeline_acceleration.sh
-          ./tools/test_menu_prerequisites.sh
-          ./tools/test_lesson_start_position.sh
-          ./tools/test_lesson14.sh
-          ./tools/test_product_launch_check.sh
-          ./tools/test_product_scaffold_check.sh
-          ./tools/test_product_gate_tools.sh
-          ./tools/test_product_repository_cleanup.sh
-          ./tools/test_product_repository_authority.sh
-          ./tools/test_product_repository_mode.sh
-          ./tools/test_product_security.sh
-          ./tools/test_product_git_usage_modes.sh
-          ./tools/check_ci_workflow_structure.sh
-
-  lesson-cli-tests:
+  policy-regression-tests:
     runs-on: ubuntu-latest
+    needs:
+      - syntax-checks
     steps:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: 7-day lesson CLI regression
-        run: ./tools/test_lesson.sh
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: "20"
+
+      - name: Composed policy regression owners
+        run: ./tools/verification-ci run-job --workflow main --job policy-regression-tests --jobs 4
+
+  lesson-cli-tests:
+    runs-on: ubuntu-latest
+    needs:
+      - syntax-checks
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Composed lesson CLI owners
+        run: ./tools/verification-ci run-job --workflow main --job lesson-cli-tests --jobs 3
 
   playwright-tests:
     runs-on: ubuntu-latest
+    needs:
+      - syntax-checks
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -310,28 +256,18 @@ jobs:
       - name: Install browser test dependencies
         run: ./tools/ci-playwright-setup
 
-      - name: Lesson Playwright dashboard checks
+      - name: Composed browser owners
         env:
           CI_EVIDENCE_DIR: ${{ runner.temp }}/ci-evidence
           CI_EVIDENCE_SOURCE_JOB: playwright-tests
-        run: ./tools/test_lesson_playwright.sh --write-evidence
-
-      - name: Dashboard control-center browser checks
-        run: ./tools/test_dashboard_control_center.sh
-
-      - name: Upload Playwright evidence
-        uses: actions/upload-artifact@v7.0.1
-        with:
-          name: ci-evidence-playwright-${{ github.run_id }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/ci-evidence
-          if-no-files-found: error
-          include-hidden-files: true
-          retention-days: 1
+          CI_EVIDENCE_WRITE: "1"
+        run: ./tools/verification-ci run-job --workflow main --job playwright-tests --jobs 1
 
   lesson-aggregate:
     runs-on: ubuntu-latest
     needs:
       - syntax-checks
+      - repository-document-sync
       - structure-docs-checks
       - policy-regression-tests
       - lesson-cli-tests
@@ -344,33 +280,21 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version: "20"
-          cache: npm
 
-      - name: Cache Playwright browsers
-        uses: actions/cache@v5.0.5
-        with:
-          path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-ms-playwright-${{ hashFiles('package-lock.json') }}
-          restore-keys: |
-            ${{ runner.os }}-ms-playwright-
-
-      - name: Download same-run evidence
-        uses: actions/download-artifact@v8.0.1
-        with:
-          name: ci-evidence-playwright-${{ github.run_id }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/ci-evidence
-
-      - name: Install browser test dependencies
-        run: ./tools/ci-playwright-setup
-
-      - name: Lesson aggregate test
+      - name: Composed owner result proof
         env:
-          CI_EVIDENCE_DIR: ${{ runner.temp }}/ci-evidence
-          CI_EVIDENCE_SOURCE_JOB: lesson-aggregate
-          CI_EVIDENCE_PLAYWRIGHT_SOURCE_JOB: playwright-tests
+          CI_COMPOSED_RESULTS_JSON: '{"syntax-checks":"${{ needs.syntax-checks.result }}","repository-document-sync":"${{ needs.repository-document-sync.result }}","structure-docs-checks":"${{ needs.structure-docs-checks.result }}","policy-regression-tests":"${{ needs.policy-regression-tests.result }}","lesson-cli-tests":"${{ needs.lesson-cli-tests.result }}","playwright-tests":"${{ needs.playwright-tests.result }}"}'
           CI_TIMING_DIR: ${{ runner.temp }}/ci-timing
           CI_TIMING_REPORT: ${{ runner.temp }}/ci-timing/lesson-aggregate.tsv
-        run: ./tools/ci-timing run lesson_aggregate --display-name "Lesson aggregate test" --command-id "tools/test_lesson_repository.sh --use-evidence --write-evidence" --mode aggregate --evidence used --inputs AGENTS.MD docs learning lesson skills reviews templates tools .github/workflows package.json package-lock.json playwright.config.js tests -- ./tools/test_lesson_repository.sh --use-evidence --write-evidence
+        run: ./tools/ci-timing run lesson_aggregate --display-name "Composed owner result proof" --command-id "verification-ci proof" --mode proof-only --evidence recorded --inputs docs/workflow/FINAL_GATE_CI_GRAPH.tsv docs/workflow/FINAL_GATE_EXECUTION_POLICY.tsv docs/workflow/GIT_HOOK_CHECKS.tsv docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv .github/workflows -- ./tools/verification-ci proof --workflow main --job lesson-aggregate --output "${{ runner.temp }}/ci-composed-proof/proof.json"
+
+      - name: Upload composed proof
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: ci-composed-proof-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/ci-composed-proof/proof.json
+          if-no-files-found: error
+          retention-days: 1
 
       - name: Upload lesson aggregate timing
         if: always()
@@ -385,11 +309,7 @@ jobs:
   git-hooks-full-no-cache:
     runs-on: ubuntu-latest
     needs:
-      - syntax-checks
-      - structure-docs-checks
-      - policy-regression-tests
-      - lesson-cli-tests
-      - playwright-tests
+      - lesson-aggregate
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -398,44 +318,13 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version: "20"
-          cache: npm
 
-      - name: Cache Playwright browsers
-        uses: actions/cache@v5.0.5
-        with:
-          path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-ms-playwright-${{ hashFiles('package-lock.json') }}
-          restore-keys: |
-            ${{ runner.os }}-ms-playwright-
-
-      - name: Download same-run Playwright evidence
-        uses: actions/download-artifact@v8.0.1
-        with:
-          name: ci-evidence-playwright-${{ github.run_id }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/ci-evidence
-
-      - name: Install browser test dependencies
-        run: ./tools/ci-playwright-setup
-
-      - name: Git hooks full no-cache regression
+      - name: Full no-cache compatibility proof
         env:
-          RESOURCE_GUARD_SKIP_LOCAL_CHECK: "1"
-          CI_EVIDENCE_DIR: ${{ runner.temp }}/ci-evidence
-          CI_EVIDENCE_SOURCE_JOB: git-hooks-full-no-cache
-          CI_EVIDENCE_PLAYWRIGHT_SOURCE_JOB: playwright-tests
+          CI_COMPOSED_RESULTS_JSON: '{"lesson-aggregate":"${{ needs.lesson-aggregate.result }}"}'
           CI_TIMING_DIR: ${{ runner.temp }}/ci-timing
           CI_TIMING_REPORT: ${{ runner.temp }}/ci-timing/git-hooks-full-no-cache.tsv
-        run: ./tools/ci-timing run git_hooks_full_no_cache --display-name "Git hooks full no-cache regression" --command-id "tools/git-hooks run --mode full --no-cache --jobs 4" --mode full-no-cache --evidence recorded --inputs docs/workflow/GIT_HOOK_CHECKS.tsv docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv docs/workflow/GIT_HOOKS_POLICY.tsv docs/workflow/FINAL_GATE_COVERAGE.tsv docs/workflow/FINAL_GATE_GAP_COMMANDS.tsv tools .github/workflows -- ./tools/git-hooks run --mode full --no-cache --jobs 4
-
-      - name: Upload Git hook evidence
-        if: always()
-        uses: actions/upload-artifact@v7.0.1
-        with:
-          name: ci-evidence-git-hooks-${{ github.run_id }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/ci-evidence
-          if-no-files-found: error
-          include-hidden-files: true
-          retention-days: 1
+        run: ./tools/ci-timing run git_hooks_full_no_cache --display-name "Full no-cache compatibility proof" --command-id "verification-ci proof" --mode proof-only --evidence used --inputs docs/workflow/FINAL_GATE_CI_GRAPH.tsv docs/workflow/FINAL_GATE_EXECUTION_POLICY.tsv .github/workflows -- ./tools/verification-ci proof --workflow main --job git-hooks-full-no-cache
 
       - name: Upload Git hooks timing
         if: always()
@@ -458,6 +347,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: "20"
+
       - name: Verify split prerequisites
         env:
           LESSON_AGGREGATE_RESULT: ${{ needs.lesson-aggregate.result }}
@@ -469,17 +363,15 @@ jobs:
             exit 1
           fi
 
-      - name: Download Git hook evidence
+      - name: Download composed proof
         uses: actions/download-artifact@v8.0.1
         with:
-          name: ci-evidence-git-hooks-${{ github.run_id }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/ci-evidence
+          name: ci-composed-proof-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/ci-composed-proof
 
-      - name: Final same-run evidence gate
+      - name: Final composed evidence gate
         env:
-          CI_FINAL_GATE_REQUIRE_HOOK_EVIDENCE: "1"
-          CI_EVIDENCE_DIR: ${{ runner.temp }}/ci-evidence
-          CI_EVIDENCE_EXPECT_SOURCE_JOB: git-hooks-full-no-cache
+          CI_COMPOSED_PROOF_FILE: ${{ runner.temp }}/ci-composed-proof/proof.json
         run: ./tools/ci-final-gate
 
       - name: Download CI timing parts

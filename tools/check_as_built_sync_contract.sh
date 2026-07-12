@@ -9,6 +9,27 @@ source "$SCRIPT_DIR/lib/document_paths.sh"
 
 ROOT="${AS_BUILT_SYNC_ROOT:-$LESSON_ROOT}"
 CONTRACT_FILE="${AS_BUILT_SYNC_CONTRACT_FILE:-$ROOT/docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv}"
+EXECUTION_POLICY_FILE="${AS_BUILT_SYNC_EXECUTION_POLICY_FILE:-$LESSON_ROOT/docs/workflow/FINAL_GATE_EXECUTION_POLICY.tsv}"
+validation_engine="${AS_BUILT_SYNC_ENGINE:-}"
+if [[ -z "$validation_engine" ]]; then
+  validation_engine="$(awk -F '\t' '$1 == "setting" && $2 == "as_built_validation_engine" { print $3; found = 1; exit } END { if (!found) exit 1 }' "$EXECUTION_POLICY_FILE")" || {
+    printf 'As-built validation engine policy is missing.\n' >&2
+    exit 1
+  }
+fi
+case "$validation_engine" in
+  single-pass)
+    exec node "$SCRIPT_DIR/check_as_built_sync_contract.mjs" \
+      --root "$ROOT" \
+      --contract "$CONTRACT_FILE" \
+      --policy "$EXECUTION_POLICY_FILE"
+    ;;
+  legacy) ;;
+  *)
+    printf 'Invalid as-built validation engine: %s\n' "$validation_engine" >&2
+    exit 1
+    ;;
+esac
 missing=0
 
 required_doc_relpaths=(

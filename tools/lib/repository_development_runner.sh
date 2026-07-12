@@ -227,10 +227,17 @@ repository_development_runner_policy_fingerprint() {
 }
 
 repository_development_runner_input_fingerprint() {
-  {
-    repository_development_runner_current_head
-    git -C "$LESSON_ROOT" status --porcelain=v1 --untracked-files=normal 2>/dev/null || true
-  } | repository_development_runner_hash_stream
+  local fingerprint_root verification_cli
+  fingerprint_root="${REPOSITORY_DEVELOPMENT_FINGERPRINT_ROOT:-$LESSON_ROOT}"
+  verification_cli="${REPOSITORY_DEVELOPMENT_VERIFICATION_CLI:-$REPOSITORY_DEVELOPMENT_RUNNER_LIB_DIR/../verification}"
+  if [[ ! -x "$verification_cli" ]]; then
+    printf 'repository development verification CLI is missing: %s\n' "$verification_cli" >&2
+    return 1
+  fi
+  "$verification_cli" fingerprint --root "$fingerprint_root" | awk -F '"' '
+    $2 == "inputFingerprint" { print $4; found = 1; exit }
+    END { if (!found) exit 1 }
+  '
 }
 
 repository_development_runner_sanitize_field() {

@@ -22,6 +22,36 @@ reject_file_contains() {
   fi
 }
 
+composition_engine="$(awk -F '\t' '$1 == "setting" && $2 == "ci_composition_engine" { print $3; found = 1; exit } END { if (!found) exit 1 }' docs/workflow/FINAL_GATE_EXECUTION_POLICY.tsv)" || {
+  printf 'CI composition engine policy is missing.\n' >&2
+  exit 1
+}
+
+if [[ "$composition_engine" == "enforce" ]]; then
+  ./tools/verification-ci check >/dev/null
+  for workflow in .github/workflows/ci.yml .github/workflows/lesson14-ci.yml; do
+    reject_file_contains "$workflow" 'continue-on-error: true'
+    reject_file_contains "$workflow" 'actions/checkout@v3'
+    reject_file_contains "$workflow" 'actions/setup-node@v3'
+    require_file_contains "$workflow" './tools/verification-ci'
+    require_file_contains "$workflow" 'tools/lib/ci_composition.mjs'
+  done
+  reject_file_contains .github/workflows/ci.yml './tools/test_lesson_repository.sh --use-evidence --write-evidence'
+  reject_file_contains .github/workflows/ci.yml './tools/git-hooks run --mode full --no-cache --jobs 4'
+  require_file_contains .github/workflows/ci.yml './tools/ci-playwright-setup'
+  require_file_contains .github/workflows/ci.yml 'ci-composed-proof-${{ github.run_id }}-${{ github.run_attempt }}'
+  require_file_contains .github/workflows/ci.yml 'CI_COMPOSED_PROOF_FILE:'
+  require_file_contains docs/workflow/GIT_HOOK_CHECKS.tsv 'test_ci_composition'
+  require_file_contains docs/workflow/FINAL_GATE_COVERAGE.tsv './tools/test_ci_composition.sh'
+  printf 'CI pipeline acceleration tests passed.\n'
+  exit 0
+fi
+
+if [[ "$composition_engine" != "legacy" ]]; then
+  printf 'Invalid CI composition engine: %s\n' "$composition_engine" >&2
+  exit 1
+fi
+
 require_parallel_kind() {
   local check_id="$1"
   local expected="$2"
@@ -57,6 +87,15 @@ for workflow in .github/workflows/ci.yml .github/workflows/lesson14-ci.yml; do
   require_file_contains "$workflow" './tools/test_ci_pipeline_acceleration.sh'
   require_file_contains "$workflow" 'tools/ci-timing'
   require_file_contains "$workflow" 'tools/test_ci_timing.sh'
+  require_file_contains "$workflow" 'tools/test_verification_foundation.sh'
+  require_file_contains "$workflow" 'tools/lib/verification_core.mjs'
+  require_file_contains "$workflow" 'tools/test_as_built_single_pass.sh'
+  require_file_contains "$workflow" 'tools/lib/as_built_index.mjs'
+  require_file_contains "$workflow" 'tools/test_verification_runner.sh'
+  require_file_contains "$workflow" 'tools/test_verification_git_hooks.sh'
+  require_file_contains "$workflow" 'tools/lib/verification_runner.mjs'
+  require_file_contains "$workflow" 'tools/test_dashboard_same_run_verification.sh'
+  require_file_contains "$workflow" 'tools/lib/dashboard_verification.mjs'
 done
 
 require_file_contains .github/workflows/ci.yml './tools/ci-playwright-setup'
@@ -113,8 +152,18 @@ require_file_contains docs/workflow/TEST_PLAN_MANIFEST.tsv 'tools/ci-playwright-
 require_file_contains docs/workflow/TEST_PLAN_MANIFEST.tsv 'tools/ci-timing'
 require_file_contains docs/workflow/GIT_HOOK_CHECKS.tsv 'test_ci_pipeline_acceleration'
 require_file_contains docs/workflow/GIT_HOOK_CHECKS.tsv 'test_ci_timing'
+require_file_contains docs/workflow/GIT_HOOK_CHECKS.tsv 'test_verification_foundation'
+require_file_contains docs/workflow/GIT_HOOK_CHECKS.tsv 'test_as_built_single_pass'
+require_file_contains docs/workflow/GIT_HOOK_CHECKS.tsv 'test_verification_runner'
+require_file_contains docs/workflow/GIT_HOOK_CHECKS.tsv 'test_verification_git_hooks'
+require_file_contains docs/workflow/GIT_HOOK_CHECKS.tsv 'test_dashboard_same_run_verification'
 require_file_contains docs/workflow/GIT_HOOK_CHECKS.tsv 'test_repository_document_sync'
 require_file_contains docs/workflow/FINAL_GATE_COVERAGE.tsv './tools/test_ci_pipeline_acceleration.sh'
 require_file_contains docs/workflow/FINAL_GATE_COVERAGE.tsv './tools/test_ci_timing.sh'
+require_file_contains docs/workflow/FINAL_GATE_COVERAGE.tsv './tools/test_verification_foundation.sh'
+require_file_contains docs/workflow/FINAL_GATE_COVERAGE.tsv './tools/test_as_built_single_pass.sh'
+require_file_contains docs/workflow/FINAL_GATE_COVERAGE.tsv './tools/test_verification_runner.sh'
+require_file_contains docs/workflow/FINAL_GATE_COVERAGE.tsv './tools/test_verification_git_hooks.sh'
+require_file_contains docs/workflow/FINAL_GATE_COVERAGE.tsv './tools/test_dashboard_same_run_verification.sh'
 
 printf 'CI pipeline acceleration tests passed.\n'

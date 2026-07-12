@@ -1,5 +1,73 @@
 # SPECIFICATION.md
 
+## Implemented CI Composed Validation Activation Specification
+
+A provider-neutral graph authority maps compatibility executions to existing CI jobs through group, kind, inclusion, and exclusion selectors. The semantic checker compares that graph with both workflow files and the hook catalog. Main owner jobs invoke one shared argv runner; proof-only terminal jobs validate provider results and a graph-bound same-run receipt.
+
+The existing final gate will retain its local Git-hook evidence and aggregate fallback modes. CI may select the composed proof adapter explicitly. Gap and fallback execution will move to the shared direct-argv executor.
+
+SYNC-ID: ci_composed_validation_activation
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/FINAL_GATE_EXECUTION_POLICY.tsv,docs/workflow/FINAL_GATE_CI_GRAPH.tsv,docs/workflow/FINAL_GATE_GAP_COMMANDS.tsv,docs/workflow/FINAL_GATE_COVERAGE.tsv,docs/workflow/TEST_PLAN_MANIFEST.tsv,docs/workflow/GIT_HOOK_CHECKS.tsv,docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv,docs/workflow/SAFEFLOW_SECURITY_BACKFILL.tsv,docs/workflow/PRODUCT_SECURITY_POLICY.tsv,tools/lib/verification_core.mjs,tools/lib/as_built_index.mjs,tools/lib/ci_composition.mjs,tools/verification-ci,tools/ci-final-gate,tools/check_ci_workflow_structure.sh,tools/test_ci_pipeline_acceleration.sh,tools/check_repository_development_workflow.sh,tools/test_ci_final_gate.sh,tools/test_ci_composition.mjs,tools/test_ci_composition.sh,tools/test_verification_git_hooks.sh,tools/test_lesson_repository.sh,.github/workflows/ci.yml,.github/workflows/lesson14-ci.yml,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_ci_composition.sh,tools/test_ci_final_gate.sh,tools/test_ci_pipeline_acceleration.sh,tools/check_ci_workflow_structure.sh,tools/test_verification_foundation.sh,tools/test_verification_git_hooks.sh,tools/test_ci_evidence.sh,tools/test_git_hooks.sh,tools/test_git_hooks_parallel.sh,tools/test_as_built_single_pass.sh,tools/test_as_built_sync_contract.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh,tools/check_test_plan_coverage.sh,tools/test_test_plan.sh,tools/check_security_invariants.sh,tools/test_security_invariants.sh,tools/test_dashboard_control_center.sh,tools/test_lesson_playwright.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh
+
+## Implemented Dashboard Control Center Same-Run Validation Specification
+
+A policy-backed owner runs the existing Control Center non-browser checks, creates one Dashboard build, inspects the emitted output, and runs the existing browser suite against the same immutable input snapshot. A build manifest and a browser receipt bind revision, policy, command, source/config inventory, test inventory, and output digests.
+
+Vite obtains its mutable dependency-cache location from a dependency-free path helper that rejects cache placement inside the configured application source root. The cache remains under the repository's ignored Dashboard runtime root, so lightweight policy CI can test the boundary without installing Vite and the source/config inventory stays immutable on clean browser runners.
+
+Standalone bundle and Control Center wrappers remain strict. The composed full/no-cache runner may omit only policy-declared subjects that the same passing owner actually performs. The implementation will not shard browser tests or persist results beyond the current execution session.
+
+SYNC-ID: dashboard_control_center_same_run_validation
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/FINAL_GATE_EXECUTION_POLICY.tsv,docs/workflow/TEST_PLAN_MANIFEST.tsv,docs/workflow/GIT_HOOK_CHECKS.tsv,docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv,docs/workflow/FINAL_GATE_COVERAGE.tsv,docs/workflow/SAFEFLOW_SECURITY_BACKFILL.tsv,docs/workflow/PRODUCT_SECURITY_POLICY.tsv,vite.config.mjs,tools/lib/dashboard_vite_runtime.mjs,tools/lib/dashboard_verification.mjs,tools/check_dashboard_bundle_contract.mjs,tools/check_dashboard_bundle_contract.sh,tools/dashboard-verification,tools/test_dashboard_control_center.sh,tools/test_dashboard_same_run_verification.mjs,tools/test_dashboard_same_run_verification.sh,tools/test_verification_runner.mjs,tools/test_lesson_repository.sh,tools/test_ci_pipeline_acceleration.sh,.github/workflows/ci.yml,.github/workflows/lesson14-ci.yml,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_dashboard_same_run_verification.sh,tools/check_dashboard_bundle_contract.sh,tools/test_dashboard_control_center.sh,tools/test_verification_runner.sh,tools/test_verification_foundation.sh,tools/test_verification_git_hooks.sh,tools/test_git_hooks.sh,tools/test_git_hooks_parallel.sh,tools/check_test_plan_coverage.sh,tools/test_test_plan.sh,tools/check_security_invariants.sh,tools/test_security_invariants.sh,tools/test_ci_pipeline_acceleration.sh,tools/check_ci_workflow_structure.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh
+
+## Implemented Local Exact-Once Verification Specification
+
+The composed runner adapts the existing hook catalog and parallel classifications into immutable tasks. It forms ordered stages around serial, heavy, and final-gate barriers; parallel stages use a rolling pool rather than wave-wide waits. Each child owns a process group, log file, timeout, and declared locks. The first failure stops new work, sends termination to active groups, waits the configured grace period, then force-stops survivors.
+
+Before execution the runner records a full content fingerprint. After non-final tasks it recomputes the fingerprint. Only an exact match allows version 1 compatibility receipts and record-only version 2 receipts to be written. A final-gate subject then verifies those receipts and gap coverage without rerunning the aggregate.
+
+The activation surface is limited to `full --no-cache`. The public `tools/git-hooks` command, summary, compatibility count, final-gate behavior, fast cache, minimal mode, Resource Guard cap, and standalone commands remain available. `GIT_HOOKS_EXECUTION_ENGINE=legacy` is the immediate rollback adapter.
+
+SYNC-ID: verification_local_exact_once_activation
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/FINAL_GATE_EXECUTION_POLICY.tsv,docs/workflow/TEST_PLAN_MANIFEST.tsv,docs/workflow/GIT_HOOK_CHECKS.tsv,docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv,docs/workflow/GIT_HOOK_RECOMMENDATION_PATHS.tsv,docs/workflow/FINAL_GATE_COVERAGE.tsv,docs/workflow/SAFEFLOW_SECURITY_BACKFILL.tsv,docs/workflow/PRODUCT_SECURITY_POLICY.tsv,tools/lib/verification_core.mjs,tools/lib/verification_runner.mjs,tools/lib/verification_git_hooks.mjs,tools/verification-runner,tools/git-hooks,tools/lib/ci_evidence.sh,tools/lib/fixture_copy.sh,tools/test_verification_runner.mjs,tools/test_verification_runner.sh,tools/test_verification_git_hooks.sh,tools/test_git_hooks_parallel.sh,tools/test_fixture_copy.sh,tools/test_ci_final_gate.sh,tools/lib/repository_development_runner.sh,tools/test_repository_development_workflow.sh,tools/test_lesson_repository.sh,tools/test_ci_pipeline_acceleration.sh,.github/workflows/ci.yml,.github/workflows/lesson14-ci.yml,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_verification_runner.sh,tools/test_verification_git_hooks.sh,tools/test_git_hooks.sh,tools/test_git_hooks_parallel.sh,tools/test_fixture_copy.sh,tools/test_ci_evidence.sh,tools/test_ci_final_gate.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh,tools/check_security_invariants.sh,tools/test_security_invariants.sh,tools/check_test_plan_coverage.sh,tools/test_test_plan.sh,tools/test_ci_pipeline_acceleration.sh,tools/check_ci_workflow_structure.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh
+
+## Implemented As-Built Single-Pass Validation Specification
+
+The owner layer will provide a standard-library index loader and a strict coordinator. The index reads every synchronized document once, creates direct lookup maps for blocks and contract metadata, and exposes normalized diagnostics without changing public file formats.
+
+Standalone sync-contract execution continues to validate its complete owner contract. Standalone documents execution performs document topics and the sync contract once. In a composed session, the documents owner emits separate logical receipts for `check_as_built_docs` and `check_as_built_sync_contract`; receipt separation does not imply duplicate execution.
+
+The migration starts in parity mode. Existing Bash validation remains available as the rollback adapter until fixture mutations prove equivalent refusal behavior and the measured runtime does not regress.
+
+SYNC-ID: as_built_single_pass_validation
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/FINAL_GATE_EXECUTION_POLICY.tsv,docs/workflow/TEST_PLAN_MANIFEST.tsv,docs/workflow/GIT_HOOK_CHECKS.tsv,docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv,docs/workflow/GIT_HOOK_RECOMMENDATION_PATHS.tsv,docs/workflow/FINAL_GATE_COVERAGE.tsv,tools/lib/verification_core.mjs,tools/lib/as_built_index.mjs,tools/check_as_built_sync_contract.mjs,tools/check_as_built_sync_contract.sh,tools/as-built-sync,tools/test_as_built_single_pass.mjs,tools/test_as_built_single_pass.sh,tools/test_lesson_repository.sh,tools/test_ci_pipeline_acceleration.sh,.github/workflows/ci.yml,.github/workflows/lesson14-ci.yml,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/test_as_built_sync_contract.sh,tools/test_as_built_single_pass.sh,tools/check_test_plan_coverage.sh,tools/test_test_plan.sh,tools/test_git_hooks.sh,tools/test_git_hooks_parallel.sh,tools/test_ci_final_gate.sh,tools/test_ci_pipeline_acceleration.sh,tools/check_ci_workflow_structure.sh,tools/check_workflow_pair_sync.sh
+
+## Implemented Verification Composition Foundation Specification
+
+The implementation adds a policy-backed, provider-neutral verification core behind the existing command surfaces.
+
+- A centralized locator resolves the execution policy and evidence schema from validated CLI or environment input and otherwise uses the repository default.
+- The catalog adapter reads existing hook, parallel-group, coverage, and gap authorities; the core does not duplicate product or repository values.
+- Canonical commands are executable plus argument arrays. Shell control operators, redirection, command substitution, and unsafe environment assignment are rejected by the core executor.
+- The input fingerprinter hashes normalized repository-relative names, object or content bytes, index/worktree states, modes, and link targets with NUL-safe Git enumeration. A concurrent mutation or unsupported filesystem entry produces a non-reusable result.
+- Version 2 receipts bind repository, command, policy, toolchain, result, output lineage, workflow/run/attempt, source owner, HEAD, and worktree state through safe metadata and digests.
+- Receipt creation uses an exclusive per-attempt claim and atomic rename. A second producer for the same attempt fails instead of overwriting evidence.
+- The migration modes are `legacy`, `record-only`, `shadow`, and `enforce`. Initial implementation remains `record-only`; no version 1 fallback is accepted after a future authoritative cutover.
+- Existing `ci-evidence`, Git hooks, final gate, aggregate checks, Step 1-7, Step 1-14, and standalone commands retain their public behavior during foundation rollout.
+
+SYNC-ID: verification_composition_foundation
+STATUS: implemented
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/FINAL_GATE_EXECUTION_POLICY.tsv,docs/workflow/FINAL_GATE_EVIDENCE_SCHEMA.tsv,docs/workflow/TEST_PLAN_MANIFEST.tsv,docs/workflow/GIT_HOOK_CHECKS.tsv,docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv,docs/workflow/GIT_HOOK_RECOMMENDATION_PATHS.tsv,docs/workflow/FINAL_GATE_COVERAGE.tsv,docs/workflow/SAFEFLOW_SECURITY_BACKFILL.tsv,docs/workflow/PRODUCT_SECURITY_POLICY.tsv,tools/lib/verification_core.mjs,tools/verification,tools/lib/ci_evidence.sh,tools/test_verification_foundation.mjs,tools/test_verification_foundation.sh,tools/test_ci_evidence.sh,tools/test_ci_pipeline_acceleration.sh,tools/test_lesson_repository.sh,.github/workflows/ci.yml,.github/workflows/lesson14-ci.yml,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/test_verification_foundation.sh,tools/test_ci_evidence.sh,tools/test_ci_final_gate.sh,tools/test_ci_pipeline_acceleration.sh,tools/check_security_invariants.sh,tools/test_security_invariants.sh,tools/check_test_plan_coverage.sh,tools/test_test_plan.sh,tools/test_git_hooks.sh,tools/check_ci_workflow_structure.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh
+
 ## As-Built Components
 
 ### Lesson Control

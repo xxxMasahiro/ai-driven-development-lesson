@@ -1,0 +1,134 @@
+#!/usr/bin/env node
+
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+import { VerificationError } from './lib/verification_core.mjs';
+import {
+  fingerprintsEqual,
+  fingerprintRepository,
+  loadGitHookExecution,
+  writeGitHookEvidenceBatch,
+} from './lib/verification_git_hooks.mjs';
+import { runExecutionPlan } from './lib/verification_runner.mjs';
+
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+
+function usage() {
+  process.stderr.write(`Usage:
+  ./tools/verification-runner git-hooks --mode <mode> --jobs <count> --no-cache [--dry-run]
+`);
+}
+
+function parse(argv) {
+  const adapter = argv.shift();
+  if (adapter !== 'git-hooks') throw new VerificationError('RUNNER_CLI', 'Only the policy-backed git-hooks adapter is available');
+  const options = { noCache: false, dryRun: false, root: process.env.LESSON_ROOT || ROOT };
+  for (let index = 0; index < argv.length; index += 1) {
+    const arg = argv[index];
+    if (arg === '--no-cache') options.noCache = true;
+    else if (arg === '--dry-run') options.dryRun = true;
+    else if (['--mode', '--jobs', '--root', '--policy'].includes(arg)) {
+      if (index + 1 >= argv.length) throw new VerificationError('RUNNER_CLI', `${arg} requires a value`);
+      options[arg.slice(2)] = argv[index + 1];
+      index += 1;
+    } else throw new VerificationError('RUNNER_CLI', `Unknown runner option: ${arg}`);
+  }
+  if (!options.mode || !options.jobs) throw new VerificationError('RUNNER_CLI', 'Mode and jobs are required');
+  options.jobs = Number(options.jobs);
+  if (!Number.isSafeInteger(options.jobs) || options.jobs <= 0) throw new VerificationError('RUNNER_CLI', 'Jobs must be a positive integer');
+  return options;
+}
+
+function integerSetting(policy, key) {
+  const value = Number(policy.settings.get(key));
+  if (!Number.isSafeInteger(value) || value <= 0) throw new VerificationError('RUNNER_POLICY', `Invalid positive integer setting: ${key}`);
+  return value;
+}
+
+function printRun(execution, run) {
+  const taskById = new Map(execution.plan.tasks.map((task) => [task.id, task]));
+  for (const result of run.results) {
+    if (result.status === 'not-started') continue;
+    process.stdout.write(`hook run: ${result.id}\n`);
+    if (result.output) process.stdout.write(result.output.endsWith('\n') ? result.output : `${result.output}\n`);
+    const task = taskById.get(result.id);
+    if (result.status === 'success') {
+      for (const provided of task?.provides ?? []) process.stdout.write(`hook attested: ${provided} (owner: ${task.id})\n`);
+    } else process.stderr.write(`hook failed: ${result.id} (${result.status})\n`);
+  }
+  if (run.failure?.id === 'pre-final-gate') process.stderr.write(`hook failed before final gate: ${run.failure.error}\n`);
+}
+
+async function main() {
+  if (process.argv.includes('--help') || process.argv.includes('-h')) {
+    usage();
+    return 0;
+  }
+  const options = parse(process.argv.slice(2));
+  if (options.mode !== 'full' || !options.noCache) {
+    throw new VerificationError('RUNNER_SCOPE', 'Composed execution is limited to full --no-cache');
+  }
+  const root = path.resolve(options.root);
+  const execution = await loadGitHookExecution({
+    root,
+    policyPath: options.policy || process.env.GIT_HOOKS_EXECUTION_POLICY_FILE,
+    env: process.env,
+    mode: options.mode,
+  });
+  if (options.dryRun) {
+    process.stdout.write(`${JSON.stringify({
+      mode: options.mode,
+      compatibility_count: execution.plan.compatibilityCount,
+      execution_count: execution.plan.executionCount,
+      compatibility_ids: execution.plan.compatibilityIds,
+      execution_ids: execution.plan.executionIds,
+      provided: execution.plan.tasks.flatMap((task) => task.provides.map((id) => ({ id, owner: task.id }))),
+    }, null, 2)}\n`);
+    return 0;
+  }
+
+  const before = await fingerprintRepository({ root });
+  let evidence = null;
+  const timeoutMs = integerSetting(execution.policy, 'default_timeout_seconds') * 1000;
+  const cancellationGraceMs = integerSetting(execution.policy, 'cancellation_grace_seconds') * 1000;
+  const maxLogBytes = integerSetting(execution.policy, 'local_max_log_bytes');
+  const run = await runExecutionPlan({
+    plan: execution.plan,
+    root,
+    maxJobs: options.jobs,
+    timeoutMs,
+    cancellationGraceMs,
+    maxLogBytes,
+    onBeforeFinalGate: async ({ results }) => {
+      const after = await fingerprintRepository({ root });
+      if (!fingerprintsEqual(before, after)) throw new VerificationError('RUNNER_REPOSITORY_MUTATION', 'Repository inputs changed during composed verification');
+      evidence = await writeGitHookEvidenceBatch({ execution, results, inputSnapshot: after, env: process.env });
+    },
+  });
+  printRun(execution, run);
+  if (!run.ok) return 1;
+
+  if (!evidence) {
+    const after = await fingerprintRepository({ root });
+    if (!fingerprintsEqual(before, after)) throw new VerificationError('RUNNER_REPOSITORY_MUTATION', 'Repository inputs changed during composed verification');
+    evidence = await writeGitHookEvidenceBatch({ execution, results: run.results, inputSnapshot: after, env: process.env });
+  }
+  for (const warning of evidence.warnings) process.stderr.write(`version 2 record-only warning: ${warning}\n`);
+  process.stdout.write(`Git hooks checks passed: ${options.mode} mode (${execution.plan.compatibilityCount} checks).\n`);
+  return 0;
+}
+
+main()
+  .then((code) => {
+    process.exitCode = code;
+  })
+  .catch((error) => {
+    if (error instanceof VerificationError) {
+      process.stderr.write(`${error.code}: ${error.message}\n`);
+      process.exitCode = 1;
+      return;
+    }
+    process.stderr.write(`${error?.stack ?? error}\n`);
+    process.exitCode = 1;
+  });

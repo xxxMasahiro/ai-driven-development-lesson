@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 
+CI_EVIDENCE_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 if [[ -z "${LESSON_ROOT:-}" ]]; then
-  SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
   # shellcheck source=lesson_common.sh
-  source "$SCRIPT_DIR/lesson_common.sh"
+  source "$CI_EVIDENCE_LIB_DIR/lesson_common.sh"
 fi
 
 ci_evidence_marker_text() {
@@ -180,6 +181,8 @@ ci_evidence_policy_hash() {
     "${GIT_HOOKS_POLICY_FILE:-docs/workflow/GIT_HOOKS_POLICY.tsv}" \
     "${CI_FINAL_GATE_COVERAGE_FILE:-docs/workflow/FINAL_GATE_COVERAGE.tsv}" \
     "${CI_FINAL_GATE_GAP_COMMANDS_FILE:-docs/workflow/FINAL_GATE_GAP_COMMANDS.tsv}" \
+    "${VERIFICATION_EXECUTION_POLICY_FILE:-docs/workflow/FINAL_GATE_EXECUTION_POLICY.tsv}" \
+    "${VERIFICATION_EVIDENCE_SCHEMA_FILE:-docs/workflow/FINAL_GATE_EVIDENCE_SCHEMA.tsv}" \
     docs/workflow/TEST_PLAN_MANIFEST.tsv \
     "${AS_BUILT_SYNC_CONTRACT_FILE:-docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv}" \
     .github/workflows/ci.yml \
@@ -190,6 +193,88 @@ ci_evidence_metadata_value() {
   local file="$1"
   local key="$2"
   awk -F '=' -v key="$key" '$1 == key { print substr($0, length(key) + 2); found = 1; exit } END { if (!found) exit 1 }' "$file"
+}
+
+ci_evidence_v2_policy_file() {
+  printf '%s\n' "${VERIFICATION_EXECUTION_POLICY_FILE:-${LESSON_ROOT:-$(pwd)}/docs/workflow/FINAL_GATE_EXECUTION_POLICY.tsv}"
+}
+
+ci_evidence_v2_mode() {
+  local policy_file
+  policy_file="$(ci_evidence_v2_policy_file)"
+  if [[ ! -f "$policy_file" || -L "$policy_file" ]]; then
+    printf 'legacy\n'
+    return 0
+  fi
+  awk -F '\t' '
+    $1 == "setting" && $2 == "activation_mode" { print $3; found = 1; exit }
+    END { if (!found) print "legacy" }
+  ' "$policy_file"
+}
+
+ci_evidence_v2_cli() {
+  if [[ -n "${VERIFICATION_CLI:-}" ]]; then
+    printf '%s\n' "$VERIFICATION_CLI"
+  else
+    printf '%s/../verification\n' "$CI_EVIDENCE_LIB_DIR"
+  fi
+}
+
+ci_evidence_v2_dir() {
+  printf '%s\n' "${VERIFICATION_EVIDENCE_V2_DIR:-$(ci_evidence_dir)/v2}"
+}
+
+ci_evidence_v2_context_args() {
+  local source_job
+  source_job="${CI_EVIDENCE_EXPECT_SOURCE_JOB:-$(ci_evidence_source_job)}"
+  printf '%s\n' \
+    --root "${LESSON_ROOT:-$(pwd)}" \
+    --evidence-dir "$(ci_evidence_v2_dir)" \
+    --scope "${VERIFICATION_SCOPE:-${GITHUB_EVENT_NAME:-local}}" \
+    --event "${GITHUB_EVENT_NAME:-local}" \
+    --ref "${GITHUB_REF:-local}" \
+    --workflow "$(ci_evidence_workflow_id)" \
+    --run-id "$(ci_evidence_run_id)" \
+    --run-attempt "${GITHUB_RUN_ATTEMPT:-1}" \
+    --source-job "$source_job"
+}
+
+ci_evidence_v2_operation() {
+  local operation="$1"
+  local evidence_id="$2"
+  local command_identity="$3"
+  shift 3
+  local cli mode input
+  local -a args=()
+  local -a context_args=()
+  mode="$(ci_evidence_v2_mode)"
+  [[ "$mode" != "legacy" ]] || return 0
+  cli="$(ci_evidence_v2_cli)"
+  [[ -x "$cli" ]] || {
+    [[ "$mode" != "enforce" ]] && return 0
+    printf 'Version 2 evidence CLI is missing or not executable.\n' >&2
+    return 1
+  }
+  mapfile -t context_args < <(ci_evidence_v2_context_args)
+  args=(
+    evidence "$operation" "$evidence_id"
+    --subject "$evidence_id"
+    --command "$command_identity"
+    "${context_args[@]}"
+  )
+  for input in "$@"; do
+    [[ -n "$input" ]] || continue
+    args+=(--input "$input")
+  done
+  if "$cli" "${args[@]}" >/dev/null 2>&1; then
+    return 0
+  fi
+  if [[ "$mode" == "enforce" ]]; then
+    printf 'Version 2 evidence %s failed: %s\n' "$operation" "$evidence_id" >&2
+    return 1
+  fi
+  printf 'Version 2 evidence %s did not match in %s mode: %s\n' "$operation" "$mode" "$evidence_id" >&2
+  return 0
 }
 
 ci_evidence_record_success() {
@@ -215,13 +300,19 @@ ci_evidence_record_success() {
     printf 'created_at=%s\n' "$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
   } >"$tmp_file"
   mv "$tmp_file" "$evidence_file"
+  ci_evidence_v2_operation record "$evidence_id" "$command_identity" "$@"
 }
 
 ci_evidence_verify_success() {
   local evidence_id="$1"
   local command_identity="$2"
   shift 2
-  local evidence_file expected actual
+  local evidence_file expected actual v2_mode
+  v2_mode="$(ci_evidence_v2_mode)"
+  if [[ "$v2_mode" == "enforce" ]]; then
+    ci_evidence_v2_operation verify "$evidence_id" "$command_identity" "$@"
+    return
+  fi
   evidence_file="$(ci_evidence_file_for "$evidence_id")"
   [[ -f "$evidence_file" ]] || {
     printf 'missing same-run evidence: %s\n' "$evidence_id" >&2
@@ -302,6 +393,10 @@ ci_evidence_verify_success() {
       return 1
     }
   fi
+
+  if [[ "$v2_mode" == "shadow" ]]; then
+    ci_evidence_v2_operation verify "$evidence_id" "$command_identity" "$@"
+  fi
 }
 
 ci_evidence_git_hook_inputs() {
@@ -313,9 +408,9 @@ ci_evidence_git_hook_inputs() {
     first="${first#./}"
   fi
   printf '%s\n' \
-    docs/workflow/GIT_HOOK_CHECKS.tsv \
-    docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv \
-    docs/workflow/GIT_HOOKS_POLICY.tsv
+    "${GIT_HOOKS_CHECKS_FILE:-docs/workflow/GIT_HOOK_CHECKS.tsv}" \
+    "${GIT_HOOKS_PARALLEL_GROUPS_FILE:-docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv}" \
+    "${GIT_HOOKS_POLICY_FILE:-docs/workflow/GIT_HOOKS_POLICY.tsv}"
   if [[ -n "$first" && -f "${LESSON_ROOT:-$(pwd)}/$first" ]]; then
     printf '%s\n' "$first"
   fi

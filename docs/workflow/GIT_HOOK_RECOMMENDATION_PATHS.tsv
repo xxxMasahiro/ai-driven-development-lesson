@@ -12,6 +12,8 @@ tools/check_repository_document_sync.mjs	full-no-cache	Parent range-based docume
 tools/lib/repository_document_sync.mjs	full-no-cache	Parent document-sync evaluator changes affect CI enforcement.
 docs/workflow/FINAL_GATE_GAP_COMMANDS.tsv	full-no-cache	Final-gate gap command changes affect CI-equivalent final verification.
 docs/workflow/FINAL_GATE_COVERAGE.tsv	full-no-cache	Final-gate coverage changes affect duplicate-test elimination safety.
+docs/workflow/FINAL_GATE_EXECUTION_POLICY.tsv	full-no-cache	Verification execution-policy changes affect local and remote release proof.
+docs/workflow/FINAL_GATE_EVIDENCE_SCHEMA.tsv	full-no-cache	Evidence-schema changes affect provenance, redaction, and reuse decisions.
 docs/workflow/SAFEFLOW_SECURITY_BACKFILL.tsv	full-no-cache	Security guard policy changes affect mechanical security validation.
 docs/workflow/PRODUCT_SECURITY_POLICY.tsv	full-no-cache	Product security policy changes affect product workflow gates.
 learning/context/WORKFLOW_CONTEXT_MAP.tsv	full-no-cache	Workflow context mapping changes affect product security and menu readiness.
@@ -26,11 +28,18 @@ tools/ci-playwright-setup	full-no-cache	Playwright setup changes affect browser 
 dashboard-control-center/	full-no-cache	React/Vite dashboard control-center changes need CI-equivalent local verification before push.
 vite.config.mjs	full-no-cache	Vite configuration changes affect dashboard control-center data serving and browser verification.
 tools/lib/ci_evidence.sh	full-no-cache	CI evidence helper changes affect same-run verification reuse.
+tools/lib/verification_core.mjs	full-no-cache	Verification-core changes affect every composed check and receipt.
+tools/verification	full-no-cache	Verification CLI changes affect local and CI adapters.
+tools/lib/verification_runner.mjs	full-no-cache	Scheduler changes affect rolling parallelism, locks, timeouts, cancellation, and logs.
+tools/lib/verification_git_hooks.mjs	full-no-cache	Hook adapter changes affect exact-once planning and same-run receipt authority.
+tools/verification-runner	full-no-cache	Composed runner changes affect full/no-cache dispatch and rollback.
 tools/lib/ci_timing.sh	full-no-cache	CI timing helper changes affect timing evidence and proposal classification.
 tools/lib/as_built_evidence.sh	full-no-cache	As-built evidence helper changes affect same-run sync-check reuse.
 tools/lib/resource_guard.sh	full-no-cache	Resource guard shared helper changes affect local verification behavior.
 tools/resource-guard	full-no-cache	Resource guard runner changes affect local verification behavior.
 tools/as-built-sync	full-no-cache	As-built status changes affect sync-contract visibility.
+tools/check_as_built_sync_contract.mjs	full-no-cache	Indexed as-built checker changes affect strict document synchronization.
+tools/lib/as_built_index.mjs	full-no-cache	As-built index changes affect contract, metadata, wiring, and runtime-evidence validation.
 tools/test-plan	full-no-cache	Test plan runner changes affect observe-only verification planning.
 tools/lib/test_plan.sh	full-no-cache	Test plan helper changes affect observe-only verification planning.
 tools/check_test_plan_coverage.sh	full-no-cache	Test plan coverage checker changes affect observe-only verification planning.

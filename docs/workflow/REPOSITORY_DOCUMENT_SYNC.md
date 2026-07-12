@@ -23,6 +23,7 @@ authority. Its additive rules distinguish:
 - product scaffold and template authorities;
 - Dashboard data contracts and Dashboard design authorities;
 - CI, Git hooks, test-plan, and final-gate governance;
+- semantic CI execution ownership, provider-result proof, and direct-argv final gaps;
 - security, external sending, MCP, browser execution, and evidence boundaries;
 - the as-built trio and TASK_TRACKER/HANDOFF workflow pair.
 
@@ -50,13 +51,28 @@ status records, symlinked policy files, oversized policy/input collections,
 unknown policy fields, and attempts to weaken its immutable self-protection
 rule.
 
-## CI And Git Hook
+## CI, Verification Ownership, And Git Hook
 
-The main CI workflow runs one small parallel job with full Git history. It uses
-Node standard-library code only: no `npm ci`, Playwright, Dashboard generation,
-child-repository traversal, `gh`, secrets, write permissions, or provider call.
-The final gate requires this job, but the job should finish before the existing
-long aggregate and full/no-cache jobs.
+The main CI workflow keeps one small parent document-sync owner with full Git
+history. It uses Node standard-library code only: no `npm ci`, Playwright,
+Dashboard generation, child-repository traversal, `gh`, secrets, write
+permissions, or provider call. The number of registered child repositories
+does not change this job's work.
+
+Common verification is assigned by `FINAL_GATE_CI_GRAPH.tsv`. Structure,
+non-browser regression, lesson CLI, and browser owners may run concurrently,
+but every authoritative compatibility execution has exactly one main-CI
+owner. `lesson-aggregate` and `git-hooks-full-no-cache` remain required job
+contexts as proof-only terminal jobs; they do not rerun their former common
+suites. `final-gate` verifies the graph/policy/catalog/HEAD/input-bound proof,
+then runs each configured final gap once. Gap and fallback commands are JSON
+argument arrays executed directly without `bash -c`, `sh -c`, or `eval`.
+
+Lesson14 workflow/job contexts remain present. They run only Lesson14-specific
+owners or semantic compatibility proofs; the main workflow still owns the
+common heavy browser and regression executions for the same commit. A failure
+in either required workflow remains blocking. This is required-context
+composition, not persistent or cross-workflow result caching.
 
 `.githooks/pre-push` provides optional repository-local early feedback when
 the existing local `.githooks` path is installed. It does not fetch. CI is the
@@ -71,6 +87,8 @@ guide, and the synchronized governance authorities together. Do not bypass a
 rule with a commit message, session-memory entry, generated file, deletion,
 rename source, Dashboard display, or external product evidence.
 
-Rollback is a normal Git revert of the policy, checker, hook, and CI wiring.
+Rollback is a normal Git revert of the policy, graph, checker, hook, and CI
+wiring. The strict standalone checks and local full/no-cache path remain
+available independently of the CI distribution graph.
 No product-repository mutation, credential action, provider call, external
 transfer, or browser execution is required.

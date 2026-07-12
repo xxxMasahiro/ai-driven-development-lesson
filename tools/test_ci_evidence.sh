@@ -72,4 +72,30 @@ if LESSON_ROOT="$TEST_REPO" \
   exit 1
 fi
 
+mkdir -p "$TEST_REPO/docs/workflow"
+for authority in \
+  FINAL_GATE_EXECUTION_POLICY.tsv \
+  FINAL_GATE_EVIDENCE_SCHEMA.tsv \
+  GIT_HOOK_CHECKS.tsv \
+  GIT_HOOK_PARALLEL_GROUPS.tsv \
+  FINAL_GATE_COVERAGE.tsv \
+  FINAL_GATE_GAP_COMMANDS.tsv
+do
+  cp "$ROOT/docs/workflow/$authority" "$TEST_REPO/docs/workflow/$authority"
+done
+run_evidence record version-two --command command-v2 --inputs input.txt >/dev/null
+v2_receipt="$(find "$EVIDENCE_DIR/v2" -type f -name receipt.json -print -quit)"
+if [[ -z "$v2_receipt" || ! -f "$v2_receipt" ]]; then
+  printf 'version 2 evidence receipt was not recorded in record-only mode\n' >&2
+  exit 1
+fi
+node -e '
+  const fs = require("node:fs");
+  const receipt = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+  if (receipt.schema_version !== "2.0.0" || receipt.status !== "success") process.exit(1);
+  for (const forbidden of ["raw_log", "environment_dump", "secret_value", "absolute_path"]) {
+    if (Object.hasOwn(receipt, forbidden)) process.exit(1);
+  }
+' "$v2_receipt"
+
 printf 'CI evidence tests passed.\n'

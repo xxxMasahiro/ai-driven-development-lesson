@@ -65,6 +65,32 @@ reject_job_contains() {
   fi
 }
 
+composition_engine="$(awk -F '\t' '$1 == "setting" && $2 == "ci_composition_engine" { print $3; found = 1; exit } END { if (!found) exit 1 }' "$ROOT/docs/workflow/FINAL_GATE_EXECUTION_POLICY.tsv")" || {
+  printf 'CI composition engine policy is missing.\n' >&2
+  exit 1
+}
+
+if [[ "$composition_engine" == "enforce" ]]; then
+  "$ROOT/tools/verification-ci" check >/dev/null
+  for workflow_file in "$ROOT/.github/workflows/ci.yml" "$ROOT/.github/workflows/lesson14-ci.yml"; do
+    if grep -Eq 'actions/(checkout|setup-node|cache|upload-artifact|download-artifact)@v[123]' "$workflow_file"; then
+      printf 'Deprecated Node-action major version in %s\n' "$workflow_file" >&2
+      exit 1
+    fi
+    if grep -Fq 'continue-on-error: true' "$workflow_file"; then
+      printf 'CI workflow must not use continue-on-error: true: %s\n' "$workflow_file" >&2
+      exit 1
+    fi
+  done
+  printf 'CI workflow structure check passed.\n'
+  exit 0
+fi
+
+if [[ "$composition_engine" != "legacy" ]]; then
+  printf 'Invalid CI composition engine: %s\n' "$composition_engine" >&2
+  exit 1
+fi
+
 check_main_ci() {
   local file="$ROOT/.github/workflows/ci.yml"
   local job
