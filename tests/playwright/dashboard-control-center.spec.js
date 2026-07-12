@@ -3161,8 +3161,30 @@ test.describe("English dashboard control center", () => {
     await expect(page.locator(".menu-tile")).toHaveCount(7);
     await expect(page.locator(".overview-status-card")).toHaveCount(4);
     await expect(page.locator(".explore-card")).toHaveCount(4);
+    await expect(page.locator("#menu-tile-heading")).toHaveJSProperty("tagName", "H2");
     const hasHorizontalOverflow = await page.locator(".app-shell").evaluate((element) => element.scrollWidth > element.clientWidth);
     expect(hasHorizontalOverflow).toBe(false);
+    const clippedOverviewControls = await page.locator(".overview-control-card").evaluateAll((elements) => elements
+      .filter((element) => element.scrollWidth > element.clientWidth + 1)
+      .map((element) => element.className));
+    expect(clippedOverviewControls).toEqual([]);
+    const undersizedMobileTargets = await page.locator([
+      ".mobile-menu-toggle",
+      ".refresh-button",
+      ".display-depth-control__select",
+      ".repository-selection__dropdown",
+      ".repository-selection__copy",
+      ".overview-executive-card__link",
+      ".common-status-link",
+    ].join(", ")).evaluateAll((elements) => elements
+      .filter((element) => {
+        const style = window.getComputedStyle(element);
+        if (style.visibility === "hidden" || style.display === "none") return false;
+        const rect = element.getBoundingClientRect();
+        return rect.width < 44 || rect.height < 44;
+      })
+      .map((element) => ({ className: element.className, text: element.textContent?.trim() || "" })));
+    expect(undersizedMobileTargets).toEqual([]);
 
     for (const target of ["Lessons", "Development Workflow", "Maintenance Sync", "Safety Actions"]) {
       await openMobileNavLink(page, target);

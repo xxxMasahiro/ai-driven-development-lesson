@@ -420,7 +420,7 @@ function MenuTileStrip({ data, t, activeMenuId, pendingMenuId, onActiveMenuChang
   }
   return (
     <section className="menu-tile-panel" aria-labelledby="menu-tile-heading">
-      <h3 id="menu-tile-heading">{t("overview.menuTitle")}</h3>
+      <h2 id="menu-tile-heading">{t("overview.menuTitle")}</h2>
       <div className="menu-tile-grid">
         {contexts.map((context) => {
           const menuId = displayText(context.menu_id, "unknown");
@@ -3052,7 +3052,7 @@ function WorkflowCurrentPositionPanel({ data, context, liveStatus, t }) {
   const repository = repositoryDisplayName(activeLiveStatus?.target_repository?.name || context?.target_repository?.name, t);
   const freshness = situationFreshnessMeta(data, activeLiveStatus, t);
   return (
-    <section className="operational-situation operational-situation--progress operational-situation--workflow" aria-labelledby="workflow-current-position-heading" data-workflow-current-position="true" data-dashboard-display-depth={displayPolicy.depth}>
+    <section className="operational-situation operational-situation--workflow" aria-labelledby="workflow-current-position-heading" data-workflow-current-position="true" data-dashboard-display-depth={displayPolicy.depth}>
       <div className="operational-situation__header">
         <span className="operational-situation__icon">
           <ClipboardCheck aria-hidden="true" size={24} />
@@ -3122,13 +3122,13 @@ function OperationalPageDecisionSummary({ data, context, liveStatus, t, tone = "
   const repositoryDetail = situationRepositoryMetaDetail(data, context, activeLiveStatus, t);
   const freshness = situationFreshnessMeta(data, activeLiveStatus, t);
   return (
-    <section className={`operational-situation operational-situation--progress operational-situation--${tone}`} aria-labelledby={`${pageId}-progress-summary-heading`} data-operational-progress-summary={pageId} data-dashboard-display-depth={displayPolicy.depth}>
+    <section className={`operational-situation operational-situation--${tone}`} aria-labelledby={`${pageId}-status-summary-heading`} data-operational-status-summary={pageId} data-dashboard-display-depth={displayPolicy.depth}>
       <div className="operational-situation__header">
         <span className="operational-situation__icon">
           <ClipboardCheck aria-hidden="true" size={24} />
         </span>
         <div>
-          <h2 id={`${pageId}-progress-summary-heading`}>{t("overview.progress.title")}</h2>
+          <h2 id={`${pageId}-status-summary-heading`}>{t("overview.progress.title")}</h2>
           <p>{t("overview.progress.subtitle")}</p>
         </div>
         <div className="operational-situation__header-actions">
@@ -3886,12 +3886,12 @@ function HorizontalProgress({ percent }) {
 
 function OverviewLocalCheckSummaryValue({ rows }) {
   return (
-    <div className="decision-progress-summary" role="list">
+    <div className="decision-status-summary" role="list">
       {rows.map((row) => (
-        <span className={`decision-progress-summary__row decision-progress-summary__row--${normalizeState(row.status)}`} role="listitem" key={row.category}>
-          <span className="decision-progress-summary__label">{row.label}</span>
+        <span className={`decision-status-summary__row decision-status-summary__row--${normalizeState(row.status)}`} role="listitem" key={row.category}>
+          <span className="decision-status-summary__label">{row.label}</span>
           {" "}
-          <strong className="decision-progress-summary__count">{row.count}</strong>
+          <strong className="decision-status-summary__count">{row.count}</strong>
         </span>
       ))}
     </div>

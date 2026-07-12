@@ -455,7 +455,7 @@
   line-height: 1;
 }
 
-.decision-progress-summary {
+.decision-status-summary {
   display: grid;
   min-width: 0;
   margin-top: 4px;
@@ -466,7 +466,7 @@
   line-height: 1.22;
 }
 
-.decision-progress-summary__row {
+.decision-status-summary__row {
   display: flex;
   min-width: 0;
   align-items: baseline;
@@ -475,13 +475,13 @@
   row-gap: 0;
 }
 
-.decision-progress-summary__label {
+.decision-status-summary__label {
   min-width: 0;
   overflow-wrap: anywhere;
 }
 
-.overview-status-card__head .decision-progress-summary__count,
-.decision-progress-summary .decision-progress-summary__count {
+.overview-status-card__head .decision-status-summary__count,
+.decision-status-summary .decision-status-summary__count {
   display: inline;
   min-width: auto;
   margin-top: 0;
