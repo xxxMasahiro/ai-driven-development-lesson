@@ -70,6 +70,7 @@ check_main_ci() {
   local job
   local required_jobs=(
     syntax-checks
+    repository-document-sync
     structure-docs-checks
     policy-regression-tests
     lesson-cli-tests
@@ -119,6 +120,19 @@ check_main_ci() {
   require_job_contains "$file" syntax-checks "bash -n tools/test_product_repository_authority.sh"
   require_job_contains "$file" syntax-checks "bash -n tools/test_product_repository_mode.sh"
   require_job_contains "$file" syntax-checks "bash -n tools/test_product_git_usage_modes.sh"
+	  require_job_contains "$file" syntax-checks "node --check tools/lib/repository_document_sync.mjs"
+	  require_job_contains "$file" syntax-checks "node --check tools/check_repository_document_sync.mjs"
+	  require_job_contains "$file" syntax-checks "node --check tools/test_repository_document_sync.mjs"
+	  require_job_contains "$file" repository-document-sync "fetch-depth: 0"
+	  require_job_contains "$file" repository-document-sync "actions/setup-node@v6"
+	  require_job_contains "$file" repository-document-sync "node-version: \"20\""
+	  require_job_contains "$file" repository-document-sync "./tools/check_repository_document_sync.sh"
+	  require_job_contains "$file" repository-document-sync "./tools/test_repository_document_sync.sh"
+	  require_job_contains "$file" repository-document-sync "--range-mode pr"
+	  require_job_contains "$file" repository-document-sync "--range-mode push"
+	  require_job_contains "$file" repository-document-sync "--initial-head"
+	  reject_job_contains "$file" repository-document-sync "npm ci"
+	  reject_job_contains "$file" repository-document-sync "product-repository-authority"
 	  require_job_contains "$file" syntax-checks "bash -n tools/lib/dashboard_data.sh"
 	  require_job_contains "$file" syntax-checks "bash -n tools/dashboard-data"
 	  require_job_contains "$file" syntax-checks "bash -n tools/dashboard-control-center"
@@ -138,6 +152,7 @@ check_main_ci() {
   require_job_contains "$file" policy-regression-tests "./tools/test_resource_guard_summary.sh"
   require_job_contains "$file" policy-regression-tests "./tools/test_test_plan.sh"
   require_job_contains "$file" policy-regression-tests "./tools/test_repository_development_workflow.sh"
+  require_job_contains "$file" policy-regression-tests "./tools/test_repository_document_sync.sh"
   require_job_contains "$file" policy-regression-tests "./tools/test_git_hooks_parallel.sh"
   require_job_contains "$file" policy-regression-tests "./tools/test_fixture_copy.sh"
   require_job_contains "$file" policy-regression-tests "./tools/test_lesson_context.sh"
@@ -228,9 +243,11 @@ check_main_ci() {
   require_job_contains "$file" final-gate 'if: ${{ always() }}'
   require_job_contains "$file" final-gate "- lesson-aggregate"
   require_job_contains "$file" final-gate "- git-hooks-full-no-cache"
+  require_job_contains "$file" final-gate "- repository-document-sync"
   require_job_contains "$file" final-gate "Verify split prerequisites"
   require_job_contains "$file" final-gate 'LESSON_AGGREGATE_RESULT: ${{ needs.lesson-aggregate.result }}'
   require_job_contains "$file" final-gate 'GIT_HOOKS_FULL_NO_CACHE_RESULT: ${{ needs.git-hooks-full-no-cache.result }}'
+  require_job_contains "$file" final-gate 'REPOSITORY_DOCUMENT_SYNC_RESULT: ${{ needs.repository-document-sync.result }}'
   require_job_contains "$file" final-gate "Split prerequisite failed:"
   require_job_contains "$file" final-gate "actions/download-artifact@v8.0.1"
   require_job_contains "$file" final-gate "CI_FINAL_GATE_REQUIRE_HOOK_EVIDENCE: \"1\""

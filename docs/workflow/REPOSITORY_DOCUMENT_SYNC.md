@@ -1,0 +1,76 @@
+# Repository Document Synchronization
+
+## Purpose
+
+This parent-repository gate checks whether the documents required by the paths
+changed in one pull request or push were also changed in that integration
+range. It is an omission guard, not a semantic review of document prose.
+
+The gate reads only this repository's Git metadata, changed path names, and the
+fixed policy file. It never expands product registry paths, walks FrameCue,
+TraceCue, or another registered repository, runs a child repository test, or
+calls GitHub or another network service. The number of registered child
+repositories therefore does not affect ordinary parent CI duration.
+
+## Parent-Specific Classifications
+
+`docs/workflow/REPOSITORY_DOCUMENT_SYNC_POLICY.json` is the machine-readable
+authority. Its additive rules distinguish:
+
+- STEP 1-7 and STEP 1-14 lesson authorities;
+- Free Development and external-product workflow policy;
+- parent-side product registry and selection contracts;
+- product scaffold and template authorities;
+- Dashboard data contracts and Dashboard design authorities;
+- CI, Git hooks, test-plan, and final-gate governance;
+- security, external sending, MCP, browser execution, and evidence boundaries;
+- the as-built trio and TASK_TRACKER/HANDOFF workflow pair.
+
+Multiple matching rules add requirements; a weaker rule cannot remove a
+security or verification requirement. The existing
+`AS_BUILT_SYNC_CONTRACT.tsv` remains the feature-level implementation registry.
+This range gate does not replace its metadata and semantic consistency checks.
+
+## Range And Change Semantics
+
+- Pull requests inspect merge-base to head.
+- Pushes inspect the exact before-to-after range.
+- An initial push inspects every tracked file in the head tree. This verifies
+  tree consistency; the later pull-request range remains the branch-change
+  guarantee.
+- Rename source and destination paths can trigger classifications.
+- Only non-deleted destination paths can satisfy required-document changes.
+- Deleted documents, rename sources, session memory, generated runtime output,
+  dependencies, reports, and ignored evidence cannot satisfy synchronization.
+- Tests-only changes do not automatically require product/as-built documents;
+  changes to verification meaning, CI, hooks, or evidence boundaries do.
+
+The checker rejects unnormalized or control-character paths, unsupported Git
+status records, symlinked policy files, oversized policy/input collections,
+unknown policy fields, and attempts to weaken its immutable self-protection
+rule.
+
+## CI And Git Hook
+
+The main CI workflow runs one small parallel job with full Git history. It uses
+Node standard-library code only: no `npm ci`, Playwright, Dashboard generation,
+child-repository traversal, `gh`, secrets, write permissions, or provider call.
+The final gate requires this job, but the job should finish before the existing
+long aggregate and full/no-cache jobs.
+
+`.githooks/pre-push` provides optional repository-local early feedback when
+the existing local `.githooks` path is installed. It does not fetch. CI is the
+final authority because local hooks can be bypassed and first pushes inspect a
+complete tree rather than the later PR range.
+
+## Recovery
+
+Fix an omission by updating the missing authority in the same PR/push range.
+Fix a false classification by changing the parent policy, checker tests, this
+guide, and the synchronized governance authorities together. Do not bypass a
+rule with a commit message, session-memory entry, generated file, deletion,
+rename source, Dashboard display, or external product evidence.
+
+Rollback is a normal Git revert of the policy, checker, hook, and CI wiring.
+No product-repository mutation, credential action, provider call, external
+transfer, or browser execution is required.

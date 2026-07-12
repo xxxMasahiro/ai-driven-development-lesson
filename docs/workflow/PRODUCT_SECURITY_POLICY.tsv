@@ -8,3 +8,4 @@ dependency_change_awareness	product-improvement	warning	warn	false	Dependency, a
 git_ci_sync_awareness	all	block	block	false	Product work must preserve existing Git sync, CI, workflow-pair, and repository-boundary gates.
 warning_block_separation	all	block	block	false	Product security must keep advisory warnings separate from high-confidence blocking failures.
 safe_output_metadata	all	block	block	false	Product security output may show categories and file references, but must not print secret values.
+parent_document_sync_external_nonaccess	all	block	block	false	Parent document-sync enforcement must not expand product registry paths, scan child repositories, invoke child tests, use network services, or treat external evidence as a parent synchronization substitute.

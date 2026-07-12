@@ -2971,3 +2971,18 @@ Focused verification:
 Next Step:
 
 - Commit and push the verified parent-repository branch, complete PR CI and approved merge, then confirm main CI and local/remote synchronization without modifying TraceCue or FrameCue.
+
+## Parent Repository Change-Aware Document Sync
+
+SYNC-ID: repository_document_sync_enforcement
+STATUS: implemented
+ARTIFACTS: AGENTS.MD,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/REPOSITORY_DOCUMENT_SYNC.md,docs/workflow/REPOSITORY_DOCUMENT_SYNC_POLICY.json,docs/workflow/SAFEFLOW_SECURITY_BACKFILL.tsv,docs/workflow/PRODUCT_SECURITY_POLICY.tsv,docs/workflow/TEST_PLAN_MANIFEST.tsv,docs/workflow/GIT_HOOK_CHECKS.tsv,docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv,docs/workflow/GIT_HOOK_RECOMMENDATION_PATHS.tsv,docs/workflow/FINAL_GATE_COVERAGE.tsv,guides/DOCUMENT_MAP.md,.githooks/pre-push,tools/lib/repository_document_sync.mjs,tools/check_repository_document_sync.mjs,tools/check_repository_document_sync.sh,tools/test_repository_document_sync.mjs,tools/test_repository_document_sync.sh,tools/check_lesson_structure.sh,tools/test_lesson_repository.sh,tools/check_ci_workflow_structure.sh,tools/test_ci_pipeline_acceleration.sh,.github/workflows/ci.yml,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/check_repository_document_sync.sh,tools/test_repository_document_sync.sh,tools/check_lesson_structure.sh,tools/check_test_plan_coverage.sh,tools/test_test_plan.sh,tools/test_git_hooks.sh,tools/test_git_hooks_parallel.sh,tools/check_ci_workflow_structure.sh,tools/test_ci_pipeline_acceleration.sh,tools/check_security_invariants.sh,tools/test_security_invariants.sh,tools/check_agents_skills.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh
+
+- [x] Read parent invariants, routing, memory, as-built authorities, CI/hooks/test policy, and TraceCue/FrameCue reference implementations without editing external repositories.
+- [x] Present the E proposal and consolidate two read-only reviews into accepted, held, and rejected findings.
+- [x] Define parent-specific additive classifications and an explicit no-child-repository-access contract.
+- [x] Implement bounded policy validation, range selection, rename/delete/current-path semantics, worktree mode, and JSON output.
+- [x] Add refusal tests for policy weakening, malformed input, false synchronization evidence, category omissions, range behavior, and registry-path nonaccess.
+- [x] Wire standalone, aggregate, Git hook, CI structure, final coverage, and parallel CI enforcement without duplicating long-running child/product checks.
+- [ ] Complete focused, medium, aggregate, full/no-cache, PR/main CI, synchronization, and TraceCue browser proof.

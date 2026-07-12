@@ -3080,3 +3080,21 @@ Restart context:
 Next safe action:
 
 - Commit and push the verified parent-repository branch, inspect PR CI, perform the approved merge, then verify main CI and local/remote synchronization. Cleanup remains limited to the parent repository.
+
+## Parent Repository Change-Aware Document Sync Handoff
+
+SYNC-ID: repository_document_sync_enforcement
+STATUS: implemented
+ARTIFACTS: AGENTS.MD,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/REPOSITORY_DOCUMENT_SYNC.md,docs/workflow/REPOSITORY_DOCUMENT_SYNC_POLICY.json,docs/workflow/SAFEFLOW_SECURITY_BACKFILL.tsv,docs/workflow/PRODUCT_SECURITY_POLICY.tsv,docs/workflow/TEST_PLAN_MANIFEST.tsv,docs/workflow/GIT_HOOK_CHECKS.tsv,docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv,docs/workflow/GIT_HOOK_RECOMMENDATION_PATHS.tsv,docs/workflow/FINAL_GATE_COVERAGE.tsv,guides/DOCUMENT_MAP.md,.githooks/pre-push,tools/lib/repository_document_sync.mjs,tools/check_repository_document_sync.mjs,tools/check_repository_document_sync.sh,tools/test_repository_document_sync.mjs,tools/test_repository_document_sync.sh,tools/check_lesson_structure.sh,tools/test_lesson_repository.sh,tools/check_ci_workflow_structure.sh,tools/test_ci_pipeline_acceleration.sh,.github/workflows/ci.yml,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/check_repository_document_sync.sh,tools/test_repository_document_sync.sh,tools/check_lesson_structure.sh,tools/check_test_plan_coverage.sh,tools/test_test_plan.sh,tools/test_git_hooks.sh,tools/test_git_hooks_parallel.sh,tools/check_ci_workflow_structure.sh,tools/test_ci_pipeline_acceleration.sh,tools/check_security_invariants.sh,tools/test_security_invariants.sh,tools/check_agents_skills.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh
+
+Restart context:
+
+- The parent now has a change-aware omission gate separate from `AS_BUILT_SYNC_CONTRACT.tsv`; it checks that required authority paths changed in the same integration range but does not judge prose meaning.
+- Normal CI reads only the parent checkout and path metadata. It does not open registry targets, FrameCue, TraceCue, or another product repository, and it does not run child tests.
+- Parent categories are STEP 1-7, STEP 1-14, Free Development/Git usage, product registry, scaffold/templates, Dashboard data/design, CI/hooks, and additive security/external/MCP/browser/evidence boundaries.
+- The policy self rule is checker-enforced and cannot be removed or weakened from the mutable JSON policy.
+- PR uses merge-base, push uses exact before/after, initial push uses the complete head tree, and only non-deleted destinations satisfy required documents.
+- The dedicated main-CI job is standard-library-only, parallel, read-only, and a final-gate prerequisite. Lesson14 CI does not duplicate it.
+- `.githooks/pre-push` is optional local feedback and never fetches; CI remains final authority.
+- External repositories remain read-only. The remaining work is verification, Git/GitHub integration, main synchronization, and TraceCue PC/mobile browser review.

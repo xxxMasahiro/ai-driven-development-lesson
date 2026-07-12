@@ -14,6 +14,7 @@ check_workflow_pair_sync	full|fast|minimal	./tools/check_workflow_pair_sync.sh	V
 check_review_protocol	full|fast	./tools/check_review_protocol.sh	Validate the sub-agent review protocol.
 check_developer_memory_requirements	full|fast|minimal	./tools/check_developer_memory_requirements.sh	Validate developer-memory requirements.
 check_repository_development_workflow	full|fast|minimal	./tools/check_repository_development_workflow.sh	Validate repository development workflow policy, skill, and wiring.
+check_repository_document_sync	full|fast|minimal	./tools/check_repository_document_sync.sh	Validate parent-only document-sync policy and immutable safety scope.
 check_dashboard_design_system	full|fast|minimal	./tools/check_dashboard_design_system.sh	Validate Dashboard Control Center design-system source-to-runtime drift.
 check_dashboard_bundle_contract	full|fast	./tools/check_dashboard_bundle_contract.sh	Validate Dashboard Control Center Vite chunking, bundle size, and large-chunk warning policy.
 test_dashboard_design_studio_events	full|fast	./tools/test_dashboard_design_studio_events.sh	Run Dashboard Design Studio local event runner/store regression tests.
@@ -21,6 +22,7 @@ test_docs_tour	full|fast	./tools/test_docs_tour.sh	Run documentation tour regres
 test_as_built_sync_contract	full|fast	./tools/test_as_built_sync_contract.sh	Run sync-contract regression tests.
 test_test_plan	full|fast	./tools/test_test_plan.sh	Run observe-only test-plan regression tests.
 test_repository_development_workflow	full|fast	./tools/test_repository_development_workflow.sh	Run repository development workflow regression tests.
+test_repository_document_sync	full|fast	./tools/test_repository_document_sync.sh	Run parent range, classification, rename, deletion, exclusion, and external-nonaccess document-sync tests.
 test_security_invariants	full|fast	./tools/test_security_invariants.sh	Run Security guard invariant regression tests.
 test_lesson_context	full|fast	./tools/test_lesson_context.sh	Run learner context map and CLI regression tests.
 test_git_workflow_policy	full|fast	./tools/test_git_workflow_policy.sh	Run Git workflow policy regression tests.

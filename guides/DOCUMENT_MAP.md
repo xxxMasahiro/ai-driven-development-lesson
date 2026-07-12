@@ -95,6 +95,8 @@ The workflow documents live in `docs/workflow/`.
 | `docs/workflow/GIT_HOOKS_POLICY.tsv` | Which Git hook modes exist and which mode is the default |
 | `docs/workflow/GIT_HOOK_CHECKS.tsv` | Which checks run in each Git hook mode |
 | `docs/workflow/GIT_HOOK_RECOMMENDATION_PATHS.tsv` | Which changed files should make the agent recommend local `full --no-cache` verification |
+| `docs/workflow/REPOSITORY_DOCUMENT_SYNC.md` | How parent PR/push changes require category-relevant document updates without scanning child repositories |
+| `docs/workflow/REPOSITORY_DOCUMENT_SYNC_POLICY.json` | Machine-readable parent path classifications and required document groups |
 | `learning/GIT_HOOK_SETTINGS.tsv` | The current local Git hook mode selected for this workspace |
 
 These two files should be treated as a pair.
