@@ -4,7 +4,7 @@ main	.github/workflows/ci.yml	CI	full	repository-document-sync	owner	syntax-chec
 main	.github/workflows/ci.yml	CI	full	structure-docs-checks	owner	syntax-checks	{"groups":["structure","sync"],"exclude":["check_repository_document_sync"]}	Own read-only structure and synchronized-document compatibility executions.
 main	.github/workflows/ci.yml	CI	full	policy-regression-tests	owner	syntax-checks	{"groups":["regression"],"exclude":["test_repository_document_sync"]}	Own isolated non-browser regression compatibility executions.
 main	.github/workflows/ci.yml	CI	full	lesson-cli-tests	owner	syntax-checks	{"groups":["lesson-cli"]}	Own lesson CLI fixture executions.
-main	.github/workflows/ci.yml	CI	full	playwright-tests	owner	syntax-checks	{"kinds":["heavy"]}	Own serial browser and Dashboard build validation.
+main	.github/workflows/ci.yml	CI	full	playwright-tests	owner	syntax-checks	{"kinds":["heavy"]}	Own serial browser and Dashboard build validation with mutable build caches isolated from validated source inputs.
 main	.github/workflows/ci.yml	CI	full	lesson-aggregate	proof	syntax-checks,repository-document-sync,structure-docs-checks,policy-regression-tests,lesson-cli-tests,playwright-tests	{}	Prove every distributed main-CI owner result without rerunning the aggregate.
 main	.github/workflows/ci.yml	CI	full	git-hooks-full-no-cache	proof	lesson-aggregate	{}	Preserve the required full-hooks context as a proof-only terminal job.
 main	.github/workflows/ci.yml	CI	full	final-gate	final	lesson-aggregate,git-hooks-full-no-cache,repository-document-sync	{"kinds":["final-gate"]}	Verify composed proof and execute final gap commands once.

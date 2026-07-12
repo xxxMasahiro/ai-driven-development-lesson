@@ -1,6 +1,6 @@
 # command_id	argv	output	description
 menu_status	["./tools/menu"]	discard	Confirm the menu command still renders.
-dashboard_all	["./tools/dashboard","all"]	discard	Confirm the dashboard command still renders every section.
+dashboard_all	["./tools/dashboard","all"]	discard	Confirm the dashboard command still renders every section without substituting for same-run build or mutable-cache-boundary validation.
 dashboard_data	["./tools/dashboard-data"]	discard	Confirm the dashboard data JSON command still renders.
 as_built_sync_status	["./tools/as-built-sync","status"]	discard	Confirm the as-built sync status view remains available.
 repository_development_workflow_status	["./tools/repository-development-workflow","status"]	discard	Confirm the repository development workflow status view remains available.

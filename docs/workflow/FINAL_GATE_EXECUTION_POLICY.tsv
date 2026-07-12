@@ -32,6 +32,7 @@ locator	final_gate_gap_commands	{"env":"CI_FINAL_GATE_GAP_COMMANDS_FILE","defaul
 locator	evidence_schema	{"env":"VERIFICATION_EVIDENCE_SCHEMA_FILE","default":"docs/workflow/FINAL_GATE_EVIDENCE_SCHEMA.tsv"}	Centralized locator for version 2 evidence validation.
 locator	as_built_contract	{"env":"AS_BUILT_SYNC_CONTRACT_FILE","default":"docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv"}	Centralized locator for the as-built synchronization contract.
 locator	dashboard_verification_runtime	{"env":"DASHBOARD_VERIFICATION_RUNTIME_DIR","default":".dashboard-control-center/verification"}	Repository-local ignored runtime parent for same-run Dashboard manifests and locks.
+setting	dashboard_vite_cache_runtime	.dashboard-control-center/vite-cache	Repository-local ignored Vite cache outside the immutable Dashboard source and configuration inventory.
 locator	ci_composition_graph	{"env":"CI_COMPOSITION_GRAPH_FILE","default":"docs/workflow/FINAL_GATE_CI_GRAPH.tsv"}	Provider-neutral exact-owner CI graph authority.
 argv	dashboard_build	["npm","run","dashboard:build"]	Canonical Dashboard production-build command.
 argv	dashboard_control_center_static	["./tools/test_dashboard_control_center.sh","--static-only"]	Canonical non-browser Control Center validation command.

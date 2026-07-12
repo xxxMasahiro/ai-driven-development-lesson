@@ -37,7 +37,7 @@ test_ci_evidence	full|fast	./tools/test_ci_evidence.sh	Run same-run CI evidence 
 test_verification_foundation	full|fast	./tools/test_verification_foundation.sh	Run policy, command identity, content fingerprint, and version 2 evidence rejection tests.
 test_verification_runner	full|fast	./tools/test_verification_runner.sh	Run rolling scheduler, lock, timeout, output-bound, cancellation, and process-tree refusal tests.
 test_verification_git_hooks	full|fast	./tools/test_verification_git_hooks.sh	Run exact-once hook planning, repository-mutation refusal, final suppression, and rollback tests.
-test_dashboard_same_run_verification	full|fast	./tools/test_dashboard_same_run_verification.sh	Run Dashboard build-manifest, browser-receipt, mutation, symlink, and lock refusal tests.
+test_dashboard_same_run_verification	full|fast	./tools/test_dashboard_same_run_verification.sh	Run Dashboard build-manifest, browser-receipt, mutable-cache-boundary, mutation, symlink, and lock refusal tests.
 test_ci_timing	full|fast	./tools/test_ci_timing.sh	Run CI timing report and proposal regression tests.
 test_dashboard_schema	full|fast	./tools/test_dashboard_schema.sh	Run dashboard control-center schema regression tests.
 test_dashboard_data	full|fast	./tools/test_dashboard_data.sh	Run dashboard control-center JSON data regression tests.

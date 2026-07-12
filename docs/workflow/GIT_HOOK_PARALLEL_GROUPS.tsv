@@ -38,7 +38,7 @@ test_ci_evidence	regression	parallel	Same-run evidence regression uses fixtures 
 test_verification_foundation	regression	parallel	Verification foundation regression uses isolated temporary Git repositories and evidence stores.
 test_verification_runner	regression	parallel	Verification scheduler regression uses isolated child process groups and temporary logs.
 test_verification_git_hooks	regression	parallel	Verification hook adapter regression uses an isolated temporary Git repository and evidence directory.
-test_dashboard_same_run_verification	regression	parallel	Dashboard same-run receipt regression uses isolated generic build fixtures and no browser process.
+test_dashboard_same_run_verification	regression	parallel	Dashboard same-run receipt and cache-boundary regression uses isolated generic build fixtures and no browser process.
 test_ci_timing	regression	parallel	CI timing regression uses fixtures and can run in parallel.
 test_dashboard_schema	regression	parallel	Dashboard schema regression validates repository-local TSV schema and can run in parallel.
 test_dashboard_data	regression	parallel	Dashboard data regression validates repository-local JSON output and can run in parallel.

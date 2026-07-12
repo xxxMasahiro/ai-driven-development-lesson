@@ -12,6 +12,7 @@ import { DASHBOARD_LOCALE_CODES } from "./dashboard-control-center/src/localePol
 const repoRoot = path.dirname(fileURLToPath(import.meta.url));
 const appRoot = path.join(repoRoot, "dashboard-control-center");
 const runtimeRoot = path.join(repoRoot, ".dashboard-control-center");
+const viteCacheRoot = path.join(runtimeRoot, "vite-cache");
 const dashboardDataToolPath = path.join(repoRoot, "tools", "dashboard-data");
 const settingsToolPath = path.join(repoRoot, "tools", "dashboard-settings");
 const designSystemToolPath = path.join(repoRoot, "tools", "dashboard-design-system");
@@ -2059,6 +2060,7 @@ function dashboardDataFilePlugin() {
 export default defineConfig({
   root: appRoot,
   base: "./",
+  cacheDir: viteCacheRoot,
   plugins: [react(), dashboardDataFilePlugin()],
   build: {
     outDir: path.join(repoRoot, "dist/dashboard-control-center"),

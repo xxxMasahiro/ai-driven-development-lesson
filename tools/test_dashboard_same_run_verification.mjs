@@ -17,6 +17,7 @@ import {
   withDashboardRunLock,
 } from './lib/dashboard_verification.mjs';
 import { VerificationError } from './lib/verification_core.mjs';
+import viteConfiguration from '../vite.config.mjs';
 
 function expectCode(code) {
   return (error) => error instanceof VerificationError && error.code === code;
@@ -71,6 +72,14 @@ async function fixture() {
   await writeFile(path.join(root, 'output', 'site', 'assets', 'vendor-main.js'), 'vendor\n');
   return root;
 }
+
+test('Vite mutable cache stays outside the configured application source root', () => {
+  assert.equal(typeof viteConfiguration.cacheDir, 'string');
+  const applicationRoot = path.resolve(viteConfiguration.root);
+  const cacheRoot = path.resolve(viteConfiguration.cacheDir);
+  const relative = path.relative(applicationRoot, cacheRoot);
+  assert.equal(relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative)), false);
+});
 
 test('one build inventory produces an exact manifest and bundle inspection', async () => {
   const root = await fixture();
