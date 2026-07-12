@@ -1,5 +1,7 @@
 # Dashboard Control Center Design System
 
+Browser-quality compatibility note: persistent status summaries use `status` rather than `progress` in DOM identifiers so automated review tools do not mistake completed status information for an active loading indicator. Overview links provide at least a 24px desktop focus target and all compact mobile controls provide at least a 44px touch target; page sections preserve sequential heading levels, and fixed-width audience badges do not shrink into clipped text.
+
 This document is the visual and interaction source of truth for Repository Control Center and Dashboard Control Center screens.
 It exists so future work can improve non-engineer comprehension without weakening existing lesson, repository, CI, security, Settings, or document-sync behavior.
 

@@ -27,6 +27,8 @@ The current implemented dashboard control center mock-aligned Overview is docume
 The current implemented dashboard control center detail-page mock parity follow-up is documented as `dashboard_control_center_detail_mock_parity`; it aligns the four category detail pages with the approved detail mock images as UI/UX source references and makes each page explain what it checks, what judgment it supports, and what must be reviewed next.
 The current implemented dashboard control center Settings safe change is documented as `dashboard_control_center_settings_safe_change_plan`; it provides guarded Settings edits, immediate post-apply snapshot refresh, and workflow display language control for Dashboard fixed UI labels without a page reload.
 The latest implemented dashboard control center operational situation board is documented as `dashboard_control_center_operational_situation_board`; it summarizes selected context, blockers, Git/worktree, tests/CI, and next safe check on the Overview without adding browser command execution authority.
+The latest implemented dashboard material-event identifier boundary keeps generated event IDs within the schema's 160-character limit and adds a deterministic digest suffix for long product evidence, preventing valid long commands from blocking snapshot publication.
+The latest implemented TraceCue browser-quality follow-up removes loading-indicator naming ambiguity from persistent status summaries, restores sequential heading levels, prevents audience-badge clipping, provides 24px minimum desktop focus targets, and provides 44px minimum mobile touch targets for compact controls.
 Safe product repository cleanup remains implemented for the external product repository created by the 7-day or 14-day lessons.
 It also preserves the 7-day and 14-day learning-mode, workflow display language, product development language, and expanded language-list controls.
 The shared standard language list remains `ja`, `en`, `ko`, `zh-CN`, `zh-TW`, `es`, `pt-BR`, `fr`, `de`, `id`, `vi`, `th`, `hi`, and `ar`, while `zh` remains a `zh-CN` alias and `custom` remains available.
@@ -34,6 +36,8 @@ The implementation remains additive and keeps the existing 7-day lesson, 14-day 
 
 ## Completed
 
+- Bounded dashboard material-update event identifiers to 160 characters with a deterministic SHA-256 suffix, added direct long-input regression coverage, and preserved read-only product evidence handling.
+- Corrected the Dashboard Control Center browser-quality findings reported by TraceCue: persistent status naming, heading hierarchy, compact-link focus size, and fixed audience-badge layout.
 - Recorded developer feedback in `docs/memory/DEVELOPER_MEMORY.md`.
 - Added 14-day approval receipts and enforcement.
 - Added learning mode A/B/C selection and switching for 7-day and 14-day lessons.

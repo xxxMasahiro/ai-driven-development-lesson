@@ -7126,10 +7126,15 @@ dashboard_material_update_events_json() {
   DASHBOARD_MATERIAL_WORKFLOW_CONTEXT="$workflow_context" \
   DASHBOARD_MATERIAL_TARGET_NAME="$target_name" \
   DASHBOARD_MATERIAL_AUTHORITY_JSON="$authority_json" \
+  DASHBOARD_MATERIAL_ROOT="$ROOT" \
 node <<'NODE'
 const cp = require("node:child_process");
-const crypto = require("node:crypto");
 const fs = require("node:fs");
+const path = require("node:path");
+const { materialEventId } = require(path.join(
+  process.env.DASHBOARD_MATERIAL_ROOT,
+  "tools/lib/dashboard_material_event_id.cjs",
+));
 
 const repo = process.env.DASHBOARD_MATERIAL_REPO || "";
 const menuId = process.env.DASHBOARD_MATERIAL_MENU_ID || "unknown";
@@ -7160,11 +7165,7 @@ function clean(value, limit = 260) {
 }
 
 function safeId(value) {
-  const text = clean(value, 180)
-    .toLowerCase()
-    .replace(/[^a-z0-9._-]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-  return text || `event-${crypto.createHash("sha256").update(String(value || "")).digest("hex").slice(0, 12)}`;
+  return materialEventId(value);
 }
 
 function isIsoLike(value) {

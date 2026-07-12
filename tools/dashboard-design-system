@@ -377,7 +377,7 @@ function applyFoundationPresets(tokens, foundation) {
 function generatedCss(tokens, components) {
   const rows = sortedTokenRows(tokens);
   const tooltipCopy = components.components.find((component) => component.id === "tooltip-copy") || {};
-  const decisionProgressSummary = components.components.find((component) => component.id === "decision-progress-summary") || null;
+  const decisionStatusSummary = components.components.find((component) => component.id === "decision-status-summary") || null;
   const contextMenuTile = components.components.find((component) => component.id === "context-menu-tile") || null;
   const tooltipInteraction = tooltipCopy.interaction?.tooltip || {};
   const copyInteraction = tooltipCopy.interaction?.copyFeedback || {};
@@ -709,8 +709,8 @@ function generatedCss(tokens, components) {
   cssLines.push("  line-height: 1;");
   cssLines.push("}");
   cssLines.push("");
-  if (decisionProgressSummary) {
-    cssLines.push(".decision-progress-summary {");
+  if (decisionStatusSummary) {
+    cssLines.push(".decision-status-summary {");
     cssLines.push("  display: grid;");
     cssLines.push("  min-width: 0;");
     cssLines.push("  margin-top: 4px;");
@@ -721,7 +721,7 @@ function generatedCss(tokens, components) {
     cssLines.push("  line-height: 1.22;");
     cssLines.push("}");
     cssLines.push("");
-    cssLines.push(".decision-progress-summary__row {");
+    cssLines.push(".decision-status-summary__row {");
     cssLines.push("  display: flex;");
     cssLines.push("  min-width: 0;");
     cssLines.push("  align-items: baseline;");
@@ -730,13 +730,13 @@ function generatedCss(tokens, components) {
     cssLines.push("  row-gap: 0;");
     cssLines.push("}");
     cssLines.push("");
-    cssLines.push(".decision-progress-summary__label {");
+    cssLines.push(".decision-status-summary__label {");
     cssLines.push("  min-width: 0;");
     cssLines.push("  overflow-wrap: anywhere;");
     cssLines.push("}");
     cssLines.push("");
-    cssLines.push(".overview-status-card__head .decision-progress-summary__count,");
-    cssLines.push(".decision-progress-summary .decision-progress-summary__count {");
+    cssLines.push(".overview-status-card__head .decision-status-summary__count,");
+    cssLines.push(".decision-status-summary .decision-status-summary__count {");
     cssLines.push("  display: inline;");
     cssLines.push("  min-width: auto;");
     cssLines.push("  margin-top: 0;");

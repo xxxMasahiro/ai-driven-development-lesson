@@ -603,11 +603,11 @@ export const dashboardControlCenterDesignSystem = Object.freeze({
       ]
     },
     {
-      "id": "decision-progress-summary",
+      "id": "decision-status-summary",
       "selectors": [
-        ".decision-progress-summary",
-        ".decision-progress-summary__row",
-        ".decision-progress-summary__count"
+        ".decision-status-summary",
+        ".decision-status-summary__row",
+        ".decision-status-summary__count"
       ],
       "tokens": [
         "--dcc-card-gap",
@@ -616,7 +616,7 @@ export const dashboardControlCenterDesignSystem = Object.freeze({
         "--dcc-page-accent-fallback"
       ],
       "contract": [
-        "Use this component for short decision-progress summaries such as local checks, CI stages, sync stages, or safety review groups.",
+        "Use this component for short decision-status summaries such as local checks, CI stages, sync stages, or safety review groups.",
         "Each row shows a plain-language label and a progress fraction on one line.",
         "The label and progress fraction use the same size and weight as other overview-card primary values.",
         "The progress fraction uses tabular numerals so the user can scan completion quickly.",

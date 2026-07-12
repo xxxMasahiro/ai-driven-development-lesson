@@ -91,11 +91,12 @@ unset LESSON_CONFIG
 JSON_FILE="$TMP_DIR/dashboard-data.json"
 DASHBOARD_DATA_GENERATED_AT="2026-06-05T00:00:00Z" "$ROOT/tools/dashboard-data" >"$JSON_FILE"
 
-node - "$JSON_FILE" "$ROOT/dashboard-control-center/src/i18n.js" "$ROOT/tools/dashboard-data" <<'NODE'
+node - "$JSON_FILE" "$ROOT/dashboard-control-center/src/i18n.js" "$ROOT/tools/dashboard-data" "$ROOT/tools/lib/dashboard_material_event_id.cjs" <<'NODE'
 const fs = require('fs');
 const file = process.argv[2];
 const i18nRaw = fs.readFileSync(process.argv[3], 'utf8');
 const producerRaw = fs.readFileSync(process.argv[4], 'utf8');
+const materialEventIdModule = require(process.argv[5]);
 const raw = fs.readFileSync(file, 'utf8');
 let data;
 try {
@@ -108,6 +109,18 @@ try {
 function fail(message) {
   console.error(message);
   process.exit(1);
+}
+
+const longMaterialEventSource = `product-gate-${'long-command-segment-'.repeat(20)}`;
+const boundedMaterialEventId = materialEventIdModule.materialEventId(longMaterialEventSource);
+if (boundedMaterialEventId.length > materialEventIdModule.MAX_MATERIAL_EVENT_ID_LENGTH) {
+  fail('long material update event ids must be bounded to the dashboard schema limit');
+}
+if (!/^[a-z0-9][a-z0-9._-]*$/.test(boundedMaterialEventId)) {
+  fail('bounded material update event ids must remain safe identifiers');
+}
+if (boundedMaterialEventId === materialEventIdModule.materialEventId(`${longMaterialEventSource}different`)) {
+  fail('bounded material update event ids must retain a collision-resistant digest');
 }
 
 function requireField(path) {
@@ -882,6 +895,9 @@ for (const event of materialUpdateEvents) {
   }
   if (!/^[a-z0-9][a-z0-9._-]*$/.test(event.event_id) || !/^[a-z0-9][a-z0-9._-]*$/.test(event.event_type) || !/^[a-z0-9][a-z0-9._-]*$/.test(event.purpose_code)) {
     fail(`material update event identifiers must be safe: ${event.event_id}`);
+  }
+  if (event.event_id.length > materialEventIdModule.MAX_MATERIAL_EVENT_ID_LENGTH) {
+    fail(`material update event id exceeds the dashboard schema limit: ${event.event_id}`);
   }
   if (materialEventIds.has(event.event_id)) {
     fail(`duplicate material update event id: ${event.event_id}`);
