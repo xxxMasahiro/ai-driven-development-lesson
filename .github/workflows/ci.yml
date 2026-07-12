@@ -124,6 +124,42 @@ jobs:
           bash -n tools/lesson
           bash -n tools/lesson-context
           bash -n tools/learn
+          node --check tools/lib/repository_document_sync.mjs
+          node --check tools/check_repository_document_sync.mjs
+          node --check tools/test_repository_document_sync.mjs
+
+  repository-document-sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout full parent history
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: "20"
+
+      - name: Validate parent document-sync policy and rejection tests
+        run: |
+          ./tools/check_repository_document_sync.sh
+          ./tools/test_repository_document_sync.sh
+
+      - name: Check pull request document synchronization
+        if: github.event_name == 'pull_request'
+        run: node tools/check_repository_document_sync.mjs --range-mode pr --base "${{ github.event.pull_request.base.sha }}" --head "${{ github.event.pull_request.head.sha }}"
+
+      - name: Check push document synchronization
+        if: github.event_name == 'push' && github.event.before != '0000000000000000000000000000000000000000'
+        run: node tools/check_repository_document_sync.mjs --range-mode push --base "${{ github.event.before }}" --head "${{ github.sha }}"
+
+      - name: Check initial push document synchronization
+        if: github.event_name == 'push' && github.event.before == '0000000000000000000000000000000000000000'
+        run: node tools/check_repository_document_sync.mjs --initial-head "${{ github.sha }}"
 
   structure-docs-checks:
     runs-on: ubuntu-latest
@@ -207,6 +243,7 @@ jobs:
           ./tools/test_as_built_sync_contract.sh
           ./tools/test_test_plan.sh
           ./tools/test_repository_development_workflow.sh
+          ./tools/test_repository_document_sync.sh
           ./tools/test_security_invariants.sh
           ./tools/test_git_workflow_policy.sh
           ./tools/test_git_hooks.sh
@@ -416,6 +453,7 @@ jobs:
     needs:
       - lesson-aggregate
       - git-hooks-full-no-cache
+      - repository-document-sync
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -424,9 +462,10 @@ jobs:
         env:
           LESSON_AGGREGATE_RESULT: ${{ needs.lesson-aggregate.result }}
           GIT_HOOKS_FULL_NO_CACHE_RESULT: ${{ needs.git-hooks-full-no-cache.result }}
+          REPOSITORY_DOCUMENT_SYNC_RESULT: ${{ needs.repository-document-sync.result }}
         run: |
-          if [[ "$LESSON_AGGREGATE_RESULT" != "success" || "$GIT_HOOKS_FULL_NO_CACHE_RESULT" != "success" ]]; then
-            printf 'Split prerequisite failed: lesson-aggregate=%s git-hooks-full-no-cache=%s\n' "$LESSON_AGGREGATE_RESULT" "$GIT_HOOKS_FULL_NO_CACHE_RESULT" >&2
+          if [[ "$LESSON_AGGREGATE_RESULT" != "success" || "$GIT_HOOKS_FULL_NO_CACHE_RESULT" != "success" || "$REPOSITORY_DOCUMENT_SYNC_RESULT" != "success" ]]; then
+            printf 'Split prerequisite failed: lesson-aggregate=%s git-hooks-full-no-cache=%s repository-document-sync=%s\n' "$LESSON_AGGREGATE_RESULT" "$GIT_HOOKS_FULL_NO_CACHE_RESULT" "$REPOSITORY_DOCUMENT_SYNC_RESULT" >&2
             exit 1
           fi
 

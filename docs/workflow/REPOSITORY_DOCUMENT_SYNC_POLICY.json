@@ -1,0 +1,367 @@
+{
+  "schema_version": "1.0.0",
+  "kind": "repository-document-sync-policy",
+  "repository_scope": "current-repository-only",
+  "external_repository_access": false,
+  "excluded_paths": [
+    ".browser-debug/**",
+    ".control-center/**",
+    ".dashboard-control-center/**",
+    ".repository-development-runs/**",
+    "coverage/**",
+    "dist/**",
+    "docs/memory/SESSION_MEMORY.md",
+    "node_modules/**",
+    "playwright-report/**",
+    "test-results/**",
+    "dashboard-control-center/src/design-system.generated.css",
+    "dashboard-control-center/src/design-system.generated.js"
+  ],
+  "document_groups": {
+    "as_built_core": {
+      "all_of": [
+        "docs/as-built/REQUIREMENTS.md",
+        "docs/as-built/SPECIFICATION.md",
+        "docs/as-built/IMPLEMENTATION_PLAN.md",
+        "docs/workflow/TASK_TRACKER.md",
+        "docs/workflow/HANDOFF.md"
+      ]
+    },
+    "workflow_pair": {
+      "all_of": [
+        "docs/workflow/TASK_TRACKER.md",
+        "docs/workflow/HANDOFF.md"
+      ]
+    },
+    "verification": {
+      "all_of": [
+        "docs/as-built/IMPLEMENTATION_PLAN.md",
+        "docs/workflow/TEST_PLAN_MANIFEST.tsv",
+        "docs/workflow/TASK_TRACKER.md",
+        "docs/workflow/HANDOFF.md"
+      ]
+    },
+    "security": {
+      "all_of": [
+        "docs/as-built/REQUIREMENTS.md",
+        "docs/as-built/SPECIFICATION.md",
+        "docs/as-built/IMPLEMENTATION_PLAN.md",
+        "docs/workflow/SAFEFLOW_SECURITY_BACKFILL.tsv",
+        "docs/workflow/PRODUCT_SECURITY_POLICY.tsv",
+        "docs/workflow/TEST_PLAN_MANIFEST.tsv",
+        "docs/workflow/TASK_TRACKER.md",
+        "docs/workflow/HANDOFF.md"
+      ]
+    },
+    "lesson_1_7": {
+      "all_of": [
+        "index.md",
+        "lesson/LESSON_FLOW.tsv",
+        "docs/workflow/TASK_TRACKER.md",
+        "docs/workflow/HANDOFF.md"
+      ]
+    },
+    "lesson_1_14": {
+      "all_of": [
+        "index-14-days.md",
+        "lesson/LESSON_FLOW_14_DAYS.tsv",
+        "lesson/SYNC_GATES_14_DAYS.tsv",
+        "docs/workflow/TASK_TRACKER.md",
+        "docs/workflow/HANDOFF.md"
+      ]
+    },
+    "free_development": {
+      "all_of": [
+        "free-development/FREE_DEVELOPMENT_MODE.md",
+        "docs/workflow/TASK_TRACKER.md",
+        "docs/workflow/HANDOFF.md"
+      ]
+    },
+    "product_git_usage": {
+      "all_of": [
+        "docs/workflow/PRODUCT_WORKFLOW_GIT_USAGE_POLICY.tsv",
+        "docs/workflow/TASK_TRACKER.md",
+        "docs/workflow/HANDOFF.md"
+      ]
+    },
+    "product_registry": {
+      "all_of": [
+        "docs/workflow/PRODUCT_REPOSITORY_REGISTRY_SCHEMA.tsv",
+        "docs/workflow/TASK_TRACKER.md",
+        "docs/workflow/HANDOFF.md"
+      ]
+    },
+    "product_scaffold_template": {
+      "all_of": [
+        "templates/TEMPLATES.md",
+        "free-development/FREE_DEVELOPMENT_MODE.md",
+        "docs/workflow/PRODUCT_REPOSITORY_STRUCTURE.tsv",
+        "docs/workflow/TASK_TRACKER.md",
+        "docs/workflow/HANDOFF.md"
+      ]
+    },
+    "dashboard_data": {
+      "all_of": [
+        "docs/workflow/DASHBOARD_DATA_SCHEMA.tsv",
+        "docs/workflow/TASK_TRACKER.md",
+        "docs/workflow/HANDOFF.md"
+      ]
+    },
+    "dashboard_design": {
+      "all_of": [
+        "docs/design-system/dashboard-control-center/DESIGN_SYSTEM.md",
+        "docs/workflow/TASK_TRACKER.md",
+        "docs/workflow/HANDOFF.md"
+      ]
+    },
+    "ci_hooks": {
+      "all_of": [
+        "docs/as-built/IMPLEMENTATION_PLAN.md",
+        "docs/workflow/TEST_PLAN_MANIFEST.tsv",
+        "docs/workflow/GIT_HOOK_CHECKS.tsv",
+        "docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv",
+        "docs/workflow/FINAL_GATE_COVERAGE.tsv",
+        "docs/workflow/TASK_TRACKER.md",
+        "docs/workflow/HANDOFF.md"
+      ]
+    },
+    "document_sync_governance": {
+      "all_of": [
+        "AGENTS.MD",
+        "docs/workflow/REPOSITORY_DOCUMENT_SYNC.md",
+        "docs/workflow/REPOSITORY_DOCUMENT_SYNC_POLICY.json"
+      ]
+    }
+  },
+  "rules": [
+    {
+      "id": "canonical-as-built-documents",
+      "description": "The three as-built authorities and workflow-state pair remain synchronized.",
+      "trigger": {
+        "any_of": [
+          "docs/as-built/REQUIREMENTS.md",
+          "docs/as-built/SPECIFICATION.md",
+          "docs/as-built/IMPLEMENTATION_PLAN.md"
+        ]
+      },
+      "required_groups": ["as_built_core"]
+    },
+    {
+      "id": "workflow-state-pair",
+      "description": "TASK_TRACKER and HANDOFF are one workflow-state pair.",
+      "trigger": {
+        "any_of": [
+          "docs/workflow/TASK_TRACKER.md",
+          "docs/workflow/HANDOFF.md"
+        ]
+      },
+      "required_groups": ["workflow_pair"]
+    },
+    {
+      "id": "document-sync-governance",
+      "description": "Document-sync enforcement changes update the complete parent governance, verification, security, and CI contract.",
+      "trigger": {
+        "any_of": [
+          ".githooks/pre-push",
+          "AGENTS.MD",
+          "docs/workflow/REPOSITORY_DOCUMENT_SYNC.md",
+          "docs/workflow/REPOSITORY_DOCUMENT_SYNC_POLICY.json",
+          "tools/check_repository_document_sync.mjs",
+          "tools/check_repository_document_sync.sh",
+          "tools/check_ci_workflow_structure.sh",
+          "tools/lib/repository_document_sync.mjs",
+          "tools/test_repository_document_sync.mjs",
+          "tools/test_repository_document_sync.sh"
+        ]
+      },
+      "required_groups": [
+        "as_built_core",
+        "verification",
+        "security",
+        "ci_hooks",
+        "document_sync_governance"
+      ],
+      "cannot_be_exempted": true
+    },
+    {
+      "id": "lesson-1-7",
+      "description": "STEP 1-7 runtime and flow changes update only the STEP 1-7 authorities and workflow state.",
+      "trigger": {
+        "any_of": [
+          "index.md",
+          "ai-driven-task-tracker-scenario.md",
+          "lesson/LESSON_FLOW.tsv",
+          "tools/lesson",
+          "tools/lib/lesson_common.sh"
+        ]
+      },
+      "required_groups": ["lesson_1_7"]
+    },
+    {
+      "id": "lesson-1-14",
+      "description": "STEP 1-14 runtime and flow changes update only the STEP 1-14 authorities and workflow state.",
+      "trigger": {
+        "any_of": [
+          "index-14-days.md",
+          "lesson/LESSON_FLOW_14_DAYS.tsv",
+          "lesson/SYNC_GATES_14_DAYS.tsv",
+          "playbooks/AGENT_PLAYBOOK_14_DAYS.md",
+          "prompts/PROMPTS_14_DAYS.md",
+          "tools/lesson14",
+          "tools/lib/lesson_runtime.sh"
+        ]
+      },
+      "required_groups": ["lesson_1_14"]
+    },
+    {
+      "id": "free-development-workflow",
+      "description": "Free Development and external-product workflow changes update their parent policy and workflow state.",
+      "trigger": {
+        "any_of": [
+          "free-development/**",
+          "tools/free-development",
+          "tools/product-improvement",
+          "tools/external-integration"
+        ]
+      },
+      "required_groups": ["free_development"]
+    },
+    {
+      "id": "product-workflow-git-usage",
+      "description": "External-product Git usage changes update their parent policy and workflow state.",
+      "trigger": {
+        "any_of": [
+          "docs/workflow/PRODUCT_WORKFLOW_GIT_USAGE_POLICY.tsv",
+          "tools/lib/product_workflow_git_usage.sh"
+        ]
+      },
+      "required_groups": ["product_git_usage"]
+    },
+    {
+      "id": "product-registry-selection",
+      "description": "Parent-side product registry and selection changes update parent schemas without reading registered repositories.",
+      "trigger": {
+        "any_of": [
+          "docs/workflow/PRODUCT_REPOSITORY_REGISTRY_SCHEMA.tsv",
+          "learning/PRODUCT_REPOSITORY_REGISTRY.tsv",
+          "learning/PRODUCT_REPOSITORY_SELECTION.tsv",
+          "tools/lib/product_repository_registry.sh",
+          "tools/product-repository-registry",
+          "tools/product-repository-mode"
+        ]
+      },
+      "required_groups": ["product_registry"]
+    },
+    {
+      "id": "product-scaffold-template",
+      "description": "Product scaffold and template changes keep the parent template, structure, and Free Development guidance synchronized.",
+      "trigger": {
+        "any_of": [
+          "templates/**",
+          "docs/workflow/PRODUCT_REPOSITORY_STRUCTURE.tsv",
+          "tools/product-gate-evidence-bootstrap",
+          "tools/product-scaffold-check",
+          "tools/product-launch-check"
+        ]
+      },
+      "required_groups": ["product_scaffold_template"]
+    },
+    {
+      "id": "dashboard-data-contract",
+      "description": "Dashboard producer and data-contract changes update the dashboard schema and workflow state.",
+      "trigger": {
+        "any_of": [
+          "docs/workflow/DASHBOARD_DATA_SCHEMA.tsv",
+          "tools/dashboard-data",
+          "tools/lib/dashboard_data.sh",
+          "dashboard-control-center/src/dashboardData.js",
+          "dashboard-control-center/src/dashboardContext.js"
+        ]
+      },
+      "required_groups": ["dashboard_data"]
+    },
+    {
+      "id": "dashboard-design-authority",
+      "description": "Dashboard design sources and maintained UI surfaces update the design authority and workflow state.",
+      "trigger": {
+        "any_of": [
+          "docs/design-system/dashboard-control-center/**",
+          "dashboard-control-center/src/App.jsx",
+          "dashboard-control-center/src/DecisionSummary.jsx",
+          "dashboard-control-center/src/styles.css",
+          "tools/dashboard-design-system"
+        ]
+      },
+      "required_groups": ["dashboard_design"]
+    },
+    {
+      "id": "verification-ci-hooks",
+      "description": "CI, Git hook, final-gate, and verification-authority changes update their complete parent verification contract.",
+      "trigger": {
+        "any_of": [
+          ".github/workflows/**",
+          ".githooks/**",
+          "docs/workflow/FINAL_GATE_*.tsv",
+          "docs/workflow/GIT_HOOK*.tsv",
+          "docs/workflow/TEST_PLAN_MANIFEST.tsv",
+          "tools/ci-*.sh",
+          "tools/ci-*",
+          "tools/git-hooks",
+          "tools/lib/ci_*.sh",
+          "tools/lib/git_hooks_policy.sh"
+        ]
+      },
+      "required_groups": ["ci_hooks"]
+    },
+    {
+      "id": "security-external-execution-evidence",
+      "description": "Security, external sending, MCP, browser execution, and evidence-boundary changes add parent security and verification requirements.",
+      "trigger": {
+        "any_of": [
+          "docs/workflow/PRODUCT_SECURITY_POLICY.tsv",
+          "docs/workflow/SAFEFLOW_SECURITY_BACKFILL.tsv",
+          "learning/context/SECURITY_FOUNDATION.md",
+          "tools/*security*",
+          "tools/lib/*security*",
+          "tools/*mcp*",
+          "tools/lib/*mcp*",
+          "tools/*browser*",
+          "tools/lib/*browser*",
+          "tools/*evidence*",
+          "tools/lib/*evidence*",
+          "tools/external-integration"
+        ]
+      },
+      "required_groups": ["security", "verification"],
+      "cannot_be_exempted": true
+    },
+    {
+      "id": "parent-implementation-fallback",
+      "description": "Previously unclassified parent implementation changes must at least update the workflow-state pair.",
+      "trigger": {
+        "any_of": [
+          ".github/workflows/**",
+          ".githooks/**",
+          "advanced/**",
+          "dashboard-control-center/**",
+          "free-development/**",
+          "lesson/**",
+          "package.json",
+          "playbooks/**",
+          "prompts/**",
+          "skills/**",
+          "templates/**",
+          "tools/**",
+          "vite.config.mjs"
+        ],
+        "exclude": [
+          "tests/**",
+          "tools/check_*.sh",
+          "tools/test_*.mjs",
+          "tools/test_*.sh"
+        ]
+      },
+      "required_groups": ["workflow_pair"]
+    }
+  ]
+}

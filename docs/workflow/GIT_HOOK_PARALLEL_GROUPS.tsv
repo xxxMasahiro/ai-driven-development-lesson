@@ -15,6 +15,7 @@ check_workflow_pair_sync	sync	parallel	Read-only workflow pair synchronization v
 check_review_protocol	sync	parallel	Read-only review protocol validation can run in parallel.
 check_developer_memory_requirements	sync	parallel	Read-only developer-memory validation can run in parallel.
 check_repository_development_workflow	sync	parallel	Read-only repository development workflow validation can run in parallel.
+check_repository_document_sync	sync	parallel	Read-only parent document-sync policy validation can run in parallel without external repository access.
 check_dashboard_design_system	sync	parallel	Read-only Dashboard Control Center design-system drift validation can run in parallel.
 check_dashboard_bundle_contract	heavy	heavy	Dashboard Control Center bundle contract runs a production Vite build and should not be parallelized with other heavy browser/build checks.
 test_dashboard_design_studio_events	regression	parallel	Design Studio event runner/store regression uses a temporary local store and can run in parallel.
@@ -22,6 +23,7 @@ test_docs_tour	regression	parallel	Documentation tour regression uses repository
 test_as_built_sync_contract	regression	parallel	Sync-contract regression uses fixtures and can run in parallel.
 test_test_plan	regression	parallel	Observe-only test-plan regression uses fixtures and can run in parallel.
 test_repository_development_workflow	regression	parallel	Repository development workflow regression uses fixtures and can run in parallel.
+test_repository_document_sync	regression	parallel	Repository document-sync regression uses temporary Git fixtures and does not access registered products.
 test_security_invariants	regression	parallel	Security guard invariant regression uses fixtures and can run in parallel.
 test_lesson_context	regression	parallel	Learner context regression is read-only and can run in parallel.
 test_git_workflow_policy	regression	parallel	Git workflow policy regression uses fixtures and can run in parallel.

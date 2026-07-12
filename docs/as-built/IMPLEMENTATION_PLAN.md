@@ -5195,3 +5195,22 @@ Approval boundaries:
 
 - Runtime implementation begins only after this implementation plan is approved.
 - Heavy aggregate, full/no-cache, pre-commit, push, PR, merge, main CI, synchronization, and cleanup remain later approval-bound phases.
+
+## Implemented Parent Repository Change-Aware Document Sync Plan
+
+SYNC-ID: repository_document_sync_enforcement
+STATUS: implemented
+ARTIFACTS: AGENTS.MD,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/REPOSITORY_DOCUMENT_SYNC.md,docs/workflow/REPOSITORY_DOCUMENT_SYNC_POLICY.json,docs/workflow/SAFEFLOW_SECURITY_BACKFILL.tsv,docs/workflow/PRODUCT_SECURITY_POLICY.tsv,docs/workflow/TEST_PLAN_MANIFEST.tsv,docs/workflow/GIT_HOOK_CHECKS.tsv,docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv,docs/workflow/GIT_HOOK_RECOMMENDATION_PATHS.tsv,docs/workflow/FINAL_GATE_COVERAGE.tsv,guides/DOCUMENT_MAP.md,.githooks/pre-push,tools/lib/repository_document_sync.mjs,tools/check_repository_document_sync.mjs,tools/check_repository_document_sync.sh,tools/test_repository_document_sync.mjs,tools/test_repository_document_sync.sh,tools/check_lesson_structure.sh,tools/test_lesson_repository.sh,tools/check_ci_workflow_structure.sh,tools/test_ci_pipeline_acceleration.sh,.github/workflows/ci.yml,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/check_repository_document_sync.sh,tools/test_repository_document_sync.sh,tools/check_lesson_structure.sh,tools/check_test_plan_coverage.sh,tools/test_test_plan.sh,tools/test_git_hooks.sh,tools/test_git_hooks_parallel.sh,tools/check_ci_workflow_structure.sh,tools/test_ci_pipeline_acceleration.sh,tools/check_security_invariants.sh,tools/test_security_invariants.sh,tools/check_agents_skills.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh
+
+Implementation order:
+
+1. Define parent-specific categories and map Security/Verification to existing parent authorities rather than copying product-local `SECURITY.md` or `VERIFICATION.md` paths.
+2. Implement the bounded standard-library parser, policy validator, additive evaluator, secure policy loader, and Git range CLI.
+3. Add refusal coverage for missing category documents, additive security overlays, fallback classification, rename/delete semantics, session/generated exclusions, malformed paths/status, policy weakening, symlinks, range modes, and external-repository nonaccess.
+4. Wire standalone checks through structure, Test Plan, Git hooks, parallel groups, final coverage, aggregate tests, CI structure tests, and pipeline tests.
+5. Add a small parallel main-CI job and final-gate dependency without duplicating product CI, npm installation, Playwright, Dashboard generation, or child-repository checks.
+6. Synchronize AGENTS, the operating guide, Security policies, five as-built/workflow authorities, and AS_BUILT sync metadata.
+7. Run focused checks, medium policy/CI checks, aggregate and full/no-cache release proof, PR/main CI, local/remote synchronization, and read-only TraceCue browser verification.
+
+Recovery keeps the existing static as-built checker and all lesson/product gates intact. If the range gate is over-broad, repair its owner policy and refusal tests in the same integration range; do not add an exception file or weaken the immutable self rule.

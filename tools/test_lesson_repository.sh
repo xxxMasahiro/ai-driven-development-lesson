@@ -90,6 +90,8 @@ WORKFLOW_PAIR_SINGLE_FILE_REASON="aggregate test may run while remediation docum
 ./tools/test_as_built_sync_contract.sh
 ./tools/test_test_plan.sh
 ./tools/test_repository_development_workflow.sh
+./tools/check_repository_document_sync.sh
+./tools/test_repository_document_sync.sh
 ./tools/test_security_invariants.sh
 ./tools/test_git_workflow_policy.sh
 ./tools/git-hooks status >/dev/null

@@ -3087,3 +3087,18 @@ All visible fixed text uses the existing locale policy and standard language cat
 The compact locale catalog is maintained source named `i18nCatalog.js`; it is split into its own build chunk and is not represented as unavailable generated output.
 
 Product repository registry and selection alignment remains a separate configuration change unit using the existing registry owner tools and focused repository-selection checks.
+
+## Implemented Parent Repository Change-Aware Document Sync Specification
+
+SYNC-ID: repository_document_sync_enforcement
+STATUS: implemented
+ARTIFACTS: AGENTS.MD,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/REPOSITORY_DOCUMENT_SYNC.md,docs/workflow/REPOSITORY_DOCUMENT_SYNC_POLICY.json,docs/workflow/SAFEFLOW_SECURITY_BACKFILL.tsv,docs/workflow/PRODUCT_SECURITY_POLICY.tsv,docs/workflow/TEST_PLAN_MANIFEST.tsv,docs/workflow/GIT_HOOK_CHECKS.tsv,docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv,docs/workflow/GIT_HOOK_RECOMMENDATION_PATHS.tsv,docs/workflow/FINAL_GATE_COVERAGE.tsv,guides/DOCUMENT_MAP.md,.githooks/pre-push,tools/lib/repository_document_sync.mjs,tools/check_repository_document_sync.mjs,tools/check_repository_document_sync.sh,tools/test_repository_document_sync.mjs,tools/test_repository_document_sync.sh,tools/check_lesson_structure.sh,tools/test_lesson_repository.sh,tools/check_ci_workflow_structure.sh,tools/test_ci_pipeline_acceleration.sh,.github/workflows/ci.yml,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/check_repository_document_sync.sh,tools/test_repository_document_sync.sh,tools/check_lesson_structure.sh,tools/check_test_plan_coverage.sh,tools/test_test_plan.sh,tools/test_git_hooks.sh,tools/test_git_hooks_parallel.sh,tools/check_ci_workflow_structure.sh,tools/test_ci_pipeline_acceleration.sh,tools/check_security_invariants.sh,tools/test_security_invariants.sh,tools/check_agents_skills.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh
+
+`REPOSITORY_DOCUMENT_SYNC_POLICY.json` declares a current-repository-only policy, reusable document groups, exclusions, and additive rules. `repository_document_sync.mjs` validates bounded exact/segment-star/double-star patterns, immutable governance coverage, normalized printable repository paths, known Git status records, and current non-deleted satisfaction paths.
+
+`check_repository_document_sync.mjs` supports exactly one of explicit paths, worktree, PR/push range, or initial-head selection. PR mode computes a merge base; push mode uses the supplied base exactly; initial-head mode uses `git ls-tree`. JSON output states `repository_scope=current-repository-only` and `external_repository_access=false`.
+
+The CI `repository-document-sync` job checks out full parent history, validates policy and rejection tests, then selects the GitHub event range. The final gate requires its result. The job has read-only contents permission and must contain no product authority call, dependency installation, browser execution, Dashboard generation, or external lookup.
+
+`.githooks/pre-push` is early local feedback only. It reads the standard pre-push ref tuple, skips deletions/non-branch refs, uses exact remote ranges for existing branches, uses the complete local head tree for first pushes, and never fetches.

@@ -2723,3 +2723,21 @@ Non-scope:
 
 - Do not add provider dispatch, browser command execution, external product writes, dependency changes, generated activity, placeholder timestamps, automatic Git/CI execution, push, merge, cleanup, or gate weakening.
 - Do not treat the product repository registry path and current selection alignment as part of this feature contract; verify and commit that configuration alignment as a separate change unit.
+
+## Implemented Parent Repository Change-Aware Document Sync Requirements
+
+SYNC-ID: repository_document_sync_enforcement
+STATUS: implemented
+ARTIFACTS: AGENTS.MD,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/REPOSITORY_DOCUMENT_SYNC.md,docs/workflow/REPOSITORY_DOCUMENT_SYNC_POLICY.json,docs/workflow/SAFEFLOW_SECURITY_BACKFILL.tsv,docs/workflow/PRODUCT_SECURITY_POLICY.tsv,docs/workflow/TEST_PLAN_MANIFEST.tsv,docs/workflow/GIT_HOOK_CHECKS.tsv,docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv,docs/workflow/GIT_HOOK_RECOMMENDATION_PATHS.tsv,docs/workflow/FINAL_GATE_COVERAGE.tsv,guides/DOCUMENT_MAP.md,.githooks/pre-push,tools/lib/repository_document_sync.mjs,tools/check_repository_document_sync.mjs,tools/check_repository_document_sync.sh,tools/test_repository_document_sync.mjs,tools/test_repository_document_sync.sh,tools/check_lesson_structure.sh,tools/test_lesson_repository.sh,tools/check_ci_workflow_structure.sh,tools/test_ci_pipeline_acceleration.sh,.github/workflows/ci.yml,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/check_repository_document_sync.sh,tools/test_repository_document_sync.sh,tools/check_lesson_structure.sh,tools/check_test_plan_coverage.sh,tools/test_test_plan.sh,tools/test_git_hooks.sh,tools/test_git_hooks_parallel.sh,tools/check_ci_workflow_structure.sh,tools/test_ci_pipeline_acceleration.sh,tools/check_security_invariants.sh,tools/test_security_invariants.sh,tools/check_agents_skills.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh
+
+The parent repository must reject missing category-relevant document updates over one PR or push range without making ordinary CI depend on the number of registered product repositories.
+
+- Inspect only parent Git metadata and changed path names; never expand product registry paths, run child checks, or call network services from this gate.
+- Classify STEP 1-7, STEP 1-14, Free Development, product registry/selection, scaffold/templates, Dashboard data, Dashboard design, CI/hooks, and security/evidence boundaries separately.
+- Add requirements when classifications overlap; do not allow a weaker category to remove Security or Verification requirements.
+- Use PR merge-base-to-head, exact push before-to-after, and complete-head-tree initial-push semantics.
+- Treat rename source and destination as triggers, but allow only non-deleted destinations to satisfy required document changes.
+- Reject session memory, generated output, deleted paths, rename sources, malformed paths/status, symlinked policy files, oversized policy/input collections, and weakened self-protection as synchronization evidence.
+- Preserve the existing AS_BUILT sync registry, static document checks, lesson gates, product-local CI, and child-repository authority as separate owner layers.
+- Keep the CI job standard-library-only and parallel; it must not install dependencies, start browsers, generate Dashboard data, use `gh`, or traverse external products.

@@ -101,6 +101,9 @@ STEP 1-14: 実践レッスン: index-14-days.md
 23. Dashboard Control Center のデザイン変更はデザインシステムを正本として適用する。
     CSS、レイアウト、余白、カード、チップ、ポップアップ、アイコン、プレビューなど Control Center の見た目と操作感を変える場合は、`docs/design-system/dashboard-control-center/DESIGN_SYSTEM.md`、`tokens.json`、`components.json` を正本とし、Design Studio と `tools/dashboard-design-system` の plan/apply/generate 経路を通して runtime CSS/JS へ反映します。`dashboard-control-center/src/design-system.generated.css` と `dashboard-control-center/src/design-system.generated.js` は生成物なので直接編集しません。`dashboard-control-center/src/styles.css` などの手書き適用層を触る場合も、デザインシステムの契約、トークン、コンポーネント定義と対応する範囲に限定し、ページ単位の場当たり的な CSS 例外を正本にしません。Design Studio はデザインシステム正本を編集・プレビュー・計画・承認・適用するための安全な入口であり、任意CSS編集画面にはしません。外部成果物リポジトリの見た目は、その成果物リポジトリ内の product-local design-system を正本候補として扱い、教材側 Control Center の CSS を外部成果物の正本にしません。
 
+24. 親リポジトリの文書同期は変更差分と変更種別で機械的に検査する。
+    `docs/workflow/REPOSITORY_DOCUMENT_SYNC_POLICY.json` を親専用の分類正本とし、PRはmerge-baseからhead、pushはbeforeからafter、初回pushはheadの全追跡ファイルを同期単位にします。通常CIは親リポジトリの差分だけを読み、登録された子リポジトリを巡回、テスト、変更しません。rename元と変更先は分類対象ですが、同期済み証拠にできるのは削除されていない変更先だけです。削除文書、rename元、`SESSION_MEMORY.md`、生成物、無視対象成果物は同期済み証拠にしません。複数分類の要件は加算し、セキュリティ、外部送信、MCP、ブラウザ実行、証跡・評価境界の変更では親のSecurityとVerification正本を追加要求します。CIを最終強制とし、pre-push hookはリポジトリローカルの早期確認に限定します。
+
 ## ドキュメントルート
 
 | 用途 | 入口 |
@@ -152,6 +155,7 @@ STEP 1-14: 実践レッスン: index-14-days.md
 | 成果物文書を作りたい | `templates/TEMPLATES.md` | `skills/task-tracker-docs/SKILL.md` | 境界確認後に更新案を提示 |
 | TASK_TRACKER/HANDOFFを同期したい | `ai-driven-task-tracker-scenario.md`、`lesson/SYNC_GATES_14_DAYS.tsv` | `skills/worklog-doc-sync/SKILL.md`、`skills/lesson-sync-gate/SKILL.md` | 更新案、同期チェック、通過 |
 | 3文書とTASK_TRACKER/HANDOFFの同期契約を確認したい | `docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv`、`docs/as-built/REQUIREMENTS.md`、`docs/as-built/SPECIFICATION.md`、`docs/as-built/IMPLEMENTATION_PLAN.md`、`docs/workflow/TASK_TRACKER.md`、`docs/workflow/HANDOFF.md` | なし | `./tools/as-built-sync status`、`./tools/check_as_built_sync_contract.sh` |
+| 親リポジトリの変更差分と必要文書の同期を確認したい | `docs/workflow/REPOSITORY_DOCUMENT_SYNC.md`、`docs/workflow/REPOSITORY_DOCUMENT_SYNC_POLICY.json` | `skills/repository-development-workflow/SKILL.md` | `./tools/check_repository_document_sync.sh`、`./tools/test_repository_document_sync.sh`、`node tools/check_repository_document_sync.mjs --worktree` |
 | Playwright E2Eを扱う | `prompts/PROMPTS_14_DAYS.md` Step 10/14からStep 11/14 | `skills/lesson-sync-gate/SKILL.md` | ローカルE2E、CI、失敗復旧 |
 | サブエージェントで精査する | `playbooks/AGENT_PLAYBOOK_14_DAYS.md` Step 12/14 | `skills/lesson-sync-gate/SKILL.md` | レビュー、テスト、同期確認 |
 | スキル/MCPを体験する | `prompts/PROMPTS_14_DAYS.md` Step 13/14 | `skills/lesson14-facilitator/SKILL.md` | 最小構成で実施 |
@@ -191,10 +195,12 @@ skills/worklog-doc-sync/SKILL.md
 ./tools/check_agents_skills.sh
 ./tools/check_as_built_docs.sh
 ./tools/check_as_built_sync_contract.sh
+./tools/check_repository_document_sync.sh
 ./tools/check_security_invariants.sh
 ./tools/as-built-sync status
 ./tools/test_docs_tour.sh
 ./tools/test_as_built_sync_contract.sh
+./tools/test_repository_document_sync.sh
 ./tools/test_security_invariants.sh
 ./tools/test_git_workflow_policy.sh
 ./tools/test_git_hooks.sh
