@@ -3211,3 +3211,19 @@ next safe action is to finish release proof and the configured Git/CI route.
 Stop on unowned dirty state, invalid local
 instruction memory, selection/mode mismatch, scope expansion, destructive or
 credential work, repeated identical failure, or failed/unknown required CI.
+
+## KeyWeave Studio Free Development Registration Handoff
+
+Registration status: implemented. The synchronized parent scope is the registry schema, registry state, selection state, task tracker, and handoff only. Verification uses the product registry, product scaffold, and repository document-sync checks.
+
+Restart context:
+
+- `keyweave-studio` is the selected Free Development repository at `$HOME/projects/agent-toolbox/keyweave-studio` and is allowed only in the `free-development` context.
+- The child remains an independent Git repository. The parent stores selection and workflow authority but does not own or merge child source history.
+- The child declares `parent_managed` operation mode, has the standard product scaffold, and passed its local product gate, Chromium test, Trace Cue review, and the parent scaffold check before registration.
+- The parent synchronization is intentionally limited to the five approved files listed above. No unrelated parent or external-product file is part of this change.
+- GitHub repository creation, push, PR, remote CI execution, publication, and release remain unapproved external-state boundaries.
+
+Next safe action:
+
+- Continue implementation and local verification inside KeyWeave Studio. Request separate approval before creating or mutating a remote, and keep future parent synchronization limited to the governing policy group.

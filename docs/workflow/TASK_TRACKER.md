@@ -3089,3 +3089,14 @@ TESTS: tools/check_development_instruction.sh,tools/test_development_instruction
 - [x] Add backward-compatible CLI projection and product start/gate projection.
 - [ ] Complete focused, medium, aggregate, full/no-cache, PR/main CI, and sync
   evidence with no external product mutations.
+
+## KeyWeave Studio Free Development Registration
+
+Registration status: implemented. The synchronized parent scope is the registry schema, registry state, selection state, task tracker, and handoff only. Verification uses the product registry, product scaffold, and repository document-sync checks.
+
+- [x] Preserve the parent repository as the management control plane and KeyWeave Studio as an independent child Git repository.
+- [x] Register `keyweave-studio` for the least-privilege `free-development` context only.
+- [x] Select `keyweave-studio` as the active Free Development product through the official registry CLI.
+- [x] Confirm the child standard scaffold, parent-managed operation mode, product-local skills, local gates, and product evidence tooling.
+- [x] Preserve every unrelated parent and external-product file; this synchronization is limited to the approved five parent files.
+- [ ] Collect remote GitHub and CI evidence only after repository creation and push receive separate approval.
