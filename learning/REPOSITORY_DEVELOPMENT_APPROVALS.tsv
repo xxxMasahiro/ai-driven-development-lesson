@@ -1,4 +1,5 @@
 # phase_id	approval_scope	required	default_state	description
+# instruction_boundary	Approval defaults operate below AGENTS.MD invariants and only after local-first, exact-absence instruction resolution succeeds.
 context_triage	read_repository_context	false	not_required	Read-only context gathering does not require a separate approval beyond the developer request.
 proposal	present_structured_proposal	false	not_required	Proposal writing is read-only and may continue inside the current task scope when no stop condition applies.
 implementation_plan	synchronize_planned_documents	false	not_required	The current developer-requested task scope authorizes planned document synchronization without a separate phase prompt.

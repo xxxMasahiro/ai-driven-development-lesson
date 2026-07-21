@@ -5334,3 +5334,35 @@ adapter while keeping existing local memories and seven-phase CLI behavior.
 Do not repair failures by merging local and parent instruction text, accepting
 an invalid local file as absent, scanning every registered child, weakening a
 gate, or caching release results across runs.
+
+## Implemented Development Instruction Authority Layer Implementation
+
+SYNC-ID: development_instruction_authority_layer_contract
+STATUS: implemented
+ARTIFACTS: AGENTS.MD,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/INSTRUCTION_MEMORY.md,docs/workflow/DEVELOPMENT_INSTRUCTION_POLICY.tsv,docs/workflow/DEVELOPMENT_AUTONOMY_WORKFLOW.tsv,docs/workflow/REPOSITORY_DEVELOPMENT_WORKFLOW.tsv,docs/workflow/REPOSITORY_DEVELOPMENT_RUNNER_POLICY.tsv,learning/REPOSITORY_DEVELOPMENT_APPROVALS.tsv,docs/workflow/PRODUCT_REPOSITORY_STRUCTURE.tsv,free-development/FREE_DEVELOPMENT_MODE.md,templates/TEMPLATES.md,guides/DOCUMENT_MAP.md,docs/workflow/REPOSITORY_DOCUMENT_SYNC.md,docs/workflow/REPOSITORY_DOCUMENT_SYNC_POLICY.json,tools/lib/development_instruction.mjs,tools/check_development_instruction.sh,tools/test_development_instruction.mjs,docs/workflow/SAFEFLOW_SECURITY_BACKFILL.tsv,docs/workflow/PRODUCT_SECURITY_POLICY.tsv,docs/workflow/TEST_PLAN_MANIFEST.tsv,docs/workflow/GIT_HOOK_CHECKS.tsv,docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv,docs/workflow/FINAL_GATE_EXECUTION_POLICY.tsv,docs/workflow/FINAL_GATE_CI_GRAPH.tsv,docs/workflow/FINAL_GATE_GAP_COMMANDS.tsv,docs/workflow/FINAL_GATE_COVERAGE.tsv,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/check_development_instruction.sh,tools/test_development_instruction.sh,tools/check_repository_document_sync.sh,tools/test_repository_document_sync.sh,tools/check_security_invariants.sh,tools/test_security_invariants.sh,tools/check_test_plan_coverage.sh,tools/test_test_plan.sh,tools/test_git_hooks.sh,tools/test_git_hooks_parallel.sh,tools/check_ci_workflow_structure.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_agents_skills.sh,tools/check_lesson_structure.sh,tools/check_lesson14_structure.sh
+
+Implementation order:
+
+1. Synchronize the two-layer authority requirement, policy-owned vocabulary,
+   Security boundary, verification ownership, and current TernWeave registry
+   selection documents. Do not modify either memory file.
+2. Add policy validation and safe authority metadata while preserving existing
+   resolver fields, A-F behavior, local D behavior, and external-repository
+   boundaries.
+3. Add isolated positive, compatibility, output, and refusal tests; then run
+   focused instruction and document-sync checks.
+4. Run medium workflow, Security, Test Plan, hooks, and CI-structure checks.
+5. Promote this synchronization block after focused and medium owner checks
+   pass, then run the exact aggregate full/no-cache release proof and configured
+   CI route. Keep child repositories unchanged.
+
+Recovery is additive: revert this policy/output slice without changing local
+instruction contents, parent A-F semantics, product registration, or either
+memory file. A failure must be fixed in its owning policy, resolver, document,
+or fixture rather than bypassed.
+
+Local release evidence: focused and medium owner checks passed, followed by the
+full no-cache Git hook run with 68 checks, same-run final-gate evidence,
+Dashboard browser receipt, and lesson Playwright coverage. Remote PR/main CI
+and synchronization remain the final configured D-phase actions.

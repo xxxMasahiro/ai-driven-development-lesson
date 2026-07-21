@@ -1,6 +1,9 @@
 # key	value	description
-schema_version	1.0.0	Version of the parent development-instruction resolver contract.
+schema_version	1.1.0	Version of the parent development-instruction resolver contract with explicit invariant and procedural authority layers.
 activation_mode	enforce	Rollout mode; enforce is active after local-priority, refusal, compatibility, and parent-only CI ownership checks passed in the implementation cycle.
+invariant_authority_path	AGENTS.MD	Applicable repository invariant authority; instruction memory is procedural and cannot override this rulebook.
+instruction_authority_scope	procedural	Instruction memory controls development procedure only and never invariant authority.
+parent_fallback_trigger	exact_absence_only	Only an ENOENT result at the configured target-local path may activate the parent fallback.
 parent_instruction_path	docs/workflow/INSTRUCTION_MEMORY.md	Parent fallback document resolved inside the lesson repository.
 local_instruction_path	docs/workflow/INSTRUCTION_MEMORY.md	Canonical target-local instruction document; an existing valid file has procedural priority over the parent fallback.
 autonomy_workflow_path	docs/workflow/DEVELOPMENT_AUTONOMY_WORKFLOW.tsv	Data-driven A-F stage mapping and continuation policy.

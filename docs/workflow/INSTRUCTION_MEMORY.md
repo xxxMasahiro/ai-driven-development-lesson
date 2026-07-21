@@ -3,13 +3,17 @@
 Instruction-Memory-Version: 1.0.0
 Instruction-Memory-Authority: parent-development-fallback
 
-This document is the development-workflow fallback for an eligible parent or
-selected child repository only when that target does not already contain its
-own valid instruction memory at the configured local path. A target-local
-instruction memory has procedural priority inside this layer. Neither source
-may override current system, developer, or user instructions, the applicable
-`AGENTS.MD`, security rules, repository boundaries, operation mode, task scope,
-or saved Git/CI settings.
+This document is the development-workflow fallback for an eligible parent. For
+an eligible selected child, it applies only when the configured target-local
+path is exactly absent. A present local file must validate; invalid, unsafe, or
+unreadable local state blocks and never falls back. A valid target-local
+instruction memory has procedural priority inside the instruction layer.
+
+The applicable `AGENTS.MD` is the invariant authority above both instruction
+sources. Instruction memory controls procedure only. Neither the local source
+nor this parent fallback may override current system, developer, or user
+instructions, `AGENTS.MD`, security rules, repository boundaries, operation
+mode, task scope, or saved Git/CI settings.
 
 Structured lesson contexts are not eligible. Context and menu eligibility,
 target kind, workflow skill, paths, versions, limits, and Git applicability are

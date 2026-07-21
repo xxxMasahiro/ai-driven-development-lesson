@@ -219,7 +219,7 @@
     },
     {
       "id": "development-instruction-governance",
-      "description": "Development instruction resolution and A-F autonomy changes update the complete parent authority, as-built, Security, verification, and CI contract.",
+      "description": "Development instruction resolution, invariant-versus-procedural authority, and A-F autonomy changes update the complete parent authority, as-built, Security, verification, and CI contract.",
       "trigger": {
         "any_of": [
           "docs/workflow/DEVELOPMENT_INSTRUCTION_POLICY.tsv",

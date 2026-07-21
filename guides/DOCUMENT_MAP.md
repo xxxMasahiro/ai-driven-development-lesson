@@ -98,7 +98,7 @@ The workflow documents live in `docs/workflow/`.
 | `docs/workflow/REPOSITORY_DOCUMENT_SYNC.md` | How parent PR/push changes require category-relevant document updates without scanning child repositories |
 | `docs/workflow/REPOSITORY_DOCUMENT_SYNC_POLICY.json` | Machine-readable parent path classifications and required document groups |
 | `docs/workflow/INSTRUCTION_MEMORY.md` | Parent A-F development fallback used only when an eligible target has no valid local instruction-memory file |
-| `docs/workflow/DEVELOPMENT_INSTRUCTION_POLICY.tsv` | Local-first resolution, eligibility, version, path, operation-mode, and Settings locators |
+| `docs/workflow/DEVELOPMENT_INSTRUCTION_POLICY.tsv` | AGENTS invariant authority plus procedural local-first resolution, exact-absence fallback, eligibility, version, path, operation-mode, and Settings locators |
 | `docs/workflow/DEVELOPMENT_AUTONOMY_WORKFLOW.tsv` | Data-driven A-F stage mapping, write scope, continuation, Git policy, and stop conditions |
 | `learning/GIT_HOOK_SETTINGS.tsv` | The current local Git hook mode selected for this workspace |
 

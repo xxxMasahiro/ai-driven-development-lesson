@@ -2864,3 +2864,26 @@ preserving repository workflow phases and all safety authorities.
   merge, and material scope expansion always stop.
 - Existing local instruction memories retain their own approval procedure; the
   parent fallback cannot silently weaken or merge with them.
+
+## Implemented Development Instruction Authority Layer Requirements
+
+SYNC-ID: development_instruction_authority_layer_contract
+STATUS: implemented
+ARTIFACTS: AGENTS.MD,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/INSTRUCTION_MEMORY.md,docs/workflow/DEVELOPMENT_INSTRUCTION_POLICY.tsv,docs/workflow/DEVELOPMENT_AUTONOMY_WORKFLOW.tsv,docs/workflow/REPOSITORY_DEVELOPMENT_WORKFLOW.tsv,docs/workflow/REPOSITORY_DEVELOPMENT_RUNNER_POLICY.tsv,learning/REPOSITORY_DEVELOPMENT_APPROVALS.tsv,docs/workflow/PRODUCT_REPOSITORY_STRUCTURE.tsv,free-development/FREE_DEVELOPMENT_MODE.md,templates/TEMPLATES.md,guides/DOCUMENT_MAP.md,docs/workflow/REPOSITORY_DOCUMENT_SYNC.md,docs/workflow/REPOSITORY_DOCUMENT_SYNC_POLICY.json,tools/lib/development_instruction.mjs,tools/check_development_instruction.sh,tools/test_development_instruction.mjs,docs/workflow/SAFEFLOW_SECURITY_BACKFILL.tsv,docs/workflow/PRODUCT_SECURITY_POLICY.tsv,docs/workflow/TEST_PLAN_MANIFEST.tsv,docs/workflow/GIT_HOOK_CHECKS.tsv,docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv,docs/workflow/FINAL_GATE_EXECUTION_POLICY.tsv,docs/workflow/FINAL_GATE_CI_GRAPH.tsv,docs/workflow/FINAL_GATE_GAP_COMMANDS.tsv,docs/workflow/FINAL_GATE_COVERAGE.tsv,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/check_development_instruction.sh,tools/test_development_instruction.sh,tools/check_repository_document_sync.sh,tools/test_repository_document_sync.sh,tools/check_security_invariants.sh,tools/test_security_invariants.sh,tools/check_test_plan_coverage.sh,tools/test_test_plan.sh,tools/test_git_hooks.sh,tools/test_git_hooks_parallel.sh,tools/check_ci_workflow_structure.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_agents_skills.sh,tools/check_lesson_structure.sh,tools/check_lesson14_structure.sh
+
+The resolver must expose and enforce two distinct authority layers without
+changing existing instruction behavior:
+
+- The applicable `AGENTS.MD` remains the invariant authority and neither a
+  local instruction nor the parent fallback may override it.
+- A valid target-local `INSTRUCTION_MEMORY.md` has procedural priority. Only
+  exact local-path absence may select the parent fallback; every present but
+  invalid or unsafe local state blocks.
+- Safe resolver metadata and CLI output must identify invariant authority,
+  procedural scope, local-file state, selected precedence, and fallback
+  trigger without exposing child paths or raw instruction contents.
+- Existing top-level result fields, lesson exclusions, selected-target checks,
+  operation-mode checks, Git settings, tests, and child non-traversal remain
+  compatible. The two memory files are outside this change and remain
+  read-only until separately authorized.

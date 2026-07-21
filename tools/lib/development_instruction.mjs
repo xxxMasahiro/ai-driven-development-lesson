@@ -22,6 +22,9 @@ export class DevelopmentInstructionError extends Error {
 const POLICY_KEYS = new Set([
   'schema_version',
   'activation_mode',
+  'invariant_authority_path',
+  'instruction_authority_scope',
+  'parent_fallback_trigger',
   'parent_instruction_path',
   'local_instruction_path',
   'autonomy_workflow_path',
@@ -196,11 +199,12 @@ function parsePolicy(parentRoot, policyPath) {
   for (const key of POLICY_KEYS) {
     if (!policy.has(key)) fail('POLICY_MISSING', 'Missing development instruction policy key: ' + key);
   }
-  if (policy.get('schema_version') !== '1.0.0') fail('POLICY_VERSION', 'Unsupported development instruction policy version.');
+  if (policy.get('schema_version') !== '1.1.0') fail('POLICY_VERSION', 'Unsupported development instruction policy version.');
   if (!['shadow', 'enforce'].includes(policy.get('activation_mode'))) {
     fail('POLICY_ACTIVATION', 'Development instruction activation mode must be shadow or enforce.');
   }
   for (const key of [
+    'invariant_authority_path',
     'parent_instruction_path',
     'local_instruction_path',
     'autonomy_workflow_path',
@@ -217,6 +221,12 @@ function parsePolicy(parentRoot, policyPath) {
     'git_workflow_settings_path',
   ]) {
     if (!isSafeRelativePath(policy.get(key))) fail('POLICY_PATH', key + ' must be a safe relative path.');
+  }
+  if (policy.get('instruction_authority_scope') !== 'procedural') {
+    fail('POLICY_AUTHORITY_SCOPE', 'instruction_authority_scope must be procedural.');
+  }
+  if (policy.get('parent_fallback_trigger') !== 'exact_absence_only') {
+    fail('POLICY_FALLBACK_TRIGGER', 'parent_fallback_trigger must be exact_absence_only.');
   }
   for (const key of ['maximum_instruction_bytes', 'maximum_scope_id_length']) {
     const value = Number(policy.get(key));
@@ -681,6 +691,7 @@ export function resolveDevelopmentInstruction({
   let source = 'local';
   let sourceProfile = 'local';
   let relativeSource = policy.get('local_instruction_path');
+  let localInstructionState = 'not_applicable';
   let file;
   if (target.targetKind === 'parent') {
     source = 'parent_fallback';
@@ -699,6 +710,7 @@ export function resolveDevelopmentInstruction({
       allowMissing: true,
     });
     if (file === null) {
+      localInstructionState = 'exactly_absent';
       source = 'parent_fallback';
       sourceProfile = 'parent_fallback';
       relativeSource = policy.get('parent_instruction_path');
@@ -707,6 +719,8 @@ export function resolveDevelopmentInstruction({
         label: 'parent fallback instruction memory',
         maximumBytes,
       });
+    } else {
+      localInstructionState = 'present_valid';
     }
   }
   const validated = validateInstructionText(file.text, policy, sourceProfile);
@@ -732,6 +746,12 @@ export function resolveDevelopmentInstruction({
   } else {
     gitPlan.decision_authority = source === 'parent_fallback' ? 'parent_fallback_settings_intersection' : 'not_applicable';
   }
+  const fallbackTrigger = policy.get('parent_fallback_trigger');
+  const instructionPrecedence = target.targetKind === 'parent'
+    ? 'parent_canonical'
+    : source === 'local'
+      ? 'target_local_first'
+      : 'parent_fallback_after_exact_absence';
   return {
     status: 'ready',
     activation_mode: policy.get('activation_mode'),
@@ -748,8 +768,18 @@ export function resolveDevelopmentInstruction({
     stages: validated.stages,
     stage: stage || 'none',
     stage_policy: stagePolicy,
+    invariant_authority: {
+      kind: 'agents',
+      path: policy.get('invariant_authority_path'),
+    },
+    instruction_authority: {
+      scope: policy.get('instruction_authority_scope'),
+      precedence: instructionPrecedence,
+      local_state: localInstructionState,
+      fallback_trigger: fallbackTrigger,
+    },
     local_instruction_priority: true,
-    parent_fallback_on: 'exact_absence_only',
+    parent_fallback_on: fallbackTrigger,
     git_plan: gitPlan,
   };
 }
@@ -772,6 +802,11 @@ export function formatDevelopmentInstruction(result) {
     'Instruction path: ' + result.source_path,
     'Instruction profile: ' + result.source_profile,
     'Instruction digest: ' + result.source_digest,
+    'Invariant authority: ' + result.invariant_authority.path,
+    'Instruction authority scope: ' + result.instruction_authority.scope,
+    'Instruction precedence: ' + result.instruction_authority.precedence,
+    'Local instruction state: ' + result.instruction_authority.local_state,
+    'Parent fallback trigger: ' + result.instruction_authority.fallback_trigger,
     'Workflow skill: ' + result.workflow_skill,
     'Stage: ' + result.stage,
   );
