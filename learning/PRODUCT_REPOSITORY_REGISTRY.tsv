@@ -2,3 +2,4 @@
 frame-cue	free-development	free-development|product-improvement|external-integration	FrameCue	$HOME/projects/agent-toolbox/frame-cue	all	explicit
 trace-cue	free-development	free-development|product-improvement|external-integration	TraceCue	$HOME/projects/agent-toolbox/trace-cue	cli	explicit
 keyweave-studio	free-development	free-development	KeyWeave Studio	$HOME/projects/agent-toolbox/keyweave-studio	web	explicit
+tern-weave	free-development	free-development	TernWeave	/home/masahiro/projects/agent-toolbox/tern-weave	custom	explicit

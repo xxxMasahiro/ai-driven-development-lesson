@@ -56,13 +56,18 @@ for stage in A B C D E F; do
 done
 
 require_pattern "docs/workflow/DEVELOPMENT_INSTRUCTION_POLICY.tsv" '^activation_mode[[:space:]]+(shadow|enforce)[[:space:]]' "activation policy"
+require_pattern "docs/workflow/DEVELOPMENT_INSTRUCTION_POLICY.tsv" '^invariant_authority_path[[:space:]]+AGENTS[.]MD[[:space:]]' "invariant authority path"
+require_pattern "docs/workflow/DEVELOPMENT_INSTRUCTION_POLICY.tsv" '^instruction_authority_scope[[:space:]]+procedural[[:space:]]' "procedural instruction scope"
+require_pattern "docs/workflow/DEVELOPMENT_INSTRUCTION_POLICY.tsv" '^parent_fallback_trigger[[:space:]]+exact_absence_only[[:space:]]' "exact-absence fallback trigger"
 require_pattern "docs/workflow/DEVELOPMENT_INSTRUCTION_POLICY.tsv" '^local_instruction_path[[:space:]]+' "local path locator"
 require_pattern "docs/workflow/DEVELOPMENT_INSTRUCTION_POLICY.tsv" '^parent_instruction_path[[:space:]]+' "parent path locator"
 require_pattern "docs/workflow/DEVELOPMENT_INSTRUCTION_POLICY.tsv" '^parent_workflow_kinds[[:space:]]+' "parent workflow kind"
 require_pattern "docs/workflow/DEVELOPMENT_INSTRUCTION_POLICY.tsv" '^product_workflow_kinds[[:space:]]+' "product workflow kind"
 require_pattern "docs/workflow/INSTRUCTION_MEMORY.md" 'This document alone never creates a task scope' "non-authorizing fallback boundary"
 require_pattern "docs/workflow/INSTRUCTION_MEMORY.md" 'failed or unknown required CI' "failed-CI merge boundary"
-require_pattern "tools/lib/development_instruction.mjs" "parent_fallback_on: 'exact_absence_only'" "exact-absence result"
+require_pattern "tools/lib/development_instruction.mjs" 'invariant_authority:' "invariant authority result"
+require_pattern "tools/lib/development_instruction.mjs" 'instruction_authority:' "procedural authority result"
+require_pattern "tools/lib/development_instruction.mjs" 'parent_fallback_on: fallbackTrigger' "exact-absence compatibility result"
 require_pattern "tools/lib/development_instruction.mjs" "result.source === 'local'" "local authority rendering"
 require_pattern "tools/test_lesson_repository.sh" '^\./tools/development-instruction status --target parent >/dev/null$' "aggregate status wiring"
 

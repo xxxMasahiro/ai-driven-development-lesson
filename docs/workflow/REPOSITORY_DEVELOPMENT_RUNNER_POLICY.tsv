@@ -1,4 +1,5 @@
 # phase_id	order	execution_mode	executable_check_sets	record_required	reuse_allowed	approval_required	release_policy	destructive_execution	stop_policy
+# instruction_boundary	Runner phases consume resolved procedural guidance but cannot weaken AGENTS.MD invariants or reinterpret an invalid local instruction as absent.
 context_triage	1	plan_only	none	false	false	false	no_release_proof	false	plan_first
 proposal	2	plan_only	none	false	false	false	no_release_proof	false	plan_first
 implementation_plan	3	plan_only	none	false	false	false	no_release_proof	false	docs_sync_only

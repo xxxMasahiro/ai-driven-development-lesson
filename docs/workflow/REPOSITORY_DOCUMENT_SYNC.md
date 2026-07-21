@@ -26,7 +26,8 @@ authority. Its additive rules distinguish:
 - semantic CI execution ownership, provider-result proof, and direct-argv final gaps;
 - security, external sending, MCP, browser execution, and evidence boundaries;
 - the as-built trio and TASK_TRACKER/HANDOFF workflow pair.
-- local-first development instruction resolution and the A-F autonomy overlay.
+- local-first development instruction resolution, the AGENTS-invariant versus
+  procedural-instruction boundary, and the A-F autonomy overlay.
 
 Multiple matching rules add requirements; a weaker rule cannot remove a
 security or verification requirement. The existing
@@ -34,8 +35,9 @@ security or verification requirement. The existing
 This range gate does not replace its metadata and semantic consistency checks.
 
 Development-instruction governance has its own immutable rule. Changes to the
-parent fallback, resolver policy, A-F mapping, repository workflow integration,
-or standalone checker must update the as-built authorities, Security,
+parent fallback, invariant/procedural authority contract, resolver policy, A-F
+mapping, repository workflow integration, or standalone checker must update
+the as-built authorities, Security,
 verification/CI catalogs, and instruction governance together. The checker
 rejects removal of this rule, removal of a protected trigger, or reduction of
 its required groups.

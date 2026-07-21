@@ -16,7 +16,7 @@ registry	status	true	ready|blocked|missing|repair_required|unknown	parent-regist
 registry	last_verified_at	true	iso8601|not_collected	parent-registry	generated	Last parent-side verification time for the registration.
 registry	source	true	explicit|discover|legacy	parent-registry	registration-method	How the row entered the registry.
 selection	menu_id	true	free-development|product-improvement|external-integration	parent-registry	user-selection	Workflow menu whose active repository is selected by this row.
-selection	repo_id	true	safe-id	parent-registry	registry	Selected repository identifier for the menu.
+selection	repo_id	true	safe-id	parent-registry	registry	Selected repository identifier for the menu and the only product target eligible for instruction resolution; selection does not grant parent ownership of child source or history.
 selection	selected_at	true	iso8601	parent-registry	generated	Time the active repository selection was changed.
 selection	selection_source	true	dashboard|cli|legacy|repair	parent-registry	user-or-tool	Surface that selected the repository.
 selection	status	true	active|missing|stale|repair_required	parent-registry	derived	Selection validity after comparing registry, path, and operation-mode data.

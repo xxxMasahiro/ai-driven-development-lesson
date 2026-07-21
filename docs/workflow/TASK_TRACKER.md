@@ -3100,3 +3100,30 @@ Registration status: implemented. The synchronized parent scope is the registry 
 - [x] Confirm the child standard scaffold, parent-managed operation mode, product-local skills, local gates, and product evidence tooling.
 - [x] Preserve every unrelated parent and external-product file; this synchronization is limited to the approved five parent files.
 - [ ] Collect remote GitHub and CI evidence only after repository creation and push receive separate approval.
+
+## Development Instruction Authority Layer Contract
+
+SYNC-ID: development_instruction_authority_layer_contract
+STATUS: implemented
+ARTIFACTS: AGENTS.MD,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/INSTRUCTION_MEMORY.md,docs/workflow/DEVELOPMENT_INSTRUCTION_POLICY.tsv,docs/workflow/DEVELOPMENT_AUTONOMY_WORKFLOW.tsv,docs/workflow/REPOSITORY_DEVELOPMENT_WORKFLOW.tsv,docs/workflow/REPOSITORY_DEVELOPMENT_RUNNER_POLICY.tsv,learning/REPOSITORY_DEVELOPMENT_APPROVALS.tsv,docs/workflow/PRODUCT_REPOSITORY_STRUCTURE.tsv,free-development/FREE_DEVELOPMENT_MODE.md,templates/TEMPLATES.md,guides/DOCUMENT_MAP.md,docs/workflow/REPOSITORY_DOCUMENT_SYNC.md,docs/workflow/REPOSITORY_DOCUMENT_SYNC_POLICY.json,tools/lib/development_instruction.mjs,tools/check_development_instruction.sh,tools/test_development_instruction.mjs,docs/workflow/SAFEFLOW_SECURITY_BACKFILL.tsv,docs/workflow/PRODUCT_SECURITY_POLICY.tsv,docs/workflow/TEST_PLAN_MANIFEST.tsv,docs/workflow/GIT_HOOK_CHECKS.tsv,docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv,docs/workflow/FINAL_GATE_EXECUTION_POLICY.tsv,docs/workflow/FINAL_GATE_CI_GRAPH.tsv,docs/workflow/FINAL_GATE_GAP_COMMANDS.tsv,docs/workflow/FINAL_GATE_COVERAGE.tsv,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/check_development_instruction.sh,tools/test_development_instruction.sh,tools/check_repository_document_sync.sh,tools/test_repository_document_sync.sh,tools/check_security_invariants.sh,tools/test_security_invariants.sh,tools/check_test_plan_coverage.sh,tools/test_test_plan.sh,tools/test_git_hooks.sh,tools/test_git_hooks_parallel.sh,tools/check_ci_workflow_structure.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_agents_skills.sh,tools/check_lesson_structure.sh,tools/check_lesson14_structure.sh
+
+- [x] Fix the scope: AGENTS invariants stay above both instruction sources; a
+  valid child-local instruction is procedurally first; exact absence alone may
+  use the parent fallback.
+- [x] Exclude `DEVELOPER_MEMORY.md` and `SESSION_MEMORY.md` from every write,
+  stage, and commit action until explicit developer permission is given.
+- [x] Add policy-derived authority metadata without removing compatibility
+  fields or changing existing A-F and Git behavior.
+- [x] Add policy refusal, local/missing state, formatter, and non-leakage tests.
+- [x] Synchronize every required parent authority and the TernWeave registry
+  selection pair without opening or changing any child repository.
+- [x] Pass focused, medium, aggregate, and full/no-cache local gates (68 checks).
+- [ ] Complete the configured PR/main CI and local/remote synchronization route.
+
+## TernWeave Free Development Registration Synchronization
+
+- [x] Register `tern-weave` for `free-development` through the parent registry.
+- [x] Select `tern-weave` as the active Free Development target.
+- [x] Synchronize the registry schema explanation, tracker, and handoff.
+- [x] Validate parent registry state without changing TernWeave.

@@ -3219,3 +3219,24 @@ operation mode, product Git usage mode, automation level, and each saved action
 setting. `none`, `local`, `remote_sync`, and `ci` keep their existing meanings.
 Normal eligible actions may be autonomous; destructive/history/credential/
 secret/external-send/admin/scope-expansion actions remain non-automatic.
+
+## Implemented Development Instruction Authority Layer Specification
+
+SYNC-ID: development_instruction_authority_layer_contract
+STATUS: implemented
+ARTIFACTS: AGENTS.MD,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/INSTRUCTION_MEMORY.md,docs/workflow/DEVELOPMENT_INSTRUCTION_POLICY.tsv,docs/workflow/DEVELOPMENT_AUTONOMY_WORKFLOW.tsv,docs/workflow/REPOSITORY_DEVELOPMENT_WORKFLOW.tsv,docs/workflow/REPOSITORY_DEVELOPMENT_RUNNER_POLICY.tsv,learning/REPOSITORY_DEVELOPMENT_APPROVALS.tsv,docs/workflow/PRODUCT_REPOSITORY_STRUCTURE.tsv,free-development/FREE_DEVELOPMENT_MODE.md,templates/TEMPLATES.md,guides/DOCUMENT_MAP.md,docs/workflow/REPOSITORY_DOCUMENT_SYNC.md,docs/workflow/REPOSITORY_DOCUMENT_SYNC_POLICY.json,tools/lib/development_instruction.mjs,tools/check_development_instruction.sh,tools/test_development_instruction.mjs,docs/workflow/SAFEFLOW_SECURITY_BACKFILL.tsv,docs/workflow/PRODUCT_SECURITY_POLICY.tsv,docs/workflow/TEST_PLAN_MANIFEST.tsv,docs/workflow/GIT_HOOK_CHECKS.tsv,docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv,docs/workflow/FINAL_GATE_EXECUTION_POLICY.tsv,docs/workflow/FINAL_GATE_CI_GRAPH.tsv,docs/workflow/FINAL_GATE_GAP_COMMANDS.tsv,docs/workflow/FINAL_GATE_COVERAGE.tsv,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/check_development_instruction.sh,tools/test_development_instruction.sh,tools/check_repository_document_sync.sh,tools/test_repository_document_sync.sh,tools/check_security_invariants.sh,tools/test_security_invariants.sh,tools/check_test_plan_coverage.sh,tools/test_test_plan.sh,tools/test_git_hooks.sh,tools/test_git_hooks_parallel.sh,tools/check_ci_workflow_structure.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_agents_skills.sh,tools/check_lesson_structure.sh,tools/check_lesson14_structure.sh
+
+`DEVELOPMENT_INSTRUCTION_POLICY.tsv` will own the invariant authority path,
+instruction authority scope, and exact fallback trigger. The resolver will
+validate those values, retain the compatibility fields
+`local_instruction_priority` and `parent_fallback_on`, and add a bounded
+`instruction_authority` object. Product resolution will classify local state
+as `present_valid` or `exactly_absent`; parent resolution will report
+`not_applicable`. Precedence will be `target_local_first`,
+`parent_fallback_after_exact_absence`, or `parent_canonical`.
+
+The formatter will surface the same policy-derived state. Isolated fixtures
+will prove local priority, exact-absence fallback, present-invalid refusal,
+policy-value refusal, output compatibility, and absence of absolute-path or
+raw-content leakage.

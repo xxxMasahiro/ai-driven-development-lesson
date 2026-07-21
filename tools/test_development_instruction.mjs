@@ -15,6 +15,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   DevelopmentInstructionError,
+  formatDevelopmentInstruction,
   resolveDevelopmentInstruction,
 } from './lib/development_instruction.mjs';
 
@@ -144,9 +145,24 @@ try {
     expect(result.status === 'ready', 'parent fallback was not ready');
     expect(result.activation_mode === 'enforce', 'parent fixture did not use enforce activation');
     expect(result.source === 'parent_fallback', 'parent source must be fallback');
+    expect(result.invariant_authority.kind === 'agents', 'parent invariant authority kind changed');
+    expect(result.invariant_authority.path === 'AGENTS.MD', 'parent invariant authority path changed');
+    expect(result.instruction_authority.scope === 'procedural', 'instruction authority exceeded procedural scope');
+    expect(result.instruction_authority.precedence === 'parent_canonical', 'parent precedence was not explicit');
+    expect(result.instruction_authority.local_state === 'not_applicable', 'parent target reported a child-local state');
+    expect(result.instruction_authority.fallback_trigger === 'exact_absence_only', 'fallback trigger changed');
+    expect(result.local_instruction_priority === true, 'compatibility local-priority field changed');
+    expect(result.parent_fallback_on === 'exact_absence_only', 'compatibility fallback field changed');
     expect(result.stage_policy.repository_phases.join('|') === 'release_gate|main_sync_cleanup', 'D mapping changed');
     expect(result.git_plan.automatic.includes('commit'), 'task-scoped D did not enable configured commit');
     expect(!JSON.stringify(result).includes(fixture.root), 'safe result leaked parent absolute path');
+    const formatted = formatDevelopmentInstruction(result);
+    expect(formatted.includes('Invariant authority: AGENTS.MD'), 'formatted invariant authority is missing');
+    expect(formatted.includes('Instruction authority scope: procedural'), 'formatted procedural scope is missing');
+    expect(formatted.includes('Instruction precedence: parent_canonical'), 'formatted parent precedence is missing');
+    expect(formatted.includes('Local instruction state: not_applicable'), 'formatted parent local state is missing');
+    expect(formatted.includes('Parent fallback trigger: exact_absence_only'), 'formatted fallback trigger is missing');
+    expect(!formatted.includes(fixture.root), 'formatted output leaked parent absolute path');
   }
 
   {
@@ -161,6 +177,8 @@ try {
     const fixture = createFixture();
     const result = resolveProduct(fixture, { stage: 'C', scopeId: 'fixture-scope' });
     expect(result.source === 'parent_fallback', 'missing local memory must use parent fallback');
+    expect(result.instruction_authority.local_state === 'exactly_absent', 'missing local memory state was not exact absence');
+    expect(result.instruction_authority.precedence === 'parent_fallback_after_exact_absence', 'missing local memory precedence changed');
     expect(result.workflow_skill === 'product-development-workflow', 'product workflow skill mapping changed');
   }
 
@@ -169,6 +187,8 @@ try {
     write('docs/workflow/INSTRUCTION_MEMORY.md', localMemory('## Notes\nallowed extra heading'), fixture.product);
     const result = resolveProduct(fixture, { stage: 'C', scopeId: 'fixture-scope' });
     expect(result.source === 'local', 'valid local memory did not take priority');
+    expect(result.instruction_authority.local_state === 'present_valid', 'valid local memory state was not explicit');
+    expect(result.instruction_authority.precedence === 'target_local_first', 'valid local memory precedence changed');
     expect(result.source_profile === 'local_compatibility', 'versionless local memory did not use compatibility profile');
     expect(result.stage_policy === null, 'parent autonomy policy overrode local instruction procedure');
     const localD = resolveProduct(fixture, { stage: 'D', scopeId: 'fixture-scope' });
@@ -268,6 +288,17 @@ try {
       'local_instruction_path\t../INSTRUCTION_MEMORY.md',
     ));
     expectCode('POLICY_PATH', () => resolveProduct(fixture));
+  }
+
+  for (const [key, replacement, code] of [
+    ['invariant_authority_path\tAGENTS.MD', 'invariant_authority_path\t../AGENTS.MD', 'POLICY_PATH'],
+    ['instruction_authority_scope\tprocedural', 'instruction_authority_scope\tinvariant', 'POLICY_AUTHORITY_SCOPE'],
+    ['parent_fallback_trigger\texact_absence_only', 'parent_fallback_trigger\tmissing_or_invalid', 'POLICY_FALLBACK_TRIGGER'],
+  ]) {
+    const fixture = createFixture();
+    const policyFile = path.join(fixture.root, 'docs/workflow/DEVELOPMENT_INSTRUCTION_POLICY.tsv');
+    writeFileSync(policyFile, readFileSync(policyFile, 'utf8').replace(key, replacement));
+    expectCode(code, () => resolveProduct(fixture));
   }
 
   {

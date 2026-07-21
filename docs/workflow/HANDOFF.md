@@ -3227,3 +3227,28 @@ Restart context:
 Next safe action:
 
 - Continue implementation and local verification inside KeyWeave Studio. Request separate approval before creating or mutating a remote, and keep future parent synchronization limited to the governing policy group.
+
+## Development Instruction Authority Layer Handoff
+
+SYNC-ID: development_instruction_authority_layer_contract
+STATUS: implemented
+ARTIFACTS: AGENTS.MD,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/INSTRUCTION_MEMORY.md,docs/workflow/DEVELOPMENT_INSTRUCTION_POLICY.tsv,docs/workflow/DEVELOPMENT_AUTONOMY_WORKFLOW.tsv,docs/workflow/REPOSITORY_DEVELOPMENT_WORKFLOW.tsv,docs/workflow/REPOSITORY_DEVELOPMENT_RUNNER_POLICY.tsv,learning/REPOSITORY_DEVELOPMENT_APPROVALS.tsv,docs/workflow/PRODUCT_REPOSITORY_STRUCTURE.tsv,free-development/FREE_DEVELOPMENT_MODE.md,templates/TEMPLATES.md,guides/DOCUMENT_MAP.md,docs/workflow/REPOSITORY_DOCUMENT_SYNC.md,docs/workflow/REPOSITORY_DOCUMENT_SYNC_POLICY.json,tools/lib/development_instruction.mjs,tools/check_development_instruction.sh,tools/test_development_instruction.mjs,docs/workflow/SAFEFLOW_SECURITY_BACKFILL.tsv,docs/workflow/PRODUCT_SECURITY_POLICY.tsv,docs/workflow/TEST_PLAN_MANIFEST.tsv,docs/workflow/GIT_HOOK_CHECKS.tsv,docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv,docs/workflow/FINAL_GATE_EXECUTION_POLICY.tsv,docs/workflow/FINAL_GATE_CI_GRAPH.tsv,docs/workflow/FINAL_GATE_GAP_COMMANDS.tsv,docs/workflow/FINAL_GATE_COVERAGE.tsv,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+TESTS: tools/check_development_instruction.sh,tools/test_development_instruction.sh,tools/check_repository_document_sync.sh,tools/test_repository_document_sync.sh,tools/check_security_invariants.sh,tools/test_security_invariants.sh,tools/check_test_plan_coverage.sh,tools/test_test_plan.sh,tools/test_git_hooks.sh,tools/test_git_hooks_parallel.sh,tools/check_ci_workflow_structure.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_agents_skills.sh,tools/check_lesson_structure.sh,tools/check_lesson14_structure.sh
+
+Restart context:
+
+- Scope is an additive resolver contract: invariant authority is the applicable
+  `AGENTS.MD`; instruction authority is procedural only.
+- A valid selected child-local instruction must win. Only exact absence may
+  activate parent fallback; invalid and unsafe present states still block.
+- Preserve existing result fields and add policy-derived structured/CLI state
+  for invariant path, procedural scope, local state, precedence, and trigger.
+- `DEVELOPER_MEMORY.md` and `SESSION_MEMORY.md` have pre-existing local changes
+  and are forbidden write/stage/commit targets until explicit permission.
+- TernWeave is the selected registry target. This parent synchronization does
+  not authorize reading, testing, or changing that child repository.
+
+The scoped resolver/test implementation, focused/medium checks, and exact
+full/no-cache local release proof are complete; the full hook owner passed all
+68 checks. Next safe action is the configured Git/PR/main-CI sequence. Any
+failure returns to its owning implementation or document layer.

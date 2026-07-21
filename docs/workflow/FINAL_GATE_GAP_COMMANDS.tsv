@@ -4,7 +4,7 @@ dashboard_all	["./tools/dashboard","all"]	discard	Confirm the dashboard command 
 dashboard_data	["./tools/dashboard-data"]	discard	Confirm the dashboard data JSON command still renders.
 as_built_sync_status	["./tools/as-built-sync","status"]	discard	Confirm the as-built sync status view remains available.
 repository_development_workflow_status	["./tools/repository-development-workflow","status"]	discard	Confirm the repository development workflow status view remains available.
-development_instruction_status	["./tools/development-instruction","status","--target","parent"]	discard	Confirm parent instruction resolution remains available without traversing registered products.
+development_instruction_status	["./tools/development-instruction","status","--target","parent"]	discard	Confirm parent instruction resolution reports the invariant/procedural authority contract without traversing registered products.
 illustrations_list	["./tools/illustrations","list"]	discard	Confirm the illustration index remains readable.
 git_hooks_status	["./tools/git-hooks","status"]	discard	Confirm the Git hooks status view remains available.
 resource_guard_status	["./tools/resource-guard","status"]	discard	Confirm the resource guard status view remains available.
