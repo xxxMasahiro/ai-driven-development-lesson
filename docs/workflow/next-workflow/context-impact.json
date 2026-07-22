@@ -1,0 +1,26 @@
+{
+  "schema_version": "1.0.0",
+  "contract_id": "next_workflow_context_impact",
+  "activation_mode": "planned",
+  "work_context_frame": {
+    "required_sections": ["repository", "task", "authorities", "documents", "runtime", "history", "git", "impact_plan", "adapter_summaries", "limits", "omissions", "conflicts"],
+    "envelope_fields": ["source_id", "origin", "trust_class", "sensitivity", "interpretation", "fresh_until", "fingerprint"],
+    "interpretation_values": ["instruction", "data", "candidate_evidence"],
+    "instruction_eligible_origins": ["invariant_policy", "resolved_procedural_instruction", "current_owner_scope"],
+    "provider_repository_agent_text_is_instruction": false,
+    "bounded_and_reproducible": true
+  },
+  "impact_graph": {
+    "node_kinds": ["requirement", "specification", "owner", "file", "check", "aggregate", "ci_job", "evidence_type"],
+    "edge_fields": ["from", "to", "relation", "owner", "inputs_fingerprint"],
+    "closure": "deterministic_transitive",
+    "unknown_policy": "expand_or_stop",
+    "required_check_miss_tolerance": 0
+  },
+  "scheduler": {"priority": "critical_path_then_stable_id", "guards": ["dependency", "file_conflict", "owner_conflict", "resource_lock", "budget"], "cycles": "STOP", "concurrent_writers_require_disjoint_ownership": true},
+  "review_selection": {"objective": "minimum_policy_compliant_perspective_cover", "required_perspectives_are_task_wide": true, "optional_value_of_information": true},
+  "schema_generation": {"allowed_when": "owner_schema_eliminates_duplicate_hand_maintenance", "generated_artifact_is_not_owner": true},
+  "progress": {"formula": "sum(accepted_weight_with_current_evidence)/sum(accepted_total_weight)", "started_work_counts": false, "parent_may_not_average_child_percentages": true, "report_interval_minutes": 15},
+  "metrics": {"correctness_first": ["required_check_misses", "authority_decision_parity", "traceability_coverage", "existing_feature_regressions", "unknown_state_green_results"], "speed_after_correctness": ["lead_time", "review_latency", "retry_count", "duplicate_check_count", "context_bytes"]},
+  "refusal_codes": ["UNKNOWN_IMPACT", "AMBIGUOUS_OWNER", "DEPENDENCY_CYCLE", "WRITE_CONFLICT", "RESOURCE_CONFLICT", "MISSING_REVIEW_PERSPECTIVE", "STALE_CONTEXT", "INSTRUCTION_IN_DATA", "UNBOUNDED_CONTEXT", "UNVERIFIED_PROGRESS"]
+}

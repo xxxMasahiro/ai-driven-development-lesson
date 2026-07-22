@@ -1,6 +1,9 @@
 {
   "name": "ai-driven-development-lesson",
   "private": true,
+  "engines": {
+    "node": ">=24.0.0"
+  },
   "scripts": {
     "dashboard:build": "vite build",
     "dashboard:build-check": "node ./tools/check_dashboard_bundle_contract.mjs",

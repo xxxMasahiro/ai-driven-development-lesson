@@ -152,11 +152,16 @@ show_lesson() {
   printf '\nHelp desk summary:\n'
   "$ROOT/tools/helpdesk" 一覧 || true
   printf '\nDeveloper memory themes:\n'
-  awk '
-    /^### / && section == 1 { print "- " substr($0, 5) }
-    /^## Systematic Review Index/ { section = 1; next }
-    /^## Chronological Operation Test Notes/ { section = 0 }
-  ' "$(lesson_doc_path developer_memory)"
+  developer_memory_path="$(lesson_doc_path developer_memory)"
+  if [[ -f "$developer_memory_path" ]]; then
+    awk '
+      /^### / && section == 1 { print "- " substr($0, 5) }
+      /^## Systematic Review Index/ { section = 1; next }
+      /^## Chronological Operation Test Notes/ { section = 0 }
+    ' "$developer_memory_path"
+  else
+    printf 'Optional local temporary memory is not present.\n'
+  fi
 }
 
 show_development() {
@@ -218,7 +223,7 @@ show_docs() {
   printf -- '- Design/as-built: docs/as-built/REQUIREMENTS.md, docs/as-built/SPECIFICATION.md, docs/as-built/IMPLEMENTATION_PLAN.md\n'
   printf -- '- Workflow state: docs/workflow/TASK_TRACKER.md, docs/workflow/HANDOFF.md\n'
   printf -- '- Git hook policy: docs/workflow/GIT_HOOKS_POLICY.tsv, docs/workflow/GIT_HOOK_CHECKS.tsv, docs/workflow/GIT_HOOK_RECOMMENDATION_PATHS.tsv, learning/GIT_HOOK_SETTINGS.tsv\n'
-  printf -- '- Memory and decisions: docs/memory/DEVELOPER_MEMORY.md, docs/memory/SESSION_MEMORY.md\n'
+  printf -- '- Optional local temporary memory (Git-ignored): docs/memory/DEVELOPER_MEMORY.md, docs/memory/SESSION_MEMORY.md\n'
   printf -- '- Reusable agent procedures: skills/*/SKILL.md\n'
   printf '\nDocument purposes:\n'
   printf -- '- AGENTS.MD: lesson-side agent rulebook; product-side AGENTS.MD is the external product rulebook, and legacy AGENT.md is a migration target\n'
@@ -232,8 +237,8 @@ show_docs() {
   printf -- '- docs/workflow/GIT_HOOK_CHECKS.tsv: checks included in each Git hook mode\n'
   printf -- '- docs/workflow/GIT_HOOK_RECOMMENDATION_PATHS.tsv: changed files that recommend local full/no-cache verification\n'
   printf -- '- learning/GIT_HOOK_SETTINGS.tsv: current local Git hook mode setting\n'
-  printf -- '- docs/memory/DEVELOPER_MEMORY.md: stable maintainer intent and follow-up requirements\n'
-  printf -- '- docs/memory/SESSION_MEMORY.md: current handoff notes, temporary verification scope, and next-session restart context\n'
+  printf -- '- docs/memory/DEVELOPER_MEMORY.md: optional Git-ignored local temporary notes; may be absent and are not repository authority\n'
+  printf -- '- docs/memory/SESSION_MEMORY.md: optional Git-ignored local session notes; may be absent and are not repository authority\n'
   printf -- '- product-side docs/memory/FAILURE_MEMORY.md: failure and recovery records when a product repository uses one\n'
   printf -- '- skills/*/SKILL.md: reusable agent procedures, not learner homework\n'
   printf '\nPrompt help: ./tools/docs-tour all, ./tools/docs-tour rules, ./tools/docs-tour memory, ./tools/docs-tour workflow, ./tools/check_document_root.sh\n'

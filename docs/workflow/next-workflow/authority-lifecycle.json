@@ -1,0 +1,67 @@
+{
+  "schema_version": "1.0.0",
+  "contract_id": "next_workflow_authority_lifecycle",
+  "activation_mode": "planned",
+  "objective": {
+    "optimization": "lexicographic",
+    "priority": [
+      "mandatory_gate_preservation",
+      "requirement_to_evidence_traceability",
+      "existing_feature_non_regression",
+      "authority_and_safety_invariants",
+      "fail_closed_unknown_state",
+      "elapsed_time"
+    ],
+    "speed_is_eligible_only_after_correctness": true
+  },
+  "authority_baseline": {
+    "procedural_instruction": "exactly_one_resolved_source",
+    "management_policy": "typed_narrowing_composition",
+    "legacy_runtime_remains_authoritative_until_enforced": true,
+    "unrelated_feature_tradeoffs": "forbidden",
+    "verification_ownership": "exactly_one_owner_per_logical_inspection"
+  },
+  "lifecycle": [
+    {"id": "outcome_discovery", "legacy_alias": "E", "display_name": "Decide the Next Value to Deliver", "returns_to": []},
+    {"id": "roadmap_decomposition", "legacy_alias": "F", "display_name": "Decide the Tasks and Their Order", "returns_to": ["outcome_discovery"]},
+    {"id": "solution_proposal_review", "legacy_alias": "A", "display_name": "Review the Implementation Proposal", "returns_to": ["outcome_discovery", "roadmap_decomposition"]},
+    {"id": "implementation_planning", "legacy_alias": "B", "display_name": "Decide the Implementation Approach", "returns_to": ["outcome_discovery", "roadmap_decomposition", "solution_proposal_review"]},
+    {"id": "build_and_verify", "legacy_alias": "C", "display_name": "Implement and Verify", "returns_to": ["implementation_planning", "solution_proposal_review"]},
+    {"id": "release_and_sync", "legacy_alias": "D", "display_name": "Deliver and Synchronize", "returns_to": ["build_and_verify"]}
+  ],
+  "repository_phase_mapping": {
+    "context_triage": ["outcome_discovery"],
+    "proposal": ["outcome_discovery", "roadmap_decomposition", "solution_proposal_review"],
+    "implementation_plan": ["roadmap_decomposition", "solution_proposal_review", "implementation_planning"],
+    "fast_loop": ["build_and_verify"],
+    "mid_tests": ["build_and_verify"],
+    "release_gate": ["release_and_sync"],
+    "main_sync_cleanup": ["release_and_sync"]
+  },
+  "rigor_levels": {
+    "L1": {"label": "minimal", "agent_range": [0, 0], "compress_stages_1_to_4": true, "formal_start_approval": false},
+    "L2": {"label": "lightweight", "agent_range": [0, 1], "compress_stages_1_to_4": true, "formal_start_approval": false},
+    "L3": {"label": "standard", "agent_range": [1, 2], "compress_stages_1_to_4": false, "formal_start_approval": false},
+    "L4": {"label": "enhanced", "agent_range": [2, 3], "compress_stages_1_to_4": false, "formal_start_approval": false},
+    "L5": {"label": "strict", "agent_range": [3, 8], "compress_stages_1_to_4": false, "formal_start_approval": true}
+  },
+  "rigor_scores": ["user_impact", "change_scope", "recoverability", "uncertainty", "verification_difficulty", "permission_boundary_impact"],
+  "hard_l5_triggers": ["security", "authentication", "secrets", "permissions", "destructive_operation", "history_rewrite", "ci_or_safety_gate_change", "external_repository_write", "data_migration", "breaking_compatibility", "unknown_impact"],
+  "developer_adjustment": {"may_raise_any_time": true, "ai_may_adjust_with_recorded_reason": true, "may_not_bypass_hard_trigger": true},
+  "decisions": ["PASS", "REVISE", "ASK_OWNER", "STOP"],
+  "approval_reasons": ["sandbox_boundary", "network_access", "credential_or_secret", "destructive_operation", "l5_scope_approval", "scope_expansion", "unowned_change_conflict", "ambiguous_owner_decision"],
+  "routine_no_approval_actions": ["read", "search", "status", "diff", "in_scope_permitted_write", "permitted_temporary_write", "required_non_destructive_verification"],
+  "immutable_stop": {"terminal_for_same_decision_fingerprint": true, "reentry_requires_material_change": true, "validator_must_issue_new_linked_decision": true},
+  "retry": {
+    "unchanged_failure_limit": {"L1": 1, "L2": 2, "L3": 3, "L4": 4, "L5": 5},
+    "required_exit_states": ["PASS", "REVISE", "ASK_OWNER", "STOP"],
+    "failure_fingerprint_fields": ["phase", "action", "input", "authority", "failure", "evidence"],
+    "progress_fingerprint_fields": ["accepted_weight", "evidence", "implementation", "authority", "state"]
+  },
+  "git_approval_migration": {
+    "legacy_reasons": ["git_push_operation_approval", "git_pr_creation_approval", "git_merge_operation_approval"],
+    "reinterpret_in_place": false,
+    "requires_versioned_preview_and_apply": true,
+    "delivery_order": ["stage_owned_changes", "create_commit", "push_branch", "create_pull_request", "verify_pr_ci", "merge_pull_request", "verify_main_ci", "verify_repository_sync", "propose_cleanup"]
+  }
+}

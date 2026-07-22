@@ -1,0 +1,47 @@
+{
+  "schema_version": "1.0.0",
+  "contract_id": "next_workflow_team_agent_security",
+  "activation_mode": "planned",
+  "layers": [
+    {"depth": 0, "kind": "orchestrator", "canonical_name": "Orchestrator Agent", "may_delegate_to": ["lead"]},
+    {"depth": 1, "kind": "lead", "canonical_name": "Lead Agent", "may_delegate_to": ["task"]},
+    {"depth": 2, "kind": "task", "canonical_name": "Task Agent", "may_delegate_to": []}
+  ],
+  "lead_roles": ["Value Design Lead", "Planning Design Lead", "Implementation Lead", "Independent Review Lead", "Safety and Acceptance Decision Lead"],
+  "external_roles": ["Developer/Owner", "Runtime/Tools"],
+  "rigor_topology": {
+    "L1": {"max_leads": 0, "max_tasks": 0, "writer": "orchestrator_as_implementation_lead"},
+    "L2": {"max_leads": 1, "max_tasks": 0, "writer": "orchestrator_or_one_implementation_lead"},
+    "L3": {"max_leads": 5, "max_tasks": 8, "writer": "implementation_lead_or_disjoint_owned_tasks"},
+    "L4": {"max_leads": 5, "max_tasks": 12, "writer": "implementation_lead_or_disjoint_owned_tasks"},
+    "L5": {"max_leads": 5, "max_tasks": 16, "writer": "implementation_lead_or_disjoint_owned_tasks"}
+  },
+  "schemas": {
+    "AgentDefinition": ["agent_id", "layer", "role", "capability_requirements", "allowed_actions", "allowed_tools"],
+    "DelegationGrant": ["grant_id", "parent_agent_id", "child_role", "scope", "authority_fingerprint", "budget", "ownership", "expires_at"],
+    "AgentLaunchIntent": ["intent_id", "grant_fingerprint", "selection_fingerprint", "effective_fingerprint", "context_fingerprint", "reservation_id", "actual_observed"],
+    "AgentRun": ["run_id", "intent_id", "parent_run_id", "depth", "state", "actual_attestation_id", "ownership"],
+    "AgentResult": ["result_id", "run_id", "status", "provenance", "scope_validation", "lead_review", "orchestrator_review"]
+  },
+  "trust_envelopes": {
+    "trusted_control": ["policy", "authority_decision", "delegation_grant", "structured_arguments"],
+    "untrusted_data": ["repository_text", "provider_output", "agent_output", "logs", "external_projection"],
+    "untrusted_data_cannot_become_instruction": true
+  },
+  "launch_security": {
+    "common_gateway_required": true,
+    "requested_selected_effective_authorized_pre_spawn": true,
+    "actual_observed_absent_pre_spawn": true,
+    "actual_observed_required_before_running": true,
+    "silent_provider_or_model_substitution": "forbidden",
+    "actual_observation_requires_injected_independent_verifier": true,
+    "post_launch_admission_failure_requires_injected_quarantine_or_terminate": true,
+    "failure_and_fence_persist_before_stop": true,
+    "unmanaged_process_after_admission_failure": "forbidden"
+  },
+  "ownership": {"read_only_default": true, "concurrent_writes_require_disjoint_paths": true, "integration_order_required": true, "independent_review_is_non_writer": true},
+  "budget_dimensions": ["agents", "parallel", "runtime_ms", "tokens", "cost", "retries", "network_bytes", "disk_bytes"],
+  "child_cannot_expand": ["scope", "authority", "budget", "capability", "ownership", "depth"],
+  "interruption_states": ["STARTING", "RUNNING", "INTERRUPTING", "INTERRUPTED", "COMPLETED", "FAILED", "STOPPED"],
+  "refusal_codes": ["DEPTH_EXCEEDED", "MISSING_LEAD_PARENT", "BUDGET_EXCEEDED", "WRITE_OWNERSHIP_CONFLICT", "UNTRUSTED_CONTROL_INPUT", "MISSING_ACTUAL_ATTESTATION", "PROVIDER_SUBSTITUTION", "DELEGATION_NOT_ALLOWED"]
+}

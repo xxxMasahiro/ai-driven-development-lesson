@@ -95,7 +95,7 @@ done
 grep 'learner approval is required before starting' /tmp/menu-approval-required.out >/dev/null
 ./tools/menu start 7 >/tmp/menu-approval-required-7.out 2>&1 && exit 1 || true
 grep 'learner approval is required before starting' /tmp/menu-approval-required-7.out >/dev/null
-./tools/menu start 7 --confirm | grep 'Start entry: docs/memory/DEVELOPER_MEMORY.md and ./tools/dashboard all' >/dev/null
+./tools/menu start 7 --confirm | grep 'Start entry: ./tools/dashboard all and optional local docs/memory/DEVELOPER_MEMORY.md when present' >/dev/null
 
 mv docs/workflow/GIT_WORKFLOW_POLICY.tsv docs/workflow/GIT_WORKFLOW_POLICY.tsv.bak
 ./tools/menu check 7 >/tmp/menu-git-policy-missing.out 2>&1 && exit 1 || true

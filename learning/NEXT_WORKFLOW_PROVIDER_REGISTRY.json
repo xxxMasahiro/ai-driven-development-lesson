@@ -1,0 +1,95 @@
+{
+  "schema_version": "1.0.0",
+  "registry_id": "next-workflow-default-provider-registry",
+  "revision": 1,
+  "activation_mode": "planned",
+  "model_catalog_policy": "runtime_discovery_no_hardcoded_model_names",
+  "adapter_families": [
+    {
+      "family_id": "codex_openai_cli",
+      "execution_provider_id": "openai",
+      "model_publisher_id": "openai",
+      "agent_product_id": "codex",
+      "adapter_id": "codex_cli",
+      "transport_id": "cli_process",
+      "availability": "observed",
+      "observed_adapter_version": "0.144.6",
+      "certification_state": "CANDIDATE",
+      "runtime_discovery": {
+        "executable_name": "codex",
+        "version_command": ["--version"],
+        "model_catalog_command": ["debug", "models", "--bundled"],
+        "allowed_script_interpreters": ["bash"],
+        "observation_ttl_seconds": 300,
+        "requires_executable_digest": true,
+        "requires_exact_adapter_version": true
+      },
+      "priority": 10,
+      "estimated_cost": 0,
+      "model_catalog_source": "runtime_discovery",
+      "capabilities": ["model_selection", "native_reasoning_configuration", "read_only_sandbox", "workspace_write_sandbox", "structured_jsonl_output"]
+    },
+    {
+      "family_id": "claude_code_anthropic_cli",
+      "execution_provider_id": "anthropic",
+      "model_publisher_id": "anthropic",
+      "agent_product_id": "claude_code",
+      "adapter_id": "claude_code_cli",
+      "transport_id": "cli_process",
+      "availability": "not_observed",
+      "certification_state": "CANDIDATE",
+      "model_catalog_source": "runtime_discovery",
+      "capabilities": []
+    },
+    {
+      "family_id": "gemini_google_cli",
+      "execution_provider_id": "google",
+      "model_publisher_id": "google",
+      "agent_product_id": "gemini_cli",
+      "adapter_id": "gemini_cli",
+      "transport_id": "cli_process",
+      "availability": "not_observed",
+      "certification_state": "CANDIDATE",
+      "model_catalog_source": "runtime_discovery",
+      "capabilities": []
+    },
+    {
+      "family_id": "openai_api",
+      "execution_provider_id": "openai",
+      "model_publisher_id": "openai",
+      "agent_product_id": null,
+      "adapter_id": "openai_api",
+      "transport_id": "api_request",
+      "availability": "not_probed",
+      "certification_state": "CANDIDATE",
+      "model_catalog_source": "provider_api",
+      "capabilities": []
+    },
+    {
+      "family_id": "anthropic_api",
+      "execution_provider_id": "anthropic",
+      "model_publisher_id": "anthropic",
+      "agent_product_id": null,
+      "adapter_id": "anthropic_api",
+      "transport_id": "api_request",
+      "availability": "not_probed",
+      "certification_state": "CANDIDATE",
+      "model_catalog_source": "provider_api",
+      "capabilities": []
+    },
+    {
+      "family_id": "google_api",
+      "execution_provider_id": "google",
+      "model_publisher_id": "google",
+      "agent_product_id": null,
+      "adapter_id": "google_api",
+      "transport_id": "api_request",
+      "availability": "not_probed",
+      "certification_state": "CANDIDATE",
+      "model_catalog_source": "provider_api",
+      "capabilities": []
+    }
+  ],
+  "entries": [],
+  "custom_entries": []
+}

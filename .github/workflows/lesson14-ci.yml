@@ -18,6 +18,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+
       - name: Shell syntax
         run: |
           bash -n tools/lib/lesson_display_labels.sh
@@ -166,7 +171,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v6
         with:
-          node-version: "20"
+          node-version: "24"
 
       - name: Composed Lesson14 structure owners
         run: ./tools/verification-ci run-job --workflow lesson14 --job lesson14-structure-sync --jobs 2
@@ -183,7 +188,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v6
         with:
-          node-version: "20"
+          node-version: "24"
 
       - name: Policy compatibility proof
         env:
@@ -201,7 +206,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v6
         with:
-          node-version: "20"
+          node-version: "24"
 
       - name: Composed Lesson14 CLI owner
         run: ./tools/verification-ci run-job --workflow lesson14 --job lesson14-cli-tests --jobs 1
@@ -219,7 +224,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v6
         with:
-          node-version: "20"
+          node-version: "24"
 
       - name: Shared Playwright coverage compatibility proof
         env:
@@ -240,7 +245,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v6
         with:
-          node-version: "20"
+          node-version: "24"
 
       - name: Lesson14 final compatibility proof
         env:
@@ -265,7 +270,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v6
         with:
-          node-version: "20"
+          node-version: "24"
 
       - name: Compatibility aggregate and full-hooks proof
         env:

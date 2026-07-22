@@ -9,7 +9,7 @@ The short version:
 - `docs/as-built/` describes what this lesson repository is meant to provide and how it is implemented.
 - `docs/design-system/` records durable UI design rules for control-center screens.
 - `docs/workflow/` records current work state and restart context.
-- `docs/memory/` records stable maintainer intent and decisions.
+- `docs/memory/` may hold optional Git-ignored local temporary notes; durable maintainer intent and decisions belong in tracked authority and workflow documents.
 - `learning/context/` stores learner-facing source context that future lesson implementation can render in the selected display language.
 - `skills/*/SKILL.md` stores reusable agent procedures.
 - Product repositories have their own documents, such as product-local `AGENTS.MD`, `docs/workflow/TASK_TRACKER.md`, `docs/workflow/HANDOFF.md`, and `docs/memory/FAILURE_MEMORY.md`; legacy product `AGENT.md` is a migration target.
@@ -100,6 +100,8 @@ The workflow documents live in `docs/workflow/`.
 | `docs/workflow/INSTRUCTION_MEMORY.md` | Parent A-F development fallback used only when an eligible target has no valid local instruction-memory file |
 | `docs/workflow/DEVELOPMENT_INSTRUCTION_POLICY.tsv` | AGENTS invariant authority plus procedural local-first resolution, exact-absence fallback, eligibility, version, path, operation-mode, and Settings locators |
 | `docs/workflow/DEVELOPMENT_AUTONOMY_WORKFLOW.tsv` | Data-driven A-F stage mapping, write scope, continuation, Git policy, and stop conditions |
+| `docs/workflow/next-workflow/*.json` | Versioned next-workflow contracts for lifecycle, team/Agent security, providers, parent-child authority, context/impact, state storage, and shadow compatibility |
+| `learning/NEXT_WORKFLOW_*.json` | Repository-local next-workflow activation, Agent selection, provider-family, public release-trust, and repository-identity settings; private signing material is never stored here |
 | `learning/GIT_HOOK_SETTINGS.tsv` | The current local Git hook mode selected for this workspace |
 
 These two files should be treated as a pair.
@@ -118,14 +120,24 @@ owns its procedure; only exact absence can select the parent fallback. The
 resolver does not merge both documents, does not repair a child by writing a
 copy, and does not apply to structured lesson workflow kinds.
 
+The next-workflow runtime remains fail-closed while its activation record is
+planned or shadow-only. `tools/next-workflow` provides read-only projection,
+catalog, health, activation, and release status plus guarded mutation and
+release commands. Read-only commands do not initialize repository identity or
+SQLite state. The remaining Control Center presentation and acceptance work is
+recorded as paused in `TASK_TRACKER.md` and `HANDOFF.md`; partial UI artifacts
+are not activation evidence.
+
 ## Memory Documents
 
 The lesson memory documents live in `docs/memory/`.
 
 | File | Plain-language role |
 | --- | --- |
-| `docs/memory/DEVELOPER_MEMORY.md` | Stable maintainer intent, preferences, review findings, and follow-up requirements |
-| `docs/memory/SESSION_MEMORY.md` | Current handoff notes, temporary verification scope, and next-session restart context |
+| `docs/memory/DEVELOPER_MEMORY.md` | Optional Git-ignored local temporary notes; never a permanent source of truth |
+| `docs/memory/SESSION_MEMORY.md` | Optional Git-ignored local session notes; never a permanent source of truth |
+
+These two lesson-side files may be absent in a fresh clone. Durable intent, policy, requirements, and handoff state must be recorded in the tracked authoritative documents instead.
 
 Product repositories may also use memory documents.
 For example, a product-side `docs/memory/FAILURE_MEMORY.md` records failures, recovery steps, and prevention notes.

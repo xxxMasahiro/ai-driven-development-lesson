@@ -1,0 +1,7 @@
+{
+  "schema_version": "1.0.0",
+  "trust_id": "next-workflow-release-verifiers",
+  "revision": 1,
+  "activation_mode": "planned",
+  "verifiers": []
+}

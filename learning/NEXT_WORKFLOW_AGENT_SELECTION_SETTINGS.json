@@ -1,0 +1,19 @@
+{
+  "schema_version": "1.0.0",
+  "settings_id": "next-workflow-agent-selection",
+  "revision": 0,
+  "activation_mode": "planned",
+  "inheritance_order": ["agent", "role", "team", "repository", "context", "global"],
+  "values": [
+    {
+      "scope": "global",
+      "subject_id": "default",
+      "mode": "auto",
+      "identity_key": null,
+      "source": "repository_default"
+    }
+  ],
+  "git_delivery_mode_is_separate": true,
+  "selection_grants_launch_authority": false,
+  "custom_registry_changes_require_certification": true
+}

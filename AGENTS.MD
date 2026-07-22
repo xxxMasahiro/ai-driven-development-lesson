@@ -123,7 +123,7 @@ STEP 1-14: 実践レッスン: index-14-days.md
 | 文書マップ | `guides/DOCUMENT_MAP.md` |
 | リポジトリ設計・実装根拠 | `docs/as-built/REQUIREMENTS.md`、`docs/as-built/SPECIFICATION.md`、`docs/as-built/IMPLEMENTATION_PLAN.md` |
 | 作業状態・引継ぎ | `docs/workflow/TASK_TRACKER.md`、`docs/workflow/HANDOFF.md` |
-| 開発者・セッションメモリ | `docs/memory/DEVELOPER_MEMORY.md`、`docs/memory/SESSION_MEMORY.md` |
+| 任意のローカル一時メモリ | 存在する場合のみ `docs/memory/DEVELOPER_MEMORY.md`、`docs/memory/SESSION_MEMORY.md`。Git管理外であり、恒久的な正本ではない |
 | STEP 1-14進行台本 | `playbooks/AGENT_PLAYBOOK_14_DAYS.md` |
 | STEP 1-14プロンプト | `prompts/PROMPTS_14_DAYS.md` |
 | STEP 1-14フロー | `lesson/LESSON_FLOW_14_DAYS.tsv` |
@@ -143,8 +143,8 @@ STEP 1-14: 実践レッスン: index-14-days.md
 
 | ユーザー意図 | 最初に読む | 使うスキル | 主なコマンド |
 | --- | --- | --- | --- |
-| メニューを表示したい | `docs/memory/DEVELOPER_MEMORY.md` のメニュー方針、`README.md` | なし | `./tools/menu` |
-| ダッシュボードを見たい | `docs/memory/DEVELOPER_MEMORY.md` のダッシュボード方針 | なし | `./tools/dashboard all` |
+| メニューを表示したい | `README.md`。任意のローカル一時メモリが存在する場合のみ補足として参照 | なし | `./tools/menu` |
+| ダッシュボードを見たい | `README.md` とDashboardの永続設定。任意のローカル一時メモリは存在する場合のみ補足として参照 | なし | `./tools/dashboard all` |
 | 文書の役割を知りたい | `guides/DOCUMENT_MAP.md`、`AGENTS.MD` | なし | `./tools/docs-tour status`、`./tools/dashboard docs`、`./tools/check_document_root.sh` |
 | 公開リポジトリから開始したい | `README.md` | なし | `git clone`、`./tools/lesson status` |
 | レッスン開始、再開、現在地確認 | 意図に応じて `index.md` または `index-14-days.md` | STEP 1-14なら `skills/lesson14-facilitator/SKILL.md` | `./tools/lesson status` または `./tools/lesson14 status` |
@@ -173,8 +173,8 @@ STEP 1-14: 実践レッスン: index-14-days.md
 | 成果物リポジトリを削除したい | `docs/as-built/SPECIFICATION.md` の product repository cleanup、`docs/workflow/HANDOFF.md` | なし | `./tools/product-repository-cleanup status`、`./tools/product-repository-cleanup plan`、必要時のみ `local --confirm` または `remote --confirm` |
 | 外部連携へ発展させたい | `free-development/FREE_DEVELOPMENT_MODE.md`、`prompts/PROMPTS_14_DAYS.md` Step 13/14 | `skills/product-development-workflow/SKILL.md`、`skills/lesson14-facilitator/SKILL.md`、`skills/worklog-doc-sync/SKILL.md` | 自由開発または既存成果物の要件・仕様から連携設計 |
 | product-securityを確認したい | `docs/workflow/PRODUCT_SECURITY_POLICY.tsv`、`learning/context/WORKFLOW_CONTEXT_MAP.tsv` | なし | `./tools/product-security status`、`./tools/product-security advise`、`./tools/product-security check`、`./tools/product-security gate` |
-| 教材リポジトリ開発の提案・計画・実装を進めたい | `docs/workflow/INSTRUCTION_MEMORY.md`、`docs/workflow/DEVELOPMENT_INSTRUCTION_POLICY.tsv`、`docs/workflow/DEVELOPMENT_AUTONOMY_WORKFLOW.tsv`、`docs/workflow/REPOSITORY_DEVELOPMENT_WORKFLOW.tsv`、`docs/memory/DEVELOPER_MEMORY.md`、`docs/memory/SESSION_MEMORY.md` | `skills/repository-development-workflow/SKILL.md` | `./tools/development-instruction check`、`./tools/repository-development-workflow status`、`./tools/check_repository_development_workflow.sh` |
-| 教材そのものを改善したい | `docs/memory/DEVELOPER_MEMORY.md`、`docs/workflow/TASK_TRACKER.md`、`docs/workflow/HANDOFF.md` | `skills/repository-development-workflow/SKILL.md`、`skills/lesson-sync-gate/SKILL.md` | `./tools/dashboard all`、各種チェック |
+| 教材リポジトリ開発の提案・計画・実装を進めたい | `docs/workflow/INSTRUCTION_MEMORY.md`、`docs/workflow/DEVELOPMENT_INSTRUCTION_POLICY.tsv`、`docs/workflow/DEVELOPMENT_AUTONOMY_WORKFLOW.tsv`、`docs/workflow/REPOSITORY_DEVELOPMENT_WORKFLOW.tsv`、`docs/workflow/TASK_TRACKER.md`、`docs/workflow/HANDOFF.md`。任意のローカル一時メモリは存在する場合のみ補足として参照 | `skills/repository-development-workflow/SKILL.md` | `./tools/development-instruction check`、`./tools/repository-development-workflow status`、`./tools/check_repository_development_workflow.sh` |
+| 教材そのものを改善したい | `docs/workflow/TASK_TRACKER.md`、`docs/workflow/HANDOFF.md`。任意のローカル一時メモリは存在する場合のみ補足として参照 | `skills/repository-development-workflow/SKILL.md`、`skills/lesson-sync-gate/SKILL.md` | `./tools/dashboard all`、各種チェック |
 | `3. 応用レッスン` でチーム開発とDockerを学びたい | `advanced/TEAM_DEVELOPMENT_DOCKER.md` | `skills/lesson-sync-gate/SKILL.md`、`skills/worklog-doc-sync/SKILL.md` | `./tools/team-development start --confirm`、`./tools/team-development gate` |
 
 ## repo-local skills

@@ -58,8 +58,12 @@ lesson_memory_doc_keys() {
   printf '%s\n' developer_memory
 }
 
-lesson_all_role_doc_keys() {
+lesson_required_role_doc_keys() {
   lesson_design_doc_keys
   lesson_workflow_doc_keys
+}
+
+lesson_all_role_doc_keys() {
+  lesson_required_role_doc_keys
   lesson_memory_doc_keys
 }

@@ -1512,7 +1512,7 @@ Non-scope:
 
 SYNC-ID: dashboard_control_center_visual_refinement_followup
 STATUS: implemented
-ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/memory/DEVELOPER_MEMORY.md,dashboard-control-center/mocks/mock-context-overview.png,dashboard-control-center/mocks/mock-context-lessons.png,dashboard-control-center/mocks/mock-context-workflow.png,dashboard-control-center/mocks/mock-context-maintenance.png,dashboard-control-center/mocks/mock-context-safety.png,dashboard-control-center/src/App.jsx,dashboard-control-center/src/i18n.js,dashboard-control-center/src/styles.css,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_control_center.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_test_plan_coverage.sh,tools/check_ci_workflow_structure.sh
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,dashboard-control-center/mocks/mock-context-overview.png,dashboard-control-center/mocks/mock-context-lessons.png,dashboard-control-center/mocks/mock-context-workflow.png,dashboard-control-center/mocks/mock-context-maintenance.png,dashboard-control-center/mocks/mock-context-safety.png,dashboard-control-center/src/App.jsx,dashboard-control-center/src/i18n.js,dashboard-control-center/src/styles.css,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_control_center.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_test_plan_coverage.sh,tools/check_ci_workflow_structure.sh
 TESTS: tools/test_dashboard_control_center.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_test_plan_coverage.sh,tools/check_ci_workflow_structure.sh
 
 The dashboard control center must preserve the mock-backed design while incorporating developer visual review refinements across Lessons, Development Workflow, Maintenance Sync, Safety Confirmation, and the shared sidebar.
@@ -1952,7 +1952,7 @@ Non-scope:
 
 SYNC-ID: dashboard_control_center_design_system
 STATUS: implemented
-ARTIFACTS: docs/design-system/dashboard-control-center/DESIGN_SYSTEM.md,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/TEST_PLAN_MANIFEST.tsv,guides/DOCUMENT_MAP.md,tools/docs-tour,dashboard-control-center/src/App.jsx,dashboard-control-center/src/i18n.js,dashboard-control-center/src/styles.css,tests/playwright/dashboard-control-center.spec.js,tools/test_docs_tour.sh,tools/test_dashboard_control_center.sh,docs/memory/DEVELOPER_MEMORY.md,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+ARTIFACTS: docs/design-system/dashboard-control-center/DESIGN_SYSTEM.md,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/TEST_PLAN_MANIFEST.tsv,guides/DOCUMENT_MAP.md,tools/docs-tour,dashboard-control-center/src/App.jsx,dashboard-control-center/src/i18n.js,dashboard-control-center/src/styles.css,tests/playwright/dashboard-control-center.spec.js,tools/test_docs_tour.sh,tools/test_dashboard_control_center.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
 TESTS: tools/test_docs_tour.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/check_developer_memory_requirements.sh,tools/check_test_plan_coverage.sh,tools/test_test_plan.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh
 
 Dashboard Control Center must have a documented design system that keeps Repository Control Center pages visually and behaviorally consistent while improving non-engineer comprehension.
@@ -1979,7 +1979,7 @@ Non-scope:
 
 SYNC-ID: dashboard_control_center_design_system_full_application
 STATUS: implemented
-ARTIFACTS: docs/design-system/dashboard-control-center/DESIGN_SYSTEM.md,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,dashboard-control-center/src/App.jsx,dashboard-control-center/src/i18n.js,dashboard-control-center/src/styles.css,tests/playwright/dashboard-control-center.spec.js,docs/memory/DEVELOPER_MEMORY.md,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+ARTIFACTS: docs/design-system/dashboard-control-center/DESIGN_SYSTEM.md,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,dashboard-control-center/src/App.jsx,dashboard-control-center/src/i18n.js,dashboard-control-center/src/styles.css,tests/playwright/dashboard-control-center.spec.js,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
 TESTS: tools/test_docs_tour.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/check_developer_memory_requirements.sh,tools/check_test_plan_coverage.sh,tools/test_test_plan.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh
 
 Dashboard Control Center must apply the documented design system to source, evidence, tooltip, copy, and detail surfaces across all repository-control pages, not only to the initial design-system document route.
@@ -2004,7 +2004,7 @@ Non-scope:
 
 SYNC-ID: dashboard_control_center_design_system_source_runtime
 STATUS: implemented
-ARTIFACTS: docs/design-system/dashboard-control-center/DESIGN_SYSTEM.md,docs/design-system/dashboard-control-center/tokens.json,docs/design-system/dashboard-control-center/components.json,dashboard-control-center/src/design-system.generated.css,dashboard-control-center/src/design-system.generated.js,dashboard-control-center/src/main.jsx,dashboard-control-center/src/App.jsx,dashboard-control-center/src/styles.css,tools/dashboard-design-system,tools/check_dashboard_design_system.sh,tools/test_dashboard_control_center.sh,tools/test_lesson_repository.sh,docs/workflow/GIT_HOOK_CHECKS.tsv,docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv,docs/workflow/TEST_PLAN_MANIFEST.tsv,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,tests/playwright/dashboard-control-center.spec.js,docs/memory/DEVELOPER_MEMORY.md,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+ARTIFACTS: docs/design-system/dashboard-control-center/DESIGN_SYSTEM.md,docs/design-system/dashboard-control-center/tokens.json,docs/design-system/dashboard-control-center/components.json,dashboard-control-center/src/design-system.generated.css,dashboard-control-center/src/design-system.generated.js,dashboard-control-center/src/main.jsx,dashboard-control-center/src/App.jsx,dashboard-control-center/src/styles.css,tools/dashboard-design-system,tools/check_dashboard_design_system.sh,tools/test_dashboard_control_center.sh,tools/test_lesson_repository.sh,docs/workflow/GIT_HOOK_CHECKS.tsv,docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv,docs/workflow/TEST_PLAN_MANIFEST.tsv,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,tests/playwright/dashboard-control-center.spec.js,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
 TESTS: tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/check_developer_memory_requirements.sh,tools/check_test_plan_coverage.sh,tools/test_test_plan.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
 
 Dashboard Control Center design-system changes must be driven by a source-to-runtime contract.
@@ -2030,7 +2030,7 @@ Non-scope:
 
 SYNC-ID: dashboard_control_center_design_studio
 STATUS: implemented
-ARTIFACTS: docs/design-system/dashboard-control-center/DESIGN_SYSTEM.md,docs/design-system/dashboard-control-center/components.json,dashboard-control-center/src/design-system.generated.css,dashboard-control-center/src/design-system.generated.js,dashboard-control-center/src/App.jsx,dashboard-control-center/src/dashboardData.js,dashboard-control-center/src/i18n.js,dashboard-control-center/src/styles.css,vite.config.mjs,tools/dashboard-design-system,tools/check_dashboard_design_system.sh,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_control_center.sh,docs/memory/DEVELOPER_MEMORY.md,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+ARTIFACTS: docs/design-system/dashboard-control-center/DESIGN_SYSTEM.md,docs/design-system/dashboard-control-center/components.json,dashboard-control-center/src/design-system.generated.css,dashboard-control-center/src/design-system.generated.js,dashboard-control-center/src/App.jsx,dashboard-control-center/src/dashboardData.js,dashboard-control-center/src/i18n.js,dashboard-control-center/src/styles.css,vite.config.mjs,tools/dashboard-design-system,tools/check_dashboard_design_system.sh,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_control_center.sh,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
 TESTS: tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/check_developer_memory_requirements.sh,tools/check_test_plan_coverage.sh,tools/test_test_plan.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
 
 Dashboard Control Center must provide a guarded Design Studio page so approved design-system changes can be edited, previewed, planned, confirmed, and applied from the dashboard without turning the dashboard into an arbitrary CSS editor.
@@ -2056,7 +2056,7 @@ Non-scope:
 
 SYNC-ID: dashboard_control_center_design_studio_visual_editor
 STATUS: implemented
-ARTIFACTS: docs/design-system/dashboard-control-center/DESIGN_SYSTEM.md,docs/design-system/dashboard-control-center/tokens.json,docs/design-system/dashboard-control-center/components.json,dashboard-control-center/src/design-system.generated.css,dashboard-control-center/src/design-system.generated.js,dashboard-control-center/src/App.jsx,dashboard-control-center/src/dashboardData.js,dashboard-control-center/src/i18n.js,dashboard-control-center/src/styles.css,vite.config.mjs,tools/dashboard-design-system,tools/check_dashboard_design_system.sh,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_control_center.sh,docs/workflow/PRODUCT_REPOSITORY_STRUCTURE.tsv,templates/TEMPLATES.md,tools/test_product_scaffold_check.sh,docs/memory/DEVELOPER_MEMORY.md,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+ARTIFACTS: docs/design-system/dashboard-control-center/DESIGN_SYSTEM.md,docs/design-system/dashboard-control-center/tokens.json,docs/design-system/dashboard-control-center/components.json,dashboard-control-center/src/design-system.generated.css,dashboard-control-center/src/design-system.generated.js,dashboard-control-center/src/App.jsx,dashboard-control-center/src/dashboardData.js,dashboard-control-center/src/i18n.js,dashboard-control-center/src/styles.css,vite.config.mjs,tools/dashboard-design-system,tools/check_dashboard_design_system.sh,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_control_center.sh,docs/workflow/PRODUCT_REPOSITORY_STRUCTURE.tsv,templates/TEMPLATES.md,tools/test_product_scaffold_check.sh,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
 TESTS: tools/check_dashboard_design_system.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/test_product_scaffold_check.sh,tools/check_developer_memory_requirements.sh,tools/check_test_plan_coverage.sh,tools/test_test_plan.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
 
 Dashboard Control Center Design Studio must become a visual design-system editor rather than a warning-only surface about direct CSS editing.
@@ -2114,7 +2114,7 @@ Non-scope:
 
 SYNC-ID: dashboard_design_studio_event_runner_store
 STATUS: implemented
-ARTIFACTS: .gitignore,.github/workflows/ci.yml,.github/workflows/lesson14-ci.yml,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/TEST_PLAN_MANIFEST.tsv,docs/workflow/GIT_HOOK_CHECKS.tsv,docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv,docs/workflow/FINAL_GATE_COVERAGE.tsv,tools/dashboard-design-system,tools/test_dashboard_design_studio_events.sh,tools/test_lesson_repository.sh,tools/check_ci_workflow_structure.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md,docs/memory/DEVELOPER_MEMORY.md
+ARTIFACTS: .gitignore,.github/workflows/ci.yml,.github/workflows/lesson14-ci.yml,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/TEST_PLAN_MANIFEST.tsv,docs/workflow/GIT_HOOK_CHECKS.tsv,docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv,docs/workflow/FINAL_GATE_COVERAGE.tsv,tools/dashboard-design-system,tools/test_dashboard_design_studio_events.sh,tools/test_lesson_repository.sh,tools/check_ci_workflow_structure.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
 TESTS: tools/test_dashboard_design_studio_events.sh,tools/check_dashboard_design_system.sh,tools/check_ci_workflow_structure.sh,tools/check_test_plan_coverage.sh,tools/test_test_plan.sh,tools/test_git_hooks.sh,tools/test_git_hooks_parallel.sh,tools/test_ci_final_gate.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh
 
 Dashboard Design Studio now has a local, append-only event runner and request-store layer for proposal work.
@@ -2235,7 +2235,7 @@ Non-scope:
 
 SYNC-ID: ci_final_gate_gap_only_safety
 STATUS: implemented
-ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/FINAL_GATE_COVERAGE.tsv,docs/workflow/FINAL_GATE_GAP_COMMANDS.tsv,tools/ci-final-gate,tools/test_ci_final_gate.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md,docs/memory/SESSION_MEMORY.md
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/FINAL_GATE_COVERAGE.tsv,docs/workflow/FINAL_GATE_GAP_COMMANDS.tsv,tools/ci-final-gate,tools/test_ci_final_gate.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
 TESTS: tools/test_ci_final_gate.sh,tools/check_ci_workflow_structure.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh
 
 The CI final gate gap-only mode must not become a shortcut that can skip aggregate coverage validation.
@@ -2258,7 +2258,7 @@ Non-scope:
 
 SYNC-ID: product_authority_evidence_detail_contract
 STATUS: implemented
-ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/DASHBOARD_DATA_SCHEMA.tsv,tools/lib/product_repository_authority.sh,tools/product-repository-authority,dashboard-control-center/src/dashboardData.js,tests/fixtures/dashboard-control-center.json,tests/fixtures/dashboard-control-center-live-update.json,tools/test_product_repository_authority.sh,tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md,docs/memory/SESSION_MEMORY.md
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/DASHBOARD_DATA_SCHEMA.tsv,tools/lib/product_repository_authority.sh,tools/product-repository-authority,dashboard-control-center/src/dashboardData.js,tests/fixtures/dashboard-control-center.json,tests/fixtures/dashboard-control-center-live-update.json,tools/test_product_repository_authority.sh,tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
 TESTS: tools/test_product_repository_authority.sh,tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh
 
 Dashboard product authority evidence items must expose producer-owned detail fields instead of requiring the UI to infer operational judgment from `status` alone.
@@ -2885,5 +2885,793 @@ changing existing instruction behavior:
   trigger without exposing child paths or raw instruction contents.
 - Existing top-level result fields, lesson exclusions, selected-target checks,
   operation-mode checks, Git settings, tests, and child non-traversal remain
-  compatible. The two memory files are outside this change and remain
-  read-only until separately authorized.
+  compatible. The developer later authorized both memory files to become
+  optional, Git-ignored local temporary records; this implementation does not
+  edit their contents or treat them as permanent authority.
+
+## Next Development Workflow Partial Implementation Requirements — Control Center and Activation Pending
+
+SYNC-ID: next_development_workflow_planning_contract
+STATUS: planned
+ARTIFACTS: .github/workflows/ci.yml,.github/workflows/lesson14-ci.yml,.gitignore,.node-version,.nvmrc,AGENTS.MD,README.md,dashboard-control-center/src/App.jsx,dashboard-control-center/src/dashboardData.js,dashboard-control-center/src/design-system.generated.css,dashboard-control-center/src/design-system.generated.js,dashboard-control-center/src/i18n.js,dashboard-control-center/src/styles.css,docs/as-built/IMPLEMENTATION_PLAN.md,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/design-system/dashboard-control-center/DESIGN_SYSTEM.md,docs/design-system/dashboard-control-center/components.json,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/DASHBOARD_DATA_SCHEMA.tsv,docs/workflow/FINAL_GATE_COVERAGE.tsv,docs/workflow/GIT_HOOK_CHECKS.tsv,docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv,docs/workflow/HANDOFF.md,docs/workflow/PRODUCT_SECURITY_POLICY.tsv,docs/workflow/REPOSITORY_DEVELOPMENT_WORKFLOW.tsv,docs/workflow/SAFEFLOW_SECURITY_BACKFILL.tsv,docs/workflow/TASK_TRACKER.md,docs/workflow/TEST_PLAN_MANIFEST.tsv,docs/workflow/next-workflow/authority-lifecycle.json,docs/workflow/next-workflow/context-impact.json,docs/workflow/next-workflow/fixtures/compatibility-profiles.json,docs/workflow/next-workflow/parent-child-authority.json,docs/workflow/next-workflow/provider-registry.json,docs/workflow/next-workflow/shadow-compatibility.json,docs/workflow/next-workflow/state-store.json,docs/workflow/next-workflow/team-agent-security.json,guides/DOCUMENT_MAP.md,learning/NEXT_WORKFLOW_ACTIVATION.json,learning/NEXT_WORKFLOW_AGENT_SELECTION_SETTINGS.json,learning/NEXT_WORKFLOW_PROVIDER_REGISTRY.json,learning/NEXT_WORKFLOW_RELEASE_TRUST.json,learning/NEXT_WORKFLOW_REPOSITORY_IDENTITY.json,package-lock.json,package.json,tests/playwright/dashboard-control-center.spec.js,tools/agent-selection-settings,tools/check_ci_workflow_structure.sh,tools/check_developer_memory_requirements.sh,tools/check_next_workflow.sh,tools/check_next_workflow_contracts.mjs,tools/check_next_workflow_contracts.sh,tools/dashboard,tools/dashboard-data,tools/dashboard-design-system,tools/dashboard-review-manifest,tools/docs-tour,tools/lib/next_workflow/agents.mjs,tools/lib/next_workflow/authority.mjs,tools/lib/next_workflow/compatibility.mjs,tools/lib/next_workflow/context.mjs,tools/lib/next_workflow/contracts.mjs,tools/lib/next_workflow/identity.mjs,tools/lib/next_workflow/migrations/001_initial.sql,tools/lib/next_workflow/migrations/002_saga_replay.sql,tools/lib/next_workflow/planning.mjs,tools/lib/next_workflow/projection.mjs,tools/lib/next_workflow/provider_discovery.mjs,tools/lib/next_workflow/providers.mjs,tools/lib/next_workflow/release.mjs,tools/lib/next_workflow/release_trust.mjs,tools/lib/next_workflow/runtime.mjs,tools/lib/next_workflow/saga.mjs,tools/lib/next_workflow/secret_policy.mjs,tools/lib/next_workflow/settings.mjs,tools/lib/next_workflow/store.mjs,tools/menu,tools/next-workflow,tools/next-workflow.mjs,tools/test_dashboard_browser_debug_manifest.sh,tools/test_dashboard_control_center.sh,tools/test_dashboard_data.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_schema.sh,tools/test_menu_prerequisites.sh,tools/test_next_workflow.sh,tools/test_next_workflow_agents.mjs,tools/test_next_workflow_agents.sh,tools/test_next_workflow_authority.mjs,tools/test_next_workflow_authority.sh,tools/test_next_workflow_child_isolation.mjs,tools/test_next_workflow_child_isolation.sh,tools/test_next_workflow_compatibility.mjs,tools/test_next_workflow_compatibility.sh,tools/test_next_workflow_context.mjs,tools/test_next_workflow_context.sh,tools/test_next_workflow_contracts.mjs,tools/test_next_workflow_contracts.sh,tools/test_next_workflow_identity.mjs,tools/test_next_workflow_identity.sh,tools/test_next_workflow_planning.mjs,tools/test_next_workflow_planning.sh,tools/test_next_workflow_projection_settings.mjs,tools/test_next_workflow_projection_settings.sh,tools/test_next_workflow_providers.mjs,tools/test_next_workflow_providers.sh,tools/test_next_workflow_release.mjs,tools/test_next_workflow_release.sh,tools/test_next_workflow_runtime.mjs,tools/test_next_workflow_runtime.sh,tools/test_next_workflow_saga.mjs,tools/test_next_workflow_saga.sh,tools/test_next_workflow_store.mjs,tools/test_next_workflow_store.sh,vite.config.mjs
+TESTS: tools/check_next_workflow.sh,tools/test_next_workflow.sh,tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/test_dashboard_settings.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/check_dashboard_design_system.sh,tools/check_test_plan_coverage.sh,tools/test_test_plan.sh,tools/check_security_invariants.sh,tools/check_ci_workflow_structure.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh,tools/test_dashboard_browser_debug_manifest.sh
+
+The repository implements the non-Control-Center workflow design agreed under
+draft ID `next_development_workflow_draft_20260721`. The implementation is
+additive and currently remains in fail-closed planned mode: `AGENTS.MD`,
+`docs/workflow/INSTRUCTION_MEMORY.md`, existing policy files, and existing
+tools remain authoritative. The developer paused the remaining Control Center
+presentation and acceptance work on 2026-07-22; its partial artifacts are
+preserved but are not completion or activation evidence. Shadow comparison
+starts only after an explicit candidate freeze. Enforcement still requires the
+resumed Control Center work and TraceCue/browser acceptance plus same-candidate
+release, recovery, rollback, archive, outbox, PR CI, main CI, and
+synchronization proofs before the explicit final activation transition.
+
+The implemented non-Control-Center runtime includes a repository-local state
+store, authority and side-effect gateway, impact/context planning, hierarchical
+Agent and Saga owners, provider discovery and dispatch boundaries, store-derived
+read projections, and guarded release-candidate/proof/transition commands.
+Read-only status, catalog, projection, and health commands must not create an
+identity, database, WAL, or other state. Release verification accepts only
+configured trusted public verifier keys and therefore remains deliberately
+unavailable while the release-trust registry has no admitted verifier.
+
+### Authority and compatibility
+
+- `AGENTS.MD` remains the invariant authority. No lifecycle, rigor,
+  instruction, adapter, Git, Dashboard, or provider feature may override it.
+- The implemented child-local instruction rule remains unchanged: a valid
+  child-local `docs/workflow/INSTRUCTION_MEMORY.md` has procedural priority;
+  parent fallback is allowed only for exact absence; every present invalid or
+  unsafe state blocks; parent and local instructions are never merged, copied,
+  generated, or overwritten.
+- STEP 1-7, STEP 1-14, the seven repository-development phases, existing CI,
+  checks, document routes, skills, security gates, Git settings, and evidence
+  ownership must remain compatible. Existing-feature tradeoffs are forbidden.
+- Product names, repository names, providers, URLs, paths, thresholds, and UI
+  cases must remain policy- or settings-driven rather than hard-coded.
+
+### Three independent workflow axes
+
+The implementation must keep three independent axes and must not use one as a
+substitute for another:
+
+| Axis | Required contract |
+| --- | --- |
+| `lifecycle_stage` | The six-stage value-to-delivery cycle |
+| `execution_phase` | The existing seven implementation and verification phases |
+| `risk_level` | L1-L5 work rigor; distinct from operational risk severity |
+
+The lifecycle order is fixed at 1→2→3→4→5→6→1:
+
+| Order | Human-facing name | Machine ID | Compatibility alias |
+| ---: | --- | --- | --- |
+| 1 | Decide the Next Value to Deliver | `outcome_discovery` | E |
+| 2 | Decide the Tasks and Their Order | `roadmap_decomposition` | F |
+| 3 | Review the Implementation Proposal | `solution_proposal_review` | A |
+| 4 | Decide the Implementation Approach | `implementation_planning` | B |
+| 5 | Implement and Verify | `build_and_verify` | C |
+| 6 | Deliver and Synchronize | `release_and_sync` | D |
+
+The aliases E, F, A, B, C, and D remain accepted for compatibility and
+instruction parsing, but normal human-facing presentation uses the descriptive
+names. The lifecycle-to-phase mapping must be data-driven, many-to-many
+capable, and finalized before activation without changing the existing phase
+order or release proof.
+
+### L1-L5 rigor determination and orchestration
+
+AI must score user impact, change scope, recoverability, uncertainty,
+verification difficulty, and permission/boundary impact from 0 to 2 each and
+show the component scores, total, selected level, and objective reasons.
+
+| Total | Required level |
+| ---: | --- |
+| 0-1 | L1 Minimal |
+| 2-3 | L2 Lightweight |
+| 4-6 | L3 Standard |
+| 7-9 | L4 Enhanced |
+| 10-12 | L5 Strict |
+
+Security, authentication, secrets, permissions, destructive operations,
+history rewriting, changes to CI or safety gates, external-repository writes,
+data migration, breaking compatibility, and unknown impact force L5. Normal
+in-scope Git delivery alone does not force L5. The developer may raise rigor at
+any time. AI may adjust rigor only with recorded objective reasons and may not
+lower L5 while a hard trigger remains.
+
+- L1 compresses lifecycle stages 1-4 internally, instantiates no Lead or Task
+  Agent, and lets the Orchestrator Agent act under the compressed Implementation
+  Lead role as the sole writer. It uses diff/read-back evidence unless another
+  contract requires independent review or stronger verification.
+- L2 produces one concise proposal and plan and may instantiate at most one
+  Lead Agent; all other Lead roles remain compressed into the Orchestrator
+  Agent. L2 does not instantiate a Task Agent. If Task-Agent delegation or more
+  than one independent agent is required, the effective level is raised to at
+  least L3 with a recorded objective reason.
+- L3 follows all stages, normally uses about two independent perspectives, and
+  performs focused plus relevant medium verification.
+- L4 strengthens independent review to about three perspectives and adds only
+  the relevant aggregate verification.
+- L5 uses at least three perspectives, strict review, and complete delivery
+  evidence.
+
+Independent-perspective counts are task-wide coverage guidelines, not per-stage
+or raw-process quotas. Rigor never removes a contractually required gate,
+creates authority, or permits duplicate execution of the same logical check for
+the same HEAD, policy, and inputs.
+
+### Hierarchical Multi-Agent Team
+
+The canonical human-facing organization name is `Hierarchical Multi-Agent
+Team`. Its terminology and responsibility boundaries are:
+
+| Layer | Layer ID | Agent type | Agent type ID | Responsibility |
+| --- | --- | --- | --- | --- |
+| Layer 0 | `orchestrator_layer` | Orchestrator Agent | `orchestrator_agent` | compose the team, assign work, enforce delegation/authority/budget limits, integrate results, and report to the Developer/Owner |
+| Layer 1 | `lead_layer` | Lead Agent | `lead_agent` | own one specialist domain, assign bounded tasks, review Task Agent results, and return one accountable domain result |
+| Layer 2 | `task_execution_layer` | Task Agent | `task_agent` | execute one bounded investigation, analysis, plan, implementation, review, or verification task and return evidence |
+
+`Developer / Owner` is the human approval and owner-decision authority outside
+the agent team. `Runtime / Tools` is the shared execution foundation, not an
+agent, and is excluded from agent, depth, independence, and concurrency counts.
+
+The Orchestrator Agent is the main agent for the workflow. Layer-1 role IDs and
+canonical display names are:
+
+| Role ID | Canonical display name | Domain responsibility |
+| --- | --- | --- |
+| `director` | Value Design Lead Agent | purpose, delivered value, scope, and completion conditions |
+| `planner` | Planning Design Lead Agent | decomposition, dependencies, order, verification, and recovery plan |
+| `builder` | Implementation Lead Agent | bounded implementation ownership and integration |
+| `reviewer_gate` | Independent Review Lead Agent | implementation-independent omission, security, compatibility, and regression review |
+| `validator` | Safety and Acceptance Decision Lead Agent | policy/authority/evidence assessment and `PASS|REVISE|ASK_OWNER|STOP` decision |
+
+The former labels `Workflow Orchestrator` and `subagent` remain accepted only as
+compatibility vocabulary. Normal human-facing output uses Orchestrator Agent,
+Lead Agent, and Task Agent. Repository `SKILL.md` packages are reusable
+instruction assets and are not a team layer or an agent type.
+
+Agent execution is selected through a versioned Provider Capability Registry
+rather than a hard-coded product branch. The canonical execution tuple keeps
+`execution_provider_id`, `model_publisher_id`, `agent_product_id`,
+`adapter_id`, execution transport (`cli_process`, `api_request`, or
+`local_runtime`), and `model_id` distinct. P0 must freeze nullability, aliases,
+ownership, and complete examples for every initial CLI, direct API, and local-
+runtime case. Initial certification targets the Codex/OpenAI, Claude Code/
+Anthropic, and Gemini/Google ecosystems; exact supported combinations and
+capability mappings must be verified from authoritative product information
+and isolated runtime probes. Local model families such as Qwen are registered
+through an execution provider/runtime and adapter while retaining their
+separate model-publisher identity.
+
+Control Center must show the Hierarchical Multi-Agent Team organization and let
+the developer choose `auto`, `manual`, or `inherit` selection for every
+configurable Agent node or applicable team default. Every mode uses the same
+non-waivable eligibility floor: schema-valid, security-probed, capability-
+compatible, sufficiently attestable, fresh, non-revoked, and inside effective
+authority and budget. `auto` deterministically ranks only eligible entries
+using the correctness-before-speed objective. `manual` pins an eligible entry
+without bypassing that floor. `inherit` resolves the first present applicable
+setting in the fixed Agent → role → team → repository → workflow-context →
+global order; a present invalid, stale, uncertified, or revoked source blocks
+rather than falling through. Parent-management ceilings compose separately and
+always narrow the result. A fallback terminates the old launch intent and
+creates a new visible selection, authority decision, and launch attempt; an
+in-flight launch is never mutated and silent substitution is forbidden.
+
+Model and reasoning settings are policy/settings inputs for every instantiated
+Lead or Task Agent and must never be hard-coded to one provider or model. Four
+immutable configuration states remain separate: `requested` user/policy
+constraints, `selected` registry choice, `effective` post-composition
+authorization, and `actual_observed` runtime evidence. Provider-native
+reasoning is observed when supported. Normalized effort is a derived assessment
+with mapping revision, source, freshness, and exact/approximate/default status;
+it is never presented as an observed native value. Unsupported or insufficient
+attestation blocks instead of guessing or claiming equivalence.
+
+The developer may register additional provider, CLI, API, local-runtime, and
+model entries through a versioned schema. A custom CLI manifest binds a
+canonical executable identity and digest, ownership/mode, working directory,
+sanitized environment allowlist, structured argument mapping, response-file
+policy, and symlink/time-of-check-to-use validation; shell templates are
+forbidden. Execution uses a descriptor-pinned executable or an equivalent
+race-free primitive, not a checked pathname. A response file is created only in
+an exact private directory with no-follow, exclusive creation, owner-only mode,
+bounded content/lifetime, and verified cleanup. An API manifest binds allowed
+scheme, host, port and path, DNS and redirect policy, TLS identity, proxy
+behavior, request/response bounds, and typed authentication capability. Private,
+loopback, link-local, metadata, and Unix-socket destinations are denied unless
+an exact local-runtime endpoint policy explicitly owns them; ordinary network
+permission is insufficient. Destination class/address is revalidated after
+every DNS resolution and before every connection, redirect, proxy, or nested-
+tunnel hop. Intended peer identity, SNI, and certificate policy are revalidated
+at every TLS handshake, including TLS proxies and nested tunnels; final-endpoint
+validation alone is insufficient. Secret references bind namespace, resolver,
+audience,
+scope, expiry, rotation/revocation state, and authorized adapter without placing
+raw secrets in settings, prompts, browser data, logs, receipts, child
+projections, or Git-managed content. Resolved secrets may enter only a typed,
+explicitly authorized ephemeral delivery channel whose argv/environment/
+response-file exposure, subprocess inheritance, lifetime, and cleanup are
+declared and enforced; every undeclared delivery path blocks.
+
+Certification is an exact execution-tuple/version/platform record with the
+canonical state enum `CANDIDATE|CERTIFIED|EXPIRED|REVOKED|FAILED|DEGRADED|
+UNAVAILABLE|REPROBE_REQUIRED`, authoritative-source and probe evidence, required
+attestation strength, issue/expiry time, trusted-clock and revocation source,
+and binary/endpoint/model/runtime drift triggers. Only `CERTIFIED` is launch-
+eligible. Legal transitions are `CANDIDATE → CERTIFIED|FAILED|REVOKED`,
+`CERTIFIED → EXPIRED|REVOKED|DEGRADED|UNAVAILABLE|REPROBE_REQUIRED`, and
+`EXPIRED|FAILED|DEGRADED|UNAVAILABLE|REPROBE_REQUIRED → CANDIDATE` only through
+a fresh probe lineage. Every non-revoked state may transition to `REVOKED` when
+compromise or revocation evidence appears. `REVOKED` is terminal; no new
+candidate for the applicable tuple/version is permitted while its revocation
+remains active, and a later eligible lineage requires revocation release plus a
+new versioned record. Clock rollback or material drift enters
+`REPROBE_REQUIRED`, outage enters `UNAVAILABLE`, and partial impairment enters
+`DEGRADED`; recovery never reuses stale success. Saving an
+uncertified custom entry is allowed for repair, but no Auto, Manual, or Inherit
+launch may select it. The current native subagent interface shall become another
+registry adapter only after the same certification, authority, and attestation
+requirements pass.
+
+Local-runtime manifests do not grant daemon start/stop, model download/removal,
+dependency installation, listening-socket creation, network destination, disk
+consumption, or monetary/token budget authority. Each action is either
+explicitly prohibited for initial activation or represented by an exact-target
+authority decision, reservation, receipt, retry ceiling, and recovery rule.
+
+The Orchestrator Agent may launch Lead Agents. A Lead Agent may launch only
+authorized Task Agents through the common launch gateway. The initial hierarchy
+permits no descendants below Layer 2: the root is depth 0, a Lead Agent is depth
+1, a Task Agent is depth 2, and a Task Agent cannot delegate. Policy owns
+`may_delegate`, `max_depth`, `max_agents`, `max_parallel`, run-time/token/cost
+budgets, retry limits, allowed roles/actions/tools, sandbox/runtime capability,
+and per-file ownership. No child may expand any inherited scope, authority,
+budget, or capability.
+
+Depth counts actual instantiated Agent Runs; a compressed Lead-role assignment
+does not create a fictional depth-1 agent. Consequently, every Task Agent has
+an actual Lead Agent parent. L1 has no separate agents, L2 has at most one Lead
+Agent and no Task Agent, and L3-L5 may instantiate the complete depth-0/1/2
+topology only as required.
+
+Read-only work is the default for investigation, planning, review, and
+validation. Concurrent writes require explicit non-overlapping ownership and a
+recorded integration order. At L1 the Orchestrator Agent acting under the
+compressed Implementation Lead role is the sole writer. At L2 either that
+Orchestrator role or one instantiated Implementation Lead Agent is the sole
+writer. At L3-L5 one Implementation Lead or its explicitly owned Task Agents
+hold sole or disjoint write ownership. An instantiated Independent Review or
+Safety and Acceptance Decision Lead never shares write ownership. Task Agent
+output is not accepted evidence until its Lead Agent and the Orchestrator Agent
+validate provenance and scope.
+
+### Roles, decisions, approvals, and loops
+
+Developer/Owner remains outside the team and owns human approval and owner-only
+decisions. The Value Design Lead owns the proposed value and completion
+definition; the Planning Design Lead and Implementation Lead own planning and
+implementation integration. Runtime/Tools executes commands without becoming
+an agent or acquiring authority. Independent Review Lead and Safety and
+Acceptance Decision Lead own independent review and internal safety/consistency
+decisions. The Orchestrator Agent coordinates roles and handoffs without
+expanding scope, authority, or acceptance criteria.
+
+Every correction loop must have `PASS`, `REVISE`, `ASK_OWNER`, and `STOP`
+equivalents and must not repeat indefinitely with unchanged information.
+
+- At L1-L4, the developer's initial clear request authorizes work only within
+  the task scope and effective runtime capability; routine per-stage approval
+  is not requested. Until a versioned Git-policy migration is applied, this
+  does not erase the current operation-specific Git approvals.
+- At L5, formal approval is requested once after lifecycle stage 4 and before
+  protected or dangerous writes. Reapproval is required only when scope, risk,
+  operation, recovery method, or acceptance criteria materially change; legacy
+  Git-operation approvals remain separate only while legacy settings apply.
+- `ASK_OWNER` is reserved for owner-only decisions such as ambiguous purpose or
+  priority, scope expansion, or conflicts with developer-owned changes.
+- `STOP` applies to safety-invariant violations, forbidden tradeoffs, failed
+  mandatory gates, insufficient evidence, or inability to continue safely.
+- A Validator safety `STOP` is terminal for the same decision fingerprint. The
+  Orchestrator Agent and Developer/Owner cannot relabel it as `PASS` or waive an
+  invariant. Work may restart only after a material input, implementation,
+  authority, or evidence change and a new Validator evaluation linked to the
+  stopped decision.
+- Core approval reasons are `sandbox_boundary`, `network_access`,
+  `credential_or_secret`, `destructive_operation`, `l5_scope_approval`,
+  `scope_expansion`, `unowned_change_conflict`, and
+  `ambiguous_owner_decision`.
+- Until a versioned Git-policy migration is explicitly applied, existing
+  operation-specific approvals remain represented by
+  `git_push_operation_approval`, `git_pr_creation_approval`, and
+  `git_merge_operation_approval`. They must not be discarded or silently
+  mapped to approval-free authority.
+
+The implementation must distinguish platform/runtime approval, workflow
+approval, and unjustified conversational confirmation. Reads, searches,
+status/diff operations, in-scope permitted writes, permitted temporary writes,
+and required non-destructive verification proceed without an extra request.
+"Just in case," file importance, and first-time reading are not approval
+reasons.
+
+### Git, Control Center, and runtime capability
+
+Delivery remains:
+`stage_owned_changes → create_commit → push_branch → create_pull_request →
+verify_pr_ci → merge_pull_request → verify_main_ci →
+verify_repository_sync → delivery complete → propose_cleanup`, followed by
+`execute_cleanup` only when separately authorized.
+
+- Only owned changes are staged; `git add -A` is prohibited.
+- PR evidence binds to the exact head SHA and main evidence to the exact merge
+  SHA. Failed or unknown required CI never permits merge.
+- Remote main, fetch/tracking reference, feature upstream, and local main are
+  reported separately. Deferred local-main updates are reported honestly.
+- Cleanup proposals are read-only. Deleting each branch or worktree is a
+  separate exact-target L5 operation.
+- Effective Git authority is the intersection of repository policy, saved
+  settings, task scope, rigor/approval, target-local instruction, and actual
+  runtime capability.
+- Control Center retains `Manual Git delivery`, Commit-only, PR/CI, and Delivery
+  & Sync
+  presets, previews changes before apply, and displays saved settings,
+  settings source, local/fallback state, target repository, effective
+  authority, and runtime capability without expanding the host sandbox.
+- Control Center also presents the organization chart with per-Agent or
+  inherited `auto|manual|inherit` execution selection. Human-facing copy labels
+  `manual` as `Choose provider/model manually` and states that selection alone
+  grants no launch, write, network, cost, or Git authority; it is distinct from
+  `Manual Git delivery`. Filtered execution-provider/model-publisher/agent-
+  product/adapter/transport/model/reasoning choices, capability and
+  certification state, selection provenance, and separate requested/selected/
+  effective/actual-observed configuration remain visible. The UI never claims
+  unsupported effort equivalence or hides a launch mismatch.
+- Before settings apply, Control Center provides an inheritance dry-run showing
+  the complete source chain, blocked/skipped sources, affected Agents, and
+  before/after authority, capability, cost, and network changes. Apply is atomic
+  and emits a revisioned receipt. Guarded revert first performs a fresh dry-run,
+  compares the expected current revision, recomputes certification, eligibility,
+  effective authority, and affected Agents, then applies atomically as a new
+  auditable revision; stale, conflicting, expired, or revoked restoration blocks.
+- The default view uses plain-language summary and remediation, with technical
+  configuration and provenance progressively disclosed. The organization chart
+  and semantic comparison table are functionally equivalent and expose at least
+  parent/layer, role, selection source, all four configuration states,
+  certification, blocker, and remediation. They have testable keyboard, focus,
+  screen-reader, non-color, error-association, and reflow behavior. A persistent
+  `planned|shadow|enforced|rolled_back` banner prevents inactive or blocked
+  controls from appearing effective: `planned` and `shadow` grant no new
+  authority, `enforced` is active, and `rolled_back` uses the restored legacy
+  path with new-workflow actions disabled.
+- Writable roots remain launch-time inputs rather than fixed persistent
+  profile values. Network capability means general outbound capability, not
+  GitHub-only authority and not workflow consent.
+
+Current Git setting values retain their existing approval semantics until a
+versioned migration is previewed and explicitly applied through the Control
+Center owner path. A future saved preset may authorize normal push, PR, eligible
+merge, main-CI monitoring, and synchronization without per-operation prompts,
+but only through a new versioned setting/value with an auditable migration;
+existing `auto` and `after_approval` values must never be reinterpreted in
+place. Failed or unknown CI, credentials, destructive cleanup, history rewrite,
+scope expansion, and target or authority mismatch remain outside that preset.
+
+### Parent-child workflow inheritance and authority
+
+The parent remains the learning/control plane, while TraceCue, FrameCue, and
+other child repositories remain independent Git repositories with independent
+invariants, instructions, tasks, approvals, Git state, CI, and evidence. The
+same reusable next-workflow engine must be bootstrappable from
+`docs/workflow/INSTRUCTION_MEMORY.md` in either the parent or a parent-managed
+child without turning the parent's instruction text into a merged child
+authority.
+
+Instruction resolution selects exactly one procedural source: a valid
+target-local instruction wins, parent fallback is permitted only when that
+exact local path is absent, and a present invalid, unreadable, unsafe, or
+unsupported local instruction blocks. The resolved instruction identifies a
+versioned workflow contract/profile and optional local constraint manifest;
+the final field names and schemas are P0 decisions. Selecting a common profile
+means reusing engine behavior, not copying, generating, merging, or overwriting
+instruction files.
+
+Procedural instruction resolution and management-policy composition are
+separate operations. The implementation must not inherit or merge an entire
+parent `AGENTS.MD`. The target repository's applicable `AGENTS.MD` remains its
+local invariant authority. A versioned `ParentManagementPolicy` may only add
+mandatory obligations or narrow capability; a semantic conflict, missing
+required baseline, stale policy, or invalid policy blocks instead of choosing
+the more permissive interpretation.
+
+Policy composition is domain-specific:
+
+- safety, privacy, and rigor floors use the stricter applicable requirement;
+- Git, provider, external-send, filesystem, network, runtime, and cost ceilings
+  use intersection;
+- tests, CI, review, dependency, license, release, and documentation duties are
+  additive, with a logical check deduplicated only for the exact same check ID,
+  inputs, and owner;
+- product documentation, design system, Git/CI execution, and evidence remain
+  owned by the exact target repository; and
+- parent roadmap priority is advisory and cannot silently rewrite child scope.
+
+A valid child-local instruction never bypasses parent Control Center Git and
+GitHub ceilings. Applicable global, workflow-context, and repository-scoped
+saved settings compose by intersection. A child may narrow them but cannot
+expand them. Git delivery blocks when the applicable parent setting or
+relationship is missing, ambiguous, stale, invalid, expired, or revoked.
+Presence of credentials, a writable root, or network access is capability only
+and never grants workflow authority.
+
+Every side effect must pass one common authority composition and enforcement
+boundary, including parent and child CLIs, workflow-engine execution, retries,
+background jobs, Git owner tools, provider adapters, and external-send
+adapters. The effective decision is bound to parent instance, stable logical
+repository identity, checkout instance, relationship, task/run, instruction,
+policy and settings revisions/fingerprints, allowed action, branch, remote,
+base/ref, tree/head/commit identity, approvals, runtime capability, issue and
+expiry times, and revocation epoch. It is reevaluated immediately before
+commit, push, PR creation, CI consumption, merge, main-CI consumption, and
+synchronization so that a stale earlier decision cannot authorize a later
+side effect.
+
+The authority model must distinguish Git/provider effects, agent launches,
+filesystem writes, adapter sends, runtime-service effects, artifact/dependency
+effects, and resource/cost reservations. Pre-launch agent authority binds the
+DelegationGrant, AgentSelectionDecision, and AgentLaunchIntent fingerprints,
+parent Agent/role, immutable requested/selected/effective configuration,
+WorkContextFrame, reserved budget, and allowed targets; `actual_observed` is
+explicitly absent and is never predicted or placeholder-filled. A separate
+post-spawn run-admission decision binds the actual observation and complete
+four-state attestation before `RUNNING`. Runtime-service authority binds exact
+process,
+daemon, socket, endpoint, health, and start/stop action. Artifact/dependency
+authority binds exact model/package identity, version, digest, provenance,
+destination, size, and download/install/remove action. Resource/cost authority
+binds monetary, token, time, network, disk, and concurrent-subtree reservations,
+retry ceilings, release, and overspend refusal.
+Filesystem-write authority binds repository-relative canonical targets,
+ownership, allowed operation, pre-write identity/content state, symlink policy,
+and integration order. Requested configuration is authorized before process
+creation; actual configuration is attested before the Agent Run may leave
+`STARTING`. Every target and authority binding is reevaluated immediately before
+the corresponding launch, file open/atomic replacement, provider effect, or
+adapter send.
+
+Stable identity must distinguish a logical repository from a checkout
+instance. Rename or move preserves logical identity, reclone creates a new
+instance, and fork creates a new logical identity. A relationship binds the
+parent instance, child logical and instance identities, relationship ID,
+authority epoch, lease/revocation state, and lifecycle status. A
+parent-managed child has exactly one active parent; zero, multiple, revoked, or
+ambiguous parents block managed actions. Detached and archived behavior must be
+explicitly represented.
+
+An adapter may exchange only a bounded, versioned state/evidence projection
+and receipt. It must never substitute one repository's approval, CI, Git state,
+or evidence for another's. Parent CI and document synchronization must not
+traverse, test, or modify registered children. Shared API, shared database, or
+shared-state implementation must not be assumed before schema and owner
+boundaries are explicitly defined.
+
+Cross-repository delivery is a Saga, not a distributed transaction. Local
+state and an external side-effect intent are committed to the repository-local
+outbox before delivery; the bounded projection is sent; and a receipt is
+reconciled afterward. A crash after push, PR creation, or merge must reconcile
+against the exact Git/provider state: an observed matching success reconstructs
+the receipt, while an unknown or conflicting outcome stops. The system must not
+claim exactly-once external effects; it provides idempotency, observation, and
+reconciliation.
+
+Each adapter message and reconstructed or received receipt must carry an
+independently verifiable authenticity and integrity proof bound to sender and
+verifier identity, relationship and authority epoch, digest, sequence/nonce,
+credential/key reference without secret material, verification time, and
+result. A self-asserted payload is never proof; failed or unavailable proof
+blocks acceptance and reconciliation.
+
+Each external-effect intent and receipt must bind a deterministic effect key,
+request fingerprint, authority decision, target repository/relationship,
+provider operation, expected provider-object selector, ref/SHA when applicable,
+attempt lineage, observation state, and recovery or compensation disposition.
+An irreversible effect such as merge is never represented as automatically
+compensated; unknown or conflicting observation remains stopped or manual.
+
+Offline behavior is deliberately limited. Lifecycle stages 1-4 may proceed
+locally only with a valid instruction and a valid unexpired management
+baseline. Stage 5 may perform only non-external, non-destructive local work;
+otherwise it remains plan-only and is labeled `LOCAL_ONLY`. Stage 6 blocks at
+commit when current parent Control Center authority cannot be checked. Parent
+completion requires a valid receipt; until then the work is `UNSYNCED`.
+
+Existing child instructions are not migrated by matching A-F headings alone.
+Versionless or 1.0.0 instructions may contain stronger local approval and
+review duties, including those already present in FrameCue and TraceCue. Those
+duties remain in force until an explicit child-local migration validates their
+semantics. Unparsed or unsupported obligations are
+`manual_required`/`unsupported`, unknown downgrade fails closed, and no parent
+task may copy or overwrite a child instruction as a migration shortcut.
+
+A graceful archive transitions from `ACTIVE` to `DRAINING`: it blocks new tasks
+and effects while permitting only already-authorized observation,
+reconciliation, and bounded delivery of pre-existing intents. It then enters
+`ARCHIVED`, revokes the relationship, and quarantines any unresolved intent. An
+emergency revocation transitions directly to `REVOKED`, permits no provider or
+external send, and quarantines rather than drains pending outbox items. Both
+paths make existing evidence read-only and preserve retention rules.
+
+Activation is ordered and fail closed: `planned → shadow → release_verified →
+recovery_verified → rollback_verified → archive_decommission_verified → ready →
+enforced`. Release verification freezes one candidate fingerprint covering the
+source tree, schema/migrations, policy/settings revisions, adapter versions,
+built artifacts, and exact head-to-merge evidence lineage. PR CI, main CI,
+local/remote synchronization, recovery, fenced rollback, archive/decommission,
+and outbox drain/quarantine proof all bind that candidate. A material candidate
+change returns to `shadow` under a new lineage. Rollback from `enforced` first
+fences new effects, drains or quarantines in-flight work, restores and verifies
+compatible state, and only then reports `rolled_back`.
+
+Parent progress may project only bounded child-owned values such as verified
+completed weight, accepted total weight, lifecycle stage, execution phase,
+blocker codes, evidence freshness, and next action. The parent must not average
+child percentages, mark a child complete, or convert a projection into parent
+evidence.
+
+The initial scope explicitly excludes simultaneous multi-parent operation, a
+generic enterprise RBAC or policy language, an always-on event bus, custom PKI
+or hardware-key infrastructure, fully automatic legacy-instruction conversion,
+a shared parent-child database, an external database service, arbitrary shell
+adapter templates, and automatic model downloads or local-runtime installation.
+
+### Precision-first completion objective
+
+The implementation must use lexicographic optimization rather than a weighted
+tradeoff between correctness and speed. A candidate execution plan is eligible
+for time optimization only after it preserves mandatory gates, complete
+requirement-to-evidence traceability, existing-feature non-regression,
+authority and safety invariants, and fail-closed unknown-state behavior. Among
+eligible plans, the workflow minimizes expected completion time, including
+expected downstream rework rather than implementation time alone.
+
+Speed improvements must come from earlier uncertainty reduction, authoritative
+context compilation, deterministic change-impact selection, exact-once check
+ownership, bounded safe parallelism, failure-result reuse, and removal of
+unjustified approval or coordination waits. They must not come from omitting a
+required review, test, document update, CI context, or synchronization proof.
+
+### Local Workflow Knowledge Store
+
+Each repository may use an independent local SQLite-backed
+`WorkflowStateStore` for transactional operational state. Git-managed
+`AGENTS.MD`, policies, settings, requirements, specifications, implementation
+plans, trackers, and handoffs remain their respective normative authorities;
+the store must not override them. The store is repository-local, ignored by
+Git, replaceable through a storage port, migration- and recovery-capable, and
+never shared as one live database between parent and child repositories.
+
+The operational model must connect work items, lifecycle and phase states,
+rigor decisions, decisions and assumptions, implementation slices,
+dependencies, evidence, failure signatures, retries, approvals, Git delivery
+state, bounded adapter projections, events, and receipts. Durable records must
+carry schema/version, opaque identity, provenance, lineage, authority, source
+revision, policy/input/content fingerprints, lifecycle, freshness, and
+sensitivity metadata. Secrets, credentials, private messages, raw untrusted
+external content, and absolute child paths are prohibited.
+
+Canonical operational changes must be transactional and auditable. Full-text
+search and other read projections are derivative and rebuildable. Initial
+delivery does not require embeddings, a vector database, a graph-database
+product, an external database service, or a dependency on TernWeave runtime
+code. TernWeave contributes architectural patterns only: transactional
+records, append-only history, provenance/lineage, and rebuildable projections.
+
+### Precision-first planning and execution
+
+Before implementation, a `WorkContextFrame` must compile the applicable
+authority, purpose, scope, completion conditions, synchronized design records,
+current repository and runtime state, prior decisions and failures, required
+documents and checks, approval state, Git authority, and bounded adapter
+summaries. Stale, contradictory, incomplete, or unauthorized inputs must remain
+visible and must not be silently collapsed into a confident plan.
+
+Every context input must carry an origin, trust class, sensitivity, and
+interpretation mode. Only applicable invariant/policy sources, the exactly
+resolved procedural instruction, and the current Developer/Owner task scope may
+be treated as instructions. Repository content, external documents, logs,
+provider responses, generated text, and prior Agent output remain untrusted data
+or candidate evidence and cannot grant authority, change role, or inject
+executable instructions. Agent prompts must keep trusted control instructions
+structurally separate from bounded data attachments, and Agent results must pass
+schema, provenance, authority, Lead review, Orchestrator acceptance, and
+Validator disposition before becoming accepted evidence.
+
+A deterministic impact graph must connect requirements, specifications,
+implementation owners/files, standalone checks, aggregate owners, CI jobs, and
+evidence. Fast-loop verification uses the smallest complete closure justified
+by this graph; unknown impact expands verification rather than narrowing it.
+Release proof continues to use the configured exact-owner path and cannot
+reuse pass results across workflow runs.
+
+Correction loops must store a failure signature and progress fingerprint.
+Another attempt is allowed only when code/configuration, the hypothesis,
+evidence, relevant inputs, or the environment materially changes. Repetition
+with unchanged information reaches the configured `ASK_OWNER` or `STOP` exit
+instead of consuming unbounded attempts.
+
+Parallel work is allowed only for dependency-independent, owner-compatible,
+file-nonconflicting, resource-lock-compatible slices with a defined integration
+order. The scheduler prioritizes the remaining critical path. Required review
+perspectives are selected as a minimum non-duplicative task-wide coverage set;
+agent count alone is not independent evidence. Lead/Task Agent adapters remain
+provider-neutral; provider, agent-product, transport, model, and reasoning
+identifiers remain versioned registry/settings data rather than code branches.
+
+Optional research or spike work may be prioritized by expected value of
+information, but that model cannot remove a mandatory action. Schema-driven
+generation should produce compatible parsers, validators, types/constants,
+fixtures, migration skeletons, producer schemas, and documentation projections
+where it removes duplicated hand-maintained contracts.
+
+### Measurement and progress reporting
+
+Correctness measures are evaluated before speed measures. Required-check
+misses, traceability gaps, unauthorized authority expansion, unjustified
+approval requests in covered fixtures, child mutation from parent CI, and
+same-run duplicate logical checks must all be zero before a speed improvement
+is accepted. Speed measures include time to the first correct change,
+end-to-end delivery time, rework attempts and duration, duplicate work,
+context-compilation time, fast-loop duration, idle/wait time, and CI critical
+path.
+
+During active implementation, progress is reported at least every 15 minutes.
+The percentage is based on weighted implementation units whose implementation
+and required evidence have both passed; starting a unit does not count it as
+complete. Each report states verified completion, current work, recent
+evidence, blockers, and the next interval's intended work.
+
+### Completion and activation boundary
+
+The non-Control-Center runtime and its focused local verification are complete
+only when the synchronized focused and aggregate tests pass on the current
+worktree. Overall implementation remains incomplete while the developer-paused
+Control Center presentation/acceptance scope and final same-candidate activation
+evidence are open. Resumption must finish Control Center implementation through
+its design-system authority, rerun TraceCue/browser review, and obtain developer
+acceptance before Phase 20 may freeze or activate a candidate. PR CI, merge,
+main CI, and local/remote synchronization may deliver the current scoped non-UI
+implementation now, but they are not final activation evidence. After Phase 18
+acceptance, a new exact-candidate local, CI, synchronization, recovery, fenced
+rollback, archive/decommission, and outbox drain/quarantine evidence set is
+required. This closure writes neither child repositories nor the current local
+bytes of either Git-ignored temporary memory file, and the next workflow is not
+activated by this sync.
+
+## Non-Control-Center Security Closure
+
+SYNC-ID: next_development_workflow_non_ui_security_closure
+STATUS: implemented
+ARTIFACTS: docs/as-built/IMPLEMENTATION_PLAN.md,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/HANDOFF.md,docs/workflow/TASK_TRACKER.md,learning/NEXT_WORKFLOW_RELEASE_PREREQUISITES.json,tools/check_document_organization.sh,tools/lib/document_paths.sh,tools/lib/next_workflow/agents.mjs,tools/lib/next_workflow/authority.mjs,tools/lib/next_workflow/compatibility.mjs,tools/lib/next_workflow/contracts.mjs,tools/lib/next_workflow/identity.mjs,tools/lib/next_workflow/projection.mjs,tools/lib/next_workflow/provider_discovery.mjs,tools/lib/next_workflow/providers.mjs,tools/lib/next_workflow/release.mjs,tools/lib/next_workflow/runtime.mjs,tools/lib/next_workflow/saga.mjs,tools/lib/next_workflow/store.mjs,tools/next-workflow.mjs,tools/test_lesson_repository.sh,tools/test_next_workflow_agents.mjs,tools/test_next_workflow_authority.mjs,tools/test_next_workflow_compatibility.mjs,tools/test_next_workflow_contracts.mjs,tools/test_next_workflow_identity.mjs,tools/test_next_workflow_projection_settings.mjs,tools/test_next_workflow_providers.mjs,tools/test_next_workflow_release.mjs,tools/test_next_workflow_runtime.mjs,tools/test_next_workflow_saga.mjs,tools/test_next_workflow_store.mjs
+TESTS: tools/check_developer_memory_requirements.sh,tools/check_document_organization.sh,tools/check_lesson_structure.sh,tools/check_lesson14_structure.sh,tools/check_next_workflow.sh,tools/test_next_workflow.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+- Generic storage writes must not create or advance DelegationGrant,
+  Relationship, or NextWorkflowActivation authority/lifecycle records. Their
+  dedicated writers must bind legal transitions, sequential revisions, exact
+  lineage/lifecycle identity, a required transition event, evidence, current
+  revocation epoch, and independent verification in the same atomic transaction.
+- Recovery-only mode must clear immediately when the final recovery-marked
+  intent/outbox/finalization mutation leaves no unresolved effect.
+- Read-only store opening and health must validate migration versions, names,
+  checksums, states, stored schema identity, and the actual `sqlite_schema`, not
+  only SQLite integrity and foreign keys. Read-write opening must not silently
+  re-bless modified schema metadata or physical schema.
+- Approval grants must be independently verified against their exact reason,
+  approval ID, target, task, authority epoch, freshness, and proof fingerprint;
+  a caller-supplied proof string cannot satisfy authority composition.
+- Provider admission must compare actual sandbox, network, paths,
+  capabilities, actions, tools, and resource limits to the persisted grant.
+  Before spawn it must also bind the persisted selection, current eligible
+  registry/certification, canonical provider plan, unspent authority-owned
+  reservation, grant-contained targets, authority epoch, and persisted topology
+  depth. Read-only ownership must imply a read-only sandbox with no writable
+  paths. Every granted and observed writable path must be contained by the
+  child's ownership and the persisted writable-parent chain, and the reservation
+  epoch must equal the gateway revocation epoch.
+  Delegation grants must use a protected independently verified writer and
+  complete finite-freshness/topology validation; generic insertion is invalid.
+  Review acceptance and retry re-entry must resolve persisted independent
+  assignments, Validator decisions, authority epochs, failures, material
+  changes, and reservations rather than caller strings or role labels. Every
+  authority-bearing write and result acceptance must atomically reject a stale
+  epoch after any global fence.
+- Provider certifications and observations must contain full source/probe/
+  clock/authority/revocation/drift evidence, and verifier verdicts must bind the
+  exact record identity and fingerprint. Probe and certification authorities
+  must be distinct and injected; a static family label or self-generated map
+  cannot certify a provider. CLI response directories must be descriptor-
+  opened, owner-matched, canonical, and exactly mode `0700`; its descriptor must
+  remain pinned through response creation, child execution, readback, and
+  cleanup. Boolean trust assertions are invalid.
+- API and local-runtime operational dispatch must remain unavailable until the
+  gateway owns the actual connection, endpoint enforcement, and ephemeral-
+  secret boundary. Typed plan construction alone grants no execution authority.
+- A release candidate must bind artifact paths and contents, repository head,
+  contracts, runtime version, and the accepted Control Center prerequisite.
+  Signed proof kinds must bind their exact CI, sync, recovery, rollback,
+  relationship, and outbox evidence. Enforced projection must reconstruct and
+  verify the complete activation record, signed transition lineage, evidence,
+  correctness, and summary rather than trusting an enforced-shaped record.
+  Current-candidate drift must deny effects.
+- Parsed instruction profiles without the exact supported version must block;
+  they cannot enter shadow comparison as a supported legacy profile.
+- The executable runtime surface must compose the common gateway for status,
+  preview, and confirmation-bound recovery. Missing runtime sources, observers,
+  receipt verifiers, or transports must stop safely.
+- The signed release-proof verification CLI must invoke the real verifier and
+  remain covered by an executable smoke test; missing imports cannot leave an
+  advertised release command unusable.
+- A global fence must invalidate every previously persisted delegation grant,
+  including grants referenced by later reservations, reviewer assignments, or
+  launch preparation. Reconciliation may persist exactly one independently
+  bound `EffectReceiptProof` and must never act as an alternate writer for
+  Relationship, activation, or Agent authority records. An existing SQLite
+  store with a nonempty application schema but missing either bootstrap anchor,
+  or with missing schema, identity, revision, or revocation metadata, must fail
+  closed without replaying migrations or recreating and re-blessing authority.
+- Writable delegation must remain contained by the Implementation Lead at
+  creation, persistence, and launch-chain resolution; a self-consistent child
+  fingerprint must not authorize scope, ownership, capability, sandbox, or
+  budget expansion beyond the persisted parent. Effect-intent persistence and
+  the PREPARED-to-DISPATCHING/outbox claim must atomically bind the live global
+  authority epoch, and a fence immediately before adapter dispatch must
+  quarantine the effect without dispatch.
+- Saga message acceptance must transactionally bind the persisted current
+  Relationship record and fingerprint, peers, lease, key, lifecycle state, and
+  live global authority epoch; an absent or post-signature-fenced Relationship
+  must not advance replay state. Activation lifecycle persistence must bind the
+  exact sequential record/payload revision, source revision, input candidate,
+  event topology, signed transition repository head, and one live global
+  authority epoch across the complete forward chain. Final activation must
+  independently reverify every signed transition with the current verifier;
+  cached verification fingerprints are not authority.
+- Canonical state import and SQLite restore must require a mandatory sidecar
+  plus an independently verified whole-artifact digest bound to identity,
+  schema, revision, and revocation epoch before publication or destination
+  quarantine. A global fence must block every stale non-revoking Relationship
+  transition. Every depth-1 delegation must be rooted at the canonical
+  `orchestrator` / `Orchestrator Agent`, and release evidence must reconstruct
+  one exact candidate head, PR identity, main merge SHA, and synchronized
+  `origin/main` lineage before enforcement.
+- Agent launch must bind the executable plan's sandbox mode and canonical
+  working directory to the persisted grant and repository root before any
+  gateway effect. Reconciliation finalization must recompute the effect/
+  observation identity from the locked intent and require a separately
+  configured independent proof verifier; the finalizer cannot trust a caller-
+  constructed proof record. Generic commit and reconciliation revision CAS
+  must be repeated after `BEGIN IMMEDIATE`, not only before the transaction.
+  Revocation fencing must likewise derive its revision and epoch from the
+  locked transaction; stale expected epoch/revision input must roll back
+  without changing authority state.
+- The exact authority epoch and fence must reach the operational adapter and
+  the final executor boundary. The default CLI executor must fail closed for
+  operational effects because it cannot make an external CLI enforce a
+  downstream fencing token; only an explicitly fencing-aware executor may
+  dispatch, and it must attest the same epoch and fence fingerprint.
+- This scoped delivery must not describe those hard-deny placeholders as
+  production wiring. After Control Center acceptance and before candidate
+  freeze, activation-bound owners must provide independently authenticated
+  authority sources, approval/receipt/reconciliation verification, separate
+  provider probe and certification authorities, operational observation and
+  containment, and exact CLI/Git/workflow adapter routing through the gateway.
+- Non-Control-Center completion requires the 14-suite aggregate with 192
+  focused assertions and all seven
+  contract fingerprints to pass. It does not complete the developer-paused
+  Control Center or Phase 20 remote/same-candidate activation evidence.
+
+The currently verified non-Control-Center implementation may be delivered now
+through a scoped commit, PR CI, merge, main CI, and local/remote synchronization.
+That delivery does not satisfy the future immutable-candidate activation proof:
+Phase 18 Control Center completion and acceptance will materially change the
+candidate, after which Phase 20 must collect a new exact-candidate evidence set.

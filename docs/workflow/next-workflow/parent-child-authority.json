@@ -1,0 +1,33 @@
+{
+  "schema_version": "1.0.0",
+  "contract_id": "next_workflow_parent_child_authority",
+  "activation_mode": "planned",
+  "instruction_resolution": {"resolver": "tools/lib/development_instruction.mjs", "runtime_authority_input_required": true, "local_valid_wins": true, "parent_fallback_only_on_exact_absence": true, "present_invalid_blocks": true, "versionless_or_unknown_profile_blocks": true, "merge_instruction_text": false},
+  "management_composition": {
+    "safety_privacy_rigor": "maximum_floor",
+    "git_provider_external_filesystem_network_runtime_cost": "intersection",
+    "tests_ci_review_dependency_license_release_documentation": "additive_exact_id_deduplication",
+    "roadmap_priority": "advisory",
+    "semantic_conflict": "block"
+  },
+  "identities": ["parent_instance_id", "repository_logical_id", "checkout_instance_id", "relationship_id", "task_id", "run_id"],
+  "relationship": {"active_parent_cardinality": 1, "states": ["ACTIVE", "DRAINING", "ARCHIVED", "REVOKED", "DETACHED"], "binds": ["authority_epoch", "lease", "revocation_state", "lifecycle_state"], "inherited_duties": {"structured": true, "stable_machine_obligation_id_required": true, "relationship_binding_required": true}, "missing_ambiguous_stale_expired_or_revoked_blocks": true},
+  "authority_variants": ["git_effect", "provider_effect", "agent_launch", "agent_run_admission", "filesystem_write", "adapter_send", "runtime_service", "artifact_dependency", "resource_cost"],
+  "decision_bindings": ["variant", "action", "parent_instance_id", "repository_logical_id", "checkout_instance_id", "relationship_id", "task_id", "run_id", "instruction_fingerprint", "policy_fingerprint", "settings_revision", "allowed_target", "approval_fingerprint", "runtime_capability_fingerprint", "issued_at", "expires_at", "revocation_epoch"],
+  "just_in_time_points": ["file_open", "atomic_replace", "agent_spawn", "provider_send", "adapter_send", "commit", "push", "pr_create", "pr_ci_consume", "merge", "main_ci_consume", "sync"],
+  "side_effect_gateway": {"required_for_all_effects": true, "intent_committed_before_dispatch": true, "direct_adapter_bypass": "forbidden", "reobserve_target_and_configuration": true},
+  "saga": {
+    "claims_exactly_once": false,
+    "guarantees": ["idempotency", "observation", "reconciliation"],
+    "message_fields": ["protocol_version", "sender_id", "verifier_id", "relationship_id", "authority_epoch", "sequence", "nonce", "causation_id", "payload_digest", "key_reference", "signature"],
+    "effect_fields": ["effect_key", "request_fingerprint", "authority_decision_id", "target_id", "provider_operation", "expected_object_selector", "ref_sha", "attempt_lineage", "observation_state", "recovery_disposition"],
+    "receipt_requires_independent_proof": true,
+    "unknown_or_conflicting_outcome": "STOP"
+  },
+  "offline": {"stages_1_to_4": "valid_unexpired_baseline_required", "stage_5": "local_non_external_non_destructive_only", "stage_6": "block_before_commit_without_current_parent_authority", "parent_completion_requires_receipt": true},
+  "archive": {"graceful_order": ["ACTIVE", "DRAINING", "ARCHIVED"], "drain_allows": ["observation", "reconciliation", "bounded_existing_intent_delivery"], "emergency_order": ["ACTIVE", "REVOKED"], "emergency_quarantines_outbox": true},
+  "activation_order": ["planned", "shadow", "release_verified", "recovery_verified", "rollback_verified", "archive_decommission_verified", "ready", "enforced"],
+  "rollback_order": ["FENCING", "DRAINING_OR_QUARANTINING", "STATE_RESTORED", "LEGACY_VERIFIED", "ROLLED_BACK"],
+  "registered_child_traversal_from_parent_ci": "forbidden",
+  "shared_parent_child_database": "excluded"
+}

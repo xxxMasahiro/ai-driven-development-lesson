@@ -9,6 +9,11 @@ Thumbs.db
 *.bak
 .repository-development-runs/
 .dashboard-design-studio-events/
+/.workflow-state/
+
+# Local temporary AI memory records (never repository authority)
+/docs/memory/DEVELOPER_MEMORY.md
+/docs/memory/SESSION_MEMORY.md
 
 # Node and Playwright generated files
 node_modules/

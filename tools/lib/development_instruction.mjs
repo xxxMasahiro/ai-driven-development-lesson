@@ -80,6 +80,16 @@ function isSafeId(value) {
   return /^[a-z0-9][a-z0-9._:-]*$/.test(String(value ?? ''));
 }
 
+function canonicalJson(value) {
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`;
+  if (value && typeof value === 'object') return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${canonicalJson(value[key])}`).join(',')}}`;
+  return JSON.stringify(value);
+}
+
+function digest(value) {
+  return createHash('sha256').update(typeof value === 'string' ? value : canonicalJson(value)).digest('hex');
+}
+
 function isSafeRelativePath(value) {
   if (typeof value !== 'string' || !value || value.includes('\0') || value.includes('\\')) return false;
   if (path.posix.isAbsolute(value)) return false;
@@ -515,10 +525,18 @@ export function validateInstructionText(text, policy, profile) {
       if (!text.includes(anchor)) fail('INSTRUCTION_ANCHOR', 'Parent fallback instruction memory is missing a required rule anchor.');
     }
   }
+  const sectionMatches = [...text.matchAll(/^##[ \t]+([A-F])\.(?:[ \t]|$).*$/gm)];
+  const sectionFingerprints = Object.fromEntries(sectionMatches.map((match, index) => {
+    const end = sectionMatches[index + 1]?.index ?? text.length;
+    return [match[1], digest(text.slice(match.index, end).trim())];
+  }));
+  const ruleIds = [...new Set([...text.matchAll(/`(workflow-rule:[a-z0-9][a-z0-9-]*)`/g)].map((match) => match[1]))].sort();
+  const proceduralContract = { version, stages: requiredStages, section_fingerprints: sectionFingerprints, rule_ids: ruleIds };
   return {
     version,
     profile: profile === 'parent_fallback' ? 'parent_strict' : (version === 'versionless' ? 'local_compatibility' : 'local_versioned'),
     stages: requiredStages,
+    procedural_contract: { ...proceduralContract, contract_fingerprint: digest(proceduralContract) },
   };
 }
 
@@ -781,6 +799,7 @@ export function resolveDevelopmentInstruction({
     local_instruction_priority: true,
     parent_fallback_on: fallbackTrigger,
     git_plan: gitPlan,
+    procedural_contract: validated.procedural_contract,
   };
 }
 

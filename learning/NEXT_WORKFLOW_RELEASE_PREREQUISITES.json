@@ -1,0 +1,12 @@
+{
+  "schema_version": "1.0.0",
+  "prerequisite_id": "next-development-workflow-release-prerequisites",
+  "revision": 1,
+  "control_center": {
+    "state": "paused",
+    "developer_accepted": false,
+    "evidence_fingerprint": null,
+    "accepted_at": null,
+    "resume_required": true
+  }
+}
