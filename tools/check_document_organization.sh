@@ -19,7 +19,7 @@ require_doc() {
   fi
 }
 
-for key in $(lesson_all_role_doc_keys); do
+for key in $(lesson_required_role_doc_keys); do
   require_doc "$key"
 done
 

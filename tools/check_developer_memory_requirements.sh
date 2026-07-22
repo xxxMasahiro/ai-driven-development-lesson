@@ -4,13 +4,14 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=tools/lib/lesson_common.sh
 source "$SCRIPT_DIR/lib/lesson_common.sh"
-# shellcheck source=tools/lib/document_paths.sh
-source "$SCRIPT_DIR/lib/document_paths.sh"
 # shellcheck source=tools/lib/git_hooks_policy.sh
 source "$SCRIPT_DIR/lib/git_hooks_policy.sh"
 
 ROOT="$LESSON_ROOT"
-DEVELOPER_MEMORY_DOC="$(lesson_doc_relpath developer_memory)"
+TEMPORARY_MEMORY_DOCS=(
+  "docs/memory/DEVELOPER_MEMORY.md"
+  "docs/memory/SESSION_MEMORY.md"
+)
 missing=0
 
 require_pattern() {
@@ -71,21 +72,50 @@ require_file() {
   fi
 }
 
-require_file "$DEVELOPER_MEMORY_DOC"
+require_pattern ".gitignore" '^/docs/memory/DEVELOPER_MEMORY\.md$' "developer memory ignore rule"
+require_pattern ".gitignore" '^/docs/memory/SESSION_MEMORY\.md$' "session memory ignore rule"
+require_pattern "AGENTS.MD" '任意のローカル一時メモリ.*Git管理外.*恒久的な正本ではない' "optional non-authoritative memory routing"
+require_pattern "guides/DOCUMENT_MAP.md" 'may be absent in a fresh clone' "fresh-clone optional memory rule"
+for structure_check in tools/check_lesson_structure.sh tools/check_lesson14_structure.sh; do
+  if grep -Fq '"$(lesson_doc_relpath developer_memory)"' "$ROOT/$structure_check"; then
+    printf 'optional developer memory must not be a required file in %s\n' "$structure_check" >&2
+    missing=1
+  fi
+done
+require_pattern "tools/lib/document_paths.sh" 'lesson_required_role_doc_keys' "required role-document set excludes optional memory"
+require_pattern "tools/check_document_organization.sh" 'lesson_required_role_doc_keys' "document organization uses required role documents only"
+require_pattern "tools/dashboard-data" '"developer_memory" "Developer memory" "optional"' "optional dashboard memory evidence"
+require_pattern "tools/dashboard-data" 'Developer memory is an optional Git-ignored local temporary record, never durable authority' "non-authoritative dashboard memory wording"
+for memory_doc in "${TEMPORARY_MEMORY_DOCS[@]}"; do
+  if git -C "$ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1 \
+    && git -C "$ROOT" ls-files --error-unmatch -- "$memory_doc" >/dev/null 2>&1; then
+    printf 'temporary memory must not be Git-tracked: %s\n' "$memory_doc" >&2
+    missing=1
+  fi
+  if [[ -f "$ROOT/$memory_doc" ]]; then
+    require_pattern "$memory_doc" '^> \*\*TEMPORARY WORKING RECORD — NOT A PERMANENT SOURCE OF TRUTH\*\*$' "temporary working record banner"
+  fi
+done
+
+if sed -n '/documents_catalog_status="\$(/,/^)"/p' "$ROOT/tools/dashboard-data" | grep -q 'developer_memory_doc_status'; then
+  printf 'optional developer memory must not affect the document catalog rollup\n' >&2
+  missing=1
+fi
+if sed -n '/documentation_sync_status="\$(/,/^)"/p' "$ROOT/tools/dashboard-data" | grep -q 'developer_memory_doc_status'; then
+  printf 'optional developer memory must not affect documentation synchronization status\n' >&2
+  missing=1
+fi
+
 require_file "learning/LESSON_MODE.tsv"
 require_file "learning/WORKFLOW_DISPLAY_LANGUAGE.tsv"
 require_file "learning/PRODUCT_DEVELOPMENT_LANGUAGE.tsv"
 require_file "learning/LESSON_APPROVALS_14_DAYS.tsv"
 require_file "learning/LESSON_MODE_14_DAYS.tsv"
 
-require_pattern "$DEVELOPER_MEMORY_DOC" 'Approval checkpoints now have tooling enforcement' "approval enforcement record"
 require_pattern "tools/lesson14" 'LESSON_RUNTIME_REQUIRE_APPROVAL=1' "lesson14 approval enforcement flag"
 require_pattern "tools/lib/lesson_runtime.sh" 'Approval required before this action' "approval gate"
 require_pattern "tools/test_lesson14.sh" 'lesson14-approval-required' "approval regression test"
 
-require_pattern "$DEVELOPER_MEMORY_DOC" 'tools/lesson 学習モード <A\|B\|C>' "7-day learning mode record"
-require_pattern "$DEVELOPER_MEMORY_DOC" 'tools/lesson14 学習モード <A\|B\|C>' "14-day learning mode record"
-require_pattern "$DEVELOPER_MEMORY_DOC" 'at any time during (the|either) lesson' "learning mode switchability record"
 require_pattern "tools/lesson" 'Learning mode is required before passing setup\.index' "7-day learning mode gate"
 require_pattern "tools/test_lesson.sh" 'Learning mode recorded: C' "7-day learning mode switch regression test"
 require_pattern "tools/test_lesson.sh" 'lesson-mode-required' "7-day learning mode regression test"
@@ -106,18 +136,12 @@ require_pattern "tools/lib/lesson_common.sh" 'lesson_supported_language_codes' "
 require_pattern "tools/lib/lesson_common.sh" 'pt-BR' "shared language pt-BR support"
 require_pattern "tools/lib/lesson_common.sh" 'zh-TW' "shared language zh-TW support"
 require_pattern "AGENTS.MD" 'ja\|en\|ko\|zh-CN\|zh-TW\|es\|pt-BR\|fr\|de\|id\|vi\|th\|hi\|ar' "AGENTS supported language invariant"
-require_pattern "$DEVELOPER_MEMORY_DOC" 'Standard language choices should include' "developer memory expanded language choices"
-
 require_pattern "README.md" 'STEP 1-7: 基礎レッスン' "STEP 1-7 entry"
 require_pattern "README.md" 'STEP 1-14: 実践レッスン' "STEP 1-14 entry"
 require_pattern "AGENTS.MD" 'STEP 1-7: 基礎レッスン.*STEP 1-14: 実践レッスン' "course selection rule"
 require_pattern "AGENTS.MD" '学習モード' "learning mode startup rule"
 require_pattern "AGENTS.MD" '既存機能とのトレードオフは一切禁止' "no existing-feature tradeoff rule"
 require_pattern "AGENTS.MD" 'リファクタリング性、エコシステム性、再利用性、汎用性' "implementation quality rule"
-require_pattern "$DEVELOPER_MEMORY_DOC" 'refactorable, ecosystem-friendly, reusable, and general' "implementation quality memory"
-require_pattern "$DEVELOPER_MEMORY_DOC" 'Existing functionality must not be traded away' "no-tradeoff memory"
-require_pattern "$DEVELOPER_MEMORY_DOC" 'Final tests pass only when every improvement or problem recorded in this developer memory' "developer-memory full-clear test rule"
-
 require_pattern "guides/LESSON_14_DAYS.md" 'Step 12/14からStep 13/14' "Step 12/14-13 guide section"
 require_pattern "guides/LESSON_14_DAYS.md" '対話と壁打ち' "dialogue practice section"
 require_pattern "prompts/PROMPTS_14_DAYS.md" '壁打ち開始プロンプト' "dialogue prompt"
@@ -125,7 +149,6 @@ require_pattern "AGENTS.MD" '壁打ち' "agent dialogue rule"
 require_pattern "prompts/PROMPTS_14_DAYS.md" 'サブエージェント|sub-agent' "sub-agent prompt guidance"
 require_pattern "prompts/PROMPTS_14_DAYS.md" 'MCP' "MCP prompt guidance"
 require_pattern "skills/lesson14-facilitator/SKILL.md" 'Step 12/14 and Step 13/14' "Step 12/14-13 skill rule"
-require_pattern "$DEVELOPER_MEMORY_DOC" 'Explain MCP Purpose Before MCP Workflows' "MCP purpose-before-workflow memory"
 require_pattern "prompts/PROMPTS_14_DAYS.md" '入力、出力、便利になること、最小範囲' "MCP input/output prompt guidance"
 require_pattern "skills/lesson14-facilitator/SKILL.md" 'Before any MCP-related work' "MCP purpose-before-workflow skill rule"
 require_pattern "guides/LESSON_14_DAYS.md" 'MCPに入る前' "MCP learner-facing guide rule"

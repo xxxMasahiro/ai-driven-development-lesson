@@ -117,7 +117,7 @@ docs/as-built/SPECIFICATION.md   教材側の仕様
 docs/as-built/IMPLEMENTATION_PLAN.md 教材側の実装計画
 docs/workflow/TASK_TRACKER.md    教材側の作業進捗
 docs/workflow/HANDOFF.md         教材側の引き継ぎ
-docs/memory/DEVELOPER_MEMORY.md  教材側の開発者メモリー
+docs/memory/DEVELOPER_MEMORY.md  任意のローカル一時メモリー（Git管理外、存在する場合のみ）
 tools/lesson                     レッスン順序の制御
 tools/learn                      学習進捗の記録
 tools/check_lesson_structure.sh  教材構成と進捗状態の検査

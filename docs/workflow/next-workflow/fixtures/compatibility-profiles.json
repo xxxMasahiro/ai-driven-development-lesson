@@ -1,0 +1,62 @@
+{
+  "schema_version": "1.0.0",
+  "fixture_set_id": "next-workflow.compatibility-profiles.v1",
+  "isolated": true,
+  "frozen": true,
+  "profiles": [
+    {
+      "profile_id": "next-workflow.profile.parent.v1",
+      "fixture_only": true,
+      "repository_fixture_id": "parent",
+      "instruction_profile_version": "1.0.0",
+      "managed_child": false,
+      "obligations": [
+        {"obligation_id": "workflow.no-unrelated-tradeoff", "enforcement": "required"},
+        {"obligation_id": "workflow.required-verification", "enforcement": "required"}
+      ],
+      "relationships": [],
+      "parent_management_policies": [],
+      "inherited_duties": []
+    },
+    {
+      "profile_id": "next-workflow.profile.trace-cue.v1",
+      "fixture_only": true,
+      "repository_fixture_id": "trace-cue",
+      "instruction_profile_version": "1.0.0",
+      "managed_child": true,
+      "obligations": [
+        {"obligation_id": "workflow.developer-approval", "enforcement": "required"}
+      ],
+      "relationships": [
+        {"relationship_id": "fixture.relationship.trace-cue.v1", "parent_instance_id": "fixture.parent.v1", "repository_logical_id": "fixture.trace-cue.v1", "checkout_instance_id": "fixture.checkout.trace-cue.v1", "state": "ACTIVE", "authority_epoch": 2, "lease": {"state": "active", "expires_at": "2030-01-01T00:00:00.000Z"}, "revocation_state": "active", "policy_fingerprint": "fixture.policy.trace-cue.v1", "settings_fingerprint": "fixture.settings.trace-cue.v1"}
+      ],
+      "parent_management_policies": [
+        {"policy_id": "fixture.parent-management.trace-cue.v1", "relationship_id": "fixture.relationship.trace-cue.v1", "parent_instance_id": "fixture.parent.v1", "revision": "1.0.0", "decision": "allow", "policy_fingerprint": "fixture.policy.trace-cue.v1", "settings_fingerprint": "fixture.settings.trace-cue.v1", "fresh_until": "2030-01-01T00:00:00.000Z", "revocation_epoch": 2, "actions": ["*"], "targets": ["*"], "required_approvals": [], "duties": [], "resource_ceilings": {"max_cost": 100}, "rigor_floor": "L3"}
+      ],
+      "inherited_duties": [
+        {"id": "workflow.required-verification", "input": {"source_profile_id": "next-workflow.profile.parent.v1", "relationship_id": "fixture.relationship.trace-cue.v1", "enforcement": "required"}, "owner": "fixture.parent.v1"}
+      ]
+    },
+    {
+      "profile_id": "next-workflow.profile.frame-cue.v1",
+      "fixture_only": true,
+      "repository_fixture_id": "frame-cue",
+      "instruction_profile_version": "1.0.0",
+      "managed_child": true,
+      "obligations": [
+        {"obligation_id": "workflow.independent-review", "enforcement": "required"},
+        {"obligation_id": "workflow.developer-approval", "enforcement": "required"}
+      ],
+      "relationships": [
+        {"relationship_id": "fixture.relationship.frame-cue.v1", "parent_instance_id": "fixture.parent.v1", "repository_logical_id": "fixture.frame-cue.v1", "checkout_instance_id": "fixture.checkout.frame-cue.v1", "state": "ACTIVE", "authority_epoch": 2, "lease": {"state": "active", "expires_at": "2030-01-01T00:00:00.000Z"}, "revocation_state": "active", "policy_fingerprint": "fixture.policy.frame-cue.v1", "settings_fingerprint": "fixture.settings.frame-cue.v1"}
+      ],
+      "parent_management_policies": [
+        {"policy_id": "fixture.parent-management.frame-cue.v1", "relationship_id": "fixture.relationship.frame-cue.v1", "parent_instance_id": "fixture.parent.v1", "revision": "1.0.0", "decision": "allow", "policy_fingerprint": "fixture.policy.frame-cue.v1", "settings_fingerprint": "fixture.settings.frame-cue.v1", "fresh_until": "2030-01-01T00:00:00.000Z", "revocation_epoch": 2, "actions": ["*"], "targets": ["*"], "required_approvals": [], "duties": [], "resource_ceilings": {"max_cost": 100}, "rigor_floor": "L4"}
+      ],
+      "inherited_duties": [
+        {"id": "workflow.no-unrelated-tradeoff", "input": {"source_profile_id": "next-workflow.profile.parent.v1", "relationship_id": "fixture.relationship.frame-cue.v1", "enforcement": "required"}, "owner": "fixture.parent.v1"},
+        {"id": "workflow.required-verification", "input": {"source_profile_id": "next-workflow.profile.parent.v1", "relationship_id": "fixture.relationship.frame-cue.v1", "enforcement": "required"}, "owner": "fixture.parent.v1"}
+      ]
+    }
+  ]
+}

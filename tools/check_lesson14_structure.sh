@@ -29,7 +29,6 @@ required_files=(
   "$(lesson_doc_relpath implementation_plan)"
   "$(lesson_doc_relpath task_tracker)"
   "$(lesson_doc_relpath handoff)"
-  "$(lesson_doc_relpath developer_memory)"
   "docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv"
   "docs/workflow/DEVELOPMENT_INSTRUCTION_POLICY.tsv"
   "docs/workflow/DEVELOPMENT_AUTONOMY_WORKFLOW.tsv"

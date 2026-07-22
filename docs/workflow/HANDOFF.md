@@ -1381,7 +1381,7 @@ Restart context:
 
 SYNC-ID: dashboard_control_center_visual_refinement_followup
 STATUS: implemented
-ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/memory/DEVELOPER_MEMORY.md,dashboard-control-center/mocks/mock-context-overview.png,dashboard-control-center/mocks/mock-context-lessons.png,dashboard-control-center/mocks/mock-context-workflow.png,dashboard-control-center/mocks/mock-context-maintenance.png,dashboard-control-center/mocks/mock-context-safety.png,dashboard-control-center/src/App.jsx,dashboard-control-center/src/i18n.js,dashboard-control-center/src/styles.css,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_control_center.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_test_plan_coverage.sh,tools/check_ci_workflow_structure.sh
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,dashboard-control-center/mocks/mock-context-overview.png,dashboard-control-center/mocks/mock-context-lessons.png,dashboard-control-center/mocks/mock-context-workflow.png,dashboard-control-center/mocks/mock-context-maintenance.png,dashboard-control-center/mocks/mock-context-safety.png,dashboard-control-center/src/App.jsx,dashboard-control-center/src/i18n.js,dashboard-control-center/src/styles.css,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_control_center.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_test_plan_coverage.sh,tools/check_ci_workflow_structure.sh
 TESTS: tools/test_dashboard_control_center.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_test_plan_coverage.sh,tools/check_ci_workflow_structure.sh
 
 Restart context:
@@ -2154,7 +2154,7 @@ Current verification state:
 
 SYNC-ID: dashboard_control_center_design_system
 STATUS: implemented
-ARTIFACTS: docs/design-system/dashboard-control-center/DESIGN_SYSTEM.md,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/TEST_PLAN_MANIFEST.tsv,guides/DOCUMENT_MAP.md,tools/docs-tour,dashboard-control-center/src/App.jsx,dashboard-control-center/src/i18n.js,dashboard-control-center/src/styles.css,tests/playwright/dashboard-control-center.spec.js,tools/test_docs_tour.sh,tools/test_dashboard_control_center.sh,docs/memory/DEVELOPER_MEMORY.md,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+ARTIFACTS: docs/design-system/dashboard-control-center/DESIGN_SYSTEM.md,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/TEST_PLAN_MANIFEST.tsv,guides/DOCUMENT_MAP.md,tools/docs-tour,dashboard-control-center/src/App.jsx,dashboard-control-center/src/i18n.js,dashboard-control-center/src/styles.css,tests/playwright/dashboard-control-center.spec.js,tools/test_docs_tour.sh,tools/test_dashboard_control_center.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
 TESTS: tools/test_docs_tour.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/check_developer_memory_requirements.sh,tools/check_test_plan_coverage.sh,tools/test_test_plan.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh
 
 Restart context:
@@ -2203,7 +2203,7 @@ Current verification state:
 
 SYNC-ID: dashboard_control_center_design_system_full_application
 STATUS: implemented
-ARTIFACTS: docs/design-system/dashboard-control-center/DESIGN_SYSTEM.md,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,dashboard-control-center/src/App.jsx,dashboard-control-center/src/i18n.js,dashboard-control-center/src/styles.css,tests/playwright/dashboard-control-center.spec.js,docs/memory/DEVELOPER_MEMORY.md,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+ARTIFACTS: docs/design-system/dashboard-control-center/DESIGN_SYSTEM.md,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,dashboard-control-center/src/App.jsx,dashboard-control-center/src/i18n.js,dashboard-control-center/src/styles.css,tests/playwright/dashboard-control-center.spec.js,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
 TESTS: tools/test_docs_tour.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/check_developer_memory_requirements.sh,tools/check_test_plan_coverage.sh,tools/test_test_plan.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh
 
 Restart context:
@@ -2252,7 +2252,7 @@ Current verification state:
 
 SYNC-ID: dashboard_control_center_design_system_source_runtime
 STATUS: implemented
-ARTIFACTS: docs/design-system/dashboard-control-center/DESIGN_SYSTEM.md,docs/design-system/dashboard-control-center/tokens.json,docs/design-system/dashboard-control-center/components.json,dashboard-control-center/src/design-system.generated.css,dashboard-control-center/src/design-system.generated.js,dashboard-control-center/src/main.jsx,dashboard-control-center/src/App.jsx,dashboard-control-center/src/styles.css,tools/dashboard-design-system,tools/check_dashboard_design_system.sh,tools/test_dashboard_control_center.sh,tools/test_lesson_repository.sh,docs/workflow/GIT_HOOK_CHECKS.tsv,docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv,docs/workflow/TEST_PLAN_MANIFEST.tsv,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,tests/playwright/dashboard-control-center.spec.js,docs/memory/DEVELOPER_MEMORY.md,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+ARTIFACTS: docs/design-system/dashboard-control-center/DESIGN_SYSTEM.md,docs/design-system/dashboard-control-center/tokens.json,docs/design-system/dashboard-control-center/components.json,dashboard-control-center/src/design-system.generated.css,dashboard-control-center/src/design-system.generated.js,dashboard-control-center/src/main.jsx,dashboard-control-center/src/App.jsx,dashboard-control-center/src/styles.css,tools/dashboard-design-system,tools/check_dashboard_design_system.sh,tools/test_dashboard_control_center.sh,tools/test_lesson_repository.sh,docs/workflow/GIT_HOOK_CHECKS.tsv,docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv,docs/workflow/TEST_PLAN_MANIFEST.tsv,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,tests/playwright/dashboard-control-center.spec.js,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
 TESTS: tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/check_developer_memory_requirements.sh,tools/check_test_plan_coverage.sh,tools/test_test_plan.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
 
 Restart context:
@@ -2302,7 +2302,7 @@ Current verification state:
 
 SYNC-ID: dashboard_control_center_design_studio_visual_editor
 STATUS: implemented
-ARTIFACTS: docs/design-system/dashboard-control-center/DESIGN_SYSTEM.md,docs/design-system/dashboard-control-center/tokens.json,docs/design-system/dashboard-control-center/components.json,dashboard-control-center/src/design-system.generated.css,dashboard-control-center/src/design-system.generated.js,dashboard-control-center/src/App.jsx,dashboard-control-center/src/dashboardData.js,dashboard-control-center/src/i18n.js,dashboard-control-center/src/styles.css,vite.config.mjs,tools/dashboard-design-system,tools/check_dashboard_design_system.sh,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_control_center.sh,docs/workflow/PRODUCT_REPOSITORY_STRUCTURE.tsv,templates/TEMPLATES.md,tools/test_product_scaffold_check.sh,docs/memory/DEVELOPER_MEMORY.md,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+ARTIFACTS: docs/design-system/dashboard-control-center/DESIGN_SYSTEM.md,docs/design-system/dashboard-control-center/tokens.json,docs/design-system/dashboard-control-center/components.json,dashboard-control-center/src/design-system.generated.css,dashboard-control-center/src/design-system.generated.js,dashboard-control-center/src/App.jsx,dashboard-control-center/src/dashboardData.js,dashboard-control-center/src/i18n.js,dashboard-control-center/src/styles.css,vite.config.mjs,tools/dashboard-design-system,tools/check_dashboard_design_system.sh,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_control_center.sh,docs/workflow/PRODUCT_REPOSITORY_STRUCTURE.tsv,templates/TEMPLATES.md,tools/test_product_scaffold_check.sh,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
 TESTS: tools/check_dashboard_design_system.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/test_product_scaffold_check.sh,tools/check_developer_memory_requirements.sh,tools/check_test_plan_coverage.sh,tools/test_test_plan.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
 
 Restart context:
@@ -2352,7 +2352,7 @@ Current verification state:
 
 SYNC-ID: dashboard_control_center_design_studio
 STATUS: implemented
-ARTIFACTS: docs/design-system/dashboard-control-center/DESIGN_SYSTEM.md,docs/design-system/dashboard-control-center/components.json,dashboard-control-center/src/design-system.generated.css,dashboard-control-center/src/design-system.generated.js,dashboard-control-center/src/App.jsx,dashboard-control-center/src/dashboardData.js,dashboard-control-center/src/i18n.js,dashboard-control-center/src/styles.css,vite.config.mjs,tools/dashboard-design-system,tools/check_dashboard_design_system.sh,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_control_center.sh,docs/memory/DEVELOPER_MEMORY.md,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
+ARTIFACTS: docs/design-system/dashboard-control-center/DESIGN_SYSTEM.md,docs/design-system/dashboard-control-center/components.json,dashboard-control-center/src/design-system.generated.css,dashboard-control-center/src/design-system.generated.js,dashboard-control-center/src/App.jsx,dashboard-control-center/src/dashboardData.js,dashboard-control-center/src/i18n.js,dashboard-control-center/src/styles.css,vite.config.mjs,tools/dashboard-design-system,tools/check_dashboard_design_system.sh,tests/playwright/dashboard-control-center.spec.js,tools/test_dashboard_control_center.sh,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
 TESTS: tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/check_developer_memory_requirements.sh,tools/check_test_plan_coverage.sh,tools/test_test_plan.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
 
 Restart context:
@@ -2584,7 +2584,7 @@ Stop and ask before:
 
 SYNC-ID: ci_final_gate_gap_only_safety
 STATUS: implemented
-ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/FINAL_GATE_COVERAGE.tsv,docs/workflow/FINAL_GATE_GAP_COMMANDS.tsv,tools/ci-final-gate,tools/test_ci_final_gate.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md,docs/memory/SESSION_MEMORY.md
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/FINAL_GATE_COVERAGE.tsv,docs/workflow/FINAL_GATE_GAP_COMMANDS.tsv,tools/ci-final-gate,tools/test_ci_final_gate.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
 TESTS: tools/test_ci_final_gate.sh,tools/check_ci_workflow_structure.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh
 
 Current State:
@@ -2627,7 +2627,7 @@ Resume notes:
 
 SYNC-ID: product_authority_evidence_detail_contract
 STATUS: implemented
-ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/DASHBOARD_DATA_SCHEMA.tsv,tools/lib/product_repository_authority.sh,tools/product-repository-authority,dashboard-control-center/src/dashboardData.js,tests/fixtures/dashboard-control-center.json,tests/fixtures/dashboard-control-center-live-update.json,tools/test_product_repository_authority.sh,tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md,docs/memory/SESSION_MEMORY.md
+ARTIFACTS: docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/DASHBOARD_DATA_SCHEMA.tsv,tools/lib/product_repository_authority.sh,tools/product-repository-authority,dashboard-control-center/src/dashboardData.js,tests/fixtures/dashboard-control-center.json,tests/fixtures/dashboard-control-center-live-update.json,tools/test_product_repository_authority.sh,tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
 TESTS: tools/test_product_repository_authority.sh,tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh
 
 ## Implemented Dashboard Browser Debug Manifest Boundary Handoff
@@ -2673,7 +2673,7 @@ TESTS: tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/test_da
 
 SYNC-ID: dashboard_design_studio_event_runner_store
 STATUS: implemented
-ARTIFACTS: .gitignore,.github/workflows/ci.yml,.github/workflows/lesson14-ci.yml,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/TEST_PLAN_MANIFEST.tsv,docs/workflow/GIT_HOOK_CHECKS.tsv,docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv,docs/workflow/FINAL_GATE_COVERAGE.tsv,tools/dashboard-design-system,tools/test_dashboard_design_studio_events.sh,tools/test_lesson_repository.sh,tools/check_ci_workflow_structure.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md,docs/memory/DEVELOPER_MEMORY.md
+ARTIFACTS: .gitignore,.github/workflows/ci.yml,.github/workflows/lesson14-ci.yml,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/TEST_PLAN_MANIFEST.tsv,docs/workflow/GIT_HOOK_CHECKS.tsv,docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv,docs/workflow/FINAL_GATE_COVERAGE.tsv,tools/dashboard-design-system,tools/test_dashboard_design_studio_events.sh,tools/test_lesson_repository.sh,tools/check_ci_workflow_structure.sh,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/as-built/IMPLEMENTATION_PLAN.md,docs/workflow/TASK_TRACKER.md,docs/workflow/HANDOFF.md
 TESTS: tools/test_dashboard_design_studio_events.sh,tools/check_dashboard_design_system.sh,tools/check_ci_workflow_structure.sh,tools/check_test_plan_coverage.sh,tools/test_test_plan.sh,tools/test_git_hooks.sh,tools/test_git_hooks_parallel.sh,tools/test_ci_final_gate.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh
 
 Restart context:
@@ -3243,8 +3243,10 @@ Restart context:
   activate parent fallback; invalid and unsafe present states still block.
 - Preserve existing result fields and add policy-derived structured/CLI state
   for invariant path, procedural scope, local state, precedence, and trigger.
-- `DEVELOPER_MEMORY.md` and `SESSION_MEMORY.md` have pre-existing local changes
-  and are forbidden write/stage/commit targets until explicit permission.
+- `DEVELOPER_MEMORY.md` and `SESSION_MEMORY.md` were initially protected from
+  write/stage/commit actions. The developer later authorized their removal
+  from Git management; their local contents remain untouched, optional, and
+  ignored rather than permanent authority.
 - TernWeave is the selected registry target. This parent synchronization does
   not authorize reading, testing, or changing that child repository.
 
@@ -3252,3 +3254,400 @@ The scoped resolver/test implementation, focused/medium checks, and exact
 full/no-cache local release proof are complete; the full hook owner passed all
 68 checks. Next safe action is the configured Git/PR/main-CI sequence. Any
 failure returns to its owning implementation or document layer.
+
+## Next Development Workflow Implementation Handoff
+
+SYNC-ID: next_development_workflow_planning_contract
+STATUS: planned
+ARTIFACTS: .github/workflows/ci.yml,.github/workflows/lesson14-ci.yml,.gitignore,.node-version,.nvmrc,AGENTS.MD,README.md,dashboard-control-center/src/App.jsx,dashboard-control-center/src/dashboardData.js,dashboard-control-center/src/design-system.generated.css,dashboard-control-center/src/design-system.generated.js,dashboard-control-center/src/i18n.js,dashboard-control-center/src/styles.css,docs/as-built/IMPLEMENTATION_PLAN.md,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/design-system/dashboard-control-center/DESIGN_SYSTEM.md,docs/design-system/dashboard-control-center/components.json,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/DASHBOARD_DATA_SCHEMA.tsv,docs/workflow/FINAL_GATE_COVERAGE.tsv,docs/workflow/GIT_HOOK_CHECKS.tsv,docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv,docs/workflow/HANDOFF.md,docs/workflow/PRODUCT_SECURITY_POLICY.tsv,docs/workflow/REPOSITORY_DEVELOPMENT_WORKFLOW.tsv,docs/workflow/SAFEFLOW_SECURITY_BACKFILL.tsv,docs/workflow/TASK_TRACKER.md,docs/workflow/TEST_PLAN_MANIFEST.tsv,docs/workflow/next-workflow/authority-lifecycle.json,docs/workflow/next-workflow/context-impact.json,docs/workflow/next-workflow/fixtures/compatibility-profiles.json,docs/workflow/next-workflow/parent-child-authority.json,docs/workflow/next-workflow/provider-registry.json,docs/workflow/next-workflow/shadow-compatibility.json,docs/workflow/next-workflow/state-store.json,docs/workflow/next-workflow/team-agent-security.json,guides/DOCUMENT_MAP.md,learning/NEXT_WORKFLOW_ACTIVATION.json,learning/NEXT_WORKFLOW_AGENT_SELECTION_SETTINGS.json,learning/NEXT_WORKFLOW_PROVIDER_REGISTRY.json,learning/NEXT_WORKFLOW_RELEASE_TRUST.json,learning/NEXT_WORKFLOW_REPOSITORY_IDENTITY.json,package-lock.json,package.json,tests/playwright/dashboard-control-center.spec.js,tools/agent-selection-settings,tools/check_ci_workflow_structure.sh,tools/check_developer_memory_requirements.sh,tools/check_next_workflow.sh,tools/check_next_workflow_contracts.mjs,tools/check_next_workflow_contracts.sh,tools/dashboard,tools/dashboard-data,tools/dashboard-design-system,tools/dashboard-review-manifest,tools/docs-tour,tools/lib/next_workflow/agents.mjs,tools/lib/next_workflow/authority.mjs,tools/lib/next_workflow/compatibility.mjs,tools/lib/next_workflow/context.mjs,tools/lib/next_workflow/contracts.mjs,tools/lib/next_workflow/identity.mjs,tools/lib/next_workflow/migrations/001_initial.sql,tools/lib/next_workflow/migrations/002_saga_replay.sql,tools/lib/next_workflow/planning.mjs,tools/lib/next_workflow/projection.mjs,tools/lib/next_workflow/provider_discovery.mjs,tools/lib/next_workflow/providers.mjs,tools/lib/next_workflow/release.mjs,tools/lib/next_workflow/release_trust.mjs,tools/lib/next_workflow/runtime.mjs,tools/lib/next_workflow/saga.mjs,tools/lib/next_workflow/secret_policy.mjs,tools/lib/next_workflow/settings.mjs,tools/lib/next_workflow/store.mjs,tools/menu,tools/next-workflow,tools/next-workflow.mjs,tools/test_dashboard_browser_debug_manifest.sh,tools/test_dashboard_control_center.sh,tools/test_dashboard_data.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_schema.sh,tools/test_menu_prerequisites.sh,tools/test_next_workflow.sh,tools/test_next_workflow_agents.mjs,tools/test_next_workflow_agents.sh,tools/test_next_workflow_authority.mjs,tools/test_next_workflow_authority.sh,tools/test_next_workflow_child_isolation.mjs,tools/test_next_workflow_child_isolation.sh,tools/test_next_workflow_compatibility.mjs,tools/test_next_workflow_compatibility.sh,tools/test_next_workflow_context.mjs,tools/test_next_workflow_context.sh,tools/test_next_workflow_contracts.mjs,tools/test_next_workflow_contracts.sh,tools/test_next_workflow_identity.mjs,tools/test_next_workflow_identity.sh,tools/test_next_workflow_planning.mjs,tools/test_next_workflow_planning.sh,tools/test_next_workflow_projection_settings.mjs,tools/test_next_workflow_projection_settings.sh,tools/test_next_workflow_providers.mjs,tools/test_next_workflow_providers.sh,tools/test_next_workflow_release.mjs,tools/test_next_workflow_release.sh,tools/test_next_workflow_runtime.mjs,tools/test_next_workflow_runtime.sh,tools/test_next_workflow_saga.mjs,tools/test_next_workflow_saga.sh,tools/test_next_workflow_store.mjs,tools/test_next_workflow_store.sh,vite.config.mjs
+TESTS: tools/check_next_workflow.sh,tools/test_next_workflow.sh,tools/test_dashboard_schema.sh,tools/test_dashboard_data.sh,tools/test_dashboard_settings.sh,tools/test_dashboard_i18n.sh,tools/test_dashboard_control_center.sh,tools/check_dashboard_design_system.sh,tools/check_test_plan_coverage.sh,tools/test_test_plan.sh,tools/check_security_invariants.sh,tools/check_ci_workflow_structure.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh,tools/test_dashboard_browser_debug_manifest.sh
+
+Restart context after local implementation:
+
+- The developer directed that every agreed item in draft
+  `next_development_workflow_draft_20260721` be fully implemented. The non-
+  Control-Center runtime, compatibility, storage, recovery, and release owners
+  are present. On 2026-07-22 the developer paused the remaining Control Center
+  presentation and acceptance work; preserve its partial artifacts but do not
+  count them as complete. The activation record remains fail-closed `planned`
+  until that scope resumes and final delivery proof plus a separately proven
+  activation transition pass.
+- The target adds six descriptive lifecycle stages and L1-L5 rigor as
+  independent axes above the existing seven execution phases. Legacy aliases
+  remain E, F, A, B, C, and D for compatibility only.
+- The design covers scoring and hard triggers, stage compression, task-wide
+  independent perspectives, role boundaries, finite loops, L1-L4
+  authorization, one L5 approval after implementation planning, Git/GitHub
+  delivery, saved presets, effective runtime authority, unnecessary-approval
+  suppression, parent-child adapters, provider-neutral Agent execution and
+  selection, Control Center presentation, migration, and activation evidence.
+- The canonical organization is the `Hierarchical Multi-Agent Team`.
+  Layer 0 is the Orchestrator Agent. Layer 1 contains Lead Agents: Director as
+  Value Design Lead, Planner as Planning Design Lead, Builder as Implementation
+  Lead, Reviewer Gate as Independent Review Lead, and Validator as Safety and
+  Acceptance Decision Lead. Layer 2 contains bounded Task Agents. Developer /
+  Owner is the human authority outside the team, and Runtime / Tools is a
+  non-agent capability plane.
+- Normal display uses Orchestrator Agent, Lead Agent, and Task Agent. `Workflow
+  Orchestrator` and `subagent` remain compatibility vocabulary only; `SKILL.md`
+  packages are reusable instruction assets, not an agent type or team layer.
+- The Orchestrator Agent is the main agent and may create authorized Lead
+  Agents. Leads may create only bounded Task Agents. The initial topology ends
+  at depth 2; Task Agents cannot delegate. Depth counts actual Agent Runs. L1
+  creates no separate agent and the Orchestrator acts under compressed Lead
+  roles. L2 may create at most one Lead Agent and no Task Agent; needing Task
+  delegation raises effective rigor to at least L3. L3-L5 instantiate only the
+  agents required for role ownership and nonduplicative independent-
+  perspective coverage.
+- Agent execution uses a provider-neutral registry with the canonical identity
+  tuple execution provider, model publisher, agent product, adapter,
+  `cli_process|api_request|local_runtime` transport, and model. Provider-native
+  reasoning observation, derived normalized-effort profile, and capability are
+  separate fields. Initial certification targets Codex/OpenAI, Claude Code/
+  Anthropic, and Gemini/Google; exact CLI/API capability combinations and
+  mappings are P0 verification decisions rather than hard-coded assumptions.
+  Local model families such as Qwen are reached through registered local-
+  runtime or compatible API/CLI adapters.
+- Control Center presents the Hierarchical Multi-Agent Team organization and
+  lets the developer set each configurable Agent or applicable team default to
+  Auto, Manual, or Inherit. Every mode, including custom and local entries,
+  uses the same schema, security, compatibility, certification, attestation,
+  freshness, revocation, authority, and budget eligibility floor. Inherit uses
+  the fixed nearest-scope order Agent → role → team → repository → workflow
+  context → global; a present invalid/stale/uncertified/revoked value blocks
+  instead of silently falling through. Fallback closes the old launch intent
+  and creates a new selection, authority decision, and intent. Custom providers,
+  CLIs, APIs, local runtimes, and model entries use versioned schema-backed
+  registration, hardened structured argv or typed requests, exact executable/
+  endpoint boundaries, and scoped secret references only. CLI execution is
+  descriptor-pinned or equivalently race-free; response files are private,
+  bounded, and short-lived. Destination class/address is revalidated after DNS
+  and before every connection/redirect/proxy/nested-tunnel hop; intended peer
+  identity, SNI, and certificate policy are revalidated at every TLS handshake,
+  including TLS proxies and nested tunnels. Private, loopback, link-local,
+  metadata, and Unix-socket destinations require an exact local-runtime endpoint
+  policy and ordinary network permission cannot grant the exception. Resolved
+  secrets use only an explicitly authorized ephemeral channel. Arbitrary shell
+  templates, raw secrets, implicit runtime starts,
+  downloads, and installs are forbidden.
+- Every launch preserves four immutable configurations: requested, selected,
+  effective, and actual-observed provider identity/configuration. Native
+  reasoning is observed; normalized effort is derived with mapping provenance,
+  never reported as an observed provider fact. Unsupported mappings,
+  unavailable configuration, stale/expired/revoked certification, clock/drift/
+  outage uncertainty, or mismatch blocks. A fallback or new automatic choice
+  is a fresh visible selection and launch decision, never a silent
+  substitution. Native subagent, API, and local-runtime transports are
+  conditional adapters and are eligible only when they expose enough evidence
+  to satisfy the same policy and attestation requirements.
+- Certification uses the implemented canonical
+  `CANDIDATE|CERTIFIED|EXPIRED|REVOKED|FAILED|DEGRADED|UNAVAILABLE|REPROBE_REQUIRED` lifecycle. Only
+  `CERTIFIED` records are eligible; every recovery starts a fresh probe lineage,
+  and revocation or drift fails closed.
+- Delegation is bounded by `may_delegate`, depth, total-agent, parallel,
+  run-time/token/cost, retry, role/action/tool, sandbox/capability, and file
+  ownership limits. Investigation, planning, review, and validation default to
+  read-only. Concurrent writes require disjoint ownership and recorded
+  integration order. At L1 the Orchestrator under the compressed Implementation
+  Lead role is the sole writer; at L2 it or one instantiated Implementation
+  Lead is the sole writer; at L3-L5 Implementation Leads or explicitly owned
+  Task Agents write. Task results require Lead review and Orchestrator
+  acceptance, and instantiated Independent Review/Safety and Acceptance
+  Decision Leads remain independent from writes.
+- A Validator safety `STOP` is immutable for the same decision fingerprint.
+  Neither Orchestrator integration nor Developer/Owner approval may relabel it
+  `PASS`; re-entry requires a material change, linked fresh decision, and new
+  Validator evaluation.
+- Agent prompts carry trusted control instructions separately from bounded
+  untrusted data. Repository content, external documents, logs, provider
+  responses, generated content, and Agent results cannot grant role, scope,
+  authority, or executable instructions. Agent results remain candidates until
+  schema/provenance/authority checks, Lead review, Orchestrator acceptance, and
+  Validator disposition pass.
+- The reviewed parent-child extension makes `INSTRUCTION_MEMORY.md` the common
+  bootstrap for the reusable workflow while preserving exact-one-source
+  resolution. Procedural instruction selection remains separate from a new
+  versioned parent management-policy composition layer; the child's applicable
+  `AGENTS.MD` remains its invariant authority and the parent's full
+  `AGENTS.MD` is never merged into it.
+- Parent-managed rules compose by domain: stricter safety/privacy/rigor floors,
+  intersected Git/provider/external-send/filesystem/network/runtime/cost
+  ceilings, additive test/CI/review/dependency/license/release/document duties,
+  exact child ownership of product docs/Git/CI/evidence, and advisory-only
+  parent roadmap priority.
+- The developer subsequently adopted an independent repository-local
+  SQLite-backed `WorkflowStateStore` and a precision-first delivery optimizer.
+  Git-managed authorities remain normative; the local ignored store owns only
+  transactional operational state, event/outbox history, evidence references,
+  and rebuildable projections. Parent and child repositories never share one
+  live database, and TernWeave is an architecture reference rather than a code
+  dependency.
+- Correctness is a hard constraint and speed is optimized only among plans that
+  preserve mandatory gates, traceability, non-regression, authority, and
+  fail-closed unknown states. Planned speed mechanisms are bounded work-context
+  compilation, typed change-impact closure, failure/progress signatures,
+  critical-path scheduling with conflict/resource guards, minimum
+  non-duplicative review coverage, schema-driven generation, and optional
+  value-of-information ordering.
+- The next workflow runtime is implemented but remains in fail-closed planned
+  mode. Shadow comparison begins only after an explicit candidate freeze. Current
+  execution remains governed by `AGENTS.MD`,
+  `docs/workflow/INSTRUCTION_MEMORY.md`, existing policies, and existing tools
+  until final activation evidence passes.
+- Built-in Codex discovery resolves and fingerprints the installed CLI and its
+  allowlisted script interpreter, observes installed version and visible model/
+  reasoning data, and issues only short-lived observation-bound certifications.
+  Other ecosystem, API, custom, and local-runtime paths remain ineligible until
+  their own versioned adapter and equivalent evidence are configured; no model
+  or transport is silently simulated.
+- The default CLI executor retains the admitted executable and interpreter by
+  descriptor through process handoff, uses structured argv and an allowlisted
+  environment, creates an exclusive owner-only response file, and returns only
+  bounded result metadata. API and local-runtime manifests and typed plans are
+  validated, but operational dispatch is intentionally unavailable until a
+  gateway-owned connection and ephemeral-secret transport can prove endpoint
+  use and prevent secret retention.
+- The production composition root owns the common SideEffectGateway and
+  provider adapter and rejects provider-leg replacement. Agent launch remains
+  unavailable unless independent actual-observation admission and containment
+  are configured. Read-only status, catalog, projection, health, and release
+  commands do not create repository identity or store files.
+- Release tooling freezes only a clean exact candidate, binds artifacts and
+  repository state by digest, verifies signed proof bundles only against
+  configured Ed25519 public verifiers, and permits ordered confirmation-bound
+  transitions. `learning/NEXT_WORKFLOW_RELEASE_TRUST.json` intentionally starts
+  with no trusted verifier, so release admission fails closed and stores no
+  private signing material.
+- The child-local instruction resolution rule delivered under PR #33 remains a
+  compatibility input to this implementation. Valid local remains
+  first; only exact absence may use parent fallback; invalid local blocks. A
+  common workflow profile loads reusable engine behavior without merging or
+  copying instructions. Versionless/1.0.0 FrameCue/TraceCue-style instructions
+  retain every stronger local approval/review obligation until a separate
+  child-local semantic migration passes; unsupported or unparsed obligations
+  remain manual/blocked rather than being silently downgraded.
+- A valid child-local instruction cannot bypass parent Control Center Git and
+  GitHub ceilings. Saved settings become global/context/repository scoped and
+  versioned. Effective authority binds stable logical and checkout identities,
+  one active parent relationship, task/run, instruction/policy/settings
+  revisions, action/ref/SHA, approval, runtime capability, expiry, and
+  revocation epoch, and is reevaluated just before every Git/provider side
+  effect through one shared enforcement gateway.
+- Existing Git `auto` and `after_approval` values retain their current explicit
+  push/PR/merge approval semantics. Approval-free normal delivery under a saved
+  preset requires a distinct versioned setting/value, Control Center preview/
+  apply migration, and auditable receipt; missing or ambiguous migration state
+  blocks. Legacy operation approval reason codes remain valid until that
+  migration.
+- `AuthorityDecision@1` becomes a tagged family for Git/provider effects, Agent
+  launches, filesystem writes, adapter sends, runtime-service effects,
+  artifact/dependency effects, and resource/cost effects. Launch decisions bind
+  grant/intent/configuration/context/budget/targets; write decisions bind
+  canonical targets, pre-write state, symlink policy, ownership, locks, and
+  integration order. The pre-launch decision authorizes requested, selected,
+  and effective configuration with actual-observed explicitly absent; a
+  separate post-spawn run-admission decision verifies the actual observation and
+  complete four-state attestation before `RUNNING`. Each target is reevaluated
+  immediately before use. Daemon starts, downloads, installs,
+  sockets, network use, disk reservations, and monetary/token cost can never
+  arrive as implicit provider capability.
+- The implemented AuthorityComposer and SideEffectGateway provide that typed
+  composition and bind repository instance, relationship, task/run, target,
+  instruction/policy/settings revisions, runtime capability, expiry, and
+  revocation. Shadow mode deliberately keeps the legacy workflow authoritative
+  until final activation proof.
+- Cross-repository work is a Saga: persist local state and external-effect
+  intent first, exchange only bounded versioned messages/projections, then
+  reconcile receipts. Crash-after-push/PR/merge recovery observes the exact
+  provider object, reconstructs a matching receipt, and stops on unknown or
+  conflicting outcome. The design does not promise exactly-once external
+  effects or share one live database.
+- Every Saga effect/receipt binds a deterministic effect key, request and
+  authority fingerprints, exact target/ref/SHA, expected provider object,
+  attempt lineage, observation, recovery disposition, and verifiable message/
+  receipt authenticity proof. Irreversible merge never claims automatic
+  compensation. Rollback first fences new effects, then drains or quarantines
+  in-flight work and reservations, restores compatible state, verifies it, and
+  only then records `ROLLED_BACK`.
+- Stable relationship identity distinguishes rename/move, reclone, and fork;
+  zero, multiple, revoked, stale, or ambiguous parent relationships block.
+  Offline work is limited to stages 1-4 with a valid unexpired baseline and
+  non-external/non-destructive stage-5 local work; stage 6 blocks at commit
+  without current parent authority. Local-only work stays `LOCAL_ONLY`, parent
+  completion stays `UNSYNCED` until receipt. Graceful archive uses
+  `ACTIVE → DRAINING → ARCHIVED`, allowing only pre-existing authorized
+  reconciliation/drain before revocation; emergency `REVOKED` permits no send
+  and quarantines pending intents. Evidence remains read-only.
+- P0 finalized lifecycle/phase mapping, rigor and finite-loop decisions,
+  immutable STOP, team and provider contracts, parent-child management and
+  tagged authority, Saga recovery, context/impact planning, SQLite storage, and
+  shadow compatibility in seven dependency-ordered JSON authorities.
+- P0 is seven dependency-ordered contract slices: authority/lifecycle;
+  team/agent security; provider registry; parent-child authority; context/
+  impact; state store; and shadow compatibility. P1 implements the store, then
+  common authority gateway, impact planner/scheduler, WorkContextFrame,
+  provider registry/adapters, Hierarchical Multi-Agent Team/common launcher,
+  Saga adapter/reconciliation, and producer-owned Control Center data in
+  producer-before-consumer order. P2 implements presentation, compatibility/
+  storage/legacy migration and shadow comparison first; then completes release,
+  data-recovery, fenced-rollback, archive/decommission, and outbox drain/
+  quarantine proof; explicit activation is the final atomic transition.
+- Control Center must distinguish requested, selected, effective, and actual-
+  observed configurations and label `Choose provider/model manually` separately
+  from `Manual Git delivery`; provider choice never grants execution or Git
+  authority. It previews inheritance before apply and applies settings atomically
+  with a revisioned receipt. Guarded revert requires a fresh dry-run, current-
+  revision match, and certification/eligibility/authority revalidation. The
+  chart and semantic comparison table are functionally equivalent and retain
+  parent/layer, role, source, four-state, certification, blocker, remediation,
+  keyboard/focus, label, contrast, and screen-reader information. The persistent
+  banner means: `planned`/`shadow` grant no new authority, `enforced` is active,
+  and `rolled_back` uses the restored legacy path with new actions disabled.
+- On 2026-07-22 the developer paused Control Center implementation and review
+  for later reconsideration. Preserve the current partial work, but keep phase
+  18 presentation, final TraceCue/browser proof, and developer acceptance
+  explicitly unfinished. Do not modify Control Center code while completing
+  the remaining non-Control-Center owners, and do not use prior partial UI
+  evidence to claim activation readiness.
+- One release-candidate fingerprint binds exact local release, PR/main CI,
+  synchronization, recovery, fenced rollback, archive/decommission, and outbox
+  drain/quarantine evidence. Any material candidate change returns the workflow
+  to shadow comparison under a new proof lineage.
+- Both local memory files remain Git-ignored temporary records. This closure
+  did not write their current local bytes and does not claim that those bytes
+  equal the last tracked snapshots; their staged index-only removal from Git
+  tracking must not be reversed by this work.
+- All permanent synchronization in this implementation contract is English.
+  Progress is reported at least every 15 minutes from verified weighted units;
+  work merely started is not counted as complete.
+- TraceCue, FrameCue, TernWeave, KeyWeave Studio, the SafeFlow reference
+  repository, and all other child/external repositories remain unmodified.
+  Parent verification uses policy files and isolated fixtures, not live child
+  traversal or child evidence substitution.
+- Independent read-only CLI audits of requirements/specification consistency,
+  slice ownership/order, provider and authority security, distributed recovery,
+  legacy compatibility, and non-engineer Control Center usability were
+  incorporated into this permanent contract. Their temporary raw reports are
+  not permanent authorities.
+
+Next safe action:
+
+- Preserve the locally verified non-Control-Center implementation without
+  changing Control Center code, and deliver that scoped implementation through
+  PR CI, merge, main CI, and synchronization now. This delivery is not the final
+  activation candidate. When the developer later resumes the paused
+  scope, return to Phase 18, complete its design-system-owned work, and rerun
+  required browser and TraceCue review plus developer acceptance before release
+  activation.
+- After Phase 18 is explicitly resumed, completed, reviewed, and accepted,
+  begin Phase 20 with the activation-bound production-wiring slice. Configure
+  independently authenticated runtime sources and approval/receipt/
+  reconciliation verifiers, separate provider probe/certification authorities,
+  operational observation and containment, and exact CLI/Git/workflow adapters
+  through the common gateway. The present hard-deny placeholders are safe but
+  are not implementation evidence for that slice. Then complete Phase 20
+  against one immutable candidate: final local aggregate and
+  no-cache evidence, PR CI, merge, main CI, and local/remote synchronization,
+  plus recovery, fenced rollback, archive/decommission, and outbox-disposition
+  proofs. If they all bind the same candidate and correctness remains green,
+  use the signed, confirmation-bound release-transition commands to persist the
+  operational activation lifecycle in the repository-local store; do not
+  manually edit the planned baseline included in the scoped delivery. Run the activation checks and
+  repeat the configured delivery proof for the final activation-only change.
+  Any material drift returns to shadow under a new candidate.
+
+Non-Control-Center closure evidence on 2026-07-22:
+
+SYNC-ID: next_development_workflow_non_ui_security_closure
+STATUS: implemented
+ARTIFACTS: docs/as-built/IMPLEMENTATION_PLAN.md,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/HANDOFF.md,docs/workflow/TASK_TRACKER.md,learning/NEXT_WORKFLOW_RELEASE_PREREQUISITES.json,tools/check_document_organization.sh,tools/lib/document_paths.sh,tools/lib/next_workflow/agents.mjs,tools/lib/next_workflow/authority.mjs,tools/lib/next_workflow/compatibility.mjs,tools/lib/next_workflow/contracts.mjs,tools/lib/next_workflow/identity.mjs,tools/lib/next_workflow/projection.mjs,tools/lib/next_workflow/provider_discovery.mjs,tools/lib/next_workflow/providers.mjs,tools/lib/next_workflow/release.mjs,tools/lib/next_workflow/runtime.mjs,tools/lib/next_workflow/saga.mjs,tools/lib/next_workflow/store.mjs,tools/next-workflow.mjs,tools/test_lesson_repository.sh,tools/test_next_workflow_agents.mjs,tools/test_next_workflow_authority.mjs,tools/test_next_workflow_compatibility.mjs,tools/test_next_workflow_contracts.mjs,tools/test_next_workflow_identity.mjs,tools/test_next_workflow_projection_settings.mjs,tools/test_next_workflow_providers.mjs,tools/test_next_workflow_release.mjs,tools/test_next_workflow_runtime.mjs,tools/test_next_workflow_saga.mjs,tools/test_next_workflow_store.mjs
+TESTS: tools/check_developer_memory_requirements.sh,tools/check_document_organization.sh,tools/check_lesson_structure.sh,tools/check_lesson14_structure.sh,tools/check_next_workflow.sh,tools/test_next_workflow.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+- The complete local aggregate passed 192 assertions across 14 standalone
+  suites, and the seven frozen P0 contracts passed fingerprint validation.
+- Relationship initialization, Relationship transitions, and activation
+  lifecycles now have dedicated atomic store writers; generic record insertion
+  cannot forge their records or transitions. Recovery
+  mode clears immediately after the last recovery transaction is finalized.
+- Read-only store opening and health now reject migration name/state/checksum,
+  stored schema identity, and physical `sqlite_schema` drift without silently
+  re-blessing it. Parsed versionless or unknown instruction profiles block, and
+  approval grants need exact independently verified proof binding before an
+  ALLOW decision.
+- Global fencing invalidates every older persisted delegation grant before a
+  reservation, reviewer assignment, or launch can reuse it. Reconciliation is
+  restricted to one effect-bound receipt proof and shares the protected-record
+  guard used by generic commits. Existing stores with deleted schema, identity,
+  revision, or revocation metadata stop without recreating those rows.
+- Writable grants are re-contained under the persisted Implementation Lead at
+  creation, dedicated persistence, and launch-chain resolution. Effect intent
+  commit and the atomic dispatch claim require the live authority epoch; a
+  fence immediately before adapter dispatch moves the claim to manual recovery
+  and quarantines its outbox without dispatch.
+- Saga acceptance rereads and binds the current persisted Relationship record,
+  fingerprint, peers, lease, key, state, and global epoch in its replay
+  transaction. Activation records require exact revision/source/event topology,
+  and signed transition evidence must carry the frozen candidate repository
+  head. Missing, changed, or post-signature-fenced state stops without replay
+  advancement.
+- Store bootstrap preflight treats only an application-schema-empty SQLite
+  container as fresh; any nonempty database missing `store_meta` or
+  `schema_migrations` stops before migration. Forward activation retains one
+  live authority epoch, final enforcement independently reverifies every
+  transition signature inside the locked transaction, and runtime trust fails
+  immediately after a fence. Cached verifier output cannot authorize it.
+- State import/restore now needs an independent verifier bound to the complete
+  artifact, manifest, identity, schema, revision, and epoch before publishing
+  or quarantining. Depth-1 grants are rooted only at the canonical Orchestrator,
+  stale non-revoking Relationship transitions stop after a fence, and release
+  proofs bind candidate HEAD through the same PR number to the main merge and
+  synchronized `origin/main` heads.
+- Agent launch now resolves the persisted grant before binding the CLI sandbox
+  and canonical repository root. Receipt finalization recomputes the locked
+  effect/observation identity and reruns a store-configured independent
+  verifier, while generic commits and finalization repeat revision CAS inside
+  `BEGIN IMMEDIATE`. The provider adapter carries the exact epoch/fence to the
+  executor; the built-in executor refuses operational dispatch because it
+  cannot enforce a downstream fence, leaving production wiring safely pending.
+  The fence writer now locks and CAS-checks revision/epoch before mutation, so
+  stale gateway requests cannot revoke and then report a conflict afterward.
+- Candidate definitions, accepted prerequisites, current repository state,
+  content-specific signed proofs, independent reviewer identities, grant
+  containment, trusted provider certification, authoritative retries, and
+  parent-management trust bindings are enforced and adversarially tested.
+- Provider discovery requires distinct injected probe and certification
+  authorities; CLI response directories are exact owner-only `0700` and remain
+  descriptor-pinned across child execution, readback, and cleanup. Pre-spawn
+  Agent admission binds current registry evidence, provider plan, persisted
+  selection, unspent reservation, targets, one authority/revocation epoch, the
+  complete persisted parent chain, and child/parent-contained write ownership
+  before any spawn. Read-only ownership cannot carry a writable sandbox.
+- Kind-specific verified writers own DelegationGrant, reviewer assignments,
+  review dispositions, Validator decisions, and resource reservations; no
+  public generic protected-record sink remains. Persisted grants require full
+  finite-freshness/topology reconstruction, and Agent authority/result writes
+  reject stale epochs after a global fence. Relationship and activation
+  writers rerun independent proof verification against the locked current row
+  inside the committing transaction; Relationship transitions bind exact
+  lineage, sequential revision, lifecycle, source revision, and event. Enforced
+  projection reconstructs the
+  complete signed release and transition lineage rather than trusting structural
+  shape or a reusable same-candidate proof bundle.
+- `tools/next-workflow runtime status`, `runtime effect-preview`, and
+  confirmation-bound `runtime reconcile` install the common runtime composition
+  in the executable surface. Any missing operational authority, observer,
+  receipt verifier, API transport, or local-runtime transport stops safely.
+- `tools/next-workflow release proofs-verify` now reaches the signed verifier
+  through the executable CLI and is protected by a regression smoke test.
+- `learning/NEXT_WORKFLOW_RELEASE_PREREQUISITES.json` is the mechanical
+  fail-closed record of the developer-paused Control Center prerequisite. It
+  remains paused and unaccepted. Control Center implementation, TraceCue/
+  browser review, and developer acceptance remain explicitly unfinished for
+  later resumption; no Control Center code was changed in this closure.
+- Parent document synchronization now has a non-exemptible Next Workflow core
+  classification. The PR/push range must contain the complete as-built,
+  instruction, verification, Security, CI, and workflow-state authorities;
+  parent CI still never traverses child repositories. Git-hook evidence also
+  handles the observed nested-sandbox status-zero/post-exec-`EPERM` condition
+  without accepting nonzero or ambiguous output, and its final-gate regression
+  passed five consecutive runs.

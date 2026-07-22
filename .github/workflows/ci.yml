@@ -21,7 +21,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v6
         with:
-          node-version: "20"
+          node-version: "24"
 
       - name: Shell syntax
         run: |
@@ -177,7 +177,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v6
         with:
-          node-version: "20"
+          node-version: "24"
 
       - name: Validate parent document-sync policy and rejection tests
         run: ./tools/verification-ci run-job --workflow main --job repository-document-sync --jobs 2
@@ -205,7 +205,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v6
         with:
-          node-version: "20"
+          node-version: "24"
 
       - name: Composed structure and document owners
         run: ./tools/verification-ci run-job --workflow main --job structure-docs-checks --jobs 4
@@ -221,7 +221,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v6
         with:
-          node-version: "20"
+          node-version: "24"
 
       - name: Composed policy regression owners
         run: ./tools/verification-ci run-job --workflow main --job policy-regression-tests --jobs 4
@@ -233,6 +233,11 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: "24"
 
       - name: Composed lesson CLI owners
         run: ./tools/verification-ci run-job --workflow main --job lesson-cli-tests --jobs 3
@@ -248,7 +253,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v6
         with:
-          node-version: "20"
+          node-version: "24"
           cache: npm
 
       - name: Cache Playwright browsers
@@ -285,7 +290,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v6
         with:
-          node-version: "20"
+          node-version: "24"
 
       - name: Composed owner result proof
         env:
@@ -323,7 +328,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v6
         with:
-          node-version: "20"
+          node-version: "24"
 
       - name: Full no-cache compatibility proof
         env:
@@ -356,7 +361,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v6
         with:
-          node-version: "20"
+          node-version: "24"
 
       - name: Verify split prerequisites
         env:

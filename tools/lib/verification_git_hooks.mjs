@@ -25,6 +25,10 @@ function git(root, args, allowFailure = false) {
   try {
     return execFileSync('git', ['-C', root, ...args], { encoding: 'buffer', maxBuffer: 128 * 1024 * 1024 });
   } catch (error) {
+    // Some nested sandboxes report a post-exec EPERM even though Git itself
+    // completed with status 0 and returned the requested bytes. Preserve that
+    // successful read-only result, but never accept a nonzero/unknown status.
+    if (error?.status === 0 && Buffer.isBuffer(error.stdout)) return error.stdout;
     if (allowFailure) return Buffer.alloc(0);
     throw new VerificationError('HOOK_EVIDENCE_GIT', `Git command failed while building evidence: ${args.join(' ')}`);
   }

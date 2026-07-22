@@ -1,0 +1,17 @@
+{
+  "schema_version": "1.0.0",
+  "activation_id": "next-development-workflow",
+  "revision": 1,
+  "mode": "planned",
+  "candidate_fingerprint": null,
+  "evidence": [],
+  "correctness": {
+    "status": "local_verification_in_progress",
+    "required_check_misses": null,
+    "authority_decision_parity": null,
+    "traceability_coverage": null,
+    "existing_feature_regressions": null,
+    "unknown_green_states": null
+  },
+  "activated_at": null
+}

@@ -1,0 +1,39 @@
+{
+  "schema_version": "1.0.0",
+  "contract_id": "next_workflow_provider_registry",
+  "activation_mode": "planned",
+  "identity_fields": ["execution_provider_id", "model_publisher_id", "agent_product_id", "adapter_id", "transport_id", "model_id"],
+  "transports": ["cli_process", "api_request", "local_runtime"],
+  "selection_modes": ["auto", "manual", "inherit"],
+  "inheritance_order": ["agent", "role", "team", "repository", "context", "global"],
+  "nearest_present_invalid_blocks": true,
+  "shared_eligibility_floor": ["schema_valid", "certified", "not_expired", "not_revoked", "capability_match", "authority_match", "budget_match", "fresh_observation"],
+  "certification": {
+    "states": ["CANDIDATE", "CERTIFIED", "EXPIRED", "REVOKED", "FAILED", "DEGRADED", "UNAVAILABLE", "REPROBE_REQUIRED"],
+    "eligible_state": "CERTIFIED",
+    "key_fields": ["provider_identity", "adapter_version", "platform", "capability_fingerprint"],
+    "requires_ttl": true,
+    "drift_or_outage_fails_closed": true
+  },
+  "configuration_states": ["requested", "selected", "effective", "actual_observed"],
+  "attestation": {"immutable_snapshots": true, "fields": ["identity", "reasoning_native", "normalized_effort", "source", "observed_at", "fingerprint", "evidence_strength"], "actual_absent_before_spawn": true, "copied_or_predicted_actual_refused": true},
+  "reasoning": {"native_and_normalized_are_distinct": true, "normalized_mapping_requires_provenance": true, "unsupported_equivalence_must_not_be_claimed": true},
+  "custom_manifest": {
+    "common_required": ["manifest_id", "version", "transport", "identity", "capabilities", "certification_profile", "resource_bounds"],
+    "cli_required": ["canonical_executable", "executable_digest", "argv_schema", "environment_allowlist", "private_response_file"],
+    "api_required": ["endpoint_policy", "method_allowlist", "request_schema", "response_schema", "secret_reference_policy"],
+    "local_required": ["exact_endpoint", "service_identity", "health_contract", "start_stop_authority"],
+    "shell_templates": "forbidden",
+    "implicit_download_install_or_service_start": "forbidden",
+    "requires_observation": true,
+    "observation_trust_class": "trusted_runtime_observation",
+    "observation_requires_injected_trusted_verifier": true,
+    "observation_must_be_fresh_and_certification_bound": true
+  },
+  "endpoint_security": {"configured_first_url_must_equal_observed_hop_zero": true, "redirect_continuity_required": true, "redirect_origins_require_exact_allowlist": true, "connection_path_requires_exact_intermediary_allowlist": true, "connection_path_requires_address_and_continuity_evidence": true, "validate_after_dns_and_each_hop": true, "validate_tls_peer_each_handshake": true, "ordinary_network_cannot_reach_private_classes": true, "private_classes_require_exact_local_policy": ["private", "loopback", "link_local", "metadata", "unix_socket"]},
+  "secret_reference": {"raw_secret_in_manifest": "forbidden", "required_fields": ["reference_id", "namespace", "resolver", "audience", "adapter_id", "scope", "issued_at", "expires_at", "revocation_state", "rotation_epoch", "revocation_epoch", "delivery_mode"], "resolver_must_be_authorized_for_adapter": true, "rotation_and_revocation_epoch_binding": true, "ephemeral_delivery_only": true, "resolved_bytes_must_be_zeroed_after_dispatch": true},
+  "initial_candidate_families": ["codex_openai", "claude_code_anthropic", "gemini_google"],
+  "model_names_hardcoded": false,
+  "selection_dry_run": {"fields": ["requested_change", "base_revision", "inheritance_trace", "affected_agents", "before_after_authority", "before_after_capability", "before_after_cost", "before_after_network", "eligibility", "blockers", "expires_at", "fingerprint"], "grants_authority": false},
+  "refusal_codes": ["NEAREST_SOURCE_INVALID", "UNCERTIFIED", "CERTIFICATION_STALE", "CERTIFICATION_REVOKED", "CAPABILITY_MISMATCH", "UNSUPPORTED_REASONING", "PLACEHOLDER_ACTUAL", "EXECUTABLE_IDENTITY_MISMATCH", "UNSAFE_ENDPOINT", "INVALID_SECRET_REFERENCE", "IMPLICIT_RUNTIME_EFFECT"]
+}

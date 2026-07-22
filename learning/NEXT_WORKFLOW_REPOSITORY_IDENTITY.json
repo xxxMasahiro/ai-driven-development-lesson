@@ -1,0 +1,7 @@
+{
+  "schema_version": "1.0.0",
+  "config_id": "next-workflow-parent-repository",
+  "management_mode": "managed",
+  "repository_logical_id": "ai-driven-development-lesson",
+  "attested_origin_digest": "61750d057055c8ecd7918f4f10338174165e0d7e33cd2e995b5b65df734ee466"
+}

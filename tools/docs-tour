@@ -119,7 +119,7 @@ show_status() {
     "$(file_presence docs/workflow/GIT_HOOK_CHECKS.tsv)" \
     "$(file_presence docs/workflow/GIT_HOOK_RECOMMENDATION_PATHS.tsv)" \
     "$(file_presence learning/GIT_HOOK_SETTINGS.tsv)"
-  printf 'Memory docs: %s, %s\n' \
+  printf 'Optional local temporary memory docs: %s, %s\n' \
     "$(file_presence docs/memory/DEVELOPER_MEMORY.md)" \
     "$(file_presence docs/memory/SESSION_MEMORY.md)"
   printf '\n'
@@ -133,7 +133,7 @@ show_status() {
   printf '%s\n' '- docs/workflow/GIT_HOOKS_POLICY.tsv and GIT_HOOK_CHECKS.tsv: what pre-commit checks run'
   printf '%s\n' '- docs/workflow/GIT_HOOK_RECOMMENDATION_PATHS.tsv: when local full/no-cache verification is recommended'
   printf '%s\n' '- learning/GIT_HOOK_SETTINGS.tsv: current local Git hook mode'
-  printf '%s\n' '- docs/memory/: stable lesson-side maintainer memory and current session handoff notes'
+  printf '%s\n' '- docs/memory/: optional Git-ignored local temporary notes; never repository authority'
   printf '%s\n' '- product-side docs/memory/FAILURE_MEMORY.md: failure and recovery records when a product repository uses one'
   printf '%s\n' '- skills/*/SKILL.md: reusable agent procedures'
   printf '\n'
@@ -224,14 +224,14 @@ show_memory() {
   print_section 'Memory And Decisions'
   case "$(current_mode_code)" in
     A)
-      printf 'Developer memory preserves stable maintainer intent, review findings, and follow-up requirements. Session memory preserves current handoff notes and temporary verification context.\n'
+      printf 'Developer and session memory are optional, Git-ignored local temporary notes. They may be absent and are never permanent sources of truth.\n'
       printf 'Failure memory is usually product-side: a product repository can use docs/memory/FAILURE_MEMORY.md to record failures and recovery steps.\n\n'
       ;;
     B)
-      printf 'Developer memory stores stable maintainer intent. Session memory stores restart context. Product-side failure memory stores failures and recovery notes.\n\n'
+      printf 'Developer and session memory are optional local temporary notes, not repository authority. Product-side failure memory stores failures and recovery notes.\n\n'
       ;;
     C)
-      printf 'DEVELOPER_MEMORY.md: maintainer intent. SESSION_MEMORY.md: restart context. Product docs/memory/FAILURE_MEMORY.md: failure recovery.\n\n'
+      printf 'DEVELOPER_MEMORY.md and SESSION_MEMORY.md: optional Git-ignored local temporary notes. Product docs/memory/FAILURE_MEMORY.md: failure recovery.\n\n'
       ;;
   esac
   printf '%s\n' '- docs/memory/DEVELOPER_MEMORY.md'

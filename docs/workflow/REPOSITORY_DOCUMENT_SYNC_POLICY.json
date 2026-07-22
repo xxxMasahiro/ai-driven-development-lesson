@@ -393,6 +393,30 @@
       "cannot_be_exempted": true
     },
     {
+      "id": "next-workflow-core",
+      "description": "Next Workflow contracts, persisted authorities, CLI, and runtime owners update the complete parent authority, as-built, Security, verification, CI, and workflow-state contract without traversing child repositories.",
+      "trigger": {
+        "any_of": [
+          "docs/workflow/next-workflow/**",
+          "learning/NEXT_WORKFLOW_*.json",
+          "tools/agent-selection-settings",
+          "tools/next-workflow",
+          "tools/next-workflow.mjs",
+          "tools/lib/next_workflow/**",
+          "tools/check_next_workflow*",
+          "tools/test_next_workflow*"
+        ]
+      },
+      "required_groups": [
+        "as_built_core",
+        "verification",
+        "security",
+        "ci_hooks",
+        "development_instruction_governance"
+      ],
+      "cannot_be_exempted": true
+    },
+    {
       "id": "parent-implementation-fallback",
       "description": "Previously unclassified parent implementation changes must at least update the workflow-state pair.",
       "trigger": {

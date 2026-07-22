@@ -1,0 +1,22 @@
+{
+  "schema_version": "1.0.0",
+  "contract_id": "next_workflow_state_store",
+  "activation_mode": "planned",
+  "adr": {"status": "accepted_for_shadow", "port": "WorkflowStateStore", "driver": "node:sqlite DatabaseSync", "minimum_node": "24.0.0", "external_dependency": false, "replaceable_driver": true, "reason": "repository-local transactional state with no service or dependency install", "rollback": "export canonical JSONL and restore legacy TSV/JSONL adapters"},
+  "placement": ".workflow-state/",
+  "sqlite_pragmas": {"foreign_keys": "ON", "journal_mode": "WAL", "synchronous": "FULL", "trusted_schema": "OFF", "busy_timeout_ms": 5000, "extensions": "disabled"},
+  "canonical_tables": ["schema_migrations", "store_meta", "records", "relations", "events", "effect_intents", "outbox", "receipts"],
+  "derivative_tables": ["full_text_documents"],
+  "transaction_boundary": "commit",
+  "commit_inputs": ["expected_revision", "records", "relations", "events", "evidence_refs", "effect_intent", "outbox_item", "receipt"],
+  "identity_fields": ["repository_logical_id", "checkout_instance_id", "parent_instance_id", "relationship_id"],
+  "repository_identity": {"managed_config": "learning/NEXT_WORKFLOW_REPOSITORY_IDENTITY.json", "logical_id_from_validated_config_only": true, "managed_config_origin_attestation_required": true, "checkout_uuid_state": ".workflow-state/checkout-identity.json", "checkout_uuid_state_ignored": true, "origin_digest_binding_required": true, "checkout_local_anchor_binding_required": true, "copied_or_forked_state_requires_reattestation": true},
+  "record_fields": ["id", "kind", "schema_version", "record_revision", "repository_id", "checkout_id", "authority_scope", "lineage_id", "lifecycle_state", "payload_json", "source_revision", "policy_fp", "input_fp", "content_fp", "sensitivity", "fresh_until", "created_at", "superseded_by"],
+  "effect_states": ["PREPARED", "DISPATCHING", "OBSERVED", "RECONCILED", "CONFLICT", "UNKNOWN", "MANUAL_RECOVERY_REQUIRED"],
+  "outbox_states": ["pending", "sending", "delivered", "quarantined"],
+  "migration": {"checksummed": true, "transactional": true, "interrupted_or_drifted": "block", "backup_required_before_upgrade": true},
+  "recovery": {"restore_requires_closed_store": true, "verify": ["manifest_digest", "schema", "integrity", "repository_identity", "checkout_identity"], "foreign_checkout_requires_separate_identity_migration": true, "stage_then_atomic_rename": true, "quarantine_old_database": true},
+  "export": {"format": "workflow-state-jsonl-v1", "canonical_only": true, "redacted": true, "digest_manifest": true},
+  "retention": {"append_only_events": true, "receipts_immutable": true, "secrets_forbidden": true, "derivatives_rebuildable": true},
+  "refusal_codes": ["IDENTITY_MISMATCH", "REVISION_CONFLICT", "MIGRATION_DRIFT", "INTEGRITY_FAILURE", "UNSAFE_DATABASE_PATH", "SYMLINK_DATABASE_PATH", "BACKUP_DIGEST_MISMATCH", "PARTIAL_OUTBOX_UNKNOWN", "FOREIGN_CHECKOUT_RESTORE"]
+}

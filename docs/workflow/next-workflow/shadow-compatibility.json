@@ -1,0 +1,41 @@
+{
+  "schema_version": "1.0.0",
+  "contract_id": "next_workflow_shadow_compatibility",
+  "activation_mode": "planned",
+  "current_runtime_authoritative": true,
+  "supported_legacy_surfaces": ["legacy_A_to_F_aliases", "seven_repository_phases", "instruction_1_0_0", "stronger_local_approval", "legacy_git_approvals", "existing_dashboard_settings", "existing_product_modes"],
+  "compatibility_profiles": {"fixture": "fixtures/compatibility-profiles.json", "isolated": true, "frozen": true, "required_fixture_ids": ["parent", "trace-cue", "frame-cue"], "stable_machine_obligation_ids": true, "versionless_or_unknown": "BLOCK"},
+  "legacy_unknown_behavior": "manual_required_or_unsupported",
+  "unknown_downgrade": "block",
+  "additive_parser": true,
+  "shadow_comparison": {"required_metrics": ["required_check_misses", "authority_decision_parity", "traceability_coverage", "existing_feature_regressions", "legacy_result_compatibility"], "zero_required_check_misses": true, "zero_green_unknown_states": true, "speed_evaluated_after_correctness": true},
+  "fixture_families": [
+    "lifecycle_order_mapping_scores_triggers_approvals_retries",
+    "instruction_local_fallback_profile_legacy",
+    "identity_relationship_replay_revocation_toctou",
+    "git_action_ref_sha_and_legacy_migration",
+    "saga_order_gap_epoch_forgery_crash_reconciliation",
+    "store_migration_backup_restore_rebuild_corruption",
+    "context_conflict_injection_staleness_omission",
+    "impact_recall_cycles_ownership_resource_conflicts",
+    "team_topology_compression_delegation_budget_writes",
+    "provider_inheritance_certification_attestation_effort",
+    "executable_endpoint_secret_runtime_effect_security",
+    "offline_drain_revoke_archive_rollback_activation",
+    "parent_ci_child_path_isolation"
+  ],
+  "activation_gate": {"candidate_fingerprint_required": true, "required_order": ["shadow", "release_verified", "recovery_verified", "rollback_verified", "archive_decommission_verified", "ready", "enforced"], "material_change_returns_to_shadow": true, "explicit_atomic_transition": true},
+  "rollback": {"restores_legacy_authority": true, "new_actions_disabled": true, "failed_or_incomplete_is_manual_recovery_required": true},
+  "prohibited_leakage": ["secret", "credential", "raw_provider_payload", "unsafe_absolute_path", "foreign_repository_evidence", "registered_child_path", "browser_executable_action"],
+  "refusal_matrix": {
+    "invalid_local_instruction": "BLOCK",
+    "unsupported_stronger_legacy_obligation": "BLOCK",
+    "versionless_or_unknown_profile": "BLOCK",
+    "stale_authority": "BLOCK",
+    "unknown_external_effect": "STOP",
+    "forged_receipt": "STOP",
+    "required_check_miss": "STOP",
+    "failed_recovery_or_rollback": "MANUAL_RECOVERY_REQUIRED",
+    "premature_activation": "BLOCK"
+  }
+}

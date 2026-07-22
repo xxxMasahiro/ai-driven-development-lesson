@@ -66,4 +66,6 @@ test_lesson_playwright	full|fast	./tools/test_lesson_playwright.sh --use-evidenc
 test_lesson_start_position	full|fast	./tools/test_lesson_start_position.sh	Run free lesson start-position regression tests.
 test_lesson	full|fast	./tools/test_lesson.sh	Run 7-day lesson CLI regression tests.
 test_lesson14	full|fast	./tools/test_lesson14.sh	Run 14-step lesson CLI regression tests.
+check_next_workflow	full|fast|minimal	./tools/check_next_workflow.sh	Validate planned-mode next-workflow contracts, runtime syntax, and the safe non-authorizing Control Center projection.
+test_next_workflow	full|fast	./tools/test_next_workflow.sh	Run next-workflow authority, store, planning, provider, team, Saga, Dashboard settings, compatibility, document-sync protection, and release regression tests.
 test_lesson_repository	full|fast	./tools/ci-final-gate	Run the same-run evidence final gate.

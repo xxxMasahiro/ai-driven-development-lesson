@@ -37,6 +37,21 @@ const IMMUTABLE_RULES = [
       'tools/check_development_instruction.sh',
       'tools/test_development_instruction.mjs'
     ])
+  },
+  {
+    id: 'next-workflow-core',
+    label: 'next-workflow protection',
+    groups: new Set(['as_built_core', 'verification', 'security', 'ci_hooks', 'development_instruction_governance']),
+    paths: new Set([
+      'docs/workflow/next-workflow/**',
+      'learning/NEXT_WORKFLOW_*.json',
+      'tools/agent-selection-settings',
+      'tools/next-workflow',
+      'tools/next-workflow.mjs',
+      'tools/lib/next_workflow/**',
+      'tools/check_next_workflow*',
+      'tools/test_next_workflow*'
+    ])
   }
 ];
 

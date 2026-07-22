@@ -50,6 +50,12 @@ test('policy is parent-scoped, bounded, self-protected, and uses a small glob la
   const weakenedInstructionRule = structuredClone(policy);
   weakenedInstructionRule.rules.find((rule) => rule.id === 'development-instruction-governance').required_groups = ['development_instruction_governance'];
   assert.throws(() => validateRepositoryDocumentSyncPolicy(weakenedInstructionRule), /development-instruction protection rule is missing required group/);
+  const missingNextWorkflowRule = structuredClone(policy);
+  missingNextWorkflowRule.rules = missingNextWorkflowRule.rules.filter((rule) => rule.id !== 'next-workflow-core');
+  assert.throws(() => validateRepositoryDocumentSyncPolicy(missingNextWorkflowRule), /next-workflow protection rule/);
+  const weakenedNextWorkflowRule = structuredClone(policy);
+  weakenedNextWorkflowRule.rules.find((rule) => rule.id === 'next-workflow-core').required_groups = ['as_built_core'];
+  assert.throws(() => validateRepositoryDocumentSyncPolicy(weakenedNextWorkflowRule), /next-workflow protection rule is missing required group/);
 });
 
 test('parent categories require only their own authorities while rules add requirements', () => {
@@ -74,6 +80,15 @@ test('development instruction governance is additive, cannot be exempted, and pa
     assert.ok(result.required_groups.includes(group), group);
   }
   assert.equal(result.matched_rules.find((rule) => rule.id === 'development-instruction-governance').cannot_be_exempted, true);
+  assert.equal(policy.external_repository_access, false);
+});
+
+test('next-workflow core changes require complete parent authorities without child traversal', () => {
+  const result = evaluateRepositoryDocumentSync(policy, asRecords(['tools/lib/next_workflow/runtime.mjs']));
+  for (const group of ['as_built_core', 'verification', 'security', 'ci_hooks', 'development_instruction_governance']) {
+    assert.ok(result.required_groups.includes(group), group);
+  }
+  assert.equal(result.matched_rules.find((rule) => rule.id === 'next-workflow-core').cannot_be_exempted, true);
   assert.equal(policy.external_repository_access, false);
 });
 

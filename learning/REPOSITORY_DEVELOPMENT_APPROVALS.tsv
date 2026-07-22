@@ -7,3 +7,4 @@ fast_loop	implement_runtime_changes	false	not_required	The current task scope au
 mid_tests	run_medium_verification	false	not_required	Focused and medium checks may run when required by the changed scope.
 release_gate	run_release_proof_and_pr_ci	false	not_required	Required proof and normal Git integration may proceed when task scope and saved action settings allow; failed CI and unsafe operations still stop.
 main_sync_cleanup	merge_main_sync_and_cleanup	false	not_required	Eligible merge, main CI monitoring, and sync follow task scope and Settings; destructive cleanup always remains approval-bound.
+# next_workflow_approval_boundary	While activation is planned, the existing rows remain authoritative. In the additive Next Workflow, L1-L4 add no phase approval inside the original clear task scope, L5 adds one post-plan implementation approval, and destructive or authority-expanding actions remain separately approval-bound.

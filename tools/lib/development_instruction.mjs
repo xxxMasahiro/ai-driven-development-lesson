@@ -54,6 +54,10 @@ const POLICY_KEYS = new Set([
   'maximum_instruction_bytes',
   'maximum_scope_id_length',
   'parent_git_usage_mode',
+  'next_workflow_activation_path',
+  'next_workflow_release_prerequisites_path',
+  'next_workflow_parent_child_contract_path',
+  'next_workflow_team_contract_path',
 ]);
 
 const REQUIRED_GIT_KEYS = new Set([
@@ -78,6 +82,16 @@ function splitList(value) {
 
 function isSafeId(value) {
   return /^[a-z0-9][a-z0-9._:-]*$/.test(String(value ?? ''));
+}
+
+function canonicalJson(value) {
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`;
+  if (value && typeof value === 'object') return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${canonicalJson(value[key])}`).join(',')}}`;
+  return JSON.stringify(value);
+}
+
+function digest(value) {
+  return createHash('sha256').update(typeof value === 'string' ? value : canonicalJson(value)).digest('hex');
 }
 
 function isSafeRelativePath(value) {
@@ -219,6 +233,10 @@ function parsePolicy(parentRoot, policyPath) {
     'product_git_usage_settings_path',
     'git_workflow_policy_path',
     'git_workflow_settings_path',
+    'next_workflow_activation_path',
+    'next_workflow_release_prerequisites_path',
+    'next_workflow_parent_child_contract_path',
+    'next_workflow_team_contract_path',
   ]) {
     if (!isSafeRelativePath(policy.get(key))) fail('POLICY_PATH', key + ' must be a safe relative path.');
   }
@@ -515,10 +533,18 @@ export function validateInstructionText(text, policy, profile) {
       if (!text.includes(anchor)) fail('INSTRUCTION_ANCHOR', 'Parent fallback instruction memory is missing a required rule anchor.');
     }
   }
+  const sectionMatches = [...text.matchAll(/^##[ \t]+([A-F])\.(?:[ \t]|$).*$/gm)];
+  const sectionFingerprints = Object.fromEntries(sectionMatches.map((match, index) => {
+    const end = sectionMatches[index + 1]?.index ?? text.length;
+    return [match[1], digest(text.slice(match.index, end).trim())];
+  }));
+  const ruleIds = [...new Set([...text.matchAll(/`(workflow-rule:[a-z0-9][a-z0-9-]*)`/g)].map((match) => match[1]))].sort();
+  const proceduralContract = { version, stages: requiredStages, section_fingerprints: sectionFingerprints, rule_ids: ruleIds };
   return {
     version,
     profile: profile === 'parent_fallback' ? 'parent_strict' : (version === 'versionless' ? 'local_compatibility' : 'local_versioned'),
     stages: requiredStages,
+    procedural_contract: { ...proceduralContract, contract_fingerprint: digest(proceduralContract) },
   };
 }
 
@@ -781,6 +807,7 @@ export function resolveDevelopmentInstruction({
     local_instruction_priority: true,
     parent_fallback_on: fallbackTrigger,
     git_plan: gitPlan,
+    procedural_contract: validated.procedural_contract,
   };
 }
 

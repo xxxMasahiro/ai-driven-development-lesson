@@ -33,3 +33,7 @@ required_parent_anchors	workflow-rule:changeability|workflow-rule:ecosystem-reus
 maximum_instruction_bytes	131072	Maximum bounded instruction document size.
 maximum_scope_id_length	96	Maximum safe task-scope identifier length accepted as runtime authorization evidence.
 parent_git_usage_mode	ci	Maximum Git/CI applicability for the lesson repository before action settings narrow it.
+next_workflow_activation_path	learning/NEXT_WORKFLOW_ACTIVATION.json	Additive Next Workflow activation authority; planned and shadow modes never replace this enforced compatibility procedure.
+next_workflow_release_prerequisites_path	learning/NEXT_WORKFLOW_RELEASE_PREREQUISITES.json	Release prerequisite authority that keeps activation blocked while Control Center completion and acceptance remain paused.
+next_workflow_parent_child_contract_path	docs/workflow/next-workflow/parent-child-authority.json	Machine-readable local-first instruction and parent-management composition contract for parent-managed child repositories.
+next_workflow_team_contract_path	docs/workflow/next-workflow/team-agent-security.json	Machine-readable Orchestrator, Lead Agent, Task Agent, delegation, rigor, and ownership contract.

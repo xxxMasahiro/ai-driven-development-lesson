@@ -65,10 +65,41 @@ reject_job_contains() {
   fi
 }
 
+require_job_node_profile() {
+  local file="$1"
+  local job="$2"
+  local version="$3"
+  require_job_contains "$file" "$job" "actions/setup-node@v6"
+  require_job_contains "$file" "$job" "node-version: \"$version\""
+}
+
+check_explicit_node_profiles() {
+  local main="$ROOT/.github/workflows/ci.yml"
+  local lesson14="$ROOT/.github/workflows/lesson14-ci.yml"
+  local job
+  for job in syntax-checks repository-document-sync structure-docs-checks lesson-cli-tests lesson-aggregate git-hooks-full-no-cache final-gate; do
+    require_job_node_profile "$main" "$job" "24"
+  done
+  for job in policy-regression-tests playwright-tests; do
+    require_job_node_profile "$main" "$job" "24"
+  done
+  for job in syntax-checks lesson14-structure-sync policy-regression-tests lesson14-cli-tests playwright-tests lesson14-final-gate aggregate-and-full-hooks; do
+    require_job_node_profile "$lesson14" "$job" "24"
+  done
+  require_job_contains "$main" policy-regression-tests "./tools/verification-ci run-job --workflow main --job policy-regression-tests"
+  require_job_contains "$main" playwright-tests "./tools/verification-ci run-job --workflow main --job playwright-tests"
+  if ! grep -Fq '"node": ">=24.0.0"' "$ROOT/package.json" || ! grep -Fxq '24.0.0' "$ROOT/.node-version" || ! grep -Fxq '24.0.0' "$ROOT/.nvmrc"; then
+    printf 'Root Node baseline must match the Node 24 workflow-state runtime.\n' >&2
+    return 1
+  fi
+}
+
 composition_engine="$(awk -F '\t' '$1 == "setting" && $2 == "ci_composition_engine" { print $3; found = 1; exit } END { if (!found) exit 1 }' "$ROOT/docs/workflow/FINAL_GATE_EXECUTION_POLICY.tsv")" || {
   printf 'CI composition engine policy is missing.\n' >&2
   exit 1
 }
+
+check_explicit_node_profiles
 
 if [[ "$composition_engine" == "enforce" ]]; then
   "$ROOT/tools/verification-ci" check >/dev/null

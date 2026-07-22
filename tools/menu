@@ -58,7 +58,7 @@ show_menu() {
 【整える】
 7. 教材そのものを改善
    レッスン、プロンプト、ダッシュボード、文書、運用テストを改善する
-   入口: docs/memory/DEVELOPER_MEMORY.md と ./tools/dashboard all を確認する
+   入口: ./tools/dashboard all と、存在する場合のみローカル docs/memory/DEVELOPER_MEMORY.md を確認する
 
 Git管理設定
    作業ブランチ、git worktree、Git自動化レベル、同期監視を設定する
@@ -149,7 +149,7 @@ menu_item_entry() {
     4) printf './tools/free-development start --confirm' ;;
     5) printf './tools/product-improvement start --confirm' ;;
     6) printf './tools/external-integration start --confirm' ;;
-    7) printf 'docs/memory/DEVELOPER_MEMORY.md and ./tools/dashboard all' ;;
+    7) printf './tools/dashboard all and optional local docs/memory/DEVELOPER_MEMORY.md when present' ;;
     *) printf 'unknown menu item: %s\n' "$1" >&2; exit 1 ;;
   esac
 }
