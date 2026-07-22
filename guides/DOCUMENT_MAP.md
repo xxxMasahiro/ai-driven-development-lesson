@@ -128,6 +128,12 @@ SQLite state. The remaining Control Center presentation and acceptance work is
 recorded as paused in `TASK_TRACKER.md` and `HANDOFF.md`; partial UI artifacts
 are not activation evidence.
 
+`REPOSITORY_DOCUMENT_SYNC_POLICY.json` also classifies Next Workflow core
+changes explicitly. Their PR or push range must include the complete as-built,
+instruction, verification, Security, CI/hook, and workflow-state authority set.
+This strict synchronization remains local to the parent repository and does
+not inspect TraceCue, FrameCue, or another registered child checkout.
+
 ## Memory Documents
 
 The lesson memory documents live in `docs/memory/`.

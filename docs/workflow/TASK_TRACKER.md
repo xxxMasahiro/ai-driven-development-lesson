@@ -3474,6 +3474,10 @@ TESTS: tools/check_developer_memory_requirements.sh,tools/check_document_organiz
   built-in executor fail closed until a fencing-aware production owner exists.
   Derive fence revision/epoch under the same write lock and reject stale
   expected values before mutating authority state.
+- [x] Add a non-exemptible Next Workflow document-sync category, synchronize
+  every authority required by the PR/push range gate, and harden nested-sandbox
+  Git evidence capture so only status-zero completed output can survive a
+  post-exec `EPERM`. Pass the final-gate regression five consecutive times.
 - [ ] Resume and complete Phase 18 Control Center implementation, TraceCue/
   browser review, and developer acceptance later. This remains an explicitly
   unfinished task and no Control Center code was changed during this closure.

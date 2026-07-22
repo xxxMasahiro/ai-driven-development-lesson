@@ -132,6 +132,18 @@ EXTERNAL_INTEGRATION_SECURITY.md   外部連携の場合
 docs/workflow/INSTRUCTION_MEMORY.md 既存の製品固有A-F手順が必要な場合のみ。AGENTS.MD不変ルールの下で手続き優先となり、親フォールバックから自動生成・上書きしない
 ```
 
+## Optional Next Workflow Local Procedure
+
+Do not create `docs/workflow/INSTRUCTION_MEMORY.md` merely to fill the optional
+path. In an eligible parent-managed product repository, exact absence is the
+only condition that permits the parent procedural fallback. If the product
+needs its own procedure, create a complete, valid local document intentionally;
+it remains below product-local `AGENTS.MD` invariants and cannot widen inherited
+parent management policy for Git/GitHub, providers, external sends,
+filesystem/network/runtime access, cost, safety, rigor, testing, release, or
+documentation. Optional `DEVELOPER_MEMORY.md` and `SESSION_MEMORY.md` files are
+Git-ignored local temporary notes, not durable workflow authority.
+
 ## LEARNING_TASK_TRACKER.md
 
 ```text

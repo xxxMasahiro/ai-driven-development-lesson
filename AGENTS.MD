@@ -221,4 +221,10 @@ skills/worklog-doc-sync/SKILL.md
 ./tools/test_menu_prerequisites.sh
 ./tools/test_product_repository_cleanup.sh
 ./tools/test_lesson14.sh
+./tools/check_next_workflow.sh
+./tools/test_next_workflow.sh
 ```
+
+The Next Workflow commands validate the additive fail-closed core only. Until
+its tracked activation record is enforced, they must not replace the current
+repository procedure or treat paused Control Center work as activation proof.

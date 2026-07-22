@@ -80,5 +80,5 @@ as_built_evidence_run_sync_contract_check	hook	check_as_built_sync_contract	Aggr
 ./tools/test_lesson_start_position.sh	hook	test_lesson_start_position	Aggregate lesson start-position coverage is provided by the matching Git hook row.
 ./tools/test_lesson.sh	hook	test_lesson	Aggregate 7-step lesson CLI coverage is provided by the matching Git hook row.
 ./tools/test_lesson14.sh	hook	test_lesson14	Aggregate 14-step lesson CLI coverage is provided by the matching Git hook row.
-./tools/check_next_workflow.sh	hook	check_next_workflow	Aggregate next-workflow contract, syntax, and projection coverage is provided by the matching Git hook row.
-./tools/test_next_workflow.sh	hook	test_next_workflow	Aggregate next-workflow runtime, refusal, recovery, compatibility, and activation coverage is provided by the matching Git hook row.
+./tools/check_next_workflow.sh	hook	check_next_workflow	Aggregate planned-mode next-workflow contract, syntax, and projection coverage is provided by the matching Git hook row without activating the paused Control Center scope.
+./tools/test_next_workflow.sh	hook	test_next_workflow	Aggregate next-workflow runtime, refusal, recovery, compatibility, document-sync protection, and activation coverage is provided by the matching Git hook row.

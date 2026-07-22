@@ -54,6 +54,10 @@ const POLICY_KEYS = new Set([
   'maximum_instruction_bytes',
   'maximum_scope_id_length',
   'parent_git_usage_mode',
+  'next_workflow_activation_path',
+  'next_workflow_release_prerequisites_path',
+  'next_workflow_parent_child_contract_path',
+  'next_workflow_team_contract_path',
 ]);
 
 const REQUIRED_GIT_KEYS = new Set([
@@ -229,6 +233,10 @@ function parsePolicy(parentRoot, policyPath) {
     'product_git_usage_settings_path',
     'git_workflow_policy_path',
     'git_workflow_settings_path',
+    'next_workflow_activation_path',
+    'next_workflow_release_prerequisites_path',
+    'next_workflow_parent_child_contract_path',
+    'next_workflow_team_contract_path',
   ]) {
     if (!isSafeRelativePath(policy.get(key))) fail('POLICY_PATH', key + ' must be a safe relative path.');
   }

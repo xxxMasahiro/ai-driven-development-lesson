@@ -4336,3 +4336,18 @@ for later resumption. The current non-Control-Center implementation may proceed
 through scoped PR/main CI delivery and synchronization, but that delivery is not
 the final Phase 20 activation candidate. Final same-candidate evidence and
 activation remain unfinished; the activation baseline stays `planned`.
+
+The parent document-sync policy has a non-exemptible `next-workflow-core`
+classification covering versioned contracts, persisted activation/settings,
+the CLI, and runtime owners. It composes the existing as-built, verification,
+Security, CI/hook, development-instruction, and workflow-state groups without
+opening a child repository. The pre-push range gate therefore rejects a
+follow-up governance commit unless that push range still contains every
+required tracked authority.
+
+Legacy Git-hook evidence remains exact-state bound. In nested sandboxes,
+`execFileSync` can report a post-exec `EPERM` while also exposing child status
+zero and the completed stdout bytes. The evidence adapter accepts only that
+precise status-zero/buffer combination; every nonzero, missing, or ambiguous
+result follows the existing fail-closed path. The shell verifier then compares
+the captured SHA, policy, input, and repository-state hashes normally.

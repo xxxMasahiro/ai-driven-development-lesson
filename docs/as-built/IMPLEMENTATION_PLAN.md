@@ -5874,6 +5874,13 @@ Implementation order completed without modifying Control Center code:
     back before mutation.
     The default CLI executor now refuses operational fenced dispatch; a future
     production executor must enforce and attest the exact downstream fence.
+16. Added a non-exemptible Next Workflow document-sync classification and
+    synchronized the legacy procedural, parent-child, CI, Security, product
+    template, and paused Control Center data authorities required by the PR and
+    push range gate. Hardened Git evidence capture for the nested-sandbox case
+    where a completed status-zero child also reports post-exec `EPERM`; only a
+    real stdout buffer with exact status zero is accepted. The final-gate test
+    passed five consecutive runs after the correction.
 
 This scoped delivery does not claim activation-bound production wiring. The
 currently composed source, observer, approval/receipt, reconciliation, provider-

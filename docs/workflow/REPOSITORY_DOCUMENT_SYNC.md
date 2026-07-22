@@ -29,6 +29,15 @@ authority. Its additive rules distinguish:
 - local-first development instruction resolution, the AGENTS-invariant versus
   procedural-instruction boundary, and the A-F autonomy overlay.
 
+The fail-closed Next Workflow core has an explicit additive classification.
+Changes to its contracts, persistent settings/activation authorities, CLI, or
+runtime owners must synchronize the canonical as-built set, verification and
+security authorities, development-instruction governance, CI/hook ownership,
+and workflow-state pair. This classification remains parent-only and never
+opens or tests a registered child repository. The Dashboard data schema is
+updated separately when its producer contract changes; paused Control Center
+source and browser work are not required merely because the non-UI core changes.
+
 Multiple matching rules add requirements; a weaker rule cannot remove a
 security or verification requirement. The existing
 `AS_BUILT_SYNC_CONTRACT.tsv` remains the feature-level implementation registry.

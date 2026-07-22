@@ -84,6 +84,18 @@ copies `INSTRUCTION_MEMORY.md` into the selected product repository. A present
 but invalid local file is a blocker and is not treated as missing. The resolved
 instruction source cannot override product-local `AGENTS.MD` invariants.
 
+The additive Next Workflow runtime follows the same boundary. A child-local
+procedure may specialize product development but cannot widen parent-managed
+Git/GitHub, provider, external-send, filesystem, network, runtime, or cost
+authority. Those capabilities remain intersections with current parent
+settings; safety and rigor remain maximum floors; required verification and
+documentation duties are additive. Missing, stale, ambiguous, expired, or
+revoked parent authority blocks the affected action. Each repository retains
+its own bounded state store and evidence; no parent/child shared database or
+ordinary parent-CI child traversal is permitted. Until the paused Control
+Center prerequisite and immutable-candidate activation proofs pass, the
+existing Free Development procedure remains authoritative.
+
 - `none`: product workspace, canonical documents, scaffold authority, product security, and required local checks are still required; Git, remote sync, and CI are not applicable.
 - `local`: local Git worktree and local Git safety checks are required; remote sync and CI are not applicable.
 - `remote_sync`: local Git and remote sync are required; CI is not applicable.

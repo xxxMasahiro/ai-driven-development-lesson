@@ -3675,3 +3675,10 @@ through a scoped commit, PR CI, merge, main CI, and local/remote synchronization
 That delivery does not satisfy the future immutable-candidate activation proof:
 Phase 18 Control Center completion and acceptance will materially change the
 candidate, after which Phase 20 must collect a new exact-candidate evidence set.
+
+PR and push delivery must also pass the parent repository document-sync range
+gate without bypass. Any Next Workflow core, instruction, security, CI, or
+evidence-boundary change must carry its complete tracked authority set in the
+same integration range. Git evidence capture may recover stdout from a nested-
+sandbox post-exec error only when the child status is exactly zero and stdout
+is a real byte buffer; nonzero or unknown outcomes remain failures.

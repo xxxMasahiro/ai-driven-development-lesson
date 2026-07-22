@@ -23,3 +23,4 @@ development_autonomy_scope_boundary	all	block	block	false	The parent A-F fallbac
 next_workflow_side_effect_authority	all	block	block	false	Git, provider, Agent launch, filesystem, adapter, runtime, dependency, and resource effects require a fresh tagged decision through the common gateway.
 next_workflow_provider_boundary	all	block	block	false	Auto, Manual, Inherit, custom CLI/API, and local runtime selections share one certification, endpoint, secret-reference, authority, attestation, and budget floor.
 next_workflow_child_boundary	all	block	block	false	Parent CI and next-workflow tests use isolated fixtures and never traverse, test, mutate, or accept evidence directly from a registered child repository.
+nested_sandbox_git_evidence	all	block	block	false	A post-exec sandbox error may preserve Git evidence only when the completed child status is exactly zero and stdout is a byte buffer; nonzero, missing, or ambiguous results fail closed.

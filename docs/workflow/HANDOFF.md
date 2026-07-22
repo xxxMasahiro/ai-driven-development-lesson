@@ -3644,3 +3644,10 @@ TESTS: tools/check_developer_memory_requirements.sh,tools/check_document_organiz
   remains paused and unaccepted. Control Center implementation, TraceCue/
   browser review, and developer acceptance remain explicitly unfinished for
   later resumption; no Control Center code was changed in this closure.
+- Parent document synchronization now has a non-exemptible Next Workflow core
+  classification. The PR/push range must contain the complete as-built,
+  instruction, verification, Security, CI, and workflow-state authorities;
+  parent CI still never traverses child repositories. Git-hook evidence also
+  handles the observed nested-sandbox status-zero/post-exec-`EPERM` condition
+  without accepting nonzero or ambiguous output, and its final-gate regression
+  passed five consecutive runs.
