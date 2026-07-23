@@ -4848,3 +4848,9 @@ paths used by Production. Missing `/usr/bin/unshare` or `/usr/bin/bwrap`
 returns a named prerequisite skip before trust material is created. The
 separate runtime-status case still runs, asserts `STOP`, and verifies ordered
 non-installing setup guidance.
+
+Launcher regression installs one suite-private Codex CLI/native package layout
+before constructing its isolated repositories. Owner-acceptance verification
+pins those deterministic descriptor bytes, while every tested launcher command
+continues to execute only the immutable fixture runtime and never invokes the
+provider descriptor.

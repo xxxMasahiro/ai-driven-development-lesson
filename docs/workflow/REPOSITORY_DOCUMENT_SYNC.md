@@ -50,6 +50,9 @@ Containment is stricter: absent fixed-path Bubblewrap or unshare is never
 fixture-substituted. The positive bootstrap case is then an explicit
 prerequisite skip and synchronized verification must retain a passing
 guided-refusal/status case.
+Installed-launcher integrity fixtures that reuse the private provider
+descriptor are covered by the same complete synchronization obligation; reuse
+does not change its non-authorizing status.
 
 Multiple matching rules add requirements; a weaker rule cannot remove a
 security or verification requirement. The existing

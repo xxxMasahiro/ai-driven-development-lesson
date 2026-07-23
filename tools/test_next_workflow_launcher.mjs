@@ -15,7 +15,38 @@ import { createSignedReleaseProofVerifier, createSignedTransitionVerifier } from
 import { openWorkflowStateStore } from "./lib/next_workflow/store.mjs";
 
 const roots = [];
-test.after(() => roots.forEach((root) => rmSync(root, { recursive: true, force: true })));
+const originalPath = process.env.PATH;
+test.after(() => {
+  process.env.PATH = originalPath;
+  roots.forEach((root) => rmSync(root, { recursive: true, force: true }));
+});
+
+function installFixtureCodex(root) {
+  const binRoot = path.join(root, "bin");
+  const packageRoot = path.join(
+    root,
+    "node_modules",
+    "@openai",
+    `codex-linux-${process.arch}`,
+    "vendor",
+    `${{ x64: "x86_64", arm64: "aarch64" }[process.arch]}-unknown-linux-musl`,
+    "bin",
+  );
+  mkdirSync(binRoot, { recursive: true, mode: 0o700 });
+  mkdirSync(packageRoot, { recursive: true, mode: 0o700 });
+  const cliPath = path.join(binRoot, "codex");
+  const nativePath = path.join(packageRoot, "codex");
+  writeFileSync(cliPath, "#!/bin/sh\nexit 0\n", { mode: 0o500 });
+  writeFileSync(nativePath, Buffer.from([0x7f, 0x45, 0x4c, 0x46]), { mode: 0o500 });
+  chmodSync(cliPath, 0o500);
+  chmodSync(nativePath, 0o500);
+  process.env.PATH = `${binRoot}:${originalPath ?? ""}`;
+}
+
+const providerRoot = mkdtempSync(path.join(tmpdir(), "next-workflow-launcher-provider-"));
+roots.push(providerRoot);
+chmodSync(providerRoot, 0o700);
+installFixtureCodex(providerRoot);
 
 function launcherFixture() {
   const sourceRoot = realpathSync(path.resolve(path.dirname(new URL(import.meta.url).pathname), ".."));

@@ -155,6 +155,9 @@ provider binary; the fixture is never an installation or Activation source.
 Unlike the non-executed provider descriptor, containment executables are never
 simulated. CI without fixed-path Bubblewrap or unshare marks positive bootstrap
 as prerequisite-skipped and still verifies the separate safe-stop guidance.
+The installed-launcher integrity suite also uses that private provider
+descriptor for signed fixture construction only; its wrapper commands never
+launch the descriptor.
 
 ## Memory Documents
 

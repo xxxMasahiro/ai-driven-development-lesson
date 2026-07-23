@@ -4067,6 +4067,9 @@ If the fixed Linux containment executables are absent, CI must not fabricate
 them or claim positive bootstrap evidence. The positive case must be marked
 prerequisite-skipped while the independent status/guidance case passes and
 Production remains unavailable.
+Installed-launcher integrity tests may reuse the private non-executed provider
+descriptor to construct their signed acceptance fixture on runners without
+Codex. This remains test setup only and cannot attest provider execution.
 
 The installed wrapper must remain as the launcher's live parent rather than
 replace itself. Protected trust must pin its shell interpreter, and the

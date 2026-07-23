@@ -6168,3 +6168,6 @@ TESTS: tools/check_next_workflow.sh,tools/test_next_workflow.sh,tools/check_as_b
     `/usr/bin/unshare` and `/usr/bin/bwrap` prerequisites exist. On other CI
     runners, skip that positive case explicitly and require the separate
     non-installing guided-refusal/status test to pass.
+11. Give installed-launcher integrity fixtures the same private, non-executed
+    Codex package-layout descriptor, so CI can construct and verify signed owner
+    acceptance without weakening Production executable resolution.

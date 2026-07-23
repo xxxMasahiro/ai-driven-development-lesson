@@ -249,3 +249,6 @@ When real `/usr/bin/unshare` or `/usr/bin/bwrap` is absent, the positive
 bootstrap-construction test must be reported as prerequisite-skipped and the
 separate guided-refusal/status test must pass; a fake isolation executable is
 forbidden.
+The same private non-executed Codex descriptor may support installed-launcher
+integrity fixtures on CI, but only for owner-acceptance construction and
+verification. It must not execute a provider or become Production evidence.

@@ -111,6 +111,8 @@ that fixture as provider certification or Production launch authority.
 Bubblewrap and unshare cannot be fixture-substituted at all. If either real
 fixed-path prerequisite is absent, positive parent bootstrap is unavailable
 and only the non-installing diagnosis/guidance path may pass.
+Reuse of the non-executed provider descriptor by parent launcher-integrity
+tests does not make it available to a product or Free Development run.
 
 - `none`: product workspace, canonical documents, scaffold authority, product security, and required local checks are still required; Git, remote sync, and CI are not applicable.
 - `local`: local Git worktree and local Git safety checks are required; remote sync and CI are not applicable.

@@ -161,6 +161,8 @@ the currently observed and parent-authorized provider executable.
 Templates also must not provide fake Bubblewrap or unshare binaries. Missing
 real containment leaves headless Production unavailable and exposes only the
 parent's installation and recheck guidance.
+The parent launcher-integrity suite may reuse its private non-executed provider
+descriptor, but generated templates must not copy or inherit that fixture.
 
 ## LEARNING_TASK_TRACKER.md
 

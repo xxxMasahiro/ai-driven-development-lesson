@@ -3712,5 +3712,8 @@ TESTS: tools/check_next_workflow.sh,tools/test_next_workflow.sh,tools/check_as_b
 - [x] Treat missing real Bubblewrap/unshare on GitHub runners honestly:
   prerequisite-skip positive bootstrap construction, keep Production blocked,
   and require the separate guided-refusal/status test to pass.
+- [x] Remove the remaining installed-launcher regression dependency on a host
+  Codex installation by reusing the suite-private, non-executed descriptor
+  while retaining exact wrapper and executable-pinning checks.
 - [ ] Deliver, merge, pass main CI, synchronize, activate the exact merge, and
   run the bounded Production smoke task.
