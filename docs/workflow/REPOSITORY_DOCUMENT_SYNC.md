@@ -58,6 +58,10 @@ Provider-discovery tests that add a native fixture to satisfy descriptor
 pinning are included in this obligation and remain non-authorizing.
 This includes development-selection tests that consume the discovered catalog;
 they must not rely on a host Codex installation.
+Changes to the live default provider probe must also synchronize the full
+parent authority set. The supported probe retains the read-only host-root bind,
+creates its runtime directory below the private writable `/tmp` tmpfs, and is
+executed only when the real containment diagnostic passes.
 
 Multiple matching rules add requirements; a weaker rule cannot remove a
 security or verification requirement. The existing

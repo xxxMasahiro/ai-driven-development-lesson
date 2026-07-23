@@ -124,6 +124,9 @@ runtime reports non-installing setup and recheck guidance and stops. It never
 runs without containment. CI runners that lack these prerequisites must test
 that guided refusal and may not represent a skipped real-containment fixture as
 production or Activation evidence.
+Live provider discovery keeps the host root read-only and binds the pinned
+probe executable only under its private writable `/tmp` tmpfs; it must never
+attempt to create a runtime path directly below the read-only root.
 
 Model and effort selection remains provider-neutral and policy constrained.
 Only certified, currently observed, permitted models are eligible; user deny

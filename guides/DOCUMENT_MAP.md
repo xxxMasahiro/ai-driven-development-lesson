@@ -162,6 +162,9 @@ Provider discovery has its own complete CLI/native fixture with an injected
 runner; it proves pinning and rejection without becoming an installed provider.
 Development-selection discovery reuses that fixture shape for portable
 model/effort assertions, never as an operational provider.
+Operational provider discovery instead uses the pinned real executable under a
+private `/tmp` tmpfs while the host root remains read-only; the real
+Bubblewrap path is covered by the focused aggregate when prerequisites exist.
 
 ## Memory Documents
 
