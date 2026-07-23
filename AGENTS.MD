@@ -251,4 +251,6 @@ separate guided-refusal/status test must pass; a fake isolation executable is
 forbidden.
 The same private non-executed Codex descriptor may support installed-launcher
 integrity fixtures on CI, but only for owner-acceptance construction and
-verification. It must not execute a provider or become Production evidence.
+verification. Those positive launcher cases also require real containment and
+are prerequisite-skipped when it is absent. The fixture must not execute a
+provider or become Production evidence.

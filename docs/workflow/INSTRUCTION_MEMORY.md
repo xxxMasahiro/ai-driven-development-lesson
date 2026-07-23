@@ -72,7 +72,8 @@ fixture. The positive bootstrap test is prerequisite-skipped, the independent
 guided-refusal/status test remains required, and Production stays unavailable.
 Bootstrap and installed-launcher integrity regressions may share a private
 non-executed provider descriptor solely to construct signed test acceptance.
-It never authorizes or performs provider execution.
+Installed-launcher positive cases also prerequisite-skip when real containment
+is absent. The descriptor never authorizes or performs provider execution.
 
 The additive lifecycle uses six purpose-named stages: decide the next value,
 order tasks, review the implementation approach, decide the implementation

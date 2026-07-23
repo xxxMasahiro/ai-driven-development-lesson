@@ -52,7 +52,8 @@ prerequisite skip and synchronized verification must retain a passing
 guided-refusal/status case.
 Installed-launcher integrity fixtures that reuse the private provider
 descriptor are covered by the same complete synchronization obligation; reuse
-does not change its non-authorizing status.
+does not change its non-authorizing status, and missing real containment
+requires the same explicit positive-case skip.
 
 Multiple matching rules add requirements; a weaker rule cannot remove a
 security or verification requirement. The existing

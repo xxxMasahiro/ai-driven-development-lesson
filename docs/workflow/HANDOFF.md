@@ -3899,4 +3899,5 @@ positive path.
 The installed-launcher regression now uses the same suite-private,
 non-executed Codex descriptor. This removes its remaining GitHub-runner Codex
 dependency while preserving executable pinning and all wrapper integrity
-checks.
+checks where real containment is present; without it, those positive cases are
+explicitly prerequisite-skipped rather than given fake isolation.

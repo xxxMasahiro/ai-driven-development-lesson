@@ -48,6 +48,12 @@ roots.push(providerRoot);
 chmodSync(providerRoot, 0o700);
 installFixtureCodex(providerRoot);
 
+function requireRealContainment(t) {
+  if (existsSync("/usr/bin/unshare") && existsSync("/usr/bin/bwrap")) return true;
+  t.skip("real Linux containment prerequisites are unavailable; guided refusal is verified separately");
+  return false;
+}
+
 function launcherFixture() {
   const sourceRoot = realpathSync(path.resolve(path.dirname(new URL(import.meta.url).pathname), ".."));
   const root = mkdtempSync(path.join(tmpdir(), "next-workflow-launcher-"));
@@ -293,7 +299,8 @@ async function enforceFixtureActivation(fixture) {
   return candidateDefinition;
 }
 
-test("the installed wrapper removes pre-Node injection variables and rejects a forged enforced row", () => {
+test("the installed wrapper removes pre-Node injection variables and rejects a forged enforced row", (t) => {
+  if (!requireRealContainment(t)) return;
   const fixture = launcherFixture();
   const database = new DatabaseSync(fixture.databasePath);
   database.prepare(`
@@ -341,7 +348,8 @@ test("the installed wrapper removes pre-Node injection variables and rejects a f
   assert.equal(existsSync(injectionMarker), false);
 });
 
-test("a copied launcher script and forged public marker cannot replace the installed wrapper entry point", () => {
+test("a copied launcher script and forged public marker cannot replace the installed wrapper entry point", (t) => {
+  if (!requireRealContainment(t)) return;
   const fixture = launcherFixture();
   const result = spawnSync(process.execPath, [fixture.trust.runtime_launcher.script_path, fixture.repositoryRoot, "runtime", "status"], {
     cwd: fixture.repositoryRoot,
@@ -361,7 +369,8 @@ test("a copied launcher script and forged public marker cannot replace the insta
   assert.match(result.stderr, /VERIFIED_LAUNCH_WRAPPER_PARENT_REQUIRED/);
 });
 
-test("the installed wrapper runs only the immutable signed runtime snapshot after complete activation", async () => {
+test("the installed wrapper runs only the immutable signed runtime snapshot after complete activation", async (t) => {
+  if (!requireRealContainment(t)) return;
   const fixture = launcherFixture();
   await enforceFixtureActivation(fixture);
   const result = spawnSync(fixture.initialized.runtime_launcher_path, [fixture.repositoryRoot, "runtime", "status", ""], {

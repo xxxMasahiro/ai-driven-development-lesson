@@ -4853,4 +4853,6 @@ Launcher regression installs one suite-private Codex CLI/native package layout
 before constructing its isolated repositories. Owner-acceptance verification
 pins those deterministic descriptor bytes, while every tested launcher command
 continues to execute only the immutable fixture runtime and never invokes the
-provider descriptor.
+provider descriptor. Each positive launcher case first requires the fixed real
+containment executables and returns the same named prerequisite skip when
+either is absent.

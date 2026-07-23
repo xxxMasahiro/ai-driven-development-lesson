@@ -6170,4 +6170,5 @@ TESTS: tools/check_next_workflow.sh,tools/test_next_workflow.sh,tools/check_as_b
     non-installing guided-refusal/status test to pass.
 11. Give installed-launcher integrity fixtures the same private, non-executed
     Codex package-layout descriptor, so CI can construct and verify signed owner
-    acceptance without weakening Production executable resolution.
+    acceptance without weakening Production executable resolution. Run those
+    positive cases only when the same real containment prerequisites exist.
