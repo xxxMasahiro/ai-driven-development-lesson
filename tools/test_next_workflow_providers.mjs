@@ -1,11 +1,12 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, closeSync, constants as fsConstants, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, realpathSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { admitAgentRun, authorizeCliLaunchPlan, buildApiRequestPlan, buildCliLaunchPlan, buildLocalRuntimePlan, createLaunchIntent, createNodeDescriptorPinnedExecutor, createOperationalProviderAdapter, createSelectionDryRun, dispatchApiRequestPlan, dispatchCliLaunchPlan, loadProviderRegistry, providerDigest, providerIdentityKey, providerManifestFingerprint, selectAgentConfiguration, simulateAgentStart, transitionProviderCertification, validateCustomManifest, validateEndpointObservation, validateSecretReference } from "./lib/next_workflow/providers.mjs";
-import { discoverBuiltinProviderInputs } from "./lib/next_workflow/provider_discovery.mjs";
+import { discoverBuiltinProviderInputs, runIsolatedProviderProbe } from "./lib/next_workflow/provider_discovery.mjs";
+import { diagnoseLinuxIsolationPrerequisites } from "./lib/next_workflow/runtime_containment.mjs";
 
 const temporaryRoots = [];
 test.after(() => temporaryRoots.forEach((root) => rmSync(root, { recursive: true, force: true })));
@@ -586,6 +587,26 @@ test("Codex discovery creates only direct-observation-bound eligible model entri
   const blocked = discoverBuiltinProviderInputs({ adapterFamilies: [family], executableLocator: () => executable, runner, platform: "linux-x64", clock: () => "2029-01-01T00:00:00.000Z" });
   assert.equal(blocked.entries?.length ?? blocked.manifests.length, 0);
   assert.equal(blocked.blockers[0].code, "PROVIDER_PROBE_AUTHORITY_REQUIRED");
+});
+
+test("the default provider probe mounts its pinned executable inside the writable private tmpfs", (context) => {
+  const isolation = diagnoseLinuxIsolationPrerequisites();
+  if (!isolation.available) {
+    context.skip(`real Linux containment unavailable: ${[...isolation.missing, ...isolation.disabled].join(",")}`);
+    return;
+  }
+  const executable = "/usr/bin/true";
+  const fd = openSync(executable, fsConstants.O_RDONLY | (fsConstants.O_NOFOLLOW ?? 0));
+  try {
+    const output = runIsolatedProviderProbe(
+      { fd, digest: providerDigest(readFileSync(executable)) },
+      ["--version"],
+      { encoding: "utf8", maxBuffer: 1024 * 1024, timeout: 5000 },
+    );
+    assert.match(output, /^true \(GNU coreutils\)/u);
+  } finally {
+    closeSync(fd);
+  }
 });
 
 test("Production discovery refuses an untrusted executable before invoking it", () => {

@@ -3845,7 +3845,7 @@ paused Control Center and separately deferred plans remain untouched.
 
 SYNC-ID: next_workflow_headless_final_security_closure
 STATUS: implemented
-ARTIFACTS: AGENTS.MD,docs/as-built/IMPLEMENTATION_PLAN.md,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/HANDOFF.md,docs/workflow/TASK_TRACKER.md,tools/lib/next_workflow/agents.mjs,tools/lib/next_workflow/headless_bootstrap.mjs,tools/lib/next_workflow/headless_plan.mjs,tools/lib/next_workflow/headless_service.mjs,tools/lib/next_workflow/release_source_receipts.mjs,tools/lib/next_workflow/release_trust.mjs,tools/lib/next_workflow/run_controller.mjs,tools/lib/next_workflow/runtime_trust.mjs,tools/lib/next_workflow/store.mjs,tools/next-workflow-launcher.cjs,tools/next-workflow.mjs,tools/test_next_workflow_headless_bootstrap.mjs,tools/test_next_workflow_headless_plan.mjs,tools/test_next_workflow_headless_runtime.mjs,tools/test_next_workflow_launcher.mjs
+ARTIFACTS: AGENTS.MD,docs/as-built/IMPLEMENTATION_PLAN.md,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/HANDOFF.md,docs/workflow/TASK_TRACKER.md,docs/workflow/TEST_PLAN_MANIFEST.tsv,tools/lib/next_workflow/agents.mjs,tools/lib/next_workflow/headless_bootstrap.mjs,tools/lib/next_workflow/headless_plan.mjs,tools/lib/next_workflow/headless_service.mjs,tools/lib/next_workflow/provider_discovery.mjs,tools/lib/next_workflow/release_source_receipts.mjs,tools/lib/next_workflow/release_trust.mjs,tools/lib/next_workflow/run_controller.mjs,tools/lib/next_workflow/runtime_trust.mjs,tools/lib/next_workflow/store.mjs,tools/next-workflow-launcher.cjs,tools/next-workflow.mjs,tools/test_next_workflow_headless_bootstrap.mjs,tools/test_next_workflow_headless_plan.mjs,tools/test_next_workflow_headless_runtime.mjs,tools/test_next_workflow_launcher.mjs,tools/test_next_workflow_providers.mjs
 TESTS: tools/check_next_workflow.sh,tools/test_next_workflow.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
 
 The remaining audit blockers are implemented. External trust and the launcher
@@ -3907,3 +3907,8 @@ is unchanged, and Production native resolution remains strict.
 The development-selection regression now supplies the same complete package
 layout. Its model/effort assertions therefore run identically on GitHub hosts
 without Codex, while the Production resolver remains unchanged.
+The first installed-launcher Production smoke exposed that the live discovery
+probe tried to create `/runtime` after binding the host root read-only. The
+probe now creates `/tmp/runtime` inside its existing private writable tmpfs,
+retains the read-only root and network isolation, and has passed a real
+Bubblewrap regression on the prerequisite-complete development host.

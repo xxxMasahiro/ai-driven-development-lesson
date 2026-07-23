@@ -3685,7 +3685,7 @@ TESTS: tools/check_next_workflow.sh,tools/test_next_workflow.sh,tools/check_as_b
 
 SYNC-ID: next_workflow_headless_final_security_closure
 STATUS: implemented
-ARTIFACTS: AGENTS.MD,docs/as-built/IMPLEMENTATION_PLAN.md,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/HANDOFF.md,docs/workflow/TASK_TRACKER.md,tools/lib/next_workflow/agents.mjs,tools/lib/next_workflow/headless_bootstrap.mjs,tools/lib/next_workflow/headless_plan.mjs,tools/lib/next_workflow/headless_service.mjs,tools/lib/next_workflow/release_source_receipts.mjs,tools/lib/next_workflow/release_trust.mjs,tools/lib/next_workflow/run_controller.mjs,tools/lib/next_workflow/runtime_trust.mjs,tools/lib/next_workflow/store.mjs,tools/next-workflow-launcher.cjs,tools/next-workflow.mjs,tools/test_next_workflow_headless_bootstrap.mjs,tools/test_next_workflow_headless_plan.mjs,tools/test_next_workflow_headless_runtime.mjs,tools/test_next_workflow_launcher.mjs
+ARTIFACTS: AGENTS.MD,docs/as-built/IMPLEMENTATION_PLAN.md,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/HANDOFF.md,docs/workflow/TASK_TRACKER.md,docs/workflow/TEST_PLAN_MANIFEST.tsv,tools/lib/next_workflow/agents.mjs,tools/lib/next_workflow/headless_bootstrap.mjs,tools/lib/next_workflow/headless_plan.mjs,tools/lib/next_workflow/headless_service.mjs,tools/lib/next_workflow/provider_discovery.mjs,tools/lib/next_workflow/release_source_receipts.mjs,tools/lib/next_workflow/release_trust.mjs,tools/lib/next_workflow/run_controller.mjs,tools/lib/next_workflow/runtime_trust.mjs,tools/lib/next_workflow/store.mjs,tools/next-workflow-launcher.cjs,tools/next-workflow.mjs,tools/test_next_workflow_headless_bootstrap.mjs,tools/test_next_workflow_headless_plan.mjs,tools/test_next_workflow_headless_runtime.mjs,tools/test_next_workflow_launcher.mjs,tools/test_next_workflow_providers.mjs
 TESTS: tools/check_next_workflow.sh,tools/test_next_workflow.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
 
 - [x] Bind complete repository identity and separate verifier key material.
@@ -3721,5 +3721,8 @@ TESTS: tools/check_next_workflow.sh,tools/test_next_workflow.sh,tools/check_as_b
   observation and pre-probe rejection.
 - [x] Make development-selection discovery equally CI-portable with a complete
   private CLI/native fixture and no Production fallback.
+- [x] Fix the live isolated provider probe to bind its pinned executable below
+  the writable private `/tmp` mount while keeping the host root read-only, and
+  prove the exact default path with real Bubblewrap when available.
 - [ ] Deliver, merge, pass main CI, synchronize, activate the exact merge, and
   run the bounded Production smoke task.

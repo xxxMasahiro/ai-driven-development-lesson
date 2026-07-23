@@ -257,3 +257,7 @@ provider or become Production evidence.
 Provider-discovery and development-selection regressions may use the same
 complete CLI/native layout only with injected observation runners and
 independent test authorities.
+The live Production provider probe must retain the read-only host-root bind and
+place its pinned executable only below the private writable tmpfs. A
+prerequisite-complete release must execute that exact default Bubblewrap path;
+CI without real containment may skip only the positive probe case.

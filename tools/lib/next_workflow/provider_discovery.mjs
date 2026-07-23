@@ -159,7 +159,7 @@ function runObservedCommand(executableDescriptor, argv, { runner = runIsolatedPr
   return output.trim();
 }
 
-function runIsolatedProviderProbe(executableDescriptor, argv, options) {
+export function runIsolatedProviderProbe(executableDescriptor, argv, options) {
   if (process.platform !== "linux") throw new Error("PROVIDER_ISOLATED_PROBE_UNAVAILABLE");
   if (!executableDescriptor || !Number.isSafeInteger(executableDescriptor.fd) || !/^[a-f0-9]{64}$/.test(executableDescriptor.digest ?? "")) throw new Error("PROVIDER_PINNED_EXECUTABLE_REQUIRED");
   const unshare = ["/usr/bin/unshare", "/bin/unshare"].find((candidate) => {
@@ -174,8 +174,8 @@ function runIsolatedProviderProbe(executableDescriptor, argv, options) {
     bwrap, "--die-with-parent", "--unshare-pid", "--cap-drop", "ALL",
     "--ro-bind", "/", "/", "--proc", "/proc", "--dev", "/dev", "--tmpfs", "/tmp",
     "--clearenv", "--setenv", "HOME", "/tmp", "--setenv", "LANG", "C.UTF-8", "--setenv", "LC_ALL", "C.UTF-8",
-    "--dir", "/runtime", "--ro-bind", "/proc/self/fd/3", "/runtime/executable",
-    "/runtime/executable", ...argv,
+    "--dir", "/tmp/runtime", "--ro-bind", "/proc/self/fd/3", "/tmp/runtime/executable",
+    "/tmp/runtime/executable", ...argv,
   ], { ...options, env: {}, shell: false, stdio: ["ignore", "pipe", "pipe", executableDescriptor.fd] });
 }
 
