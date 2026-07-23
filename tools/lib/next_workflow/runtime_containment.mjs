@@ -137,14 +137,38 @@ function mapPath(root, sandboxRoot, candidate) {
   return relative === "" ? sandboxRoot : path.posix.join(sandboxRoot, ...relative.split(path.sep));
 }
 
-export function createLinuxIsolatedContainment({ runtimeTrust, authorityId, inputRoot, outputRoot } = {}) {
+const PROVIDER_ONLY_DISABLED_FEATURES = Object.freeze([
+  "shell_tool",
+  "unified_exec",
+  "code_mode_host",
+  "apps",
+  "browser_use",
+  "in_app_browser",
+  "computer_use",
+  "image_generation",
+  "standalone_web_search",
+  "multi_agent",
+  "skill_search",
+  "plugin_sharing",
+  "remote_plugin",
+  "tool_suggest",
+]);
+
+function hasDisabledFeature(argv, feature) {
+  return argv.some((argument, index) => argument === "--disable" && argv[index + 1] === feature);
+}
+
+export function createLinuxIsolatedContainment({ runtimeTrust, authorityId, inputRoot, outputRoot, recoveryOnly = false } = {}) {
   if (process.platform !== "linux") throw new Error("LINUX_CONTAINMENT_REQUIRED");
+  if (typeof recoveryOnly !== "boolean") throw new Error("LINUX_CONTAINMENT_RECOVERY_MODE_INVALID");
   const authority = protectedRuntimeAuthority(runtimeTrust, authorityId, "linux_isolation");
-  if (authority.profile_id !== "linux-user-mount-net-v1" || !Number.isSafeInteger(authority.revision) || authority.revision < 1) throw new Error("LINUX_CONTAINMENT_AUTHORITY_INVALID");
+  const providerNetwork = authority.profile_id === "linux-user-mount-provider-net-v1";
+  if (!new Set(["linux-user-mount-net-v1", "linux-user-mount-provider-net-v1"]).has(authority.profile_id) || !Number.isSafeInteger(authority.revision) || authority.revision < 1) throw new Error("LINUX_CONTAINMENT_AUTHORITY_INVALID");
   const unshare = protectedExecutable(authority.unshare, "LINUX_CONTAINMENT_UNSHARE_INVALID");
   const bubblewrap = protectedExecutable(authority.bubblewrap, "LINUX_CONTAINMENT_BUBBLEWRAP_INVALID");
   const barrierInterpreter = protectedExecutable(authority.barrier_interpreter, "LINUX_CONTAINMENT_BARRIER_INTERPRETER_INVALID");
   const barrierScript = protectedFile(authority.barrier_script, "LINUX_CONTAINMENT_BARRIER_SCRIPT_INVALID");
+  const providerAuthFile = providerNetwork && !recoveryOnly ? protectedFile(authority.provider_auth_file, "LINUX_CONTAINMENT_PROVIDER_AUTH_INVALID") : null;
   const input = privateRoot(inputRoot, "LINUX_CONTAINMENT_INPUT_ROOT_INVALID");
   const output = privateRoot(outputRoot, "LINUX_CONTAINMENT_OUTPUT_ROOT_INVALID");
   if (within(input, output) || within(output, input)) throw new Error("LINUX_CONTAINMENT_ROOTS_MUST_BE_DISJOINT");
@@ -165,9 +189,14 @@ export function createLinuxIsolatedContainment({ runtimeTrust, authorityId, inpu
     bubblewrap,
     barrier_interpreter: barrierInterpreter,
     barrier_script: barrierScript,
+    provider_auth_file: providerAuthFile,
+    provider_network: providerNetwork,
+    task_network_access: false,
+    task_tools_enabled: false,
     input_root: input,
     output_root: output,
     validatePlan(plan) {
+      if (recoveryOnly) throw new Error("LINUX_CONTAINMENT_RECOVERY_ONLY");
       const working = mapPath(input, "/input", plan.working_directory);
       const prompt = mapPath(input, "/input", plan.stdin_file);
       const response = mapPath(output, "/output", plan.response_file);
@@ -182,18 +211,32 @@ export function createLinuxIsolatedContainment({ runtimeTrust, authorityId, inpu
       return { working_directory: working, stdin_file: prompt, response_file: response, argv };
     },
     buildSpawn({ plan, hasInterpreter = false }) {
+      if (recoveryOnly) throw new Error("LINUX_CONTAINMENT_RECOVERY_ONLY");
       const mapped = this.validatePlan(plan);
       const target = hasInterpreter ? "/runtime/interpreter" : "/runtime/executable";
       const targetArgv = hasInterpreter ? ["/runtime/executable", ...mapped.argv] : mapped.argv;
       const bubblewrapArgs = [
         "/proc/self/fd/4", "--die-with-parent", "--unshare-pid", "--unshare-uts", "--unshare-ipc", "--cap-drop", "ALL",
+        "--clearenv",
         "--dir", "/usr", "--ro-bind", "/usr/lib", "/usr/lib", "--ro-bind", "/usr/lib64", "/usr/lib64", "--symlink", "usr/lib", "/lib", "--symlink", "usr/lib64", "/lib64",
         "--proc", "/proc", "--dev", "/dev", "--tmpfs", "/tmp", "--dir", "/runtime", "--dir", "/input", "--dir", "/output",
+        ...(providerNetwork ? [
+          "--dir", "/etc", "--dir", "/home", "--dir", "/home/agent", "--tmpfs", "/provider-home",
+          "--ro-bind", "/proc/self/fd/13", "/provider-home/auth.json",
+          "--ro-bind", "/etc/ssl", "/etc/ssl",
+          "--ro-bind", "/etc/resolv.conf", "/etc/resolv.conf",
+          "--ro-bind", "/etc/hosts", "/etc/hosts",
+          "--ro-bind", "/etc/nsswitch.conf", "/etc/nsswitch.conf",
+          "--setenv", "CODEX_HOME", "/provider-home",
+          "--setenv", "HOME", "/home/agent",
+          "--setenv", "LANG", "C.UTF-8",
+          "--setenv", "LC_ALL", "C.UTF-8",
+        ] : []),
         "--ro-bind", "/proc/self/fd/5", "/runtime/executable",
         ...(hasInterpreter ? ["--ro-bind", "/proc/self/fd/8", "/runtime/interpreter"] : []),
-        "--ro-bind", "/proc/self/fd/6", "/input", "--bind", "/proc/self/fd/7", "/output", "--chdir", mapped.working_directory, "--block-fd", "9", "--clearenv", target, ...targetArgv,
+        "--ro-bind", "/proc/self/fd/6", "/input", "--bind", "/proc/self/fd/7", "/output", "--chdir", mapped.working_directory, "--block-fd", "9", target, ...targetArgv,
       ];
-      const unshareArgv = ["--user", "--map-root-user", "--net", "--mount", "--fork", "--kill-child", ...bubblewrapArgs];
+      const unshareArgv = ["--user", "--map-root-user", ...(providerNetwork ? [] : ["--net"]), "--mount", "--fork", "--kill-child", ...bubblewrapArgs];
       return { executable: "/proc/self/fd/11", argv: ["/proc/self/fd/10", "/proc/self/fd/3", ...unshareArgv], mapped };
     },
     observeBarrierProcess({ pid, processGroupId, startNonce }) {
@@ -211,13 +254,19 @@ export function createLinuxIsolatedContainment({ runtimeTrust, authorityId, inpu
       const containedMarker = processMarker(pid);
       if (!marker || !containedMarker) throw new Error("RUN_LIFECYCLE_PROCESS_MARKER_UNAVAILABLE");
       const namespaces = namespaceSnapshot(pid);
-      const namespaceSeparated = ["user", "net", "mnt"].every((name) => namespaces[name] !== parentNamespaces[name]);
+      const namespaceSeparated = ["user", "mnt"].every((name) => namespaces[name] !== parentNamespaces[name])
+        && (providerNetwork ? namespaces.net === parentNamespaces.net : namespaces.net !== parentNamespaces.net);
       const argv = readFileSync(`/proc/${pid}/cmdline`).toString("utf8").split("\0").filter(Boolean);
-      const requiredArguments = ["--net", "--mount", "--ro-bind", "--bind", plan.selected_model, plan.selected_effort];
-      if (!namespaceSeparated || requiredArguments.some((argument) => !argv.includes(argument))) throw new Error("RUN_LIFECYCLE_CONTAINMENT_OBSERVATION_FAILED");
+      const requiredArguments = [
+        "--mount", "--ro-bind", "--bind", "--model", plan.selected_model, "-c", `model_reasoning_effort="${plan.selected_effort}"`,
+        ...(providerNetwork ? ["/provider-home/auth.json"] : ["--net"]),
+      ];
+      if (!namespaceSeparated
+        || requiredArguments.some((argument) => !argv.includes(argument))
+        || (providerNetwork && PROVIDER_ONLY_DISABLED_FEATURES.some((feature) => !hasDisabledFeature(argv, feature)))) throw new Error("RUN_LIFECYCLE_CONTAINMENT_OBSERVATION_FAILED");
       const processIdentity = { ...marker, process_group_id: processGroupId, start_nonce: startNonce, containment_authority_fingerprint: authorityFingerprint };
       const processIdentityFingerprint = digest(processIdentity);
-      const evidence = { verified: true, barrier_ready: true, contained: true, contained_pid: pid, contained_process_identity: containedMarker, profile_id: authority.profile_id, authority_id: authorityId, authority_fingerprint: authorityFingerprint, process_identity: processIdentity, process_identity_fingerprint: processIdentityFingerprint, namespaces, argv };
+      const evidence = { verified: true, barrier_ready: true, contained: true, contained_pid: pid, contained_process_identity: containedMarker, profile_id: authority.profile_id, authority_id: authorityId, authority_fingerprint: authorityFingerprint, process_identity: processIdentity, process_identity_fingerprint: processIdentityFingerprint, namespaces, argv, provider_network: providerNetwork, provider_network_boundary: providerNetwork ? "pinned_provider_process_only" : "disabled", disabled_task_features: providerNetwork ? [...PROVIDER_ONLY_DISABLED_FEATURES] : [], task_network_access: false, task_tools_enabled: false };
       return Object.freeze({ ...evidence, fingerprint: digest(evidence) });
     },
     matchPersistedProcess({ pid, observation }) {

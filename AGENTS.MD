@@ -233,4 +233,7 @@ verification profile: real prerequisite checks, private store-bound lifecycle
 authority, immutable launch/admission provenance, and independent review are
 mandatory. Missing Bubblewrap or namespace support must produce installation
 or operating-system guidance and a safe stop, never an unisolated fallback.
-Production Agent launch remains unavailable and Activation remains `planned`.
+Production Agent launch remains unavailable while Activation is not `enforced`.
+After the complete signed release lineage is enforced, Production Agent launch
+is authorized only through the owner-protected external launcher recorded in
+the protected runtime trust; direct repository entry points remain fail-closed.

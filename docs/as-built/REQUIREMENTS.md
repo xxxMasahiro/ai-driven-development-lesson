@@ -3836,12 +3836,244 @@ separate production-Activation boundary:
     containment are explicitly skipped. Tests must never substitute an
     unisolated execution path, and the operational runtime remains unavailable.
 
-Current local conformance evidence is 217 passing tests across 17 standalone
-suites, all seven frozen contracts, and the clean-candidate canonical
-repository aggregate. PR CI, merge, main CI, and local/remote synchronization
-evidence are still required before delivery is complete.
+Current local conformance evidence passes all 24 registered standalone suites,
+all seven frozen contracts, and the clean-candidate canonical repository
+aggregate. PR CI, merge, main CI, and local/remote synchronization evidence are
+still required before delivery is complete.
 
 The future Control Center reconstruction must expose the isolation diagnostic,
 guided installation/recheck, provider billing mode, model and publisher policy,
 and cost ceilings in non-technical language. This requirement does not
 authorize changes to the currently paused Control Center.
+
+## Development-session automatic Agent selection requirements
+
+SYNC-ID: next_workflow_development_agent_auto_selection
+STATUS: implemented
+ARTIFACTS: docs/as-built/IMPLEMENTATION_PLAN.md,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/HANDOFF.md,docs/workflow/INSTRUCTION_MEMORY.md,docs/workflow/TASK_TRACKER.md,docs/workflow/TEST_PLAN_MANIFEST.tsv,learning/NEXT_WORKFLOW_AGENT_SELECTION_SETTINGS.json,skills/repository-development-workflow/SKILL.md,skills/repository-development-workflow/references/repository-development.md,tools/lib/next_workflow/provider_discovery.mjs,tools/lib/next_workflow/providers.mjs,tools/lib/next_workflow/settings.mjs,tools/next-workflow.mjs,tools/test_next_workflow.sh,tools/test_next_workflow_development_selection.mjs,tools/test_next_workflow_development_selection.sh
+TESTS: tools/check_next_workflow.sh,tools/test_next_workflow.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+The next repository-development task must be able to choose the Lead or Task
+Agent model and native reasoning effort automatically before a direct
+development-session CLI launch. The choice must use the installed adapter's
+bounded official model catalog, the saved nearest-scope `auto|manual|inherit`
+policy, model and publisher allow/deny rules, role, L1-L5 rigor, risk,
+complexity, and an explicit correctness/balance/efficiency objective.
+
+This path is advisory and development-session-only. It grants no launch, Git,
+network, credential, API-spend, release, or Production Activation authority.
+It must not mark an observed model `CERTIFIED`, weaken the production selector,
+or make the protected runtime available while Activation is `planned`.
+The result must contain the exact selected model and provider-native effort,
+catalog and policy provenance, a deterministic fingerprint, and a bounded
+argument contract that the Orchestrator can compare with the values passed to
+the CLI. Missing, malformed, stale, disallowed, or empty catalog data must stop
+without a fallback to an unspecified model or effort.
+
+The repository default allowlist initially contains only the currently
+supported GPT-5.6 Sol, Terra, and Luna models. GPT-5.5 is opt-in rather than an
+initial automatic candidate, and GPT-5.4 is outside the supported initial
+configuration. A future Control Center may update the same saved policy, but a
+saved change cannot make an unobserved or adapter-unsupported model eligible.
+
+## Headless Production team enablement requirements
+
+SYNC-ID: next_workflow_headless_production_enablement
+STATUS: implemented
+ARTIFACTS: docs/as-built/IMPLEMENTATION_PLAN.md,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/DEVELOPMENT_INSTRUCTION_POLICY.tsv,docs/workflow/FINAL_GATE_GAP_COMMANDS.tsv,docs/workflow/HANDOFF.md,docs/workflow/INSTRUCTION_MEMORY.md,docs/workflow/TASK_TRACKER.md,docs/workflow/TEST_PLAN_MANIFEST.tsv,learning/NEXT_WORKFLOW_RELEASE_PREREQUISITES.json,tools/lib/next_workflow/agents.mjs,tools/lib/next_workflow/headless_bootstrap.mjs,tools/lib/next_workflow/headless_plan.mjs,tools/lib/next_workflow/headless_runtime.mjs,tools/lib/next_workflow/headless_service.mjs,tools/lib/next_workflow/provider_discovery.mjs,tools/lib/next_workflow/release_signing.mjs,tools/lib/next_workflow/release_source_receipts.mjs,tools/lib/next_workflow/run_controller.mjs,tools/lib/next_workflow/run_lifecycle.mjs,tools/lib/next_workflow/runtime_barrier.cjs,tools/lib/next_workflow/runtime_containment.mjs,tools/lib/next_workflow/runtime_trust.mjs,tools/next-workflow.mjs,tools/test_next_workflow.sh,tools/test_next_workflow_agents.mjs,tools/test_next_workflow_headless_bootstrap.mjs,tools/test_next_workflow_headless_bootstrap.sh,tools/test_next_workflow_headless_plan.mjs,tools/test_next_workflow_headless_plan.sh,tools/test_next_workflow_headless_runtime.mjs,tools/test_next_workflow_headless_runtime.sh,tools/test_next_workflow_release_signing.mjs,tools/test_next_workflow_release_signing.sh,tools/test_next_workflow_run_controller.mjs,tools/test_next_workflow_run_controller.sh
+TESTS: tools/check_next_workflow.sh,tools/test_next_workflow.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+The repository must support real headless Production operation without waiting
+for the developer-paused Control Center reconstruction. A protected external
+owner trust, accepted headless-runtime prerequisite, immutable candidate, signed
+release and transition evidence, and enforced activation remain mandatory. The
+paused Control Center does not grant authority and does not block headless
+activation; it remains the only deferred implementation scope.
+
+`runtime acceptance-create --confirm` must first create an externally stored,
+signed Owner acceptance receipt bound to the exact repository identity and
+complete prerequisite-document fingerprint. `runtime bootstrap
+--owner-acceptance PATH --confirm` must verify that receipt, create a private
+external trust root and distinct source-evidence and final-release keys, and
+must not infer developer acceptance from candidate-controlled tracked text or
+overwrite an existing valid root. Missing Bubblewrap or
+Linux namespace support must produce non-installing setup and recheck guidance
+and must never fall back to an uncontained process. Production discovery must
+admit only a currently observed, digest-pinned, independently probed and
+certified CLI executable.
+
+`team run` must resolve the current saved selection policy, choose each required
+Lead or Task Agent model and exact native effort, pass those values explicitly,
+and report the observed values after execution. L1 creates no child Agent Run;
+L2-L5 use the rigor-bounded hierarchy. Every launch is read-only in this
+headless scope, receives only an authority-owned private task envelope, runs
+without task tools or task network access, and remains candidate data until the
+required structural and independent disposition gates pass.
+
+Execution preference supports `auto`, `single_agent`, and `team`. `auto` is the
+default. `single_agent` uses only the Orchestrator and is eligible only when the
+effective rigor remains L1. Hard-L5 security, authentication, permission,
+destructive-operation, major-compatibility, and equivalent safety triggers
+override that preference. A `team` preference may raise but cannot lower rigor.
+The future Control Center must expose these choices without changing the safety
+floor; its UI remains deferred.
+
+Unknown outcomes, stale activation, candidate drift, provider or effort drift,
+unresolved effects, absent containment, malformed results, unchanged failures,
+or unverified progress must stop. Restart reconciliation must occur before a
+new launch, and a failed launch must not be blindly retried. Paid API and local
+runtime transports remain separate future work and are not enabled by this
+slice.
+
+Release signing must use the private external owner key that matches the
+protected public trust entry. The complete Git tree object is the immutable
+release boundary; the artifact list is diagnostic only. Final signing must
+consume and embed fresh candidate-bound source receipts signed by the distinct
+source-evidence key, then sign with the final-release key. It must bind all
+eight release proof kinds and each transition to the immutable candidate,
+repository lineage, accepted prerequisite, expiry, and evidence fingerprint.
+Candidate-controlled or unmatched keys, shape-correct raw evidence, incomplete
+evidence, and stale signatures must be rejected.
+
+Lead, Orchestrator, and Validator review must be performed by three separately
+launched CLI reviewer runs. Their grants, reservations, runtime provenance,
+result candidates, and process identities must be persisted and must be
+distinct from the reviewed subject and each other. Candidate self-report cannot
+satisfy an independent review assignment.
+
+Production provider discovery must authorize the executable digest before any
+version or catalog command and run that probe inside non-networked Linux
+isolation. Every Agent and reviewer launch must recheck certification issue and
+expiry time, revocation state, and observation freshness. Reported
+provider/model/effort is evidence of the pinned contained CLI launch
+configuration, not a claim about remote-backend routing.
+
+Activation and runtime status must fail closed. Invalid protected trust/store
+state, unavailable isolation, non-enforced or stale Activation, deployment
+drift, and unavailable providers must report `decision: STOP` and
+`production_available: false`; a legacy or tracked state cannot become a
+fallback source of Production authority.
+
+These requirements supersede every earlier requirement in this planning
+contract that made Control Center acceptance a prerequisite for headless
+Activation or required the protected AgentLauncher to remain unavailable after
+this delivery. They do not enable separately deferred API, local-runtime,
+child-adapter, Local Agent Bus, or long-term-memory work.
+
+## Headless Production trust-boundary hardening requirements
+
+SYNC-ID: next_workflow_headless_production_hardening
+STATUS: implemented
+ARTIFACTS: docs/as-built/IMPLEMENTATION_PLAN.md,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/HANDOFF.md,docs/workflow/TASK_TRACKER.md,tools/lib/next_workflow/agents.mjs,tools/lib/next_workflow/headless_bootstrap.mjs,tools/lib/next_workflow/headless_plan.mjs,tools/lib/next_workflow/headless_service.mjs,tools/lib/next_workflow/release.mjs,tools/lib/next_workflow/run_controller.mjs,tools/lib/next_workflow/runtime_trust.mjs,tools/lib/next_workflow/store.mjs,tools/next-workflow-launcher.cjs,tools/next-workflow.mjs,tools/test_next_workflow.sh,tools/test_next_workflow_agents.mjs,tools/test_next_workflow_headless_bootstrap.mjs,tools/test_next_workflow_headless_plan.mjs,tools/test_next_workflow_headless_runtime.mjs,tools/test_next_workflow_run_controller.mjs,tools/test_next_workflow_store.mjs
+TESTS: tools/check_next_workflow.sh,tools/test_next_workflow.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+Production must not evaluate candidate repository JavaScript before independently
+checking the activated candidate. Bootstrap must install an external,
+owner-only immutable launcher. That launcher must read the externally enrolled
+Owner trust, require the exact protected database generation, require enforced
+Activation, and compare clean Git HEAD, tree, and every release artifact
+fingerprint before loading the repository CLI. Direct Production team runs and
+recovery writes outside this launcher must stop.
+
+Owner acceptance must use a previously enrolled external Owner key and anchor;
+the acceptance receipt must bind the anchor, repository identity, complete
+prerequisite fingerprint, and exact native provider path and digest. Production
+database selection must come from external Owner trust, not an
+environment-selected alternate file, and the database must carry the same
+generation identifier.
+
+Automatic task classification must compute effective L1-L5 rigor independently
+from risk, complexity, scope, and hard safety triggers. A developer-provided
+rigor is a minimum only. `single_agent` may use only effective L1, `team` may
+raise L1 to L2, and neither can weaken a hard L5 result. Until direct L1
+Orchestrator execution is available, a headless team command must report STOP
+instead of a zero-launch PASS.
+
+Agent stop and reviewer closure records must use the validated lifecycle writer;
+generic state commits cannot forge them. Open Agent Runs must block later work,
+be visible in status, and be reconciled to an authorized STOP when a bound
+candidate exists. Saved settings must be re-read before every launch and by the
+finalization fence. Git inspection must use a root-owned absolute executable,
+a clean allowlisted environment, disabled replacement objects, disabled hooks,
+and no inherited Git configuration.
+
+Runtime accounting may report only controller-observed duration and process
+launches. Provider-supplied token or duration fields are untrusted; when
+authoritative token usage is unavailable, output must say so and must not claim
+token-budget enforcement. Control Center reconstruction remains deferred and
+unchanged.
+
+## Headless launcher audit-closure requirements
+
+SYNC-ID: next_workflow_headless_launcher_closure
+STATUS: implemented
+ARTIFACTS: docs/as-built/IMPLEMENTATION_PLAN.md,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/HANDOFF.md,docs/workflow/INSTRUCTION_MEMORY.md,docs/workflow/TASK_TRACKER.md,docs/workflow/TEST_PLAN_MANIFEST.tsv,tools/lib/next_workflow/headless_bootstrap.mjs,tools/lib/next_workflow/headless_plan.mjs,tools/lib/next_workflow/runtime_trust.mjs,tools/lib/next_workflow/store.mjs,tools/next-workflow-launcher.cjs,tools/test_next_workflow.sh,tools/test_next_workflow_headless_bootstrap.mjs,tools/test_next_workflow_headless_plan.mjs,tools/test_next_workflow_launcher.mjs,tools/test_next_workflow_launcher.sh,tools/test_next_workflow_store.mjs
+TESTS: tools/check_next_workflow.sh,tools/test_next_workflow.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+The official Production entry point must be the owner-only wrapper installed by
+bootstrap, not a repository JavaScript command. The wrapper must start the
+digest-pinned Node interpreter from a clean environment before Node evaluates
+`NODE_OPTIONS` or `NODE_PATH`. External trust must bind the wrapper, launcher
+script, interpreter, repository logical identity, checkout identity, and
+database generation. Repository names must not be compiled into the launcher.
+
+Before candidate code is imported, the installed launcher must independently
+verify the complete signed release-proof and ordered transition-proof lineage,
+freshness, active non-shared verifier keys, source receipts, accepted
+prerequisite fingerprint, authority epoch, deployed merge commit, Git tree, and
+tracked artifact fingerprints. A shape-correct or forged `mode: enforced`
+database row must stop.
+
+Automatic rigor classification must inspect every bounded child-task summary,
+scope, and data fragment in addition to the root task. A benign root summary
+must not hide a destructive, credential, authentication, permission, or other
+hard-L5 child task. Every child scope path must be independently validated.
+
+Any persisted `AgentRun` without an accepted, stopped, or reviewer closure must
+place the store in recovery-only mode after restart. Ordinary writes remain
+blocked until an authorized lifecycle recovery closes every unresolved run.
+
+## Headless Production final security-closure requirements
+
+SYNC-ID: next_workflow_headless_final_security_closure
+STATUS: implemented
+ARTIFACTS: AGENTS.MD,docs/as-built/IMPLEMENTATION_PLAN.md,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/HANDOFF.md,docs/workflow/TASK_TRACKER.md,tools/lib/next_workflow/agents.mjs,tools/lib/next_workflow/headless_bootstrap.mjs,tools/lib/next_workflow/headless_plan.mjs,tools/lib/next_workflow/headless_service.mjs,tools/lib/next_workflow/release_source_receipts.mjs,tools/lib/next_workflow/release_trust.mjs,tools/lib/next_workflow/run_controller.mjs,tools/lib/next_workflow/runtime_trust.mjs,tools/lib/next_workflow/store.mjs,tools/next-workflow-launcher.cjs,tools/next-workflow.mjs,tools/test_next_workflow_headless_bootstrap.mjs,tools/test_next_workflow_headless_plan.mjs,tools/test_next_workflow_headless_runtime.mjs,tools/test_next_workflow_launcher.mjs
+TESTS: tools/check_next_workflow.sh,tools/test_next_workflow.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+Production admission must bind all six repository identity fields, use
+cryptographically distinct release and source-verifier keys, and reject
+future-dated Activation. The launcher must compare every deployed artifact to
+the exact Git blob, copy only verified bytes into a private read-only snapshot,
+and execute the runtime entry from that snapshot.
+
+Production runtime provenance must be checked before opening even the
+read-only protected store. The runtime must confirm the pinned parent
+interpreter, installed launcher script, signed snapshot root, and original
+repository root. Direct repository entry points cannot acquire Production
+write authority by setting environment variables.
+
+The installed wrapper must remain as the launcher's live parent rather than
+replace itself. Protected trust must pin its shell interpreter, and the
+launcher must match the parent executable, canonical wrapper path, and complete
+forwarded argument vector. A replayed public environment marker alone is not
+launch provenance.
+
+L1 must perform exactly one bounded Orchestrator launch and close through
+single-Agent internal verification. It must not fabricate zero-launch success
+or independent reviewer activity. The execution boundary must revalidate the
+signed topology and exact-one L1 structure. L2-L5 must launch the depth-zero
+Orchestrator before its Lead and Task descendants and include all actual
+subject and reviewer launches in the process budget. Classification inputs and
+every scope path must be bounded and canonical; overflow or noncanonical input
+stops. Task count and the closed set of explicit safety signals must be bounded
+before classification traversal.
+
+The authority-derived rigor and admitted topology must be captured separately
+from the public plan projection. RunController must reject a topology whose
+rigor differs from that captured value, even when the replacement topology is
+internally re-fingerprinted.
+
+Protected recovery authorization must be regenerated and exact-compared at the
+store boundary. Recovery-only mode ends only when every Agent Run has a valid
+terminal closure. A caller-supplied lookalike authorization cannot reopen
+ordinary writes.

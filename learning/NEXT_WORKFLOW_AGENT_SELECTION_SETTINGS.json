@@ -11,7 +11,11 @@
       "mode": "auto",
       "identity_key": null,
       "model_policy": {
-        "allowed_model_ids": [],
+        "allowed_model_ids": [
+          "gpt-5.6-luna",
+          "gpt-5.6-sol",
+          "gpt-5.6-terra"
+        ],
         "denied_model_ids": [],
         "allowed_model_publishers": [],
         "denied_model_publishers": [],

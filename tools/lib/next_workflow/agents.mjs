@@ -3,6 +3,13 @@ import path from "node:path";
 import { admitAgentRun, createLaunchIntent } from "./providers.mjs";
 
 const LEAD_ROLES = ["Value Design Lead", "Planning Design Lead", "Implementation Lead", "Independent Review Lead", "Safety and Acceptance Decision Lead"];
+const LEAD_AGENT_IDS = Object.freeze({
+  "Value Design Lead": "lead-value-design",
+  "Planning Design Lead": "lead-planning-design",
+  "Implementation Lead": "lead-implementation",
+  "Independent Review Lead": "lead-independent-review",
+  "Safety and Acceptance Decision Lead": "lead-safety-acceptance",
+});
 const MINIMUM_PERSPECTIVES = { L1: 0, L2: 0, L3: 1, L4: 2, L5: 3 };
 const STRICT_PERSPECTIVES = ["technical", "independent_review", "safety_acceptance"];
 const RUN_TRANSITIONS = {
@@ -70,7 +77,7 @@ function grantCore(grant) {
 }
 
 function grantFromPersistedPayload(payload) {
-  const { scope_fingerprint: ignoredScope, budget_fingerprint: ignoredBudget, ownership_fingerprint: ignoredOwnership, authority_epoch: ignoredEpoch, authority_id: ignoredAuthority, authority_proof_fingerprint: ignoredProof, ...grant } = payload ?? {};
+  const { scope_fingerprint: ignoredScope, budget_fingerprint: ignoredBudget, ownership_fingerprint: ignoredOwnership, authority_epoch: ignoredEpoch, authority_id: ignoredAuthority, authority_proof_fingerprint: ignoredProof, authority_verifier_fingerprint: ignoredVerifier, authority_trust_fingerprint: ignoredTrust, ...grant } = payload ?? {};
   return grant;
 }
 
@@ -100,17 +107,24 @@ function normalizeDelegationSandbox(sandbox, ownership) {
 export function validateDelegationGrant(grant, { now = new Date().toISOString() } = {}) {
   if (!grant || typeof grant !== "object" || Array.isArray(grant)) throw new Error("DELEGATION_GRANT_REQUIRED");
   for (const field of ["grant_id", "parent_agent_id", "parent_role", "child_agent_id", "child_role", "authority_fingerprint", "expires_at", "issued_at"]) requireString(grant[field], `DELEGATION_GRANT_FIELD_REQUIRED:${field}`);
-  if (!Number.isSafeInteger(grant.parent_depth) || !Number.isSafeInteger(grant.child_depth) || grant.parent_depth < 0 || grant.child_depth !== grant.parent_depth + 1 || grant.child_depth > 2) throw new Error("DELEGATION_TOPOLOGY_DEPTH_INVALID");
+  const directOrchestratorGrant = grant.parent_depth === -1 && grant.child_depth === 0;
+  if (!Number.isSafeInteger(grant.parent_depth)
+    || !Number.isSafeInteger(grant.child_depth)
+    || (!directOrchestratorGrant && grant.parent_depth < 0)
+    || grant.child_depth !== grant.parent_depth + 1
+    || grant.child_depth > 2) throw new Error("DELEGATION_TOPOLOGY_DEPTH_INVALID");
   if (!Number.isFinite(Date.parse(now)) || !Number.isFinite(Date.parse(grant.expires_at)) || !Number.isFinite(Date.parse(grant.issued_at)) || Date.parse(grant.issued_at) > Date.parse(now) || Date.parse(grant.expires_at) <= Date.parse(now)) throw new Error("DELEGATION_GRANT_EXPIRED_OR_INVALID");
   for (const key of ["max_runtime_ms", "max_tokens", "max_cost", "max_retries"]) if (!Number.isFinite(grant.budget?.[key]) || grant.budget[key] < 0) throw new Error(`DELEGATION_BUDGET_INVALID:${key}`);
   const scopePaths = normalizePathSet(grant.scope?.paths ?? [], "DELEGATION_SCOPE_PATHS_INVALID");
   const ownershipPaths = normalizePathSet(grant.ownership?.paths ?? [], "DELEGATION_OWNERSHIP_PATHS_INVALID");
   const ownership = { ...structuredClone(grant.ownership), read_only: grant.ownership?.read_only !== false, paths: ownershipPaths };
+  if (directOrchestratorGrant && ownership.read_only !== true) throw new Error("DELEGATION_DIRECT_ORCHESTRATOR_READ_ONLY_REQUIRED");
   if (!ownership.read_only && ((grant.child_depth === 1 && grant.child_role !== "Implementation Lead") || (grant.child_depth === 2 && grant.parent_role !== "Implementation Lead"))) throw new Error("WRITE_DELEGATION_REQUIRES_IMPLEMENTATION_LEAD");
   if (grant.ownership?.read_only === false && (ownershipPaths.length === 0 || ownershipPaths.some((owned) => !scopePaths.some((scoped) => pathContains(scoped, owned))))) throw new Error("DELEGATION_OWNERSHIP_OUTSIDE_SCOPE");
   if (!Array.isArray(grant.allowed_actions) || !Array.isArray(grant.allowed_tools) || !Array.isArray(grant.capabilities)) throw new Error("DELEGATION_ALLOWLIST_REQUIRED");
   const sandbox = normalizeDelegationSandbox(grant.sandbox, ownership);
   if (grant.child_depth === 2 && (typeof grant.parent_grant_id !== "string" || grant.parent_grant_id.length === 0 || !/^[a-f0-9]{64}$/.test(grant.parent_grant_fingerprint ?? ""))) throw new Error("DELEGATION_PARENT_GRANT_REFERENCE_REQUIRED");
+  if (grant.child_depth === 0 && (grant.parent_agent_id !== "run-controller" || grant.parent_role !== "Runtime Adapter" || grant.child_agent_id !== "orchestrator" || grant.child_role !== "Orchestrator Agent" || grant.parent_depth !== -1 || grant.parent_grant_id !== null || grant.parent_grant_fingerprint !== null)) throw new Error("DELEGATION_DIRECT_ORCHESTRATOR_REFERENCE_INVALID");
   if (grant.child_depth === 1 && (grant.parent_agent_id !== "orchestrator" || grant.parent_role !== "Orchestrator Agent" || grant.parent_depth !== 0 || grant.parent_grant_id !== null || grant.parent_grant_fingerprint !== null)) throw new Error("DELEGATION_ROOT_PARENT_REFERENCE_INVALID");
   if (grant.fingerprint !== digest(grantCore(grant))) throw new Error("DELEGATION_GRANT_FINGERPRINT_INVALID");
   return { ...structuredClone(grant), scope: { ...structuredClone(grant.scope), paths: scopePaths }, ownership, sandbox };
@@ -129,17 +143,22 @@ function assertDelegationContained(childGrant, parentGrant) {
 export function planTeamTopology({ rigor, requiredRoles = [], tasks = [], requiredPerspectives = [], budgets }) {
   if (!new Set(["L1", "L2", "L3", "L4", "L5"]).has(rigor)) throw new Error("TEAM_RIGOR_INVALID");
   if (!budgets || !Number.isInteger(budgets.max_agents) || !Number.isInteger(budgets.max_parallel) || budgets.max_agents < 0 || budgets.max_parallel < 1) throw new Error("TEAM_BUDGET_INVALID");
+  budgets = {
+    ...structuredClone(budgets),
+    max_process_launches: budgets.max_process_launches ?? (rigor === "L1" ? 1 : budgets.max_agents * 4),
+  };
+  if (!Number.isInteger(budgets.max_process_launches) || budgets.max_process_launches < 0) throw new Error("TEAM_BUDGET_INVALID");
   const unknownRoles = requiredRoles.filter((role) => !LEAD_ROLES.includes(role));
   if (unknownRoles.length) throw new Error(`TEAM_ROLE_INVALID:${unknownRoles.join(",")}`);
   const agents = [{ agent_id: "orchestrator", layer: "orchestrator", depth: 0, role: "Orchestrator Agent", parent_agent_id: null, may_delegate: true, writer: rigor === "L1" }];
   const compressedRoles = [];
-  if (rigor === "L1") compressedRoles.push(...requiredRoles);
+  if (rigor === "L1") compressedRoles.push(...LEAD_ROLES);
   else if (rigor === "L2") {
     const implementationRequired = requiredRoles.includes("Implementation Lead") || tasks.length > 0;
     if (implementationRequired) agents.push({ agent_id: "lead-implementation", layer: "lead", depth: 1, role: "Implementation Lead", parent_agent_id: "orchestrator", may_delegate: false, writer: true });
-    compressedRoles.push(...requiredRoles.filter((role) => role !== "Implementation Lead"));
+    compressedRoles.push(...LEAD_ROLES.filter((role) => role !== "Implementation Lead"));
   } else {
-    for (const role of [...new Set(requiredRoles)].sort()) agents.push({ agent_id: `lead-${role.toLowerCase().replace(/[^a-z]+/g, "-").replace(/^-|-$/g, "")}`, layer: "lead", depth: 1, role, parent_agent_id: "orchestrator", may_delegate: true, writer: role === "Implementation Lead" });
+    for (const role of [...new Set(requiredRoles)].sort()) agents.push({ agent_id: LEAD_AGENT_IDS[role], layer: "lead", depth: 1, role, parent_agent_id: "orchestrator", may_delegate: true, writer: role === "Implementation Lead" });
     const implementationLead = agents.find((agent) => agent.role === "Implementation Lead");
     for (const task of tasks) {
       requireString(task.task_id, "TASK_ID_REQUIRED");
@@ -151,12 +170,14 @@ export function planTeamTopology({ rigor, requiredRoles = [], tasks = [], requir
     }
   }
   if (agents.length - 1 > budgets.max_agents) throw new Error("TEAM_AGENT_BUDGET_EXCEEDED");
+  const plannedProcessLaunches = rigor === "L1" ? 1 : agents.length * 4;
+  if (plannedProcessLaunches > budgets.max_process_launches) throw new Error("TEAM_PROCESS_LAUNCH_BUDGET_EXCEEDED");
   if (tasks.filter((task) => task.parallel !== false).length > budgets.max_parallel && rigor !== "L1" && rigor !== "L2") throw new Error("TEAM_PARALLEL_BUDGET_EXCEEDED");
   const effectiveRequiredPerspectives = [...new Set([...(rigor === "L5" ? STRICT_PERSPECTIVES : []), ...requiredPerspectives])].sort();
   const covered = new Set(agents.flatMap((agent) => agent.perspectives ?? []).concat(agents.filter((agent) => agent.role === "Independent Review Lead").map(() => "independent_review"), agents.filter((agent) => agent.role === "Safety and Acceptance Decision Lead").map(() => "safety_acceptance")));
   const missingPerspectives = effectiveRequiredPerspectives.filter((perspective) => !covered.has(perspective));
   const coverageBelowRigorFloor = covered.size < MINIMUM_PERSPECTIVES[rigor];
-  const result = { schema_version: "1.0.0", rigor, agents, compressed_roles: compressedRoles, required_perspectives: effectiveRequiredPerspectives, covered_perspectives: [...covered].sort(), minimum_perspective_count: MINIMUM_PERSPECTIVES[rigor], missing_perspectives: missingPerspectives.sort(), budgets, decision: missingPerspectives.length || coverageBelowRigorFloor ? "STOP" : "PASS" };
+  const result = { schema_version: "1.0.0", rigor, agents, compressed_roles: compressedRoles, required_perspectives: effectiveRequiredPerspectives, covered_perspectives: [...covered].sort(), minimum_perspective_count: MINIMUM_PERSPECTIVES[rigor], missing_perspectives: missingPerspectives.sort(), budgets, planned_process_launches: plannedProcessLaunches, decision: missingPerspectives.length || coverageBelowRigorFloor ? "STOP" : "PASS" };
   return { ...result, fingerprint: digest(result) };
 }
 
@@ -164,18 +185,22 @@ export function createDelegationGrant({ grantId, parent, child, scope, authority
   if (!parent || !child) throw new Error("DELEGATION_AGENTS_REQUIRED");
   if (parent.depth === 2 || child.depth !== parent.depth + 1) throw new Error("DELEGATION_DEPTH_INVALID");
   if (child.parent_agent_id !== parent.agent_id) throw new Error("DELEGATION_PARENT_MISMATCH");
-  if (parent.depth === 0 && (parent.agent_id !== "orchestrator" || parent.role !== "Orchestrator Agent")) throw new Error("DELEGATION_ROOT_ORCHESTRATOR_REQUIRED");
+  const directOrchestratorGrant = parent.depth === -1 && child.depth === 0;
+  if (directOrchestratorGrant && (parent.agent_id !== "run-controller" || parent.role !== "Runtime Adapter" || child.agent_id !== "orchestrator" || child.role !== "Orchestrator Agent")) throw new Error("DELEGATION_DIRECT_ORCHESTRATOR_REQUIRED");
+  if (!directOrchestratorGrant && parent.depth === 0 && (parent.agent_id !== "orchestrator" || parent.role !== "Orchestrator Agent")) throw new Error("DELEGATION_ROOT_ORCHESTRATOR_REQUIRED");
+  if (parent.depth < -1) throw new Error("DELEGATION_DEPTH_INVALID");
   if (parent.may_delegate !== true) throw new Error("DELEGATION_NOT_ALLOWED");
   for (const key of ["max_runtime_ms", "max_tokens", "max_cost", "max_retries"]) if (!Number.isFinite(budget?.[key]) || budget[key] < 0) throw new Error(`DELEGATION_BUDGET_INVALID:${key}`);
   const normalizedScope = { ...structuredClone(scope ?? {}), paths: normalizePathSet(scope?.paths ?? [], "DELEGATION_SCOPE_PATHS_INVALID") };
   const normalizedOwnership = { read_only: ownership?.read_only !== false, paths: normalizePathSet(ownership?.paths ?? [], "DELEGATION_OWNERSHIP_PATHS_INVALID") };
+  if (directOrchestratorGrant && normalizedOwnership.read_only !== true) throw new Error("DELEGATION_DIRECT_ORCHESTRATOR_READ_ONLY_REQUIRED");
   if (!normalizedOwnership.read_only && ((child.depth === 1 && child.role !== "Implementation Lead") || (child.depth === 2 && parent.role !== "Implementation Lead"))) throw new Error("WRITE_DELEGATION_REQUIRES_IMPLEMENTATION_LEAD");
   if (!normalizedOwnership.read_only && (normalizedOwnership.paths.length === 0 || normalizedOwnership.paths.some((owned) => !normalizedScope.paths.some((scoped) => pathContains(scoped, owned))))) throw new Error("DELEGATION_OWNERSHIP_OUTSIDE_SCOPE");
   const expiryInput = requireString(expiresAt, "DELEGATION_EXPIRY_REQUIRED");
   if (!Number.isFinite(Date.parse(now)) || !Number.isFinite(Date.parse(expiryInput)) || Date.parse(expiryInput) <= Date.parse(now)) throw new Error("DELEGATION_EXPIRY_INVALID");
   const issuedAt = new Date(Date.parse(now)).toISOString();
   const expiry = new Date(Date.parse(expiryInput)).toISOString();
-  const normalizedParentGrant = parent.depth === 0 ? null : validateDelegationGrant(parentGrant, { now: issuedAt });
+  const normalizedParentGrant = parent.depth <= 0 ? null : validateDelegationGrant(parentGrant, { now: issuedAt });
   const normalizedSandbox = normalizeDelegationSandbox(sandbox, normalizedOwnership);
   if (normalizedParentGrant) {
     const candidate = { grant_id: grantId, parent_agent_id: parent.agent_id, parent_role: parent.role, parent_depth: parent.depth, child_agent_id: child.agent_id, child_role: child.role, child_depth: child.depth, scope: normalizedScope, authority_fingerprint: authorityFingerprint, budget, ownership: normalizedOwnership, allowed_actions: allowedActions, allowed_tools: allowedTools, capabilities, sandbox: normalizedSandbox, parent_grant_id: normalizedParentGrant.grant_id, parent_grant_fingerprint: normalizedParentGrant.fingerprint, issued_at: issuedAt, expires_at: expiry };
@@ -200,7 +225,7 @@ function resolvePersistedGrantChain(store, grant, now, authorityEpoch) {
   if (typeof store.get !== "function") throw new Error("DELEGATION_STORE_GET_REQUIRED");
   const current = store.get({ id: `delegation-grant-${grant.grant_id}` });
   validatePersistedGrantRecord(current, grant, now, "AGENT_PERSISTED_GRANT_REQUIRED", authorityEpoch);
-  if (grant.child_depth === 1) return [current];
+  if (grant.child_depth <= 1) return [current];
   const parent = store.get({ id: `delegation-grant-${grant.parent_grant_id}` });
   const parentGrant = validatePersistedGrantRecord(parent, grantFromPersistedPayload(parent?.payload), now, "DELEGATION_PERSISTED_PARENT_CHAIN_REQUIRED", authorityEpoch);
   try { assertDelegationContained(grant, parentGrant); } catch { throw new Error("DELEGATION_PERSISTED_PARENT_CHAIN_REQUIRED"); }
@@ -228,7 +253,7 @@ export function persistDelegationGrant({ store, grant, authorityBindings, verifi
     if (parent.payload?.authority_epoch !== authorityBindings.authority_epoch) throw new Error("DELEGATION_PERSISTED_PARENT_CHAIN_REQUIRED");
   }
   if (typeof store.persistDelegationGrantAuthority !== "function") throw new Error("DELEGATION_GRANT_STORE_WRITER_REQUIRED");
-  const persisted = store.persistDelegationGrantAuthority({ expectedRevision, record: { id: recordId, kind: "DelegationGrant", schema_version: "1.0.0", record_revision: 1, authority_scope: authorityBindings.task_id, lineage_id: validated.grant_id, lifecycle_state: "AUTHORIZED", payload, source_revision: validated.parent_grant_fingerprint ?? "orchestrator-root", policy_fp: authorityBindings.policy_fingerprint, input_fp: validated.fingerprint, fresh_until: validated.expires_at }, event: { event_id: `event-${recordId}`, aggregate_id: recordId, event_type: "DELEGATION_GRANT_AUTHORIZED", authority_decision_id: validated.authority_fingerprint, payload: { grant_id: validated.grant_id, parent_agent_id: validated.parent_agent_id, child_agent_id: validated.child_agent_id, scope_fingerprint: payload.scope_fingerprint, authority_epoch: authorityBindings.authority_epoch, expires_at: validated.expires_at } }, verifier });
+  const persisted = store.persistDelegationGrantAuthority({ expectedRevision, record: { id: recordId, kind: "DelegationGrant", schema_version: "1.0.0", record_revision: 1, authority_scope: authorityBindings.task_id, lineage_id: validated.grant_id, lifecycle_state: "AUTHORIZED", payload, source_revision: validated.parent_grant_fingerprint ?? (validated.child_depth === 0 ? "runtime-adapter-root" : "orchestrator-root"), policy_fp: authorityBindings.policy_fingerprint, input_fp: validated.fingerprint, fresh_until: validated.expires_at }, event: { event_id: `event-${recordId}`, aggregate_id: recordId, event_type: "DELEGATION_GRANT_AUTHORIZED", authority_decision_id: validated.authority_fingerprint, payload: { grant_id: validated.grant_id, parent_agent_id: validated.parent_agent_id, child_agent_id: validated.child_agent_id, scope_fingerprint: payload.scope_fingerprint, authority_epoch: authorityBindings.authority_epoch, expires_at: validated.expires_at } }, verifier });
   return { ...persisted, grant_id: validated.grant_id, state: "AUTHORIZED", fingerprint: validated.fingerprint };
 }
 
@@ -266,7 +291,7 @@ export function persistReviewerAssignment({ store, assignment, grant, authorityB
   assertCurrentAuthorityEpoch(store, authorityBindings, "REVIEWER_ASSIGNMENT_AUTHORITY_EPOCH_STALE");
   if (!assignment || !new Set(["lead", "orchestrator", "validator"]).has(assignment.assignment_kind)) throw new Error("REVIEWER_ASSIGNMENT_INVALID");
   for (const field of ["run_id", "agent_id", "agent_role"]) requireString(assignment[field], `REVIEWER_ASSIGNMENT_FIELD_REQUIRED:${field}`);
-  const allowedRoles = assignment.assignment_kind === "lead" ? LEAD_ROLES : assignment.assignment_kind === "orchestrator" ? ["Orchestrator Agent"] : ["Safety and Acceptance Decision Lead"];
+  const allowedRoles = assignment.assignment_kind === "lead" ? LEAD_ROLES : assignment.assignment_kind === "orchestrator" ? ["Orchestrator Agent", "Orchestrator Review Lead"] : ["Safety and Acceptance Decision Lead"];
   if (!allowedRoles.includes(assignment.agent_role) || assignment.agent_id === validatedGrant.child_agent_id || assignment.read_only !== true) throw new Error("REVIEWER_ASSIGNMENT_INDEPENDENCE_INVALID");
   const payload = { ...structuredClone(assignment), grant_fingerprint: validatedGrant.fingerprint, authority_epoch: authorityBindings.authority_epoch };
   const id = `agent-reviewer-assignment-${assignment.run_id}-${assignment.assignment_kind}`;
@@ -286,7 +311,14 @@ export function persistAgentReview({ store, runId, assignmentKind, review, autho
   const assignment = store.get({ id: assignmentId });
   if (assignment?.kind !== "AgentReviewerAssignment" || assignment.lifecycle_state !== "AUTHORIZED" || assignment.payload?.assignment_kind !== assignmentKind || assignment.payload?.agent_id !== review?.agent_id || assignment.payload?.authority_epoch !== authorityBindings.authority_epoch || assignment.policy_fp !== authorityBindings.policy_fingerprint || Date.parse(assignment.fresh_until) < Date.parse(now)) throw new Error("AGENT_REVIEW_ASSIGNMENT_INVALID");
   if (review.result_fingerprint === undefined || review.accepted !== true || (assignmentKind === "validator" && review.decision !== "PASS")) throw new Error("AGENT_REVIEW_DISPOSITION_INVALID");
-  const payload = { ...structuredClone(review), assignment_kind: assignmentKind, assignment_fingerprint: digest(assignment.payload), authority_epoch: authorityBindings.authority_epoch };
+  for (const field of ["review_run_id", "review_candidate_record_id", "review_result_fingerprint", "review_process_identity_fingerprint"]) requireString(review?.[field], `AGENT_REVIEW_EVIDENCE_FIELD_REQUIRED:${field}`);
+  const reviewRun = store.get({ id: review.review_run_id });
+  const reviewCandidate = store.get({ id: review.review_candidate_record_id });
+  const reviewGrant = reviewRun?.source_revision ? store.query({ kind: "DelegationGrant", limit: 1000 }).records.find((candidate) => candidate.payload?.fingerprint === reviewRun.source_revision) : null;
+  const subjectRun = store.get({ id: runId });
+  const subjectCandidate = subjectRun?.payload?.result_candidate_record_id ? store.get({ id: subjectRun.payload.result_candidate_record_id }) : null;
+  if (reviewRun?.kind !== "AgentRun" || reviewRun.lifecycle_state !== "RUNNING" || reviewRun.payload?.child_agent_id !== review.agent_id || reviewRun.payload?.result_candidate_record_id !== review.review_candidate_record_id || reviewCandidate?.kind !== "AgentResultCandidate" || reviewCandidate.lineage_id !== review.review_run_id || reviewCandidate.payload?.result_fingerprint !== review.review_result_fingerprint || reviewCandidate.payload?.process_identity_fingerprint !== review.review_process_identity_fingerprint || reviewGrant?.payload?.scope?.review_subject_fingerprint !== review.result_fingerprint || reviewGrant.payload?.scope?.assignment_kind !== assignmentKind || review.review_process_identity_fingerprint === subjectCandidate?.payload?.process_identity_fingerprint) throw new Error("AGENT_REVIEW_EVIDENCE_INVALID");
+  const payload = { ...structuredClone(review), run_id: runId, assignment_kind: assignmentKind, assignment_fingerprint: digest(assignment.payload), authority_epoch: authorityBindings.authority_epoch };
   const kinds = { lead: "AgentLeadReview", orchestrator: "AgentOrchestratorReview", validator: "AgentValidatorDisposition" };
   const id = `agent-review-${runId}-${assignmentKind}`;
   const record = { id, kind: kinds[assignmentKind], schema_version: "1.0.0", record_revision: 1, authority_scope: authorityBindings.task_id, lineage_id: runId, lifecycle_state: "accepted", payload, source_revision: assignmentId, policy_fp: authorityBindings.policy_fingerprint, input_fp: review.result_fingerprint, fresh_until: authorityBindings.fresh_until };
@@ -382,9 +414,10 @@ export function evaluateAgentRetry({ failureFingerprint, previousFailureFingerpr
   if (!Number.isInteger(attempt) || !Number.isInteger(limit) || !Number.isInteger(totalLimit) || !Number.isInteger(unchangedAttempt) || attempt < 0 || limit < 0 || totalLimit < 0 || unchangedAttempt < 0 || [elapsedMs, maxRuntimeMs, spentTokens, maxTokens, spentCost, maxCost].some((value) => typeof value !== "number" || Number.isNaN(value) || value < 0)) throw new Error("AGENT_RETRY_INPUT_INVALID");
   if (validatorDecision === "STOP") return { decision: "STOP", retry: false, reason: "VALIDATOR_STOP" };
   if (attempt >= totalLimit) return { decision: "STOP", retry: false, reason: "TOTAL_RETRY_LIMIT" };
-  if (elapsedMs >= maxRuntimeMs || spentTokens >= maxTokens || spentCost >= maxCost) return { decision: "STOP", retry: false, reason: "RESOURCE_RETRY_LIMIT" };
+  const costLimitReached = maxCost === 0 ? spentCost > 0 : spentCost >= maxCost;
+  if (elapsedMs >= maxRuntimeMs || spentTokens >= maxTokens || costLimitReached) return { decision: "STOP", retry: false, reason: "RESOURCE_RETRY_LIMIT" };
   if (failureFingerprint === previousFailureFingerprint && unchangedAttempt >= limit) return { decision: "STOP", retry: false, reason: "UNCHANGED_FAILURE_LIMIT" };
-  if (failureFingerprint !== previousFailureFingerprint && materialProgressVerified !== true) return { decision: "STOP", retry: false, reason: "MATERIAL_PROGRESS_UNVERIFIED" };
+  if (materialProgressVerified !== true) return { decision: "STOP", retry: false, reason: "MATERIAL_PROGRESS_UNVERIFIED" };
   return { decision: "REVISE", retry: true, reason: failureFingerprint === previousFailureFingerprint ? "BOUNDED_RETRY" : "MATERIAL_PROGRESS" };
 }
 
@@ -438,7 +471,7 @@ export function acceptAgentResult({ store, result, grant, leadAgentId, orchestra
   const assignments = Object.fromEntries(Object.entries(assignmentIds).map(([role, id]) => [role, store.get({ id })]));
   const expectedAssignments = {
     lead: { agent_id: leadAgentId, allowed_roles: LEAD_ROLES },
-    orchestrator: { agent_id: orchestratorAgentId, allowed_roles: ["Orchestrator Agent"] },
+    orchestrator: { agent_id: orchestratorAgentId, allowed_roles: ["Orchestrator Agent", "Orchestrator Review Lead"] },
     validator: { agent_id: validatorAgentId, allowed_roles: ["Safety and Acceptance Decision Lead"] }
   };
   for (const role of Object.keys(assignments)) {
@@ -480,7 +513,140 @@ export function acceptAgentResult({ store, result, grant, leadAgentId, orchestra
     events: stateHistory.map((state, index) => ({ event_id: `event-${closureId}-${index + 1}`, aggregate_id: result.run_id, event_type: `AGENT_RUN_${state}`, payload: { run_id: result.run_id, result_id: resultId, state, validator_disposition_fingerprint: digest(authoritativeResult.validator_disposition) } })),
     evidenceRefs: [...new Set(result.evidence_references ?? [])]
   });
-  return { decision: "PASS", run_id: result.run_id, result_id: resultId, closure_id: closureId, state: "CLOSED", result_fingerprint: verdict.result_fingerprint };
+  return { decision: "PASS", run_id: result.run_id, result_id: resultId, closure_id: closureId, state: "CLOSED", result_fingerprint: verdict.result_fingerprint, evidence_fingerprint: verdict.evidence_fingerprint };
+}
+
+export function acceptDirectOrchestratorResult({ store, result, grant, authorityBindings, now = new Date().toISOString() }) {
+  if (!store || typeof store.get !== "function" || typeof store.commitAgentLifecycle !== "function") throw new Error("AGENT_RESULT_STORE_REQUIRED");
+  const validatedGrant = validateDelegationGrant(grant, { now });
+  validateAgentAuthorityBindings(authorityBindings, now, "AGENT_RESULT_AUTHORITY_BINDINGS_REQUIRED");
+  assertCurrentAuthorityEpoch(store, authorityBindings, "AGENT_RESULT_AUTHORITY_EPOCH_STALE");
+  if (validatedGrant.child_depth !== 0
+    || validatedGrant.child_agent_id !== "orchestrator"
+    || validatedGrant.child_role !== "Orchestrator Agent"
+    || validatedGrant.parent_agent_id !== "run-controller"
+    || validatedGrant.parent_role !== "Runtime Adapter"
+    || validatedGrant.ownership.read_only !== true) return { decision: "STOP", code: "DIRECT_ORCHESTRATOR_GRANT_REQUIRED" };
+  const run = store.get({ id: result?.run_id });
+  const candidateId = run?.payload?.result_candidate_record_id;
+  const candidate = typeof candidateId === "string" ? store.get({ id: candidateId }) : null;
+  const candidateFingerprint = candidate?.payload?.result_fingerprint;
+  const launchReport = candidate?.payload?.launch_report;
+  if (run?.kind !== "AgentRun"
+    || run.lifecycle_state !== "RUNNING"
+    || run.source_revision !== validatedGrant.fingerprint
+    || run.payload?.authority_epoch !== authorityBindings.authority_epoch
+    || run.payload?.depth !== 0
+    || run.payload?.child_agent_id !== "orchestrator"
+    || result?.candidate_record_id !== candidateId
+    || candidate?.kind !== "AgentResultCandidate"
+    || candidate.lifecycle_state !== "REPORTED"
+    || candidate.lineage_id !== result.run_id
+    || candidate.policy_fp !== authorityBindings.policy_fingerprint
+    || candidate.source_revision !== candidateFingerprint
+    || candidate.input_fp !== candidateFingerprint
+    || candidate.payload?.accepted !== false
+    || !/^[a-f0-9]{64}$/.test(candidateFingerprint ?? "")
+    || digest(candidate.payload?.result) !== candidateFingerprint
+    || candidate.payload?.result?.status !== "succeeded"
+    || candidate.payload.result.findings?.some((finding) => finding?.severity === "error")
+    || result?.provenance?.source_fingerprint !== candidateFingerprint
+    || candidate.payload?.lifecycle_run_id !== run.payload?.lifecycle_run_id
+    || !/^[a-f0-9]{64}$/.test(candidate.payload?.process_identity_fingerprint ?? "")
+    || !launchReport
+    || [launchReport.provider, launchReport.model, launchReport.effort].some((value) => typeof value !== "string" || value.length === 0)
+    || launchReport.effort === "none") return { decision: "STOP", code: "DIRECT_ORCHESTRATOR_RESULT_BINDING_REQUIRED" };
+  const evidenceFingerprint = agentResultEvidenceFingerprint(result);
+  const selfVerification = {
+    agent_id: "orchestrator",
+    accepted: true,
+    result_fingerprint: evidenceFingerprint,
+    verified_at: now,
+  };
+  const authoritativeResult = {
+    ...structuredClone(result),
+    review_mode: "single_agent_internal",
+    rigor: "L1",
+    self_verification: selfVerification,
+  };
+  const resultFingerprint = digest(authoritativeResult);
+  const resultId = `agent-result-${result.run_id}`;
+  const closureId = `agent-run-closure-${result.run_id}`;
+  const stateHistory = ["REPORTED", "SELF_VERIFIED", "CLOSED"];
+  const selfVerificationFingerprint = digest(selfVerification);
+  store.commitAgentLifecycle({
+    expectedRevision: store.revision,
+    authorityEpoch: authorityBindings.authority_epoch,
+    records: [
+      {
+        id: resultId,
+        kind: "AgentResult",
+        schema_version: "1.0.0",
+        authority_scope: authorityBindings.task_id,
+        lineage_id: result.run_id,
+        lifecycle_state: "accepted",
+        payload: {
+          ...authoritativeResult,
+          candidate_record_id: candidateId,
+          candidate_result_fingerprint: candidateFingerprint,
+          evidence_fingerprint: evidenceFingerprint,
+          self_verification_fingerprint: selfVerificationFingerprint,
+        },
+        source_revision: candidateId,
+        policy_fp: authorityBindings.policy_fingerprint,
+        input_fp: resultFingerprint,
+      },
+      {
+        id: closureId,
+        kind: "AgentRunClosure",
+        schema_version: "1.0.0",
+        authority_scope: authorityBindings.task_id,
+        lineage_id: result.run_id,
+        lifecycle_state: "CLOSED",
+        payload: {
+          run_id: result.run_id,
+          result_id: resultId,
+          result_candidate_record_id: candidateId,
+          candidate_result_fingerprint: candidateFingerprint,
+          review_mode: "single_agent_internal",
+          rigor: "L1",
+          state_history: stateHistory,
+          self_verification_fingerprint: selfVerificationFingerprint,
+          authority_epoch: authorityBindings.authority_epoch,
+          closed_at: now,
+        },
+        source_revision: candidateId,
+        policy_fp: authorityBindings.policy_fingerprint,
+        input_fp: resultFingerprint,
+      },
+    ],
+    relations: [
+      { from_id: result.run_id, relation_kind: "produced_result", to_id: resultId },
+      { from_id: resultId, relation_kind: "closed_by", to_id: closureId },
+    ],
+    events: stateHistory.map((state, index) => ({
+      event_id: `event-${closureId}-${index + 1}`,
+      aggregate_id: result.run_id,
+      event_type: `AGENT_RUN_${state}`,
+      payload: {
+        run_id: result.run_id,
+        result_id: resultId,
+        state,
+        self_verification_fingerprint: selfVerificationFingerprint,
+      },
+    })),
+    evidenceRefs: [...new Set(result.evidence_references ?? [])],
+  });
+  return {
+    decision: "PASS",
+    run_id: result.run_id,
+    result_id: resultId,
+    closure_id: closureId,
+    state: "CLOSED",
+    review_mode: "single_agent_internal",
+    result_fingerprint: resultFingerprint,
+    evidence_fingerprint: evidenceFingerprint,
+  };
 }
 
 function requireIndependentVerifier(verifier) {
@@ -556,6 +722,9 @@ export function createAgentLauncher({ gateway, store, registryProvider, observat
   return {
     async launch({ grant, selection, context, reservation, targets, authorityBindings, providerExecution, taskData = [], expectedSelector = {} }) {
       const launchTime = clock();
+      const launchNonce = idFactory();
+      const intentId = `launch-${launchNonce}`;
+      const launchEffectId = `effect-${launchNonce}`;
       const validatedGrant = validateDelegationGrant(grant, { now: launchTime });
       validateAgentAuthorityBindings(authorityBindings, launchTime, "AGENT_LAUNCH_AUTHORITY_BINDINGS_REQUIRED");
       assertCurrentAuthorityEpoch(store, authorityBindings, "AGENT_LAUNCH_AUTHORITY_EPOCH_STALE");
@@ -578,6 +747,14 @@ export function createAgentLauncher({ gateway, store, registryProvider, observat
       if (!registry || typeof registry.fingerprint !== "string" || providerExecution.registry_fingerprint !== registry.fingerprint) throw new Error("AGENT_PROVIDER_REGISTRY_BINDING_INVALID");
       const registryEntry = registry.entries?.find((entry) => entry.eligible === true && entry.manifest?.identity_key === selection.effective);
       if (!registryEntry || providerExecution.manifest_fingerprint !== digest(registryEntry.manifest) || providerExecution.certification_fingerprint !== digest(registryEntry.certification)) throw new Error("AGENT_PROVIDER_CURRENT_CERTIFICATION_INVALID");
+      if (registryEntry.certification?.state !== "CERTIFIED"
+        || registryEntry.certification?.revocation_state !== "active"
+        || !Number.isFinite(Date.parse(registryEntry.certification?.certified_at))
+        || Date.parse(registryEntry.certification.certified_at) > Date.parse(launchTime)
+        || !Number.isFinite(Date.parse(registryEntry.certification?.expires_at))
+        || Date.parse(registryEntry.certification.expires_at) <= Date.parse(launchTime)
+        || !Number.isFinite(Date.parse(registryEntry.observation?.fresh_until))
+        || Date.parse(registryEntry.observation.fresh_until) <= Date.parse(launchTime)) throw new Error("AGENT_PROVIDER_CURRENT_CERTIFICATION_STALE");
       if (!selection.manifest || digest(selection.manifest) !== digest(registryEntry.manifest)) throw new Error("AGENT_PROVIDER_SELECTION_MANIFEST_BINDING_INVALID");
       if (providerExecution.plan.model_id !== selection.selected_model || providerExecution.plan.native_reasoning !== selection.selected_native_reasoning || registryEntry.manifest?.effort_mapping?.[providerExecution.plan.native_reasoning] !== selection.selected_normalized_effort) throw new Error("AGENT_PROVIDER_MODEL_OR_EFFORT_BINDING_INVALID");
       if (!selection.selection_lineage?.some((entry) => entry.identity_key === selection.effective && entry.eligible === true && entry.registry_fingerprint === registry.fingerprint)) throw new Error("AGENT_PROVIDER_SELECTION_LINEAGE_INVALID");
@@ -596,7 +773,21 @@ export function createAgentLauncher({ gateway, store, registryProvider, observat
       if (!executionPolicy || !Number.isSafeInteger(executionPolicy.timeout_ms) || executionPolicy.timeout_ms < 1 || executionPolicy.timeout_ms > reservationRecord.payload.budget.max_runtime_ms) throw new Error("AGENT_PROVIDER_RUNTIME_BOUND_OUTSIDE_RESERVATION");
       const providerBudgetBindingFingerprint = digest({ resource_bounds: resourceBounds, estimated_cost: registryEntry.manifest.estimated_cost, reservation_budget: reservationRecord.payload.budget, execution_timeout_ms: executionPolicy.timeout_ms });
       if (store.get({ id: `resource-reservation-consumption-${reservation.reservation_id}` })) throw new Error("AGENT_LAUNCH_RESERVATION_SPENT");
-      const delivery = await taskDeliveryPreparer({ grant: structuredClone(validatedGrant), repositoryRoot: store.repository_root, promptFile: providerExecution.plan.stdin_file, data: structuredClone(taskData), authorityBindings: structuredClone(authorityBindings), providerIdentityKey: providerExecution.identity_key });
+      const delivery = await taskDeliveryPreparer({
+        grant: structuredClone(validatedGrant),
+        repositoryRoot: store.repository_root,
+        promptFile: providerExecution.plan.stdin_file,
+        data: structuredClone(taskData),
+        resultContract: {
+          schema_version: "1.0.0",
+          run_id: launchEffectId,
+          ...(validatedGrant.scope?.review_subject_fingerprint ? {
+            review_subject_fingerprint: validatedGrant.scope.review_subject_fingerprint,
+          } : {}),
+        },
+        authorityBindings: structuredClone(authorityBindings),
+        providerIdentityKey: providerExecution.identity_key,
+      });
       const deliveryFields = ["invariant_fingerprint", "instruction_fingerprint", "envelope_fingerprint", "delivery_fingerprint"];
       if (!delivery || delivery.prompt_file !== providerExecution.plan.stdin_file || delivery.envelope?.grant_fingerprint !== validatedGrant.fingerprint || deliveryFields.some((field) => !/^[a-f0-9]{64}$/.test(delivery[field] ?? "")) || typeof delivery.verify !== "function" || typeof delivery.cleanup !== "function") {
         try { delivery?.cleanup?.(); } catch {}
@@ -607,7 +798,6 @@ export function createAgentLauncher({ gateway, store, registryProvider, observat
       const boundProviderPlanCore = { ...structuredClone(providerPlanCore), stdin_fingerprint: delivery.delivery_fingerprint };
       const boundProviderPlan = { ...boundProviderPlanCore, fingerprint: digest(boundProviderPlanCore) };
       const effectiveProviderExecution = { ...structuredClone(providerExecution), plan: boundProviderPlan, plan_fingerprint: boundProviderPlan.fingerprint, invariant_fingerprint: delivery.invariant_fingerprint, instruction_fingerprint: delivery.instruction_fingerprint, envelope_fingerprint: delivery.envelope_fingerprint, delivery_fingerprint: delivery.delivery_fingerprint };
-      const intentId = `launch-${idFactory()}`;
       const taskEnvelopeBindings = Object.fromEntries(deliveryFields.map((field) => [field, delivery[field]]));
       const intent = createLaunchIntent({ grant: validatedGrant, selection, context, reservation, targets: normalizedTargets, authorityEpoch: authorityBindings.authority_epoch, intentId, createdAt: launchTime, taskEnvelope: taskEnvelopeBindings });
       const launchRequest = { intent: structuredClone(intent), provider_execution: structuredClone(effectiveProviderExecution) };
@@ -669,7 +859,7 @@ export function createAgentLauncher({ gateway, store, registryProvider, observat
       let launch;
       try {
         delivery.verify();
-        launch = await gateway.execute({ variant: "agent_launch", action: "spawn", subject: launchSubject, bindings: authorityBindings, target: { targets: normalizedTargets }, request: structuredClone(launchRequest), expected_selector: expectedSelector }, { beforeFinalize: () => delivery.verify() });
+        launch = await gateway.execute({ effect_id: launchEffectId, variant: "agent_launch", action: "spawn", subject: launchSubject, bindings: authorityBindings, target: { targets: normalizedTargets }, request: structuredClone(launchRequest), expected_selector: expectedSelector }, { beforeFinalize: () => delivery.verify() });
       } finally {
         delivery.cleanup();
       }

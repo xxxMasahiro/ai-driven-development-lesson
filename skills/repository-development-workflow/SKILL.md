@@ -35,8 +35,20 @@ Use this skill for this repository's own development. It supports `AGENTS.MD`; i
 ./tools/repository-development-workflow next --phase fast_loop
 ```
 
-8. If product documents are involved, route to `skills/worklog-doc-sync/SKILL.md`.
-9. If final lesson gates or STEP 1-14 synchronization are involved, route to `skills/lesson-sync-gate/SKILL.md`.
+8. Before directly launching a Lead Agent or Task Agent CLI, obtain the
+   development-session advisory plan, display its exact selected model and
+   native effort, pass those values explicitly, and verify the prepared
+   configuration:
+
+```bash
+./tools/next-workflow agent-selection plan --agent <agent-id> --role <role-id> --rigor <L1-L5> --risk <risk> --complexity <complexity>
+./tools/next-workflow agent-selection verify-config --plan <repository-bound-plan.json> --model <selected-model> --effort <selected-native-effort>
+```
+
+   A STOP or mismatch blocks that Agent launch. This read-only advisory step
+   grants no launch or other authority and does not activate Production.
+9. If product documents are involved, route to `skills/worklog-doc-sync/SKILL.md`.
+10. If final lesson gates or STEP 1-14 synchronization are involved, route to `skills/lesson-sync-gate/SKILL.md`.
 
 ## Guardrails
 

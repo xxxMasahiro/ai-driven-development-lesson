@@ -45,7 +45,13 @@ function persistedGrantPayload(grant) {
 test("L1 compresses all roles into the Orchestrator and has no child agents", () => {
   const plan = planTeamTopology({ rigor: "L1", requiredRoles: ["Implementation Lead", "Independent Review Lead"], budgets });
   assert.equal(plan.agents.length, 1);
-  assert.deepEqual(plan.compressed_roles, ["Implementation Lead", "Independent Review Lead"]);
+  assert.deepEqual(plan.compressed_roles, [
+    "Value Design Lead",
+    "Planning Design Lead",
+    "Implementation Lead",
+    "Independent Review Lead",
+    "Safety and Acceptance Decision Lead",
+  ]);
 });
 
 test("L2 has at most one Lead and no Task Agent", () => {
@@ -152,9 +158,11 @@ test("trusted control and untrusted data remain separate", () => {
 
 test("finite retries stop unchanged failures and immutable STOP cannot transition", () => {
   assert.equal(evaluateAgentRetry({ failureFingerprint: "same", previousFailureFingerprint: "same", attempt: 3, limit: 3 }).decision, "STOP");
+  assert.equal(evaluateAgentRetry({ failureFingerprint: "same", previousFailureFingerprint: "same", attempt: 1, limit: 3 }).reason, "MATERIAL_PROGRESS_UNVERIFIED");
   assert.equal(evaluateAgentRetry({ failureFingerprint: "new", previousFailureFingerprint: "old", attempt: 20, limit: 3, totalLimit: 20, materialProgressVerified: true }).reason, "TOTAL_RETRY_LIMIT");
   assert.equal(evaluateAgentRetry({ failureFingerprint: "new", previousFailureFingerprint: "old", attempt: 2, limit: 3, totalLimit: 5, materialProgressVerified: true }).retry, true);
   assert.equal(evaluateAgentRetry({ failureFingerprint: "new", previousFailureFingerprint: "old", attempt: 2, limit: 3, totalLimit: 5 }).reason, "MATERIAL_PROGRESS_UNVERIFIED");
+  assert.equal(evaluateAgentRetry({ failureFingerprint: "new", previousFailureFingerprint: "old", attempt: 0, limit: 1, totalLimit: 1, materialProgressVerified: false, spentCost: 0, maxCost: 0 }).reason, "MATERIAL_PROGRESS_UNVERIFIED");
   assert.throws(() => transitionAgentRun({ state: "STOPPED" }, "STARTING"), /AGENT_RUN_TRANSITION_INVALID|IMMUTABLE_STOP/);
   assert.throws(() => transitionAgentRun({ state: "FAILED", failure_fingerprint: "failure" }, "AUTHORIZED", { materialChangeFingerprint: "changed", validatorDecisionFingerprint: "caller-string" }), /AUTHORITATIVE_REAUTHORIZATION_REQUIRED/);
 });
@@ -223,9 +231,34 @@ test("accepted results persist the canonical reported-reviewed-closed lifecycle"
     { run_id: "run-one", assignment_kind: "validator", agent_id: "validator", agent_role: "Safety and Acceptance Decision Lead", read_only: true }
   ];
   for (const assignment of assignments) persistReviewerAssignment({ store, assignment, grant: taskGrant, authorityBindings: reviewAuthority, verifier: authorityVerifier(`assignment-${assignment.assignment_kind}`), now: "2029-01-01T00:00:00.000Z" });
-  persistAgentReview({ store, runId: "run-one", assignmentKind: "lead", review: { agent_id: "lead", accepted: true, result_fingerprint: resultFingerprint }, authorityBindings: reviewAuthority, verifier: authorityVerifier("review-lead"), now: "2029-01-01T00:00:00.000Z" });
-  persistAgentReview({ store, runId: "run-one", assignmentKind: "orchestrator", review: { agent_id: "orchestrator", accepted: true, result_fingerprint: resultFingerprint }, authorityBindings: reviewAuthority, verifier: authorityVerifier("review-orchestrator"), now: "2029-01-01T00:00:00.000Z" });
-  persistAgentReview({ store, runId: "run-one", assignmentKind: "validator", review: { agent_id: "validator", decision: "PASS", accepted: true, result_fingerprint: resultFingerprint }, authorityBindings: reviewAuthority, verifier: authorityVerifier("review-validator"), now: "2029-01-01T00:00:00.000Z" });
+  const orchestrator = { agent_id: "orchestrator", depth: 0, role: "Orchestrator Agent", may_delegate: true };
+  const reviewEvidence = new Map();
+  for (const assignment of assignments) {
+    const kind = assignment.assignment_kind;
+    const reviewer = { agent_id: assignment.agent_id, depth: 1, role: assignment.agent_role, parent_agent_id: "orchestrator", may_delegate: false };
+    const reviewGrant = createDelegationGrant({ grantId: `review-grant-${kind}`, parent: orchestrator, child: reviewer, scope: { paths: ["a/file.mjs"], review_subject_fingerprint: resultFingerprint, assignment_kind: kind }, authorityFingerprint: `review-${kind}`, budget: taskGrant.budget, ownership: { read_only: true, paths: [] }, expiresAt: "2030-01-01T00:00:00.000Z", allowedActions: ["read"], allowedTools: [], capabilities: ["read"], sandbox: { mode: "read_only", network: false, writable_paths: [] }, now: "2029-01-01T00:00:00.000Z" });
+    persistGrant(store, reviewGrant);
+    const lifecycleRunId = `review-lifecycle-${kind}`;
+    const reviewRunId = `review-run-${kind}`;
+    const reviewCandidateId = `review-candidate-${kind}`;
+    const reviewResult = { schema_version: "1.0.0", run_id: lifecycleRunId, status: "succeeded", summary: `${kind} review passed`, findings: [], artifacts: [], metrics: { duration_ms: 1 } };
+    const reviewResultFingerprint = teamDigest(reviewResult);
+    const reviewProcessFingerprint = teamDigest(`review-process-${kind}`);
+    const reviewLaunchReport = { provider: "fixture", model: "fixture-model", effort: "high" };
+    store.createRuntimeRun({ expectedRevision: store.revision, run: { run_id: lifecycleRunId, idempotency_key: `${lifecycleRunId}-key`, plan_fingerprint: teamDigest(`${kind}-plan`), authority_epoch: 0, fence_fingerprint: teamDigest(`${kind}-fence`), start_nonce: teamDigest(`${kind}-nonce`), started_at: "2029-01-01T00:00:00.000Z", observation: {} } });
+    store.transitionRuntimeRun({ expectedRevision: store.revision, runId: lifecycleRunId, expectedStates: ["STARTING"], nextState: "RUNNING", patch: { pid: 5000 + reviewEvidence.size, process_group_id: 5000 + reviewEvidence.size, observation: { process_identity_fingerprint: reviewProcessFingerprint } } });
+    store.transitionRuntimeRun({ expectedRevision: store.revision, runId: lifecycleRunId, expectedStates: ["RUNNING"], nextState: "COMPLETED", patch: { exit_code: 0, result_fingerprint: reviewResultFingerprint, result_size: 1, observation: { process_identity_fingerprint: reviewProcessFingerprint, launch_report: reviewLaunchReport, agent_result: reviewResult } } });
+    const reviewRun = { id: reviewRunId, kind: "AgentRun", schema_version: "1.0.0", authority_scope: "task", lineage_id: `review-intent-${kind}`, lifecycle_state: "RUNNING", payload: { authority_epoch: 0, child_agent_id: assignment.agent_id, lifecycle_run_id: lifecycleRunId, result_candidate_record_id: reviewCandidateId, state_history: ["PLANNED", "AUTHORIZED", "STARTING", "RUNNING"] }, source_revision: reviewGrant.fingerprint, policy_fp: "policy", input_fp: `review-intent-${kind}` };
+    const reviewCandidate = { id: reviewCandidateId, kind: "AgentResultCandidate", schema_version: "1.0.0", authority_scope: "task", lineage_id: reviewRunId, lifecycle_state: "REPORTED", payload: { result: reviewResult, result_fingerprint: reviewResultFingerprint, lifecycle_run_id: lifecycleRunId, process_identity_fingerprint: reviewProcessFingerprint, launch_report: reviewLaunchReport, accepted: false }, source_revision: reviewResultFingerprint, policy_fp: "policy", input_fp: reviewResultFingerprint };
+    const reviewRelations = [{ from_id: reviewRunId, relation_kind: "reported_candidate", to_id: reviewCandidateId }];
+    const reviewEvents = ["PLANNED", "AUTHORIZED", "STARTING", "RUNNING"].map((state, index) => ({ event_id: `event-${reviewRunId}-${index + 1}`, aggregate_id: reviewRunId, event_type: `AGENT_RUN_${state}`, payload: { launch_effect_id: lifecycleRunId, state } }));
+    reviewEvents.push({ event_id: `event-${reviewCandidateId}`, aggregate_id: reviewRunId, event_type: "AGENT_RESULT_CANDIDATE_REPORTED", payload: { result_candidate_record_id: reviewCandidateId, result_fingerprint: reviewResultFingerprint, review_required: true } });
+    store.commitAgentLifecycle({ expectedRevision: store.revision, authorityEpoch: 0, records: [reviewRun, reviewCandidate], relations: reviewRelations, events: reviewEvents });
+    reviewEvidence.set(kind, { review_run_id: reviewRunId, review_candidate_record_id: reviewCandidateId, review_result_fingerprint: reviewResultFingerprint, review_process_identity_fingerprint: reviewProcessFingerprint });
+  }
+  persistAgentReview({ store, runId: "run-one", assignmentKind: "lead", review: { agent_id: "lead", accepted: true, result_fingerprint: resultFingerprint, ...reviewEvidence.get("lead") }, authorityBindings: reviewAuthority, verifier: authorityVerifier("review-lead"), now: "2029-01-01T00:00:00.000Z" });
+  persistAgentReview({ store, runId: "run-one", assignmentKind: "orchestrator", review: { agent_id: "orchestrator", accepted: true, result_fingerprint: resultFingerprint, ...reviewEvidence.get("orchestrator") }, authorityBindings: reviewAuthority, verifier: authorityVerifier("review-orchestrator"), now: "2029-01-01T00:00:00.000Z" });
+  persistAgentReview({ store, runId: "run-one", assignmentKind: "validator", review: { agent_id: "validator", decision: "PASS", accepted: true, result_fingerprint: resultFingerprint, ...reviewEvidence.get("validator") }, authorityBindings: reviewAuthority, verifier: authorityVerifier("review-validator"), now: "2029-01-01T00:00:00.000Z" });
   assert.throws(() => store.commitAgentLifecycle({ expectedRevision: store.revision, authorityEpoch: 0, records: [
     { id: "agent-result-run-one", kind: "AgentResult", schema_version: "1.0.0", authority_scope: "task", lineage_id: "run-one", lifecycle_state: "accepted", payload: { ...core, candidate_result_fingerprint: candidateFingerprint }, source_revision: candidateId, policy_fp: "policy", input_fp: teamDigest(core) },
     { id: "agent-run-closure-run-one", kind: "AgentRunClosure", schema_version: "1.0.0", authority_scope: "task", lineage_id: "run-one", lifecycle_state: "CLOSED", payload: { result_id: "agent-result-run-one", result_candidate_record_id: candidateId, candidate_result_fingerprint: candidateFingerprint, state_history: ["REPORTED", "REVIEWED", "CLOSED"], authority_epoch: 0 }, source_revision: candidateId, policy_fp: "policy", input_fp: teamDigest(core) }
@@ -270,8 +303,8 @@ test("a spawned agent that fails admission is contained, fenced, and persisted b
   };
   const containment = { async quarantineOrTerminate() { order.push("containment"); return { contained: true, action: "terminate", fingerprint: "termination-proof" }; } };
   const providerManifest = { identity_key: "expected", identity: { model_id: "fixture-model" }, capabilities: ["read"], effort_mapping: { high: "enhanced" }, resource_bounds: { cost: 1 }, estimated_cost: 1 };
-  const providerCertification = { certification_id: "expected-certification" };
-  const registry = { fingerprint: teamDigest("registry"), entries: [{ eligible: true, manifest: providerManifest, certification: providerCertification }] };
+  const providerCertification = { certification_id: "expected-certification", state: "CERTIFIED", revocation_state: "active", certified_at: "2028-01-01T00:00:00.000Z", expires_at: "2030-01-01T00:00:00.000Z" };
+  const registry = { fingerprint: teamDigest("registry"), entries: [{ eligible: true, manifest: providerManifest, certification: providerCertification, observation: { fresh_until: "2030-01-01T00:00:00.000Z" } }] };
   const selectionCore = { decision: "PASS", requested: "expected", selected: "expected", effective: "expected", selected_model: "fixture-model", selected_native_reasoning: "high", selected_normalized_effort: "enhanced", selection_lineage: [{ identity_key: "expected", eligible: true, registry_fingerprint: registry.fingerprint }], manifest: providerManifest };
   const selection = { ...selectionCore, fingerprint: teamDigest(selectionCore) };
   const privateInput = "/private/task-input";
@@ -297,6 +330,9 @@ test("a spawned agent that fails admission is contained, fenced, and persisted b
   persistedGrantRecord.payload.authority_epoch = 0;
   await assert.rejects(() => launcher.launch({ grant: leadGrant, selection, context: { fingerprint: "context" }, reservation: { reservation_id: "reservation" }, providerExecution: { ...providerExecution, plan: { ...providerExecution.plan, sandbox: "danger-full-access" } }, targets: ["a"], authorityBindings: { task_id: "task", policy_fingerprint: "policy", authority_epoch: 0, revocation_epoch: 0, fresh_until: "2030-01-01T00:00:00.000Z" } }), /AGENT_PROVIDER_PLAN_SANDBOX_OUTSIDE_GRANT/);
   await assert.rejects(() => launcher.launch({ grant: leadGrant, selection, context: { fingerprint: "context" }, reservation: { reservation_id: "reservation" }, providerExecution: { ...providerExecution, plan: { ...providerExecution.plan, working_directory: "/outside" } }, targets: ["a"], authorityBindings: { task_id: "task", policy_fingerprint: "policy", authority_epoch: 0, revocation_epoch: 0, fresh_until: "2030-01-01T00:00:00.000Z" } }), /AGENT_PROVIDER_PLAN_WORKING_DIRECTORY_NOT_PRIVATE_INPUT/);
+  providerCertification.expires_at = "2028-01-01T00:00:00.000Z";
+  await assert.rejects(() => launcher.launch({ grant: leadGrant, selection, context: { fingerprint: "context" }, reservation: { reservation_id: "reservation" }, providerExecution: { ...providerExecution, certification_fingerprint: teamDigest(providerCertification) }, targets: ["a"], authorityBindings: { task_id: "task", policy_fingerprint: "policy", authority_epoch: 0, revocation_epoch: 0, fresh_until: "2030-01-01T00:00:00.000Z" } }), /AGENT_PROVIDER_CURRENT_CERTIFICATION_STALE/);
+  providerCertification.expires_at = "2030-01-01T00:00:00.000Z";
   assert.equal(order.length, 0);
   const result = await launcher.launch({
     grant: leadGrant,
@@ -345,8 +381,8 @@ test("a completed CLI report remains an unaccepted candidate until independent r
     }
   };
   const providerManifest = { identity_key: identityKey, identity, capabilities: ["read"], effort_mapping: { high: "enhanced" }, resource_bounds: { cost: 1 }, estimated_cost: 1 };
-  const providerCertification = { certification_id: "candidate-certification" };
-  const registry = { fingerprint: teamDigest("candidate-registry"), entries: [{ eligible: true, manifest: providerManifest, certification: providerCertification }] };
+  const providerCertification = { certification_id: "candidate-certification", state: "CERTIFIED", revocation_state: "active", certified_at: "2028-01-01T00:00:00.000Z", expires_at: "2030-01-01T00:00:00.000Z" };
+  const registry = { fingerprint: teamDigest("candidate-registry"), entries: [{ eligible: true, manifest: providerManifest, certification: providerCertification, observation: { fresh_until: "2030-01-01T00:00:00.000Z" } }] };
   const selectionCore = { decision: "PASS", requested: identityKey, selected: identityKey, effective: identityKey, selected_model: identity.model_id, selected_native_reasoning: "high", selected_normalized_effort: "enhanced", selection_lineage: [{ identity_key: identityKey, eligible: true, registry_fingerprint: registry.fingerprint }], manifest: providerManifest };
   const selection = { ...selectionCore, fingerprint: teamDigest(selectionCore) };
   const privateInput = "/private/task-input";

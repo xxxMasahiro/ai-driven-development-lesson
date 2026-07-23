@@ -144,7 +144,7 @@ function normalizeLaunchObservation(verifier, { stdout, stderr, plan, processEvi
   const observationInputFingerprint = digest({ stdout: digest(stdout), stderr: digest(stderr), plan_fingerprint: plan.plan_fingerprint, process_evidence_fingerprint: processEvidence?.fingerprint, observed_at: observedAt });
   const verdict = verifier.observe({ stdout, stderr, plan: structuredClone(plan), process_evidence: structuredClone(processEvidence), fingerprint: observationInputFingerprint, observed_at: observedAt });
   if (verdict && typeof verdict.then === "function") throw new Error("RUN_LIFECYCLE_ASYNC_OBSERVER_UNSUPPORTED");
-  const allowed = new Set(["verified", "verifier_id", "fingerprint", "proof_fingerprint", "actual_provider", "actual_model", "actual_effort", "observation_scope"]);
+  const allowed = new Set(["verified", "verifier_id", "fingerprint", "proof_fingerprint", "actual_provider", "actual_model", "actual_effort", "observation_scope", "backend_attestation", "backend_attestation_available"]);
   closed(verdict, allowed, "RUN_LIFECYCLE_LAUNCH_OBSERVATION");
   if (verdict.verified !== true || verdict.verifier_id !== verifier.verifier_id || verdict.fingerprint !== observationInputFingerprint) throw new Error("RUN_LIFECYCLE_LAUNCH_OBSERVATION_INVALID");
   for (const field of ["proof_fingerprint", "actual_provider", "actual_model", "actual_effort"]) requiredString(verdict[field], field, "RUN_LIFECYCLE_LAUNCH_OBSERVATION");
@@ -152,11 +152,12 @@ function normalizeLaunchObservation(verifier, { stdout, stderr, plan, processEvi
   if (verdict.actual_provider !== plan.selected_provider || verdict.actual_model !== plan.selected_model || verdict.actual_effort !== plan.selected_effort) throw new Error("RUN_LIFECYCLE_MODEL_OR_EFFORT_SUBSTITUTION");
   if (verdict.actual_effort === "none") throw new Error("RUN_LIFECYCLE_IMPLICIT_EFFORT_FORBIDDEN");
   if (verdict.observation_scope !== "pinned_cli_launch_configuration") throw new Error("RUN_LIFECYCLE_LAUNCH_OBSERVATION_SCOPE_INVALID");
-  return Object.freeze({ actual_provider: verdict.actual_provider, actual_model: verdict.actual_model, actual_effort: verdict.actual_effort, observation_scope: verdict.observation_scope, verifier_id: verdict.verifier_id, proof_fingerprint: verdict.proof_fingerprint, observed_at: observedAt });
+  if (verdict.backend_attestation !== null || verdict.backend_attestation_available !== false) throw new Error("RUN_LIFECYCLE_BACKEND_ATTESTATION_UNSUPPORTED");
+  return Object.freeze({ actual_provider: verdict.actual_provider, actual_model: verdict.actual_model, actual_effort: verdict.actual_effort, observation_scope: verdict.observation_scope, backend_attestation: null, backend_attestation_available: false, verifier_id: verdict.verifier_id, proof_fingerprint: verdict.proof_fingerprint, observed_at: observedAt });
 }
 
 function normalizePlan(input, { now, limits, pathPolicy }) {
-  const allowed = new Set(["run_id", "idempotency_key", "plan_fingerprint", "manifest_fingerprint", "authority_epoch", "fence_fingerprint", "executable_path", "executable_fingerprint", "interpreter_path", "interpreter_fingerprint", "argv", "working_directory", "stdin_file", "stdin_fingerprint", "response_file", "environment", "timeout_ms", "max_result_bytes", "max_stderr_bytes", "selected_provider", "selected_model", "selected_effort"]);
+  const allowed = new Set(["run_id", "idempotency_key", "plan_fingerprint", "manifest_fingerprint", "authority_epoch", "fence_fingerprint", "executable_path", "executable_fingerprint", "interpreter_path", "interpreter_fingerprint", "argv", "working_directory", "stdin_file", "stdin_fingerprint", "response_file", "environment", "timeout_ms", "max_result_bytes", "max_stderr_bytes", "selected_provider", "selected_model", "selected_effort", "attestation_expectation"]);
   closed(input, allowed, "RUN_LIFECYCLE_PLAN");
   for (const field of ["run_id", "idempotency_key", "plan_fingerprint", "manifest_fingerprint", "fence_fingerprint", "executable_path", "executable_fingerprint", "working_directory", "stdin_file", "stdin_fingerprint", "response_file", "selected_provider", "selected_model", "selected_effort"]) requiredString(input[field], field, "RUN_LIFECYCLE_PLAN");
   sha256(input.plan_fingerprint, "RUN_LIFECYCLE_PLAN_FINGERPRINT_INVALID");
@@ -175,6 +176,10 @@ function normalizePlan(input, { now, limits, pathPolicy }) {
   if (dirname(input.response_file) !== realpathSync(dirname(input.response_file)) || basename(input.response_file) === "." || basename(input.response_file) === "..") throw new Error("RUN_LIFECYCLE_RESPONSE_PATH_INVALID");
   if (typeof pathPolicy !== "function" || pathPolicy({ plan: structuredClone(input) })?.allowed !== true) throw new Error("RUN_LIFECYCLE_PATH_POLICY_DENIED");
   const environment = validateEnvironment(input.environment ?? {});
+  if (input.attestation_expectation !== null && input.attestation_expectation !== undefined) {
+    plainObject(input.attestation_expectation, "RUN_LIFECYCLE_ATTESTATION_EXPECTATION_INVALID");
+    assertNoSecretMaterial(input.attestation_expectation, "RUN_LIFECYCLE_ATTESTATION_EXPECTATION_SECRET_FORBIDDEN");
+  }
   assertNoSecretMaterial({ argv: input.argv }, "RUN_LIFECYCLE_RAW_SECRET_FORBIDDEN");
   const immutable = { ...input, environment };
   const derived = digest({ ...immutable, started_at: now });
@@ -258,11 +263,12 @@ export function createRunLifecyclePort({
   pathPolicy,
   spawnRunner = spawn,
   beforeExecutionRelease,
+  recoveryAuthorizer = () => ({ decision: "DENY" }),
   clock = () => new Date().toISOString(),
   terminationGraceMs = 1500,
   limits = {},
 } = {}) {
-  if (!store || typeof store.createRuntimeRun !== "function" || typeof store.bindRuntimeProcess !== "function" || typeof store.transitionRuntimeRun !== "function" || typeof fenceGuard !== "function" || typeof effectFencer !== "function" || typeof spawnRunner !== "function" || (beforeExecutionRelease !== undefined && typeof beforeExecutionRelease !== "function") || !Number.isSafeInteger(terminationGraceMs) || terminationGraceMs < 1 || process.platform !== "linux") throw new Error("RUN_LIFECYCLE_CONFIGURATION_INVALID");
+  if (!store || typeof store.createRuntimeRun !== "function" || typeof store.bindRuntimeProcess !== "function" || typeof store.transitionRuntimeRun !== "function" || typeof fenceGuard !== "function" || typeof effectFencer !== "function" || typeof spawnRunner !== "function" || (beforeExecutionRelease !== undefined && typeof beforeExecutionRelease !== "function") || typeof recoveryAuthorizer !== "function" || !Number.isSafeInteger(terminationGraceMs) || terminationGraceMs < 1 || process.platform !== "linux") throw new Error("RUN_LIFECYCLE_CONFIGURATION_INVALID");
   const protectedContainment = assertProtectedContainment(containment);
   assertProtectedRuntimeVerifier(launchObservationVerifier, "launch_observation");
   const effectiveLimits = Object.freeze({ maxRuntimeMs: limits.maxRuntimeMs ?? 30 * 60 * 1000, maxResultBytes: limits.maxResultBytes ?? 4 * 1024 * 1024, maxStderrBytes: limits.maxStderrBytes ?? 1024 * 1024, maxArgv: limits.maxArgv ?? 128, maxPromptBytes: limits.maxPromptBytes ?? 4 * 1024 * 1024 });
@@ -318,14 +324,15 @@ export function createRunLifecyclePort({
     return true;
   }
 
-  async function start(input) {
+  async function start(input, { releaseGuard } = {}) {
+    if (releaseGuard !== undefined && typeof releaseGuard !== "function") throw new Error("RUN_LIFECYCLE_RELEASE_GUARD_INVALID");
     const startedAt = clock();
     const plan = normalizePlan(input, { now: startedAt, limits: effectiveLimits, pathPolicy });
     const fenceVerdict = await fenceGuard({ operation: "start", plan: structuredClone(plan), now: startedAt });
     if (fenceVerdict?.allowed !== true || fenceVerdict.fence_fingerprint !== plan.fence_fingerprint || fenceVerdict.authority_epoch !== plan.authority_epoch) throw new Error("RUN_LIFECYCLE_START_FENCE_DENIED");
     protectedContainment.validatePlan(plan);
     const startNonce = digest({ run_id: plan.run_id, idempotency_key: plan.idempotency_key, plan_fingerprint: plan.plan_fingerprint, fence_fingerprint: plan.fence_fingerprint });
-    const recoveryPlan = { response_file: plan.response_file, max_result_bytes: plan.max_result_bytes, selected_provider: plan.selected_provider, selected_model: plan.selected_model, selected_effort: plan.selected_effort, manifest_fingerprint: plan.manifest_fingerprint };
+    const recoveryPlan = { input_root: protectedContainment.input_root, output_root: protectedContainment.output_root, response_file: plan.response_file, max_result_bytes: plan.max_result_bytes, selected_provider: plan.selected_provider, selected_model: plan.selected_model, selected_effort: plan.selected_effort, manifest_fingerprint: plan.manifest_fingerprint };
     const persisted = store.createRuntimeRun({ expectedRevision: store.revision, run: { run_id: plan.run_id, idempotency_key: plan.idempotency_key, plan_fingerprint: plan.plan_fingerprint, authority_epoch: plan.authority_epoch, fence_fingerprint: plan.fence_fingerprint, start_nonce: startNonce, started_at: startedAt, observation: { selected_provider: plan.selected_provider, selected_model: plan.selected_model, selected_effort: plan.selected_effort, containment_authority_fingerprint: protectedContainment.authority_fingerprint, recovery_plan: recoveryPlan } }, lifecycleWriter });
     if (persisted.reused) {
       const existing = active.get(plan.run_id);
@@ -338,6 +345,7 @@ export function createRunLifecyclePort({
     let bubblewrap;
     let barrierInterpreter;
     let barrierScript;
+    let providerAuthFile;
     let prompt;
     let inputRootFd;
     let outputRootFd;
@@ -352,6 +360,7 @@ export function createRunLifecyclePort({
       bubblewrap = pinRegularFile(protectedContainment.bubblewrap.path, { expectedFingerprint: protectedContainment.bubblewrap.fingerprint, maxBytes: 32 * 1024 * 1024, executable: true, code: "RUN_LIFECYCLE_BUBBLEWRAP_INVALID" });
       barrierInterpreter = pinRegularFile(protectedContainment.barrier_interpreter.path, { expectedFingerprint: protectedContainment.barrier_interpreter.fingerprint, maxBytes: 512 * 1024 * 1024, executable: true, code: "RUN_LIFECYCLE_BARRIER_INTERPRETER_INVALID" });
       barrierScript = pinRegularFile(protectedContainment.barrier_script.path, { expectedFingerprint: protectedContainment.barrier_script.fingerprint, maxBytes: 1024 * 1024, code: "RUN_LIFECYCLE_BARRIER_SCRIPT_INVALID" });
+      if (protectedContainment.provider_auth_file) providerAuthFile = pinRegularFile(protectedContainment.provider_auth_file.path, { expectedFingerprint: protectedContainment.provider_auth_file.fingerprint, maxBytes: 4 * 1024 * 1024, privateFile: true, code: "RUN_LIFECYCLE_PROVIDER_AUTH_INVALID" });
       prompt = pinRegularFile(plan.stdin_file, { expectedFingerprint: plan.stdin_fingerprint, maxBytes: effectiveLimits.maxPromptBytes, privateFile: true, code: "RUN_LIFECYCLE_PROMPT_INVALID" });
       inputRootFd = openSync(protectedContainment.input_root, fsConstants.O_RDONLY | (fsConstants.O_DIRECTORY ?? 0) | (fsConstants.O_NOFOLLOW ?? 0));
       outputRootFd = openSync(protectedContainment.output_root, fsConstants.O_RDONLY | (fsConstants.O_DIRECTORY ?? 0) | (fsConstants.O_NOFOLLOW ?? 0));
@@ -365,9 +374,9 @@ export function createRunLifecyclePort({
       responseFd = openSync(responseAccessPath, fsConstants.O_RDWR | fsConstants.O_CREAT | fsConstants.O_EXCL | (fsConstants.O_NOFOLLOW ?? 0), 0o600);
       const responseStat = fstatSync(responseFd);
       const hasInterpreter = Boolean(interpreter);
-      const stdio = [prompt.fd, "pipe", "pipe", unshare.fd, bubblewrap.fd, executable.fd, inputRootFd, responseDirectoryFd, hasInterpreter ? interpreter.fd : "ignore", "pipe", barrierScript.fd, barrierInterpreter.fd, "pipe"];
+      const stdio = [prompt.fd, "pipe", "pipe", unshare.fd, bubblewrap.fd, executable.fd, inputRootFd, responseDirectoryFd, hasInterpreter ? interpreter.fd : "ignore", "pipe", barrierScript.fd, barrierInterpreter.fd, "pipe", providerAuthFile?.fd ?? "ignore"];
       if (!plan.argv.includes(plan.response_file)) throw new Error("RUN_LIFECYCLE_RESPONSE_ARGUMENT_REQUIRED");
-      const spawnPlan = protectedContainment.buildSpawn({ plan, hasInterpreter });
+      const spawnPlan = protectedContainment.buildSpawn({ plan, hasInterpreter, hasProviderAuth: Boolean(providerAuthFile) });
       child = spawnRunner(spawnPlan.executable, spawnPlan.argv, { cwd: "/", env: {}, shell: false, detached: true, windowsHide: true, stdio });
       const handle = { child, completion: null, plan, stdout: Buffer.alloc(0), stderr: Buffer.alloc(0), stdout_truncated: false, stderr_truncated: false, response_fd: responseFd, response_directory_fd: responseDirectoryFd, response_stat: responseStat, response_access_path: responseAccessPath, process_group_id: null, process_identity_fingerprint: null, process_evidence: null, timeout: null, timeout_triggered: false, termination: null, termination_error: null, collected: false };
       responseFd = undefined;
@@ -398,9 +407,15 @@ export function createRunLifecyclePort({
       const launchObservation = normalizeLaunchObservation(launchObservationVerifier, { stdout: "", stderr: "", plan, processEvidence, observedAt: clock() });
       handle.process_evidence = processEvidence;
       const bound = store.getRuntimeRun({ runId: plan.run_id });
-      const observation = { ...bound.observation, actual_provider: launchObservation.actual_provider, actual_model: launchObservation.actual_model, actual_effort: launchObservation.actual_effort, launch_observation_scope: launchObservation.observation_scope, launch_observation_verifier_id: launchObservation.verifier_id, launch_observation_proof_fingerprint: launchObservation.proof_fingerprint, process_identity: processEvidence.process_identity, process_identity_fingerprint: processEvidence.process_identity_fingerprint, contained_process_identity: processEvidence.contained_process_identity, containment_evidence_fingerprint: processEvidence.fingerprint };
+      const observation = { ...bound.observation, actual_provider: launchObservation.actual_provider, actual_model: launchObservation.actual_model, actual_effort: launchObservation.actual_effort, observation_scope: launchObservation.observation_scope, backend_attestation: null, backend_attestation_available: false, launch_observation_verifier_id: launchObservation.verifier_id, launch_observation_proof_fingerprint: launchObservation.proof_fingerprint, process_identity: processEvidence.process_identity, process_identity_fingerprint: processEvidence.process_identity_fingerprint, contained_process_identity: processEvidence.contained_process_identity, containment_evidence_fingerprint: processEvidence.fingerprint, containment_profile_id: processEvidence.profile_id, provider_network: processEvidence.provider_network === true, task_network_access: processEvidence.task_network_access === true, task_tools_enabled: processEvidence.task_tools_enabled === true };
       transition(plan.run_id, ["STARTING"], "RUNNING", { observation });
       if (beforeExecutionRelease) await beforeExecutionRelease({ run: structuredClone(store.getRuntimeRun({ runId: plan.run_id })), process_evidence: structuredClone(processEvidence) });
+      const releaseFenceVerdict = await fenceGuard({ operation: "release", plan: structuredClone(plan), run: structuredClone(store.getRuntimeRun({ runId: plan.run_id })), process_evidence: structuredClone(processEvidence), now: clock() });
+      if (releaseFenceVerdict?.allowed !== true || releaseFenceVerdict.fence_fingerprint !== plan.fence_fingerprint || releaseFenceVerdict.authority_epoch !== plan.authority_epoch) throw new Error("RUN_LIFECYCLE_RELEASE_FENCE_DENIED");
+      if (releaseGuard) {
+        const liveAuthority = await releaseGuard();
+        if (liveAuthority?.current !== true || liveAuthority.authority_epoch !== plan.authority_epoch || digest(liveAuthority.fencing_token) !== plan.fence_fingerprint) throw new Error("RUN_LIFECYCLE_RELEASE_AUTHORITY_DENIED");
+      }
       child.stdio[9]?.write("R");
       child.stdio[9]?.end();
       handle.timeout = setTimeout(() => {
@@ -416,6 +431,7 @@ export function createRunLifecyclePort({
       const orphanedHandle = active.get(plan.run_id);
       if (orphanedHandle?.timeout) clearTimeout(orphanedHandle.timeout);
       if (orphanedHandle?.response_fd !== undefined) try { closeSync(orphanedHandle.response_fd); } catch {}
+      if (orphanedHandle?.response_access_path) try { unlinkSync(orphanedHandle.response_access_path); } catch {}
       if (orphanedHandle?.response_directory_fd !== undefined) try { closeSync(orphanedHandle.response_directory_fd); } catch {}
       active.delete(plan.run_id);
       try { if (responseAccessPath && existsSync(responseAccessPath)) unlinkSync(responseAccessPath); } catch {}
@@ -425,7 +441,7 @@ export function createRunLifecyclePort({
       } catch {}
       throw error;
     } finally {
-      for (const pinned of [executable, interpreter, unshare, bubblewrap, barrierInterpreter, barrierScript, prompt]) if (pinned?.fd !== undefined) try { closeSync(pinned.fd); } catch {}
+      for (const pinned of [executable, interpreter, unshare, bubblewrap, barrierInterpreter, barrierScript, providerAuthFile, prompt]) if (pinned?.fd !== undefined) try { closeSync(pinned.fd); } catch {}
       for (const directoryFd of [inputRootFd, outputRootFd]) if (directoryFd !== undefined) try { closeSync(directoryFd); } catch {}
       if (responseDirectoryFd !== undefined) try { closeSync(responseDirectoryFd); } catch {}
       if (responseFd !== undefined) try { closeSync(responseFd); } catch {}
@@ -440,7 +456,7 @@ export function createRunLifecyclePort({
     if (handle && persisted.state === "STARTING") {
       try {
         const launchObservation = normalizeLaunchObservation(launchObservationVerifier, { stdout: redactSecretText(handle.stdout.toString("utf8")), stderr: redactSecretText(handle.stderr.toString("utf8")), plan: handle.plan, processEvidence: handle.process_evidence, observedAt: clock() });
-        const observation = { ...persisted.observation, actual_provider: launchObservation.actual_provider, actual_model: launchObservation.actual_model, actual_effort: launchObservation.actual_effort, launch_observation_verifier_id: launchObservation.verifier_id, launch_observation_proof_fingerprint: launchObservation.proof_fingerprint, process_identity: handle.process_evidence.process_identity, process_identity_fingerprint: handle.process_evidence.process_identity_fingerprint, containment_evidence_fingerprint: handle.process_evidence.fingerprint };
+        const observation = { ...persisted.observation, actual_provider: launchObservation.actual_provider, actual_model: launchObservation.actual_model, actual_effort: launchObservation.actual_effort, observation_scope: launchObservation.observation_scope, backend_attestation: null, backend_attestation_available: false, launch_observation_verifier_id: launchObservation.verifier_id, launch_observation_proof_fingerprint: launchObservation.proof_fingerprint, process_identity: handle.process_evidence.process_identity, process_identity_fingerprint: handle.process_evidence.process_identity_fingerprint, containment_evidence_fingerprint: handle.process_evidence.fingerprint, containment_profile_id: handle.process_evidence.profile_id, provider_network: handle.process_evidence.provider_network === true, task_network_access: handle.process_evidence.task_network_access === true, task_tools_enabled: handle.process_evidence.task_tools_enabled === true };
         persisted = transition(runId, ["STARTING"], "RUNNING", { observation }).run;
         launchReport = { provider: launchObservation.actual_provider, model: launchObservation.actual_model, effort: launchObservation.actual_effort, observation_proof_fingerprint: launchObservation.proof_fingerprint };
       } catch (error) {
@@ -557,10 +573,10 @@ export function createRunLifecyclePort({
       const bytes = readFileSync(handle.response_fd);
       const result = validateResult(JSON.parse(bytes.toString("utf8")), { runId, maxBytes: handle.plan.max_result_bytes });
       const launchObservation = current.observation?.actual_model
-        ? { actual_provider: current.observation.actual_provider, actual_model: current.observation.actual_model, actual_effort: current.observation.actual_effort, verifier_id: current.observation.launch_observation_verifier_id, proof_fingerprint: current.observation.launch_observation_proof_fingerprint }
+        ? { actual_provider: current.observation.actual_provider, actual_model: current.observation.actual_model, actual_effort: current.observation.actual_effort, observation_scope: current.observation.observation_scope, backend_attestation: null, backend_attestation_available: false, verifier_id: current.observation.launch_observation_verifier_id, proof_fingerprint: current.observation.launch_observation_proof_fingerprint }
         : normalizeLaunchObservation(launchObservationVerifier, { stdout: redactSecretText(handle.stdout.toString("utf8")), stderr: redactSecretText(handle.stderr.toString("utf8")), plan: handle.plan, processEvidence: handle.process_evidence, observedAt });
       const launchReport = { provider: launchObservation.actual_provider, model: launchObservation.actual_model, effort: launchObservation.actual_effort, observation_proof_fingerprint: launchObservation.proof_fingerprint };
-      const observation = { selected_provider: handle.plan.selected_provider, selected_model: handle.plan.selected_model, selected_effort: handle.plan.selected_effort, actual_provider: launchObservation.actual_provider, actual_model: launchObservation.actual_model, actual_effort: launchObservation.actual_effort, launch_observation_proof_fingerprint: launchObservation.proof_fingerprint, launch_observation_verifier_id: launchObservation.verifier_id, process_identity_fingerprint: handle.process_identity_fingerprint, process_identity: handle.process_evidence.process_identity, containment_evidence_fingerprint: handle.process_evidence.fingerprint, stdout_fingerprint: digest(handle.stdout), stderr_fingerprint: digest(handle.stderr), stdout_truncated: handle.stdout_truncated, stderr_truncated: handle.stderr_truncated, launch_report: launchReport, agent_result: result.value };
+      const observation = { ...current.observation, selected_provider: handle.plan.selected_provider, selected_model: handle.plan.selected_model, selected_effort: handle.plan.selected_effort, actual_provider: launchObservation.actual_provider, actual_model: launchObservation.actual_model, actual_effort: launchObservation.actual_effort, observation_scope: launchObservation.observation_scope, backend_attestation: null, backend_attestation_available: false, launch_observation_proof_fingerprint: launchObservation.proof_fingerprint, launch_observation_verifier_id: launchObservation.verifier_id, process_identity_fingerprint: handle.process_identity_fingerprint, process_identity: handle.process_evidence.process_identity, containment_evidence_fingerprint: handle.process_evidence.fingerprint, stdout_fingerprint: digest(handle.stdout), stderr_fingerprint: digest(handle.stderr), stdout_truncated: handle.stdout_truncated, stderr_truncated: handle.stderr_truncated, launch_report: launchReport, agent_result: result.value };
       transition(runId, ["RUNNING", "UNKNOWN"], "COMPLETED", { exit_code: 0, result_fingerprint: result.fingerprint, result_size: result.bytes, observation });
       handle.collected = true;
       return { run_id: runId, state: "COMPLETED", exit_code: 0, signal: null, launch_report: launchReport, result: result.value, result_fingerprint: result.fingerprint };
@@ -592,6 +608,18 @@ export function createRunLifecyclePort({
     if (TERMINAL_STATES.has(persisted.state)) return { ...(await reconcile(runId)), recovery: "already_terminal" };
     if (persisted.state === "CONFLICT") return { run_id: runId, result: "conflict", recovery: "manual_required", code: persisted.observation?.recovery_code ?? "RUNTIME_CONFLICT" };
     const processStatus = persistedProcessStatus(persisted);
+    const recoveryRequest = {
+      run_id: runId,
+      persisted_state: persisted.state,
+      authority_epoch: Number(persisted.authority_epoch),
+      process_status: processStatus,
+      process_identity_fingerprint: persisted.observation?.process_identity_fingerprint ?? null,
+      requested_action: processStatus === "matched" ? "fence_and_terminate" : processStatus === "absent" ? "fail_closed" : "record_manual_recovery",
+    };
+    const recoveryFingerprint = digest(recoveryRequest);
+    const recoveryVerdict = await recoveryAuthorizer({ request: structuredClone(recoveryRequest), fingerprint: recoveryFingerprint, now: clock() });
+    if (recoveryVerdict?.decision !== "ALLOW" || recoveryVerdict.fingerprint !== recoveryFingerprint || recoveryVerdict.run_id !== runId || recoveryVerdict.authority_epoch !== Number(persisted.authority_epoch)) throw new Error("RUN_LIFECYCLE_RECOVERY_AUTHORIZATION_REQUIRED");
+    store.assertAuthorityEpoch({ authorityEpoch: Number(persisted.authority_epoch) });
     if (processStatus === "reused") {
       if (persisted.state !== "UNKNOWN") persisted = transition(runId, [persisted.state], "UNKNOWN", { observation: { ...persisted.observation, recovery_code: "PROCESS_IDENTITY_REUSED" } }, true).run;
       const conflict = store.recordRuntimeConflict({ conflictKind: "runtime_run", idempotencyKey: persisted.idempotency_key, existingId: runId, existingFingerprint: persisted.observation?.process_identity_fingerprint ?? digest("missing-process-identity"), incomingFingerprint: digest({ run_id: runId, recovery: "pid_reused" }), details: { recovery_code: "PROCESS_IDENTITY_REUSED" } });

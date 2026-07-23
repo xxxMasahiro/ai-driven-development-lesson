@@ -177,6 +177,8 @@ function normalizeManifest(manifest) {
   if (!Object.hasOwn(manifest, "estimated_cost")) throw new Error("PROVIDER_ESTIMATED_COST_REQUIRED");
   const estimatedCost = manifest.estimated_cost;
   if (!Number.isFinite(estimatedCost) || estimatedCost < 0) throw new Error("PROVIDER_ESTIMATED_COST_INVALID");
+  const recommendationRank = manifest.recommendation_rank ?? null;
+  if (recommendationRank !== null && (!Number.isSafeInteger(recommendationRank) || recommendationRank <= 0)) throw new Error("PROVIDER_RECOMMENDATION_RANK_INVALID");
   return {
     manifest_id: requireString(manifest.manifest_id, "PROVIDER_MANIFEST_ID_REQUIRED"),
     version: requireString(manifest.version, "PROVIDER_MANIFEST_VERSION_REQUIRED"),
@@ -193,7 +195,8 @@ function normalizeManifest(manifest) {
     custom: manifest.custom === true,
     requires_observation: manifest.custom === true || manifest.requires_observation === true,
     priority: manifest.priority ?? 100,
-    estimated_cost: estimatedCost
+    estimated_cost: estimatedCost,
+    recommendation_rank: recommendationRank
   };
 }
 
@@ -699,21 +702,50 @@ export function selectAgentConfiguration({ registry, policy, inheritanceChain = 
     if (!requested) return { decision: "STOP", code: "NO_INHERITED_SELECTION", inheritance_trace: trace };
   }
   const effectiveRequirements = { ...requirements, model_policy: composeModelPolicy(policy, requirements) };
-  const evaluated = registry.entries.map((entry) => {
+  const objective = developmentObjective(effectiveRequirements);
+  let evaluated = registry.entries.map((entry) => {
     const effort = selectManifestEffort(entry.manifest, { requirements: effectiveRequirements, authority, requestedNativeReasoning });
     return { entry, effort, blockers: [...new Set([...eligibility(entry, effectiveRequirements, authority, budget), ...effort.blockers])].sort() };
   });
+  if (policy.mode === "auto") {
+    const catalogRanks = evaluated.map((item) => item.entry.manifest.recommendation_rank).filter((rank) => Number.isSafeInteger(rank));
+    if (catalogRanks.length > 0) {
+      const maximumRecommendedRank = Math.min(...catalogRanks) + DEVELOPMENT_RECOMMENDATION_RANK_SPAN;
+      evaluated = evaluated.map((item) => item.entry.manifest.recommendation_rank > maximumRecommendedRank
+        ? { ...item, blockers: [...new Set([...item.blockers, "OUTSIDE_RECOMMENDED_COHORT"])].sort() }
+        : item);
+    }
+  }
   const role = effectiveRequirements.role ?? null;
+  const eligibleRanks = evaluated.filter((item) => item.blockers.length === 0).map((item) => item.entry.manifest.recommendation_rank).filter((rank) => Number.isSafeInteger(rank)).sort((left, right) => left - right);
+  const medianRank = eligibleRanks.length > 0 ? eligibleRanks[Math.floor((eligibleRanks.length - 1) / 2)] : null;
   const ranked = [...evaluated].sort((a, b) => {
     const aRole = role !== null && a.entry.manifest.selection_profile.roles.includes(role) ? 1 : 0;
     const bRole = role !== null && b.entry.manifest.selection_profile.roles.includes(role) ? 1 : 0;
+    const commonTail = () => a.entry.manifest.priority - b.entry.manifest.priority
+      || a.entry.manifest.estimated_cost - b.entry.manifest.estimated_cost
+      || a.entry.manifest.identity_key.localeCompare(b.entry.manifest.identity_key);
+    if (objective === "efficiency") {
+      return b.entry.manifest.selection_profile.efficiency - a.entry.manifest.selection_profile.efficiency
+        || bRole - aRole
+        || b.entry.manifest.selection_profile.correctness - a.entry.manifest.selection_profile.correctness
+        || b.entry.manifest.selection_profile.safety - a.entry.manifest.selection_profile.safety
+        || commonTail();
+    }
+    if (objective === "balanced" && medianRank !== null) {
+      const aDistance = Number.isSafeInteger(a.entry.manifest.recommendation_rank) ? Math.abs(a.entry.manifest.recommendation_rank - medianRank) : Number.MAX_SAFE_INTEGER;
+      const bDistance = Number.isSafeInteger(b.entry.manifest.recommendation_rank) ? Math.abs(b.entry.manifest.recommendation_rank - medianRank) : Number.MAX_SAFE_INTEGER;
+      return aDistance - bDistance
+        || bRole - aRole
+        || (b.entry.manifest.selection_profile.correctness + b.entry.manifest.selection_profile.safety + b.entry.manifest.selection_profile.efficiency)
+          - (a.entry.manifest.selection_profile.correctness + a.entry.manifest.selection_profile.safety + a.entry.manifest.selection_profile.efficiency)
+        || commonTail();
+    }
     return b.entry.manifest.selection_profile.correctness - a.entry.manifest.selection_profile.correctness
       || b.entry.manifest.selection_profile.safety - a.entry.manifest.selection_profile.safety
       || bRole - aRole
       || b.entry.manifest.selection_profile.efficiency - a.entry.manifest.selection_profile.efficiency
-      || a.entry.manifest.priority - b.entry.manifest.priority
-      || a.entry.manifest.estimated_cost - b.entry.manifest.estimated_cost
-      || a.entry.manifest.identity_key.localeCompare(b.entry.manifest.identity_key);
+      || commonTail();
   });
   const selectionLineage = ranked.map((item, index) => ({ rank: index + 1, identity_key: item.entry.manifest.identity_key, eligible: item.blockers.length === 0, blockers: [...item.blockers], registry_fingerprint: registry.fingerprint, observed_at: registry.observed_at }));
   let selected;
@@ -726,7 +758,224 @@ export function selectAgentConfiguration({ registry, policy, inheritanceChain = 
   if (selected.blockers.length) return { decision: "STOP", code: "SELECTION_INELIGIBLE", requested: selected.entry.manifest.identity_key, blockers: selected.blockers, inheritance_trace: trace };
   if (policy.previous_effective && policy.previous_effective !== selected.entry.manifest.identity_key && (typeof policy.reselection_reason !== "string" || policy.reselection_reason.length === 0)) return { decision: "STOP", code: "RESELECTION_REASON_REQUIRED", requested: requested ?? "auto", previous_effective: policy.previous_effective, proposed_effective: selected.entry.manifest.identity_key, selection_lineage: selectionLineage };
   const selectedRank = selectionLineage.find((item) => item.identity_key === selected.entry.manifest.identity_key)?.rank ?? 1;
-  const result = { decision: "PASS", mode: policy.mode, requested: requested ?? "auto", selected: selected.entry.manifest.identity_key, effective: selected.entry.manifest.identity_key, selected_model: selected.entry.manifest.identity.model_id, selected_native_reasoning: selected.effort.native_reasoning, selected_normalized_effort: selected.effort.normalized_effort, effort_criteria: selected.effort.criteria, previous_effective: policy.previous_effective ?? null, reselection_reason: policy.reselection_reason ?? null, fallback_count: policy.mode === "auto" ? selectedRank - 1 : 0, selection_lineage: selectionLineage, manifest: selected.entry.manifest, inheritance_trace: trace, actual_observed: null };
+  const result = { decision: "PASS", mode: policy.mode, objective, requested: requested ?? "auto", selected: selected.entry.manifest.identity_key, effective: selected.entry.manifest.identity_key, selected_model: selected.entry.manifest.identity.model_id, selected_native_reasoning: selected.effort.native_reasoning, selected_normalized_effort: selected.effort.normalized_effort, effort_criteria: selected.effort.criteria, previous_effective: policy.previous_effective ?? null, reselection_reason: policy.reselection_reason ?? null, fallback_count: policy.mode === "auto" ? selectedRank - 1 : 0, selection_lineage: selectionLineage, manifest: selected.entry.manifest, inheritance_trace: trace, actual_observed: null };
+  return { ...result, fingerprint: digest(result) };
+}
+
+const DEVELOPMENT_OBJECTIVES = new Set(["auto", "correctness", "balanced", "efficiency"]);
+const DEVELOPMENT_RISK = new Set(["low", "normal", "high", "critical"]);
+const DEVELOPMENT_COMPLEXITY = new Set(["low", "normal", "high", "extreme"]);
+const DEVELOPMENT_RECOMMENDATION_RANK_SPAN = 2;
+
+function developmentStop(code, details = {}) {
+  const result = {
+    schema_version: "1.0.0",
+    decision: "STOP",
+    profile: "development_advisory",
+    code,
+    ...details,
+    production_eligible: false,
+    selection_grants_launch_authority: false,
+    backend_attestation: false,
+  };
+  return { ...result, fingerprint: digest(result) };
+}
+
+function developmentObjective(requirements) {
+  const requested = requirements.objective ?? "auto";
+  if (!DEVELOPMENT_OBJECTIVES.has(requested)) throw new Error("DEVELOPMENT_SELECTION_OBJECTIVE_INVALID");
+  const rigor = requirements.rigor ?? "L3";
+  const risk = requirements.risk ?? "normal";
+  const complexity = requirements.complexity ?? "normal";
+  if (!Object.hasOwn(RIGOR_EFFORT_FLOOR, rigor)) throw new Error("SELECTION_RIGOR_INVALID");
+  if (!DEVELOPMENT_RISK.has(risk) || !DEVELOPMENT_COMPLEXITY.has(complexity)) throw new Error("SELECTION_RISK_OR_COMPLEXITY_INVALID");
+  if (requested !== "auto") return requested;
+  if (["L4", "L5"].includes(rigor) || ["high", "critical"].includes(risk) || ["high", "extreme"].includes(complexity)) return "correctness";
+  if (["L1", "L2"].includes(rigor) && risk === "low" && ["low", "normal"].includes(complexity)) return "efficiency";
+  return "balanced";
+}
+
+function normalizedDevelopmentEffort(nativeReasoning) {
+  if (Object.hasOwn(NORMALIZED_EFFORT_RANK, nativeReasoning)) return nativeReasoning;
+  if (nativeReasoning === "ultra") return "max";
+  return null;
+}
+
+function validateDevelopmentCatalogSet(catalogSet, now) {
+  if (!catalogSet || catalogSet.catalog_kind !== "development_advisory_set" || catalogSet.schema_version !== "1.0.0") return "DEVELOPMENT_CATALOG_SET_INVALID";
+  if (!/^[a-f0-9]{64}$/.test(catalogSet.fingerprint ?? "") || digest(Object.fromEntries(Object.entries(catalogSet).filter(([key]) => key !== "fingerprint"))) !== catalogSet.fingerprint) return "DEVELOPMENT_CATALOG_SET_FINGERPRINT_INVALID";
+  if (!Array.isArray(catalogSet.catalogs) || catalogSet.catalogs.length === 0 || catalogSet.catalogs.length > 32) return "DEVELOPMENT_CATALOG_SET_EMPTY";
+  const nowTimestamp = Date.parse(now);
+  if (!Number.isFinite(nowTimestamp) || !Number.isFinite(Date.parse(catalogSet.observed_at)) || !Number.isFinite(Date.parse(catalogSet.fresh_until)) || Date.parse(catalogSet.observed_at) > nowTimestamp || Date.parse(catalogSet.fresh_until) < nowTimestamp) return "DEVELOPMENT_CATALOG_SET_STALE";
+  for (const catalog of catalogSet.catalogs) {
+    if (!catalog || catalog.catalog_kind !== "development_advisory" || catalog.production_eligible !== false || catalog.selection_grants_launch_authority !== false) return "DEVELOPMENT_CATALOG_INVALID";
+    if (!/^[a-f0-9]{64}$/.test(catalog.fingerprint ?? "") || digest(Object.fromEntries(Object.entries(catalog).filter(([key]) => key !== "fingerprint"))) !== catalog.fingerprint) return "DEVELOPMENT_CATALOG_FINGERPRINT_INVALID";
+    if (!Number.isFinite(Date.parse(catalog.observed_at)) || !Number.isFinite(Date.parse(catalog.fresh_until)) || Date.parse(catalog.observed_at) > nowTimestamp || Date.parse(catalog.fresh_until) < nowTimestamp) return "DEVELOPMENT_CATALOG_STALE";
+    if (!Array.isArray(catalog.models) || catalog.models.length === 0 || catalog.models.length > 256) return "DEVELOPMENT_MODEL_CATALOG_INVALID";
+    if (!Array.isArray(catalog.capabilities) || !catalog.resource_bounds || typeof catalog.resource_bounds !== "object" || Array.isArray(catalog.resource_bounds) || !Number.isFinite(catalog.estimated_cost) || catalog.estimated_cost < 0) return "DEVELOPMENT_CATALOG_POLICY_INVALID";
+    for (const field of ["execution_provider_id", "model_publisher_id", "adapter_id", "transport_id", "adapter_version"]) if (typeof catalog[field] !== "string" || catalog[field].length === 0) return "DEVELOPMENT_CATALOG_IDENTITY_INVALID";
+    for (const model of catalog.models) {
+      if (typeof model?.model_id !== "string" || model.model_id.length === 0 || !Number.isSafeInteger(model.recommendation_rank) || model.recommendation_rank <= 0 || !Array.isArray(model.native_reasoning_values) || model.native_reasoning_values.length === 0) return "DEVELOPMENT_MODEL_CATALOG_INVALID";
+      if (model.native_reasoning_values.some((value) => typeof value !== "string" || normalizedDevelopmentEffort(value) === null)) return "DEVELOPMENT_MODEL_EFFORT_UNSUPPORTED";
+    }
+  }
+  return null;
+}
+
+function developmentOrdering(models, objective) {
+  const ranks = [...new Set(models.map((item) => item.recommendation_rank))].sort((left, right) => left - right);
+  const medianRank = ranks[Math.floor((ranks.length - 1) / 2)];
+  return [...models].sort((left, right) => {
+    if (objective === "efficiency") return right.recommendation_rank - left.recommendation_rank || left.identity_key.localeCompare(right.identity_key);
+    if (objective === "balanced") return Math.abs(left.recommendation_rank - medianRank) - Math.abs(right.recommendation_rank - medianRank) || left.recommendation_rank - right.recommendation_rank || left.identity_key.localeCompare(right.identity_key);
+    return left.recommendation_rank - right.recommendation_rank || left.identity_key.localeCompare(right.identity_key);
+  });
+}
+
+export function selectDevelopmentAgentConfiguration({ catalogSet, policy, requirements = {}, budget = { cost: 0 }, now = new Date().toISOString() }) {
+  const catalogError = validateDevelopmentCatalogSet(catalogSet, now);
+  if (catalogError) return developmentStop(catalogError);
+  if (!policy || !new Set(["auto", "manual"]).has(policy.mode)) return developmentStop("DEVELOPMENT_SELECTION_POLICY_INVALID");
+  let objective;
+  try {
+    objective = developmentObjective(requirements);
+  } catch (error) {
+    return developmentStop(error?.message ?? "DEVELOPMENT_SELECTION_REQUIREMENTS_INVALID");
+  }
+  const models = [];
+  const identityKeys = new Set();
+  for (const catalog of catalogSet.catalogs) {
+    for (const model of catalog.models) {
+      const identity = {
+        execution_provider_id: catalog.execution_provider_id,
+        model_publisher_id: catalog.model_publisher_id,
+        agent_product_id: catalog.agent_product_id ?? null,
+        adapter_id: catalog.adapter_id,
+        transport_id: catalog.transport_id,
+        model_id: model.model_id,
+      };
+      let identityKey;
+      try { identityKey = providerIdentityKey(identity); } catch { return developmentStop("DEVELOPMENT_CATALOG_IDENTITY_INVALID"); }
+      if (identityKeys.has(identityKey)) return developmentStop("DEVELOPMENT_MODEL_IDENTITY_DUPLICATE");
+      identityKeys.add(identityKey);
+      models.push({ catalog, model, identity, identity_key: identityKey, recommendation_rank: model.recommendation_rank });
+    }
+  }
+  const uniqueRanks = [...new Set(models.map((item) => item.recommendation_rank))].sort((left, right) => left - right);
+  const maximumRecommendedRank = uniqueRanks[0] + DEVELOPMENT_RECOMMENDATION_RANK_SPAN;
+  const recommended = models.filter((item) => item.recommendation_rank <= maximumRecommendedRank);
+  const ordered = developmentOrdering(recommended, objective);
+  const orderByIdentity = new Map(ordered.map((item, index) => [item.identity_key, index]));
+  const advisoryRegistry = {
+    schema_version: "1.0.0",
+    observed_at: catalogSet.observed_at,
+    fingerprint: catalogSet.fingerprint,
+    entries: models.map((item) => {
+      const outsideRecommendedCohort = policy.mode === "auto" && !orderByIdentity.has(item.identity_key);
+      const order = orderByIdentity.get(item.identity_key) ?? recommended.length + item.recommendation_rank;
+      const effortMapping = Object.fromEntries(item.model.native_reasoning_values.map((value) => [value, normalizedDevelopmentEffort(value)]));
+      return {
+        eligible: !outsideRecommendedCohort,
+        blockers: outsideRecommendedCohort ? ["OUTSIDE_RECOMMENDED_COHORT"] : [],
+        certification: null,
+        observation: null,
+        manifest: {
+          manifest_id: `${item.catalog.catalog_id}:${item.model.model_id}`,
+          version: `1.0.0+${item.catalog.adapter_version}`,
+          identity: item.identity,
+          identity_key: item.identity_key,
+          capabilities: [...new Set(item.catalog.capabilities)].sort(),
+          native_reasoning_values: [...item.model.native_reasoning_values],
+          effort_mapping: effortMapping,
+          selection_profile: {
+            correctness: Math.max(0, 100 - Math.min(order, 100)),
+            safety: Math.max(0, 100 - Math.min(order, 100)),
+            efficiency: objective === "efficiency" ? Math.max(0, 100 - Math.min(order, 100)) : 50,
+            roles: requirements.role ? [requirements.role] : [],
+          },
+          resource_bounds: { ...item.catalog.resource_bounds },
+          estimated_cost: item.catalog.estimated_cost,
+          priority: order + 1,
+          development_catalog_fingerprint: item.catalog.fingerprint,
+          recommendation_rank: item.recommendation_rank,
+        },
+      };
+    }),
+  };
+  const selected = selectAgentConfiguration({
+    registry: advisoryRegistry,
+    policy,
+    requirements: { ...requirements, objective: undefined },
+    authority: { decision: "ALLOW", rigor: requirements.rigor ?? "L3" },
+    budget,
+  });
+  if (selected.decision !== "PASS") return developmentStop(selected.code ?? "DEVELOPMENT_SELECTION_INELIGIBLE", {
+    requested: selected.requested ?? policy.mode,
+    blockers: selected.blockers ?? [],
+    selection_lineage: selected.selection_lineage ?? [],
+    catalog_set_fingerprint: catalogSet.fingerprint,
+    policy_fingerprint: digest(policy),
+  });
+  const preparedConfiguration = {
+    model_argument: ["--model", selected.selected_model],
+    reasoning_argument: ["-c", `model_reasoning_effort=${JSON.stringify(selected.selected_native_reasoning)}`],
+  };
+  const result = {
+    schema_version: "1.0.0",
+    decision: "RECOMMEND",
+    profile: "development_advisory",
+    mode: selected.mode,
+    requested: selected.requested,
+    agent_id: requirements.agent_id ?? null,
+    role: requirements.role ?? null,
+    rigor: selected.effort_criteria.rigor,
+    risk: selected.effort_criteria.risk,
+    complexity: selected.effort_criteria.complexity,
+    objective,
+    selected_provider: selected.selected,
+    selected_model: selected.selected_model,
+    selected_native_reasoning: selected.selected_native_reasoning,
+    selected_normalized_effort: selected.selected_normalized_effort,
+    effort_criteria: selected.effort_criteria,
+    catalog_set_fingerprint: catalogSet.fingerprint,
+    policy_fingerprint: digest(policy),
+    selection_lineage: selected.selection_lineage,
+    prepared_configuration: preparedConfiguration,
+    production_eligible: false,
+    selection_grants_launch_authority: false,
+    backend_attestation: false,
+  };
+  return { ...result, fingerprint: digest(result) };
+}
+
+export function verifyDevelopmentAgentConfiguration({ plan, preparedModel, preparedNativeReasoning }) {
+  if (!plan || plan.decision !== "RECOMMEND" || plan.profile !== "development_advisory" || plan.production_eligible !== false || plan.selection_grants_launch_authority !== false || plan.backend_attestation !== false) return developmentStop("DEVELOPMENT_SELECTION_PLAN_INVALID");
+  const expectedFingerprint = digest(Object.fromEntries(Object.entries(plan).filter(([key]) => key !== "fingerprint")));
+  if (!/^[a-f0-9]{64}$/.test(plan.fingerprint ?? "") || expectedFingerprint !== plan.fingerprint) return developmentStop("DEVELOPMENT_SELECTION_PLAN_FINGERPRINT_INVALID");
+  if (typeof preparedModel !== "string" || typeof preparedNativeReasoning !== "string") return developmentStop("PREPARED_CONFIGURATION_INVALID");
+  const expectedModelArguments = ["--model", plan.selected_model];
+  const expectedReasoningArguments = ["-c", `model_reasoning_effort=${JSON.stringify(plan.selected_native_reasoning)}`];
+  const matches = preparedModel === plan.selected_model
+    && preparedNativeReasoning === plan.selected_native_reasoning
+    && canonicalJson(plan.prepared_configuration?.model_argument) === canonicalJson(expectedModelArguments)
+    && canonicalJson(plan.prepared_configuration?.reasoning_argument) === canonicalJson(expectedReasoningArguments);
+  if (!matches) return developmentStop("PREPARED_CONFIGURATION_MISMATCH", {
+    plan_fingerprint: plan.fingerprint,
+    prepared_model: preparedModel,
+    prepared_native_reasoning: preparedNativeReasoning,
+  });
+  const result = {
+    schema_version: "1.0.0",
+    decision: "PASS",
+    profile: "development_advisory",
+    plan_fingerprint: plan.fingerprint,
+    prepared_model: preparedModel,
+    prepared_native_reasoning: preparedNativeReasoning,
+    configuration_binding: "prepared_cli_arguments",
+    production_eligible: false,
+    selection_grants_launch_authority: false,
+    backend_attestation: false,
+  };
   return { ...result, fingerprint: digest(result) };
 }
 
@@ -784,7 +1033,40 @@ export function admitAgentRun({ intent, grant, actualObserved, observationProof,
   return { decision: "PASS", attestation: { ...attestation, fingerprint: digest(attestation) } };
 }
 
-export function buildCliLaunchPlan({ manifest, promptFile, promptFingerprint = null, responseFile, modelId, nativeReasoning, sandbox, workingDirectory }) {
+function normalizeCliAttestationExpectation(value, manifest) {
+  if (value === null || value === undefined) return null;
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("CLI_ATTESTATION_EXPECTATION_INVALID");
+  const normalizedManifest = normalizeManifest(manifest);
+  const identity = providerIdentity(value.identity);
+  if (providerIdentityKey(identity) !== normalizedManifest.identity_key) throw new Error("CLI_ATTESTATION_IDENTITY_MISMATCH");
+  const targets = [...new Set(value.targets ?? [])].sort();
+  const capabilities = [...new Set(value.capabilities ?? [])].sort();
+  const actions = [...new Set(value.actions ?? [])].sort();
+  const tools = [...new Set(value.tools ?? [])].sort();
+  if (targets.length === 0 || targets.some((target) => typeof target !== "string" || target.length === 0 || target.includes("\0")) || [capabilities, actions, tools].some((items) => items.some((item) => typeof item !== "string" || item.length === 0))) throw new Error("CLI_ATTESTATION_BOUNDARY_INVALID");
+  if (!value.sandbox || typeof value.sandbox !== "object" || Array.isArray(value.sandbox) || !new Set(["read_only", "workspace_write"]).has(value.sandbox.mode) || typeof value.sandbox.network !== "boolean" || !Array.isArray(value.sandbox.writable_paths)) throw new Error("CLI_ATTESTATION_SANDBOX_INVALID");
+  if (typeof value.adapter_instance_id !== "string" || value.adapter_instance_id.length === 0 || typeof value.normalized_effort !== "string" || normalizedManifest.effort_mapping[value.native_reasoning] !== value.normalized_effort) throw new Error("CLI_ATTESTATION_CONFIGURATION_INVALID");
+  const resourceLimits = structuredClone(value.resource_limits ?? { max_runtime_ms: 0, max_tokens: 0, max_cost: 0, max_retries: 0 });
+  for (const field of ["max_runtime_ms", "max_tokens", "max_cost", "max_retries"]) if (!Number.isFinite(resourceLimits[field]) || resourceLimits[field] < 0) throw new Error("CLI_ATTESTATION_RESOURCE_LIMIT_INVALID");
+  return {
+    identity,
+    native_reasoning: value.native_reasoning,
+    normalized_effort: value.normalized_effort,
+    adapter_instance_id: value.adapter_instance_id,
+    sandbox: {
+      mode: value.sandbox.mode,
+      network: value.sandbox.network,
+      writable_paths: [...new Set(value.sandbox.writable_paths)].sort(),
+    },
+    capabilities,
+    actions,
+    tools,
+    resource_limits: resourceLimits,
+    targets,
+  };
+}
+
+export function buildCliLaunchPlan({ manifest, promptFile, promptFingerprint = null, responseFile, modelId, nativeReasoning, sandbox, workingDirectory, attestationExpectation = null }) {
   const normalized = normalizeManifest(manifest);
   if (normalized.identity.transport_id !== "cli_process") throw new Error("CLI_TRANSPORT_REQUIRED");
   for (const value of [promptFile, responseFile, workingDirectory]) if (!isAbsolute(value)) throw new Error("CLI_PATH_MUST_BE_ABSOLUTE");
@@ -810,7 +1092,7 @@ export function buildCliLaunchPlan({ manifest, promptFile, promptFingerprint = n
   };
   const argv = descriptor.argv_template.map((token) => /^\{\{[a-z_]+\}\}$/.test(token) ? values[token.slice(2, -2)] : token);
   if (promptFingerprint !== null && !/^[a-f0-9]{64}$/.test(promptFingerprint)) throw new Error("CLI_PROMPT_FINGERPRINT_INVALID");
-  const core = { transport: "cli_process", executable, executable_descriptor: structuredClone(descriptor.executable), interpreter_descriptor: structuredClone(descriptor.interpreter ?? null), model_id: modelId, native_reasoning: nativeReasoning, sandbox, argv, working_directory: workingDirectory, stdin_file: promptFile, stdin_fingerprint: promptFingerprint, response_file: responseFile, shell: false, environment: {}, environment_allowlist: [...descriptor.environment_allowlist], execution_policy: structuredClone(descriptor.execution_policy ?? null), implicit_network_authority: false, requires_executable_revalidation: true };
+  const core = { transport: "cli_process", executable, executable_descriptor: structuredClone(descriptor.executable), interpreter_descriptor: structuredClone(descriptor.interpreter ?? null), model_id: modelId, native_reasoning: nativeReasoning, sandbox, argv, working_directory: workingDirectory, stdin_file: promptFile, stdin_fingerprint: promptFingerprint, response_file: responseFile, shell: false, environment: {}, environment_allowlist: [...descriptor.environment_allowlist], execution_policy: structuredClone(descriptor.execution_policy ?? null), attestation_expectation: normalizeCliAttestationExpectation(attestationExpectation, normalized), implicit_network_authority: false, requires_executable_revalidation: true };
   return { ...core, fingerprint: digest(core) };
 }
 
@@ -869,7 +1151,7 @@ export async function dispatchCliLaunchPlan({ manifest, plan, executableObservat
     assertProtectedAuthorityFencedCliExecutor(executor);
     if (executor.authority_fence_enforced !== true) throw new Error("CLI_AUTHORITY_FENCE_ENFORCEMENT_UNAVAILABLE");
   }
-  const rebuilt = buildCliLaunchPlan({ manifest, promptFile: plan?.stdin_file, promptFingerprint: plan?.stdin_fingerprint ?? null, responseFile: plan?.response_file, modelId: plan?.model_id, nativeReasoning: plan?.native_reasoning, sandbox: plan?.sandbox, workingDirectory: plan?.working_directory });
+  const rebuilt = buildCliLaunchPlan({ manifest, promptFile: plan?.stdin_file, promptFingerprint: plan?.stdin_fingerprint ?? null, responseFile: plan?.response_file, modelId: plan?.model_id, nativeReasoning: plan?.native_reasoning, sandbox: plan?.sandbox, workingDirectory: plan?.working_directory, attestationExpectation: plan?.attestation_expectation ?? null });
   if (rebuilt.fingerprint !== plan?.fingerprint) throw new Error("CLI_EXECUTION_PLAN_NOT_CANONICAL");
   const admission = authorizeCliLaunchPlan({ manifest, plan, executableObservation });
   const pinned = pinExecutableDescriptor({ descriptor: plan.executable_descriptor, observation: executableObservation });
@@ -896,6 +1178,7 @@ export async function dispatchCliLaunchPlan({ manifest, plan, executableObservat
       selected_provider: manifest.identity_key,
       selected_model: plan.model_id,
       selected_effort: plan.native_reasoning,
+      attestation_expectation: structuredClone(plan.attestation_expectation),
       shell: false,
       plan_fingerprint: admission.plan_fingerprint,
       manifest_fingerprint: digest(manifest),
@@ -1023,6 +1306,14 @@ export function createRunLifecycleCliExecutor({ lifecyclePort, observationBuilde
         selected_provider: input.selected_provider,
         selected_model: input.selected_model,
         selected_effort: input.selected_effort,
+        attestation_expectation: structuredClone(input.attestation_expectation),
+      }, {
+        releaseGuard: () => input.authority_fence.guard({
+          authority_epoch: input.authority_fence.authority_epoch,
+          fencing_token: input.authority_fence.fencing_token,
+          effect_id: input.authority_fence.effect_id,
+          effect_key: input.authority_fence.effect_key,
+        }),
       });
       const collected = await lifecyclePort.collect_result(started.run_id);
       if (collected.state !== "COMPLETED" || collected.exit_code !== 0 || !collected.launch_report || !collected.result_fingerprint) throw new Error("RUN_LIFECYCLE_CLI_EXECUTION_INCOMPLETE");

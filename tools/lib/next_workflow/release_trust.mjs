@@ -1,5 +1,6 @@
 import { createHash, createPublicKey, verify as verifySignature } from "node:crypto";
 import { assertNoSecretMaterial } from "./secret_policy.mjs";
+import { verifySignedSourceReceipt } from "./release_source_receipts.mjs";
 
 function canonicalJson(value) {
   if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
@@ -17,6 +18,7 @@ function validateTrustDocument(document, now) {
   const current = Date.parse(now);
   if (!Number.isFinite(current)) throw new Error("RELEASE_TRUST_TIME_INVALID");
   const keys = new Set();
+  const keyMaterial = new Set();
   const verifiers = new Map();
   for (const entry of document.verifiers) {
     if (!entry || typeof entry.verifier !== "string" || typeof entry.key_id !== "string" || typeof entry.public_key_pem !== "string" || !Array.isArray(entry.allowed_kinds) || entry.revocation_state !== "active" || !Number.isFinite(Date.parse(entry.expires_at)) || Date.parse(entry.expires_at) < current) throw new Error("RELEASE_TRUST_ENTRY_INVALID");
@@ -26,7 +28,20 @@ function validateTrustDocument(document, now) {
     let publicKey;
     try { publicKey = createPublicKey(entry.public_key_pem); } catch { throw new Error("RELEASE_TRUST_PUBLIC_KEY_INVALID"); }
     if (publicKey.type !== "public" || publicKey.asymmetricKeyType !== "ed25519") throw new Error("RELEASE_TRUST_KEY_TYPE_INVALID");
+    const material = digest(publicKey.export({ type: "spki", format: "der" }));
+    if (keyMaterial.has(material)) throw new Error("RELEASE_TRUST_KEY_MATERIAL_DUPLICATE");
+    keyMaterial.add(material);
     verifiers.set(key, { ...entry, publicKey });
+  }
+  if (Array.isArray(document.source_verifiers)) {
+    const sourceKeys = new Set();
+    for (const entry of document.source_verifiers) {
+      let publicKey;
+      try { publicKey = createPublicKey(entry?.public_key_pem); } catch { throw new Error("RELEASE_SOURCE_PUBLIC_KEY_INVALID"); }
+      const material = digest(publicKey.export({ type: "spki", format: "der" }));
+      if (keyMaterial.has(material) || sourceKeys.has(material)) throw new Error("RELEASE_TRUST_AUTHORITY_MATERIAL_SEPARATION_REQUIRED");
+      sourceKeys.add(material);
+    }
   }
   return verifiers;
 }
@@ -55,11 +70,29 @@ function signedVerification({ trustDocument, purpose, kind, proof, candidateFing
 }
 
 export function createSignedReleaseProofVerifier({ trustDocument, now = () => new Date().toISOString() } = {}) {
-  return ({ kind, proof, candidateFingerprint }) => ({ ...signedVerification({ trustDocument, purpose: "next-workflow-release-proof", kind, proof, candidateFingerprint, now: now() }), verified: true, correctness: true });
+  return ({ kind, proof, candidateFingerprint }) => {
+    const current = now();
+    const signed = signedVerification({ trustDocument, purpose: "next-workflow-release-proof", kind, proof, candidateFingerprint, now: current });
+    if (Array.isArray(trustDocument?.source_verifiers) && trustDocument.source_verifiers.length > 0) {
+      const source = verifySignedSourceReceipt({ trustDocument, receipt: proof.source_receipt, purpose: "next-workflow-release-source", kind, candidateFingerprint, now: current });
+      if (canonicalJson(source.evidence) !== canonicalJson(proof.evidence) || Date.parse(source.fresh_until) < Date.parse(proof.fresh_until) || proof.correctness?.fingerprint !== digest({ kind, candidate_fingerprint: candidateFingerprint, evidence: proof.evidence, source_receipt_fingerprint: source.receipt_fingerprint })) throw new Error("RELEASE_SOURCE_RECEIPT_BINDING_INVALID");
+      return { ...signed, verified: true, correctness: true, source_verification_fingerprint: source.verification_fingerprint };
+    }
+    return { ...signed, verified: true, correctness: true };
+  };
 }
 
 export function createSignedTransitionVerifier({ trustDocument, now = () => new Date().toISOString() } = {}) {
-  return ({ nextMode, candidateFingerprint, evidence }) => ({ ...signedVerification({ trustDocument, purpose: "next-workflow-activation-transition", kind: nextMode, proof: evidence, candidateFingerprint, now: now() }), verified: true, correctness: true });
+  return ({ nextMode, candidateFingerprint, evidence }) => {
+    const current = now();
+    const signed = signedVerification({ trustDocument, purpose: "next-workflow-activation-transition", kind: nextMode, proof: evidence, candidateFingerprint, now: current });
+    if (Array.isArray(trustDocument?.source_verifiers) && trustDocument.source_verifiers.length > 0) {
+      const source = verifySignedSourceReceipt({ trustDocument, receipt: evidence.source_receipt, purpose: "next-workflow-transition-source", kind: `transition:${nextMode}`, candidateFingerprint, now: current });
+      if (canonicalJson(source.evidence) !== canonicalJson(evidence.evidence) || Date.parse(source.fresh_until) < Date.parse(evidence.fresh_until) || evidence.correctness?.fingerprint !== digest({ kind: nextMode, candidate_fingerprint: candidateFingerprint, evidence: evidence.evidence, source_receipt_fingerprint: source.receipt_fingerprint })) throw new Error("TRANSITION_SOURCE_RECEIPT_BINDING_INVALID");
+      return { ...signed, verified: true, correctness: true, source_verification_fingerprint: source.verification_fingerprint };
+    }
+    return { ...signed, verified: true, correctness: true };
+  };
 }
 
 export function releaseTrustDigest(value) {

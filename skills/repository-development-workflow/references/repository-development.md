@@ -40,6 +40,16 @@ arbitrary shell, dashboard mutation, credential handling, or release-proof
 shortcuts. The instruction projection reports which normal D actions are
 eligible; their owner tools and required evidence remain authoritative.
 
+Before a direct development-session Lead Agent or Task Agent CLI launch, run
+`tools/next-workflow agent-selection plan` with the exact Agent, role, rigor,
+risk, complexity, capabilities, and task-local model policy. Report the
+selected model and native effort, pass them explicitly to the CLI, and run
+`agent-selection verify-config` against the prepared values. STOP, stale
+catalog, ineligible model, unsupported effort, or configuration mismatch means
+do not launch that Agent. This advisory configuration binding does not certify
+the provider, attest backend execution, activate Production, or grant launch,
+Git, network, credential, API-spend, or filesystem authority.
+
 ## Ownership Boundaries
 
 - AGENTS.MD remains the top-level invariant source.

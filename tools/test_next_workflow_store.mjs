@@ -375,6 +375,74 @@ test("startup is recovery-only for every nonterminal effect or pending/inflight 
   }
 });
 
+test("startup is recovery-only while any persisted AgentRun lacks a terminal closure", () => {
+  const f = fixture();
+  let store = openWorkflowStateStore({ repositoryRoot: f.root, databasePath: f.databasePath, expectedIdentity: f.identity });
+  store.close();
+  const database = new DatabaseSync(f.databasePath);
+  const payload = JSON.stringify({ child_agent_id: "task-agent", authority_epoch: 0 });
+  database.prepare(`
+    INSERT INTO records(
+      id,kind,schema_version,record_revision,repository_id,checkout_id,authority_scope,
+      lineage_id,lifecycle_state,payload_json,source_revision,policy_fp,input_fp,content_fp,
+      sensitivity,fresh_until,created_at,superseded_by
+    ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+  `).run(
+    "agent-run-open",
+    "AgentRun",
+    "1.0.0",
+    1,
+    f.identity.repository_logical_id,
+    f.identity.checkout_instance_id,
+    "task-1",
+    "open",
+    "RUNNING",
+    payload,
+    "grant",
+    "policy",
+    "input",
+    createHash("sha256").update(payload).digest("hex"),
+    "internal",
+    "2030-01-01T00:00:00.000Z",
+    "2029-01-01T00:00:00.000Z",
+    null,
+  );
+  const malformedClosurePayload = JSON.stringify({ run_id: "agent-run-open" });
+  database.prepare(`
+    INSERT INTO records(
+      id,kind,schema_version,record_revision,repository_id,checkout_id,authority_scope,
+      lineage_id,lifecycle_state,payload_json,source_revision,policy_fp,input_fp,content_fp,
+      sensitivity,fresh_until,created_at,superseded_by
+    ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+  `).run(
+    "agent-run-nonterminal-closure",
+    "AgentRunClosure",
+    "1.0.0",
+    1,
+    f.identity.repository_logical_id,
+    f.identity.checkout_instance_id,
+    "task-1",
+    "agent-run-open",
+    "PENDING",
+    malformedClosurePayload,
+    "candidate",
+    "policy",
+    "input",
+    createHash("sha256").update(malformedClosurePayload).digest("hex"),
+    "internal",
+    "2030-01-01T00:00:00.000Z",
+    "2029-01-01T00:00:00.000Z",
+    null,
+  );
+  database.close();
+  store = openWorkflowStateStore({ repositoryRoot: f.root, databasePath: f.databasePath, expectedIdentity: f.identity });
+  assert.equal(store.recovery_only, true);
+  assert.equal(store.mode, "recovery-only");
+  assert.deepEqual(store.recovery_state.agent_runs.map((entry) => entry.id), ["agent-run-open"]);
+  assert.throws(() => store.commit({ expectedRevision: store.revision, records: [record("blocked-by-agent-run")] }), /STORE_RECOVERY_ONLY/);
+  store.close();
+});
+
 test("canonical JSONL export can rebuild a fresh store without authority drift", () => {
   const f = fixture();
   const store = openWorkflowStateStore({ repositoryRoot: f.root, databasePath: f.databasePath, expectedIdentity: f.identity });
@@ -504,6 +572,8 @@ test("agent authority records cannot bypass their dedicated verified writers", (
   assert.throws(() => store.commit({ expectedRevision: 0, records: [{ ...record("forged-delegation"), kind: "DelegationGrant" }] }), /AGENT_AUTHORITY_RECORD_WRITER_REQUIRED/);
   assert.throws(() => store.commit({ expectedRevision: 0, records: [{ ...record("forged-receipt-proof"), kind: "EffectReceiptProof" }] }), /RECONCILIATION_PROOF_WRITER_REQUIRED/);
   assert.throws(() => store.commit({ expectedRevision: 0, records: [{ ...record("forged-agent-run"), kind: "AgentRun" }] }), /AGENT_LIFECYCLE_RECORD_WRITER_REQUIRED/);
+  assert.throws(() => store.commit({ expectedRevision: 0, records: [{ ...record("forged-agent-stop"), kind: "AgentRunStopClosure" }] }), /AGENT_LIFECYCLE_RECORD_WRITER_REQUIRED/);
+  assert.throws(() => store.commit({ expectedRevision: 0, records: [{ ...record("forged-reviewer-closure"), kind: "AgentReviewerRunClosure" }] }), /AGENT_LIFECYCLE_RECORD_WRITER_REQUIRED/);
   assert.equal(store.persistAgentAuthorityRecord, undefined);
   assert.throws(() => store.persistResourceCostReservationAuthority({ expectedRevision: 0, record: { ...record("wrong-kind"), kind: "ValidatorDecision" }, event: { event_id: "wrong-kind", event_type: "RESOURCE_COST_RESERVED" }, verifier: { trusted: true, independent: true, authority_id: "authority", verify: () => ({}) } }), /AGENT_AUTHORITY_RECORD_KIND_MISMATCH/);
   assert.equal(store.revision, 0);

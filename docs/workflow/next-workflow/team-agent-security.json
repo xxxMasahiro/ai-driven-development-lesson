@@ -1,5 +1,5 @@
 {
-  "schema_version": "1.2.0",
+  "schema_version": "1.3.0",
   "contract_id": "next_workflow_team_agent_security",
   "activation_mode": "planned",
   "layers": [
@@ -16,11 +16,20 @@
     "L4": {"max_leads": 5, "max_tasks": 12, "writer": "implementation_lead_or_disjoint_owned_tasks"},
     "L5": {"max_leads": 5, "max_tasks": 16, "writer": "implementation_lead_or_disjoint_owned_tasks"}
   },
+  "execution_preference": {
+    "modes": ["auto", "single_agent", "team"],
+    "default": "auto",
+    "single_agent_uses_orchestrator_only": true,
+    "single_agent_requires_effective_rigor": "L1",
+    "hard_l5_overrides_single_agent": true,
+    "team_preference_may_raise_but_never_lower_rigor": true,
+    "control_center_configuration": "deferred"
+  },
   "schemas": {
     "AgentDefinition": ["agent_id", "layer", "role", "capability_requirements", "allowed_actions", "allowed_tools"],
     "DelegationGrant": ["grant_id", "parent_agent_id", "child_role", "scope", "authority_fingerprint", "budget", "ownership", "expires_at"],
     "AgentLaunchIntent": ["intent_id", "grant_fingerprint", "selection_fingerprint", "effective_fingerprint", "selected_model", "selected_native_reasoning", "selected_normalized_effort", "context_fingerprint", "reservation_id", "invariant_fingerprint", "instruction_fingerprint", "envelope_fingerprint", "delivery_fingerprint", "actual_observed"],
-    "AgentRun": ["run_id", "intent_id", "launch_intent_fingerprint", "parent_run_id", "depth", "state", "process_group_identity", "launch_observation", "actual_attestation_id", "ownership"],
+    "AgentRun": ["run_id", "intent_id", "launch_intent_fingerprint", "parent_run_id", "depth", "state", "process_group_identity", "launch_observation", "ownership"],
     "AgentResultCandidate": ["candidate_id", "run_id", "lifecycle_run_id", "result_fingerprint", "process_identity_fingerprint", "launch_report", "accepted"],
     "AgentResult": ["result_id", "run_id", "candidate_record_id", "candidate_result_fingerprint", "status", "provenance", "scope_validation", "lead_review", "orchestrator_review", "validator_disposition"]
   },
@@ -60,7 +69,12 @@
     "candidate_requires_durable_launch_intent_and_exact_admission_subject": true,
     "candidate_requires_exact_launch_request_fingerprint": true,
     "candidate_relation_and_event_topology_is_exact": true,
+    "lead_orchestrator_and_validator_reviews_require_separate_cli_runs": true,
+    "reviewer_process_identities_are_distinct_from_subject_and_each_other": true,
+    "reviewer_results_require_the_same_candidate_provenance_checks": true,
+    "candidate_self_report_cannot_satisfy_independent_review": true,
     "agent_authority_records_require_protected_owner_trust_brand": true,
+    "provider_certification_and_observation_freshness_rechecked_before_every_launch": true,
     "completed_runtime_replay_preserves_result_fingerprint": true,
     "closed_result_schema_and_redaction_required": true
   },

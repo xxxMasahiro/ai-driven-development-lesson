@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
-import { realpathSync } from "node:fs";
+import { lstatSync, realpathSync } from "node:fs";
 import path from "node:path";
 import { advanceActivation, advanceRollback, beginRollback } from "./saga.mjs";
 
@@ -32,11 +32,45 @@ function requireString(value, code) {
   return value;
 }
 
+export function trustedGitExecutable(candidates = ["/usr/bin/git", "/bin/git"]) {
+  for (const candidate of candidates) {
+    try {
+      const canonical = realpathSync(candidate);
+      const info = lstatSync(canonical);
+      if (info.isFile() && !info.isSymbolicLink() && (info.mode & 0o111) !== 0 && (info.mode & 0o022) === 0 && info.uid === 0) return canonical;
+    } catch {}
+  }
+  throw new Error("TRUSTED_GIT_EXECUTABLE_UNAVAILABLE");
+}
+
+export function trustedGitEnvironment() {
+  return Object.freeze({
+    PATH: "/usr/bin:/bin",
+    LANG: "C.UTF-8",
+    LC_ALL: "C.UTF-8",
+    GIT_CONFIG_NOSYSTEM: "1",
+    GIT_CONFIG_GLOBAL: "/dev/null",
+    GIT_OPTIONAL_LOCKS: "0",
+    GIT_TERMINAL_PROMPT: "0",
+    GIT_NO_REPLACE_OBJECTS: "1",
+  });
+}
+
 export function validateReleasePrerequisites(value) {
   if (!value || value.schema_version !== "1.0.0" || value.prerequisite_id !== "next-development-workflow-release-prerequisites" || !Number.isSafeInteger(value.revision) || value.revision < 1) throw new Error("RELEASE_PREREQUISITES_INVALID");
+  const headlessRuntime = value.headless_runtime;
+  if (!headlessRuntime || headlessRuntime.state !== "accepted" || headlessRuntime.developer_accepted !== true || !/^[a-f0-9]{64}$/.test(headlessRuntime.evidence_fingerprint ?? "") || !Number.isFinite(Date.parse(headlessRuntime.accepted_at))) throw new Error("HEADLESS_RUNTIME_ACCEPTANCE_PREREQUISITE_UNMET");
   const controlCenter = value.control_center;
-  if (!controlCenter || controlCenter.state !== "accepted" || controlCenter.developer_accepted !== true || controlCenter.resume_required !== false || !/^[a-f0-9]{64}$/.test(controlCenter.evidence_fingerprint ?? "") || !Number.isFinite(Date.parse(controlCenter.accepted_at))) throw new Error("CONTROL_CENTER_ACCEPTANCE_PREREQUISITE_UNMET");
-  return { valid: true, fingerprint: digest(value), revision: value.revision, control_center_evidence_fingerprint: controlCenter.evidence_fingerprint };
+  if (!controlCenter || !new Set(["paused", "accepted"]).has(controlCenter.state) || typeof controlCenter.blocks_headless_activation !== "boolean") throw new Error("CONTROL_CENTER_PREREQUISITE_STATE_INVALID");
+  if (controlCenter.state === "paused" && controlCenter.blocks_headless_activation !== false) throw new Error("CONTROL_CENTER_MUST_NOT_BLOCK_HEADLESS_ACTIVATION");
+  if (controlCenter.state === "accepted" && (controlCenter.developer_accepted !== true || !/^[a-f0-9]{64}$/.test(controlCenter.evidence_fingerprint ?? "") || !Number.isFinite(Date.parse(controlCenter.accepted_at)))) throw new Error("CONTROL_CENTER_ACCEPTANCE_EVIDENCE_INVALID");
+  return {
+    valid: true,
+    fingerprint: digest(value),
+    revision: value.revision,
+    headless_runtime_evidence_fingerprint: headlessRuntime.evidence_fingerprint,
+    control_center_state: controlCenter.state,
+  };
 }
 
 function validateEvidenceValue(value, type) {
@@ -58,6 +92,11 @@ function validProofEvidence(kind, evidence, candidateFingerprint) {
   if (kind === "archive_decommission" && evidence.from_state !== "DRAINING" && evidence.from_state !== "DETACHED") return false;
   if (kind === "archive_decommission" && evidence.to_state !== "ARCHIVED") return false;
   return true;
+}
+
+export function validateReleaseProofEvidence({ kind, evidence, candidateFingerprint } = {}) {
+  if (!REQUIRED_PROOFS.includes(kind) || !/^[a-f0-9]{64}$/.test(candidateFingerprint ?? "") || !validProofEvidence(kind, evidence, candidateFingerprint)) throw new Error("RELEASE_PROOF_EVIDENCE_INVALID");
+  return structuredClone(evidence);
 }
 
 function validReleaseProofLineage(proofs, candidateDefinition, candidateFingerprint) {
@@ -82,7 +121,7 @@ function validReleaseProofLineage(proofs, candidateDefinition, candidateFingerpr
 function validateCandidateDefinition(candidate, { candidateFingerprint, prerequisiteFingerprint }) {
   if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) throw new Error("RELEASE_CANDIDATE_DEFINITION_REQUIRED");
   const { candidate_fingerprint: claimed, ...core } = candidate;
-  if (claimed !== candidateFingerprint || digest(core) !== claimed || candidate.release_prerequisite_fingerprint !== prerequisiteFingerprint || !Array.isArray(candidate.artifact_paths)) throw new Error("RELEASE_CANDIDATE_DEFINITION_INVALID");
+  if (claimed !== candidateFingerprint || digest(core) !== claimed || candidate.release_prerequisite_fingerprint !== prerequisiteFingerprint || !/^[a-f0-9]{40,64}$/.test(candidate.repository_tree ?? "") || !Array.isArray(candidate.artifact_paths)) throw new Error("RELEASE_CANDIDATE_DEFINITION_INVALID");
   return structuredClone(candidate);
 }
 
@@ -94,7 +133,8 @@ function proofBody(kind, proof) {
     candidate_fingerprint: proof.candidate_fingerprint,
     fresh_until: proof.fresh_until,
     correctness: proof.correctness,
-    evidence: proof.evidence
+    evidence: proof.evidence,
+    ...(proof.source_receipt ? { source_receipt: proof.source_receipt } : {}),
   };
 }
 
@@ -106,7 +146,8 @@ function transitionProofBody(nextMode, proof) {
     candidate_fingerprint: proof.candidate_fingerprint,
     fresh_until: proof.fresh_until,
     correctness: proof.correctness,
-    evidence: proof.evidence
+    evidence: proof.evidence,
+    ...(proof.source_receipt ? { source_receipt: proof.source_receipt } : {}),
   };
 }
 
@@ -120,29 +161,31 @@ function verifyTransitionEvidence({ nextMode, candidateFingerprint, repositoryHe
   return { ...structuredClone(evidence), verification_fingerprint: verified.verification_fingerprint };
 }
 
-export function freezeReleaseCandidate({ repositoryHead, artifactFingerprints, artifactPaths = [], nodeVersion, contractFingerprint, releasePrerequisites }) {
+export function freezeReleaseCandidate({ repositoryHead, repositoryTree, artifactFingerprints, artifactPaths = [], nodeVersion, contractFingerprint, releasePrerequisites }) {
   const prerequisites = validateReleasePrerequisites(releasePrerequisites);
-  if (!/^[a-f0-9]{40,64}$/.test(repositoryHead) || !Array.isArray(artifactFingerprints) || artifactFingerprints.length === 0 || typeof contractFingerprint !== "string") throw new Error("RELEASE_CANDIDATE_INPUT_INVALID");
+  if (!/^[a-f0-9]{40,64}$/.test(repositoryHead) || !/^[a-f0-9]{40,64}$/.test(repositoryTree ?? "") || !Array.isArray(artifactFingerprints) || artifactFingerprints.length === 0 || typeof contractFingerprint !== "string") throw new Error("RELEASE_CANDIDATE_INPUT_INVALID");
   if (!Array.isArray(artifactPaths) || artifactPaths.some((entry) => typeof entry !== "string")) throw new Error("RELEASE_CANDIDATE_ARTIFACT_PATHS_INVALID");
-  const candidate = { schema_version: "1.0.0", repository_head: repositoryHead, artifact_fingerprints: [...artifactFingerprints].sort(), artifact_paths: [...new Set(artifactPaths)].sort(), node_version: nodeVersion, contract_fingerprint: contractFingerprint, release_prerequisite_fingerprint: prerequisites.fingerprint };
+  const candidate = { schema_version: "1.0.0", repository_head: repositoryHead, repository_tree: repositoryTree, artifact_fingerprints: [...artifactFingerprints].sort(), artifact_paths: [...new Set(artifactPaths)].sort(), node_version: nodeVersion, contract_fingerprint: contractFingerprint, release_prerequisite_fingerprint: prerequisites.fingerprint };
   return { ...candidate, candidate_fingerprint: digest(candidate) };
 }
 
 export function freezeRepositoryReleaseCandidate({ repositoryRoot, artifactPaths, contractFingerprint, releasePrerequisites, nodeVersion = process.versions.node, gitRunner = execFileSync } = {}) {
   if (typeof repositoryRoot !== "string" || !Array.isArray(artifactPaths) || artifactPaths.length === 0 || artifactPaths.some((entry) => typeof entry !== "string" || entry.length === 0 || path.isAbsolute(entry))) throw new Error("REPOSITORY_RELEASE_CANDIDATE_INPUT_INVALID");
   const root = realpathSync(repositoryRoot);
+  const gitExecutable = trustedGitExecutable();
   const runGit = (arguments_) => {
-    const output = gitRunner("git", ["-C", root, ...arguments_], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], timeout: 30000, maxBuffer: 16 * 1024 * 1024 });
+    const output = gitRunner(gitExecutable, ["--no-replace-objects", "--no-optional-locks", "-c", "core.hooksPath=/dev/null", "-c", "protocol.file.allow=never", "-C", root, ...arguments_], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], timeout: 30000, maxBuffer: 16 * 1024 * 1024, env: trustedGitEnvironment() });
     if (typeof output !== "string") throw new Error("REPOSITORY_RELEASE_GIT_OUTPUT_INVALID");
     return output.trim();
   };
   const runGitBytes = (arguments_) => {
-    const output = gitRunner("git", ["-C", root, ...arguments_], { encoding: null, stdio: ["ignore", "pipe", "pipe"], timeout: 30000, maxBuffer: 64 * 1024 * 1024 });
+    const output = gitRunner(gitExecutable, ["--no-replace-objects", "--no-optional-locks", "-c", "core.hooksPath=/dev/null", "-c", "protocol.file.allow=never", "-C", root, ...arguments_], { encoding: null, stdio: ["ignore", "pipe", "pipe"], timeout: 30000, maxBuffer: 64 * 1024 * 1024, env: trustedGitEnvironment() });
     if (!Buffer.isBuffer(output) && typeof output !== "string") throw new Error("REPOSITORY_RELEASE_GIT_OUTPUT_INVALID");
     return Buffer.isBuffer(output) ? output : Buffer.from(output);
   };
   if (runGit(["status", "--porcelain=v1", "--untracked-files=all"]) !== "") throw new Error("RELEASE_CANDIDATE_REQUIRES_CLEAN_WORKTREE");
   const repositoryHead = runGit(["rev-parse", "HEAD"]);
+  const repositoryTree = runGit(["rev-parse", `${repositoryHead}^{tree}`]);
   const fingerprints = [...new Set(artifactPaths)].sort().map((relativePath) => {
     if (relativePath.includes("\0") || relativePath.includes("\\")) throw new Error(`RELEASE_ARTIFACT_PATH_INVALID:${relativePath}`);
     const normalized = path.posix.normalize(relativePath);
@@ -151,8 +194,59 @@ export function freezeRepositoryReleaseCandidate({ repositoryRoot, artifactPaths
     if (tracked !== normalized) throw new Error(`RELEASE_ARTIFACT_NOT_TRACKED:${relativePath}`);
     return `${normalized}:${digest(runGitBytes(["show", `${repositoryHead}:${normalized}`]))}`;
   });
-  if (runGit(["rev-parse", "HEAD"]) !== repositoryHead || runGit(["status", "--porcelain=v1", "--untracked-files=all"]) !== "") throw new Error("RELEASE_CANDIDATE_CHANGED_DURING_FREEZE");
-  return freezeReleaseCandidate({ repositoryHead, artifactFingerprints: fingerprints, artifactPaths, nodeVersion, contractFingerprint, releasePrerequisites });
+  if (runGit(["rev-parse", "HEAD"]) !== repositoryHead || runGit(["rev-parse", `${repositoryHead}^{tree}`]) !== repositoryTree || runGit(["status", "--porcelain=v1", "--untracked-files=all"]) !== "") throw new Error("RELEASE_CANDIDATE_CHANGED_DURING_FREEZE");
+  return freezeReleaseCandidate({ repositoryHead, repositoryTree, artifactFingerprints: fingerprints, artifactPaths, nodeVersion, contractFingerprint, releasePrerequisites });
+}
+
+export function verifyRepositoryReleaseDeployment({
+  repositoryRoot,
+  candidateDefinition,
+  signedReleaseProofs,
+  contractFingerprint,
+  releasePrerequisites,
+  nodeVersion = process.versions.node,
+  gitRunner = execFileSync,
+} = {}) {
+  const prerequisites = validateReleasePrerequisites(releasePrerequisites);
+  const expected = validateCandidateDefinition(candidateDefinition, {
+    candidateFingerprint: candidateDefinition?.candidate_fingerprint,
+    prerequisiteFingerprint: prerequisites.fingerprint,
+  });
+  const deployed = freezeRepositoryReleaseCandidate({
+    repositoryRoot,
+    artifactPaths: expected.artifact_paths,
+    contractFingerprint,
+    releasePrerequisites,
+    nodeVersion,
+    gitRunner,
+  });
+  const immutableContentMatches = canonicalJson(deployed.artifact_paths) === canonicalJson(expected.artifact_paths)
+    && canonicalJson(deployed.artifact_fingerprints) === canonicalJson(expected.artifact_fingerprints)
+    && deployed.repository_tree === expected.repository_tree
+    && deployed.node_version === expected.node_version
+    && deployed.contract_fingerprint === expected.contract_fingerprint
+    && deployed.release_prerequisite_fingerprint === expected.release_prerequisite_fingerprint;
+  if (!immutableContentMatches) throw new Error("DEPLOYED_RELEASE_CONTENT_DRIFT");
+  const mainCi = signedReleaseProofs?.main_ci?.evidence;
+  const synchronization = signedReleaseProofs?.local_remote_sync?.evidence;
+  if (!mainCi || !synchronization
+    || deployed.repository_head !== mainCi.merge_sha
+    || synchronization.local_head !== deployed.repository_head
+    || synchronization.remote_head !== deployed.repository_head
+    || synchronization.remote_ref !== "refs/remotes/origin/main") {
+    throw new Error("DEPLOYED_RELEASE_LINEAGE_DRIFT");
+  }
+  return {
+    candidate_fingerprint: expected.candidate_fingerprint,
+    repository_head: deployed.repository_head,
+    deployment_fingerprint: digest({
+      candidate_fingerprint: expected.candidate_fingerprint,
+      repository_head: deployed.repository_head,
+      artifact_fingerprints: deployed.artifact_fingerprints,
+      main_ci_fingerprint: signedReleaseProofs.main_ci.fingerprint,
+      synchronization_fingerprint: signedReleaseProofs.local_remote_sync.fingerprint,
+    }),
+  };
 }
 
 export function evaluateCorrectness({ requiredCheckMisses, authorityDecisionParity, traceabilityCoverage, existingFeatureRegressions, unknownGreenStates }) {

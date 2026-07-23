@@ -13,7 +13,7 @@
       "adapter_id": "codex_cli",
       "transport_id": "cli_process",
       "availability": "observed",
-      "observed_adapter_version": "0.144.6",
+      "observed_adapter_version": "0.145.0",
       "certification_state": "CANDIDATE",
       "runtime_discovery": {
         "executable_name": "codex",

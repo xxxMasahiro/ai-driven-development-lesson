@@ -86,7 +86,15 @@ const AGENT_AUTHORITY_RECORD_KINDS = new Set([
   "ValidatorDecision",
   "ResourceCostReservation"
 ]);
-const AGENT_LIFECYCLE_RECORD_KINDS = new Set(["AgentRun", "AgentResultCandidate", "AgentResult", "AgentRunClosure"]);
+const AGENT_LIFECYCLE_RECORD_KINDS = new Set([
+  "AgentRun",
+  "AgentResultCandidate",
+  "AgentResult",
+  "AgentRunClosure",
+  "AgentRunStopDisposition",
+  "AgentRunStopClosure",
+  "AgentReviewerRunClosure"
+]);
 const MIGRATION_LEDGER_SQL = "CREATE TABLE IF NOT EXISTS schema_migrations (version INTEGER PRIMARY KEY, name TEXT NOT NULL UNIQUE, checksum TEXT NOT NULL, state TEXT NOT NULL CHECK(state IN ('pending','applied','failed')), started_at TEXT NOT NULL, applied_at TEXT) STRICT";
 let EXPECTED_SQLITE_SCHEMA_FINGERPRINT;
 
@@ -355,7 +363,28 @@ function recoveryState(db) {
   `).all();
   const outbox = db.prepare("SELECT outbox_id,intent_id,state FROM outbox WHERE state IN ('pending','sending') ORDER BY outbox_id").all();
   const runs = db.prepare("SELECT run_id,idempotency_key,state,pid,process_group_id,updated_at FROM runtime_runs WHERE state NOT IN ('COMPLETED','FAILED','CANCELLED','TIMED_OUT') ORDER BY run_id").all();
-  return { required: intents.length > 0 || outbox.length > 0 || runs.length > 0, intents, outbox, runs };
+  const agentRuns = db.prepare(`
+    SELECT run.id,run.authority_scope,run.lifecycle_state,run.created_at
+    FROM records run
+    WHERE run.kind='AgentRun'
+      AND NOT EXISTS (
+        SELECT 1 FROM records closure
+        WHERE closure.lineage_id=run.id
+          AND (
+            (closure.kind='AgentRunClosure' AND closure.lifecycle_state='CLOSED')
+            OR (closure.kind='AgentRunStopClosure' AND closure.lifecycle_state='STOPPED')
+            OR (closure.kind='AgentReviewerRunClosure' AND closure.lifecycle_state='CLOSED')
+          )
+      )
+    ORDER BY run.id
+  `).all();
+  return {
+    required: intents.length > 0 || outbox.length > 0 || runs.length > 0 || agentRuns.length > 0,
+    intents,
+    outbox,
+    runs,
+    agent_runs: agentRuns,
+  };
 }
 
 function randomSibling(target, label) {
@@ -436,6 +465,17 @@ function normalizeRecord(record, identity, now) {
 function normalizeRuntimeObservation(observation = {}) {
   assertPlainObject(observation, "RUNTIME_RUN_OBSERVATION_INVALID");
   assertNoRawSecrets(observation);
+  const undefinedPath = (value, prefix = "observation") => {
+    if (!value || typeof value !== "object") return null;
+    for (const [key, child] of Object.entries(value)) {
+      if (child === undefined) return `${prefix}.${key}`;
+      const nested = undefinedPath(child, `${prefix}.${key}`);
+      if (nested) return nested;
+    }
+    return null;
+  };
+  const invalidPath = undefinedPath(observation);
+  if (invalidPath) throw new Error(`RUNTIME_RUN_OBSERVATION_UNDEFINED:${invalidPath}`);
   const encoded = canonicalJson(observation);
   if (Buffer.byteLength(encoded) > 8 * 1024 * 1024) throw new Error("RUNTIME_RUN_OBSERVATION_TOO_LARGE");
   return encoded;
@@ -485,14 +525,17 @@ function assertDedicatedRecordWriterKinds(records, { allowEffectReceiptProof = f
   if (!allowEffectReceiptProof && records.some((record) => record.kind === "EffectReceiptProof")) throw new Error("RECONCILIATION_PROOF_WRITER_REQUIRED");
 }
 
-export function openWorkflowStateStore({ repositoryRoot, databasePath, expectedIdentity, mode = "readwrite", receiptProofVerifier, finalizationFenceVerifier, protectedRuntimeVerifiers = false, clock = () => new Date().toISOString() }) {
+export function openWorkflowStateStore({ repositoryRoot, databasePath, expectedIdentity, expectedGenerationId = null, mode = "readwrite", receiptProofVerifier, finalizationFenceVerifier, runtimeRecoveryAuthorizer, protectedRuntimeVerifiers = false, clock = () => new Date().toISOString() }) {
   const identity = normalizeIdentity(expectedIdentity);
+  if (expectedGenerationId !== null && (typeof expectedGenerationId !== "string" || !/^[0-9a-f-]{36}$/u.test(expectedGenerationId))) throw new Error("STORE_GENERATION_ID_INVALID");
   if (typeof protectedRuntimeVerifiers !== "boolean") throw new Error("STORE_PROTECTED_RUNTIME_VERIFIER_MODE_INVALID");
   const receiptProofVerifierFingerprint = protectedRuntimeVerifiers ? protectedRuntimeVerifierFingerprint(receiptProofVerifier, "receipt_proof") : null;
   const finalizationFenceVerifierFingerprint = protectedRuntimeVerifiers ? protectedRuntimeVerifierFingerprint(finalizationFenceVerifier, "finalization_fence") : null;
+  const runtimeRecoveryAuthorizerFingerprint = protectedRuntimeVerifiers && runtimeRecoveryAuthorizer ? protectedRuntimeVerifierFingerprint(runtimeRecoveryAuthorizer, "runtime_recovery") : null;
   const receiptRuntimeTrustFingerprint = protectedRuntimeVerifiers ? protectedRuntimeVerifierTrustFingerprint(receiptProofVerifier, "receipt_proof") : null;
   const finalizationRuntimeTrustFingerprint = protectedRuntimeVerifiers ? protectedRuntimeVerifierTrustFingerprint(finalizationFenceVerifier, "finalization_fence") : null;
-  if (protectedRuntimeVerifiers && receiptRuntimeTrustFingerprint !== finalizationRuntimeTrustFingerprint) throw new Error("STORE_PROTECTED_RUNTIME_TRUST_MISMATCH");
+  const recoveryRuntimeTrustFingerprint = protectedRuntimeVerifiers && runtimeRecoveryAuthorizer ? protectedRuntimeVerifierTrustFingerprint(runtimeRecoveryAuthorizer, "runtime_recovery") : null;
+  if (protectedRuntimeVerifiers && (receiptRuntimeTrustFingerprint !== finalizationRuntimeTrustFingerprint || (runtimeRecoveryAuthorizer && receiptRuntimeTrustFingerprint !== recoveryRuntimeTrustFingerprint))) throw new Error("STORE_PROTECTED_RUNTIME_TRUST_MISMATCH");
   const requireProtectedRunLifecycleWriter = (lifecycleWriter) => {
     if (protectedRuntimeVerifiers) assertProtectedRunLifecycleWriter(lifecycleWriter, api);
   };
@@ -504,7 +547,7 @@ export function openWorkflowStateStore({ repositoryRoot, databasePath, expectedI
   if (mode === "readonly" && !existsSync(candidate)) throw new Error("STORE_NOT_FOUND");
   const db = new DatabaseSync(candidate, { readOnly: mode === "readonly", allowExtension: false });
   let closed = false;
-  let startupRecovery = { required: false, intents: [], outbox: [], runs: [] };
+  let startupRecovery = { required: false, intents: [], outbox: [], runs: [], agent_runs: [] };
   if (mode === "readwrite") {
     let migrationResult;
     let schemaBefore;
@@ -542,6 +585,11 @@ export function openWorkflowStateStore({ repositoryRoot, databasePath, expectedI
       setMeta(db, "identity", identity);
       setMeta(db, "store_revision", 0);
       setMeta(db, "revocation_epoch", 0);
+      if (expectedGenerationId !== null) setMeta(db, "state_generation_id", expectedGenerationId);
+    }
+    if (expectedGenerationId !== null && getMeta(db, "state_generation_id") !== expectedGenerationId) {
+      db.close();
+      throw new Error("STORE_GENERATION_MISMATCH");
     }
     const actualSchemaFingerprint = sqliteSchemaFingerprint(db);
     if (actualSchemaFingerprint !== expectedSqliteSchemaFingerprint()) {
@@ -571,6 +619,10 @@ export function openWorkflowStateStore({ repositoryRoot, databasePath, expectedI
     if (canonicalJson(storedIdentity) !== canonicalJson(identity)) {
       db.close();
       throw new Error("STORE_IDENTITY_MISMATCH");
+    }
+    if (expectedGenerationId !== null && getMeta(db, "state_generation_id") !== expectedGenerationId) {
+      db.close();
+      throw new Error("STORE_GENERATION_MISMATCH");
     }
     try {
       assertMigrationIdentity(db, identity);
@@ -634,7 +686,9 @@ export function openWorkflowStateStore({ repositoryRoot, databasePath, expectedI
       const grant = delegationGrantCoreFromPayload(payload);
       if (record.lifecycle_state !== "AUTHORIZED" || record.id !== `delegation-grant-${payload.grant_id}` || record.lineage_id !== payload.grant_id || record.input_fp !== payload.fingerprint || payload.fingerprint !== digest(grant) || record.fresh_until !== payload.expires_at || payload.scope_fingerprint !== digest(payload.scope) || payload.budget_fingerprint !== digest(payload.budget) || payload.ownership_fingerprint !== digest(payload.ownership) || event.event_type !== "DELEGATION_GRANT_AUTHORIZED") throw new Error("DELEGATION_GRANT_RECORD_INVALID");
       if (payload.ownership?.read_only === false && ((payload.child_depth === 1 && payload.child_role !== "Implementation Lead") || (payload.child_depth === 2 && payload.parent_role !== "Implementation Lead"))) throw new Error("DELEGATION_GRANT_WRITE_ROLE_INVALID");
-      if (payload.child_depth === 1) {
+      if (payload.child_depth === 0) {
+        if (payload.parent_agent_id !== "run-controller" || payload.parent_role !== "Runtime Adapter" || payload.parent_depth !== -1 || payload.child_agent_id !== "orchestrator" || payload.child_role !== "Orchestrator Agent" || payload.parent_grant_id !== null || payload.parent_grant_fingerprint !== null || payload.ownership?.read_only !== true || record.source_revision !== "runtime-adapter-root") throw new Error("DELEGATION_GRANT_DIRECT_ORCHESTRATOR_INVALID");
+      } else if (payload.child_depth === 1) {
         if (payload.parent_agent_id !== "orchestrator" || payload.parent_role !== "Orchestrator Agent" || payload.parent_depth !== 0 || payload.parent_grant_id !== null || payload.parent_grant_fingerprint !== null || record.source_revision !== "orchestrator-root") throw new Error("DELEGATION_GRANT_ROOT_CHAIN_INVALID");
       } else if (payload.child_depth === 2) {
         const parent = persistedAgentRecord("DelegationGrant", (candidate) => candidate.id === `delegation-grant-${payload.parent_grant_id}` && candidate.lifecycle_state === "AUTHORIZED");
@@ -666,6 +720,12 @@ export function openWorkflowStateStore({ repositoryRoot, databasePath, expectedI
       const expectedAssignmentKind = { AgentLeadReview: "lead", AgentOrchestratorReview: "orchestrator", AgentValidatorDisposition: "validator" }[writerKind];
       const assignment = persistedAgentRecord("AgentReviewerAssignment", (candidate) => candidate.id === record.source_revision);
       if (!assignment || assignment.payload?.assignment_kind !== expectedAssignmentKind || assignment.payload?.agent_id !== payload.agent_id || assignment.payload?.authority_epoch !== payload.authority_epoch || payload.assignment_fingerprint !== digest(assignment.payload) || payload.accepted !== true || typeof payload.result_fingerprint !== "string" || record.input_fp !== payload.result_fingerprint || (writerKind === "AgentValidatorDisposition" && payload.decision !== "PASS")) throw new Error("AGENT_REVIEW_RECORD_INVALID");
+      const reviewRun = persistedAgentRecord("AgentRun", (candidate) => candidate.id === payload.review_run_id);
+      const reviewCandidate = persistedAgentRecord("AgentResultCandidate", (candidate) => candidate.id === payload.review_candidate_record_id);
+      const reviewGrant = reviewRun ? persistedAgentRecord("DelegationGrant", (candidate) => candidate.payload?.fingerprint === reviewRun.source_revision) : null;
+      const subjectRun = persistedAgentRecord("AgentRun", (candidate) => candidate.id === payload.run_id);
+      const subjectCandidate = subjectRun?.payload?.result_candidate_record_id ? persistedAgentRecord("AgentResultCandidate", (candidate) => candidate.id === subjectRun.payload.result_candidate_record_id) : null;
+      if (reviewRun?.lifecycle_state !== "RUNNING" || reviewRun.payload?.child_agent_id !== payload.agent_id || reviewRun.payload?.result_candidate_record_id !== payload.review_candidate_record_id || reviewCandidate?.lineage_id !== payload.review_run_id || reviewCandidate.payload?.result_fingerprint !== payload.review_result_fingerprint || reviewCandidate.payload?.process_identity_fingerprint !== payload.review_process_identity_fingerprint || reviewGrant?.payload?.scope?.review_subject_fingerprint !== payload.result_fingerprint || reviewGrant.payload?.scope?.assignment_kind !== expectedAssignmentKind || payload.review_process_identity_fingerprint === subjectCandidate?.payload?.process_identity_fingerprint) throw new Error("AGENT_REVIEW_EVIDENCE_INVALID");
       const expectedEvent = writerKind === "AgentValidatorDisposition" ? "AGENT_VALIDATOR_DISPOSITION_RECORDED" : "AGENT_REVIEW_RECORDED";
       if (event.event_type !== expectedEvent) throw new Error("AGENT_REVIEW_EVENT_INVALID");
       return;
@@ -713,7 +773,7 @@ export function openWorkflowStateStore({ repositoryRoot, databasePath, expectedI
     }
   }
 
-  function validateAgentLifecycleCommit({ authorityEpoch, records, relations = [], events = [] }) {
+  function validateAgentLifecycleCommit({ authorityEpoch, records, relations = [], events = [], recovery = false }) {
     if (!Number.isSafeInteger(authorityEpoch) || authorityEpoch !== Number(getMeta(db, "revocation_epoch") ?? 0) || !Array.isArray(records) || !Array.isArray(relations) || !Array.isArray(events)) throw new Error("AGENT_LIFECYCLE_AUTHORITY_REQUIRED");
     if (records.length < 1 || records.some((record) => !AGENT_LIFECYCLE_RECORD_KINDS.has(record.kind))) throw new Error("AGENT_LIFECYCLE_RECORD_SET_INVALID");
     const byKind = new Map(records.map((record) => [record.kind, record]));
@@ -753,14 +813,201 @@ export function openWorkflowStateStore({ repositoryRoot, databasePath, expectedI
       } else if (run.payload?.result_candidate_record_id) throw new Error("AGENT_RESULT_CANDIDATE_RECORD_REQUIRED");
       return;
     }
+    if (byKind.has("AgentRunStopDisposition") || byKind.has("AgentRunStopClosure")) {
+      if (records.length !== 2 || !byKind.has("AgentRunStopDisposition") || !byKind.has("AgentRunStopClosure")) throw new Error("AGENT_LIFECYCLE_STOP_SET_INVALID");
+      const disposition = byKind.get("AgentRunStopDisposition");
+      const closure = byKind.get("AgentRunStopClosure");
+      const run = api.get({ id: disposition.lineage_id });
+      const candidateRecord = api.get({ id: disposition.source_revision });
+      const candidateFingerprint = candidateRecord?.payload?.result_fingerprint;
+      if (run?.kind !== "AgentRun"
+        || run.lifecycle_state !== "RUNNING"
+        || run.payload?.authority_epoch !== authorityEpoch
+        || candidateRecord?.kind !== "AgentResultCandidate"
+        || candidateRecord.lifecycle_state !== "REPORTED"
+        || candidateRecord.lineage_id !== run.id
+        || disposition.id !== `agent-run-stop-disposition-${run.id}`
+        || closure.id !== `agent-run-stop-closure-${run.id}`
+        || disposition.lifecycle_state !== "STOP"
+        || closure.lifecycle_state !== "STOPPED"
+        || disposition.lineage_id !== run.id
+        || closure.lineage_id !== run.id
+        || disposition.source_revision !== candidateRecord.id
+        || closure.source_revision !== disposition.id
+        || disposition.policy_fp !== run.policy_fp
+        || closure.policy_fp !== run.policy_fp
+        || disposition.input_fp !== candidateFingerprint
+        || closure.input_fp !== candidateFingerprint
+        || disposition.payload?.run_id !== run.id
+        || closure.payload?.run_id !== run.id
+        || disposition.payload?.result_candidate_record_id !== candidateRecord.id
+        || closure.payload?.result_candidate_record_id !== candidateRecord.id
+        || disposition.payload?.candidate_result_fingerprint !== candidateFingerprint
+        || closure.payload?.candidate_result_fingerprint !== candidateFingerprint
+        || disposition.payload?.decision !== "STOP"
+        || closure.payload?.decision !== "STOP"
+        || typeof disposition.payload?.code !== "string"
+        || disposition.payload.code.length === 0
+        || closure.payload?.code !== disposition.payload.code
+        || closure.payload?.disposition_id !== disposition.id
+        || disposition.payload?.authority_epoch !== authorityEpoch
+        || closure.payload?.authority_epoch !== authorityEpoch
+        || !/^[a-f0-9]{64}$/u.test(candidateFingerprint ?? "")
+        || digest(candidateRecord.payload?.result) !== candidateFingerprint) throw new Error("AGENT_LIFECYCLE_STOP_BINDING_INVALID");
+      const expectedRelations = [
+        { from_id: run.id, relation_kind: "stopped_by", to_id: disposition.id },
+        { from_id: disposition.id, relation_kind: "closed_by", to_id: closure.id },
+      ];
+      const expectedEvents = [{
+        event_id: `event-${closure.id}`,
+        aggregate_id: run.id,
+        event_type: "AGENT_RUN_STOPPED",
+        payload: {
+          run_id: run.id,
+          disposition_id: disposition.id,
+          code: disposition.payload.code,
+          authority_epoch: authorityEpoch,
+        },
+      }];
+      if (canonicalJson(relations) !== canonicalJson(expectedRelations) || canonicalJson(events) !== canonicalJson(expectedEvents)) throw new Error("AGENT_LIFECYCLE_STOP_TOPOLOGY_INVALID");
+      if (protectedRuntimeVerifiers && recovery) {
+        if (typeof runtimeRecoveryAuthorizer !== "function") throw new Error("AGENT_RUN_RECOVERY_AUTHORIZER_REQUIRED");
+        const request = {
+          run_id: run.id,
+          authority_epoch: authorityEpoch,
+          requested_action: "record_manual_recovery",
+          candidate_record_id: candidateRecord.id,
+          candidate_result_fingerprint: candidateFingerprint,
+        };
+        const requestFingerprint = digest(request);
+        const recordedRequest = disposition.payload?.evidence?.recovery_request;
+        const recordedAuthorization = disposition.payload?.evidence?.recovery_authorization;
+        const authorization = runtimeRecoveryAuthorizer({
+          request: structuredClone(request),
+          fingerprint: requestFingerprint,
+        });
+        if (authorization && typeof authorization.then === "function") throw new Error("AGENT_RUN_RECOVERY_ASYNC_AUTHORIZER_UNSUPPORTED");
+        if (canonicalJson(recordedRequest) !== canonicalJson(request)
+          || canonicalJson(recordedAuthorization) !== canonicalJson(authorization)
+          || authorization?.decision !== "ALLOW"
+          || authorization.fingerprint !== requestFingerprint
+          || authorization.run_id !== run.id
+          || authorization.authority_epoch !== authorityEpoch
+          || !/^[a-f0-9]{64}$/u.test(authorization.proof_fingerprint ?? "")) throw new Error("AGENT_RUN_RECOVERY_AUTHORIZATION_INVALID");
+      }
+      return;
+    }
+    if (byKind.has("AgentReviewerRunClosure")) {
+      if (records.length !== 1) throw new Error("AGENT_REVIEWER_CLOSURE_SET_INVALID");
+      const closure = byKind.get("AgentReviewerRunClosure");
+      const run = api.get({ id: closure.lineage_id });
+      const candidateRecord = api.get({ id: closure.source_revision });
+      const subjectRun = api.get({ id: closure.payload?.review_subject_run_id });
+      const candidateFingerprint = candidateRecord?.payload?.result_fingerprint;
+      const assignmentKind = closure.payload?.assignment_kind;
+      const assignment = api.get({ id: `agent-reviewer-assignment-${subjectRun?.id}-${assignmentKind}` });
+      const reviewerGrant = run?.source_revision
+        ? persistedAgentRecord("DelegationGrant", (record) => record.payload?.fingerprint === run.source_revision && record.payload?.authority_epoch === authorityEpoch)
+        : null;
+      if (run?.kind !== "AgentRun"
+        || run.lifecycle_state !== "RUNNING"
+        || run.payload?.authority_epoch !== authorityEpoch
+        || candidateRecord?.kind !== "AgentResultCandidate"
+        || candidateRecord.lifecycle_state !== "REPORTED"
+        || candidateRecord.lineage_id !== run.id
+        || subjectRun?.kind !== "AgentRun"
+        || closure.id !== `agent-reviewer-run-closure-${run.id}`
+        || closure.lifecycle_state !== "CLOSED"
+        || closure.lineage_id !== run.id
+        || closure.source_revision !== candidateRecord.id
+        || closure.policy_fp !== run.policy_fp
+        || closure.input_fp !== candidateFingerprint
+        || closure.payload?.run_id !== run.id
+        || closure.payload?.result_candidate_record_id !== candidateRecord.id
+        || closure.payload?.result_fingerprint !== candidateFingerprint
+        || !["lead", "orchestrator", "validator"].includes(assignmentKind)
+        || !["PASS", "STOP"].includes(closure.payload?.decision)
+        || closure.payload?.authority_epoch !== authorityEpoch
+        || assignment?.kind !== "AgentReviewerAssignment"
+        || assignment.lifecycle_state !== "AUTHORIZED"
+        || assignment.lineage_id !== subjectRun.id
+        || assignment.payload?.assignment_kind !== assignmentKind
+        || assignment.payload?.agent_id !== run.payload?.child_agent_id
+        || !/^[a-f0-9]{64}$/u.test(reviewerGrant?.payload?.scope?.review_subject_fingerprint ?? "")
+        || reviewerGrant?.payload?.scope?.assignment_kind !== assignmentKind
+        || !/^[a-f0-9]{64}$/u.test(candidateFingerprint ?? "")
+        || digest(candidateRecord.payload?.result) !== candidateFingerprint) throw new Error("AGENT_REVIEWER_CLOSURE_BINDING_INVALID");
+      const expectedRelations = [
+        { from_id: run.id, relation_kind: "consumed_as_review", to_id: closure.id },
+        { from_id: closure.id, relation_kind: "reviews", to_id: subjectRun.id },
+      ];
+      const expectedEvents = [{
+        event_id: `event-${closure.id}`,
+        aggregate_id: run.id,
+        event_type: "AGENT_REVIEWER_RUN_CLOSED",
+        payload: {
+          run_id: run.id,
+          review_subject_run_id: subjectRun.id,
+          assignment_kind: assignmentKind,
+          decision: closure.payload.decision,
+          authority_epoch: authorityEpoch,
+        },
+      }];
+      if (canonicalJson(relations) !== canonicalJson(expectedRelations) || canonicalJson(events) !== canonicalJson(expectedEvents)) throw new Error("AGENT_REVIEWER_CLOSURE_TOPOLOGY_INVALID");
+      return;
+    }
     if (records.length !== 2 || !byKind.has("AgentResult") || !byKind.has("AgentRunClosure")) throw new Error("AGENT_LIFECYCLE_CLOSURE_SET_INVALID");
     const result = byKind.get("AgentResult");
     const closure = byKind.get("AgentRunClosure");
     const run = api.get({ id: result.lineage_id });
     const candidateRecord = run?.payload?.result_candidate_record_id ? api.get({ id: run.payload.result_candidate_record_id }) : null;
     const candidateFingerprint = candidateRecord?.payload?.result_fingerprint;
-    if (run?.kind !== "AgentRun" || run.lifecycle_state !== "RUNNING" || run.payload?.authority_epoch !== authorityEpoch || candidateRecord?.kind !== "AgentResultCandidate" || candidateRecord.lifecycle_state !== "REPORTED" || result.lifecycle_state !== "accepted" || closure.lifecycle_state !== "CLOSED" || closure.lineage_id !== run.id || result.payload?.candidate_record_id !== candidateRecord.id || result.payload?.candidate_result_fingerprint !== candidateFingerprint || closure.payload?.result_candidate_record_id !== candidateRecord.id || closure.payload?.candidate_result_fingerprint !== candidateFingerprint || closure.payload?.result_id !== result.id || result.source_revision !== candidateRecord.id || closure.source_revision !== candidateRecord.id || result.policy_fp !== run.policy_fp || closure.policy_fp !== run.policy_fp || closure.payload?.authority_epoch !== authorityEpoch || canonicalJson(closure.payload?.state_history) !== canonicalJson(["REPORTED", "REVIEWED", "CLOSED"])) throw new Error("AGENT_LIFECYCLE_CLOSURE_BINDING_INVALID");
+    if (run?.kind !== "AgentRun" || run.lifecycle_state !== "RUNNING" || run.payload?.authority_epoch !== authorityEpoch || candidateRecord?.kind !== "AgentResultCandidate" || candidateRecord.lifecycle_state !== "REPORTED" || result.lifecycle_state !== "accepted" || closure.lifecycle_state !== "CLOSED" || closure.lineage_id !== run.id || result.payload?.candidate_record_id !== candidateRecord.id || result.payload?.candidate_result_fingerprint !== candidateFingerprint || closure.payload?.result_candidate_record_id !== candidateRecord.id || closure.payload?.candidate_result_fingerprint !== candidateFingerprint || closure.payload?.result_id !== result.id || result.source_revision !== candidateRecord.id || closure.source_revision !== candidateRecord.id || result.policy_fp !== run.policy_fp || closure.policy_fp !== run.policy_fp || closure.payload?.authority_epoch !== authorityEpoch) throw new Error("AGENT_LIFECYCLE_CLOSURE_BINDING_INVALID");
     if (!/^[a-f0-9]{64}$/.test(candidateFingerprint ?? "") || digest(candidateRecord.payload?.result) !== candidateFingerprint || result.payload?.provenance?.source_fingerprint !== candidateFingerprint) throw new Error("AGENT_LIFECYCLE_RESULT_PROVENANCE_INVALID");
+    const directOrchestratorMode = result.payload?.review_mode === "single_agent_internal" || closure.payload?.review_mode === "single_agent_internal";
+    const expectedStateHistory = directOrchestratorMode ? ["REPORTED", "SELF_VERIFIED", "CLOSED"] : ["REPORTED", "REVIEWED", "CLOSED"];
+    if (canonicalJson(closure.payload?.state_history) !== canonicalJson(expectedStateHistory)) throw new Error("AGENT_LIFECYCLE_CLOSURE_BINDING_INVALID");
+    const grant = persistedAgentRecord("DelegationGrant", (record) => record.lifecycle_state === "AUTHORIZED" && record.payload?.fingerprint === run.source_revision && record.payload?.authority_epoch === authorityEpoch);
+    if (!grant || grant.policy_fp !== run.policy_fp || Date.parse(grant.fresh_until) < Date.parse(clock())) throw new Error("AGENT_LIFECYCLE_GRANT_INVALID");
+    if (directOrchestratorMode) {
+      const evidenceFingerprint = digest({ run_id: result.payload?.run_id, candidate_record_id: result.payload?.candidate_record_id, provenance: result.payload?.provenance, scope_fingerprint: result.payload?.scope_fingerprint, conclusion: result.payload?.conclusion ?? null, evidence_references: result.payload?.evidence_references ?? [], changed_artifact_manifest: result.payload?.changed_artifact_manifest ?? [], unresolved_items: result.payload?.unresolved_items ?? [] });
+      const selfVerification = result.payload?.self_verification;
+      const selfVerificationFingerprint = digest(selfVerification);
+      if (result.payload?.review_mode !== "single_agent_internal"
+        || closure.payload?.review_mode !== "single_agent_internal"
+        || result.payload?.rigor !== "L1"
+        || closure.payload?.rigor !== "L1"
+        || run.payload?.depth !== 0
+        || run.payload?.parent_agent_id !== "run-controller"
+        || run.payload?.child_agent_id !== "orchestrator"
+        || grant.payload?.parent_depth !== -1
+        || grant.payload?.child_depth !== 0
+        || grant.payload?.parent_agent_id !== "run-controller"
+        || grant.payload?.parent_role !== "Runtime Adapter"
+        || grant.payload?.child_agent_id !== "orchestrator"
+        || grant.payload?.child_role !== "Orchestrator Agent"
+        || grant.payload?.ownership?.read_only !== true
+        || candidateRecord.payload?.result?.status !== "succeeded"
+        || candidateRecord.payload.result.findings?.some((finding) => finding?.severity === "error")
+        || result.payload?.run_id !== run.id
+        || result.payload?.evidence_fingerprint !== evidenceFingerprint
+        || selfVerification?.agent_id !== "orchestrator"
+        || selfVerification?.accepted !== true
+        || selfVerification?.result_fingerprint !== evidenceFingerprint
+        || !Number.isFinite(Date.parse(selfVerification?.verified_at))
+        || result.payload?.self_verification_fingerprint !== selfVerificationFingerprint
+        || closure.payload?.self_verification_fingerprint !== selfVerificationFingerprint) throw new Error("AGENT_LIFECYCLE_DIRECT_ORCHESTRATOR_INVALID");
+      const authoritativeResult = structuredClone(result.payload);
+      delete authoritativeResult.candidate_result_fingerprint;
+      delete authoritativeResult.evidence_fingerprint;
+      delete authoritativeResult.self_verification_fingerprint;
+      const authoritativeResultFingerprint = digest(authoritativeResult);
+      if (result.input_fp !== authoritativeResultFingerprint || closure.input_fp !== authoritativeResultFingerprint) throw new Error("AGENT_LIFECYCLE_RESULT_FINGERPRINT_INVALID");
+      const expectedRelations = [{ from_id: run.id, relation_kind: "produced_result", to_id: result.id }, { from_id: result.id, relation_kind: "closed_by", to_id: closure.id }];
+      const expectedEvents = expectedStateHistory.map((state, index) => ({ event_id: `event-${closure.id}-${index + 1}`, aggregate_id: run.id, event_type: `AGENT_RUN_${state}`, payload: { run_id: run.id, result_id: result.id, state, self_verification_fingerprint: selfVerificationFingerprint } }));
+      if (canonicalJson(relations) !== canonicalJson(expectedRelations) || canonicalJson(events) !== canonicalJson(expectedEvents)) throw new Error("AGENT_LIFECYCLE_DIRECT_ORCHESTRATOR_TOPOLOGY_INVALID");
+      return;
+    }
     const assignmentIds = closure.payload?.reviewer_assignment_ids;
     const reviewIds = closure.payload?.review_record_ids;
     const roles = ["lead", "orchestrator", "validator"];
@@ -769,15 +1016,14 @@ export function openWorkflowStateStore({ repositoryRoot, databasePath, expectedI
     for (const role of roles) {
       if (assignmentIds[role] !== `agent-reviewer-assignment-${run.id}-${role}` || reviewIds[role] !== `agent-review-${run.id}-${role}`) throw new Error("AGENT_LIFECYCLE_REVIEW_TOPOLOGY_INVALID");
     }
-    const grant = persistedAgentRecord("DelegationGrant", (record) => record.lifecycle_state === "AUTHORIZED" && record.payload?.fingerprint === run.source_revision && record.payload?.authority_epoch === authorityEpoch);
-    if (!grant || grant.policy_fp !== run.policy_fp || Date.parse(grant.fresh_until) < Date.parse(clock())) throw new Error("AGENT_LIFECYCLE_GRANT_INVALID");
-    const assignmentKinds = { lead: ["Value Design Lead", "Planning Design Lead", "Implementation Lead", "Independent Review Lead", "Safety and Acceptance Decision Lead"], orchestrator: ["Orchestrator Agent"], validator: ["Safety and Acceptance Decision Lead"] };
+    const assignmentKinds = { lead: ["Value Design Lead", "Planning Design Lead", "Implementation Lead", "Independent Review Lead", "Safety and Acceptance Decision Lead"], orchestrator: ["Orchestrator Agent", "Orchestrator Review Lead"], validator: ["Safety and Acceptance Decision Lead"] };
     const reviewKinds = { lead: "AgentLeadReview", orchestrator: "AgentOrchestratorReview", validator: "AgentValidatorDisposition" };
     const resultReviewFields = { lead: "lead_review", orchestrator: "orchestrator_review", validator: "validator_disposition" };
     const closureReviewFields = { lead: "lead_review_fingerprint", orchestrator: "orchestrator_review_fingerprint", validator: "validator_disposition_fingerprint" };
     const evidenceFingerprint = digest({ run_id: result.payload?.run_id, candidate_record_id: result.payload?.candidate_record_id, provenance: result.payload?.provenance, scope_fingerprint: result.payload?.scope_fingerprint, conclusion: result.payload?.conclusion ?? null, evidence_references: result.payload?.evidence_references ?? [], changed_artifact_manifest: result.payload?.changed_artifact_manifest ?? [], unresolved_items: result.payload?.unresolved_items ?? [] });
     if (result.payload?.run_id !== run.id || result.payload?.evidence_fingerprint !== evidenceFingerprint) throw new Error("AGENT_LIFECYCLE_RESULT_EVIDENCE_INVALID");
     const assignedAgents = [];
+    const reviewerProcessIdentities = [];
     for (const role of roles) {
       const assignment = api.get({ id: assignmentIds[role] });
       const review = api.get({ id: reviewIds[role] });
@@ -785,8 +1031,13 @@ export function openWorkflowStateStore({ repositoryRoot, databasePath, expectedI
       assignedAgents.push(assignment.payload.agent_id);
       const reviewPayload = result.payload?.[resultReviewFields[role]];
       if (review?.kind !== reviewKinds[role] || review.lifecycle_state !== "accepted" || review.lineage_id !== run.id || review.source_revision !== assignment.id || review.policy_fp !== run.policy_fp || Date.parse(review.fresh_until) < Date.parse(clock()) || review.payload?.assignment_kind !== role || review.payload?.agent_id !== assignment.payload.agent_id || review.payload?.assignment_fingerprint !== digest(assignment.payload) || review.payload?.authority_epoch !== authorityEpoch || review.payload?.accepted !== true || review.payload?.result_fingerprint !== evidenceFingerprint || typeof review.payload?.authority_proof_fingerprint !== "string" || (protectedRuntimeVerifiers && (review.payload?.authority_trust_fingerprint !== receiptRuntimeTrustFingerprint || !/^[a-f0-9]{64}$/.test(review.payload?.authority_verifier_fingerprint ?? ""))) || (role === "validator" && review.payload?.decision !== "PASS") || canonicalJson(reviewPayload) !== canonicalJson(review.payload) || closure.payload?.[closureReviewFields[role]] !== digest(review.payload)) throw new Error("AGENT_LIFECYCLE_REVIEW_RECORD_INVALID");
+      const reviewerRun = api.get({ id: review.payload.review_run_id });
+      const reviewerCandidate = api.get({ id: review.payload.review_candidate_record_id });
+      const reviewerGrant = reviewerRun?.source_revision ? persistedAgentRecord("DelegationGrant", (candidate) => candidate.payload?.fingerprint === reviewerRun.source_revision) : null;
+      if (reviewerRun?.kind !== "AgentRun" || reviewerRun.lifecycle_state !== "RUNNING" || reviewerRun.payload?.child_agent_id !== assignment.payload.agent_id || reviewerRun.payload?.result_candidate_record_id !== reviewerCandidate?.id || reviewerCandidate?.kind !== "AgentResultCandidate" || reviewerCandidate.lineage_id !== reviewerRun.id || reviewerCandidate.payload?.result_fingerprint !== review.payload.review_result_fingerprint || reviewerCandidate.payload?.process_identity_fingerprint !== review.payload.review_process_identity_fingerprint || reviewerGrant?.payload?.scope?.review_subject_fingerprint !== evidenceFingerprint || reviewerGrant.payload?.scope?.assignment_kind !== role) throw new Error("AGENT_LIFECYCLE_REVIEW_EVIDENCE_INVALID");
+      reviewerProcessIdentities.push(review.payload.review_process_identity_fingerprint);
     }
-    if (new Set(assignedAgents).size !== roles.length || assignedAgents.includes(grant.payload.child_agent_id)) throw new Error("AGENT_LIFECYCLE_REVIEWER_INDEPENDENCE_INVALID");
+    if (new Set(assignedAgents).size !== roles.length || assignedAgents.includes(grant.payload.child_agent_id) || new Set(reviewerProcessIdentities).size !== roles.length || reviewerProcessIdentities.includes(candidateRecord.payload.process_identity_fingerprint)) throw new Error("AGENT_LIFECYCLE_REVIEWER_INDEPENDENCE_INVALID");
     const authoritativeResult = structuredClone(result.payload);
     delete authoritativeResult.candidate_result_fingerprint;
     delete authoritativeResult.evidence_fingerprint;
@@ -808,6 +1059,7 @@ export function openWorkflowStateStore({ repositoryRoot, databasePath, expectedI
     get protected_runtime_verifiers() { return protectedRuntimeVerifiers; },
     get receipt_proof_verifier_fingerprint() { return receiptProofVerifierFingerprint; },
     get finalization_fence_verifier_fingerprint() { return finalizationFenceVerifierFingerprint; },
+    get runtime_recovery_authorizer_fingerprint() { return runtimeRecoveryAuthorizerFingerprint; },
     get runtime_trust_fingerprint() { return receiptRuntimeTrustFingerprint; },
     get mode() { assertOpen(); return mode === "readonly" ? "readonly" : startupRecovery.required ? "recovery-only" : "readwrite"; },
     get recovery_only() { assertOpen(); return startupRecovery.required; },
@@ -912,8 +1164,13 @@ export function openWorkflowStateStore({ repositoryRoot, databasePath, expectedI
       }
     },
     commitAgentLifecycle(input = {}) {
-      assertWritable();
-      validateAgentLifecycleCommit(input);
+      const recoveryKinds = new Set(["AgentRunStopDisposition", "AgentRunStopClosure", "AgentReviewerRunClosure"]);
+      const recovery = startupRecovery.required
+        && Array.isArray(input.records)
+        && input.records.length > 0
+        && input.records.every((record) => recoveryKinds.has(record?.kind));
+      assertWritable({ recovery });
+      validateAgentLifecycleCommit({ ...input, recovery });
       const { expectedRevision, authorityEpoch, records = [], relations = [], events = [], evidenceRefs = [] } = input;
       if (!Number.isInteger(expectedRevision) || expectedRevision < 0 || api.revision !== expectedRevision) throw new Error("REVISION_CONFLICT");
       assertNoRawSecrets({ records, relations, events, evidenceRefs });
@@ -932,6 +1189,7 @@ export function openWorkflowStateStore({ repositoryRoot, databasePath, expectedI
         for (const evidenceRef of evidenceRefs) if (typeof evidenceRef !== "string" || evidenceRef.length === 0) throw new Error("EVIDENCE_REFERENCE_INVALID");
         setMeta(db, "store_revision", lockedRevision + 1);
         db.exec("COMMIT");
+        if (recovery) startupRecovery = recoveryState(db);
         return { revision: lockedRevision + 1 };
       } catch (error) {
         try { db.exec("ROLLBACK"); } catch {}
@@ -1157,6 +1415,22 @@ export function openWorkflowStateStore({ repositoryRoot, databasePath, expectedI
     listUnresolvedRuntimeRuns() {
       assertOpen();
       return db.prepare("SELECT * FROM runtime_runs WHERE state NOT IN ('COMPLETED','FAILED','CANCELLED','TIMED_OUT') ORDER BY run_id").all().map(decodeRuntimeRun);
+    },
+    listUnresolvedAgentRuns() {
+      assertOpen();
+      return db.prepare(`
+        SELECT run.*
+        FROM records AS run
+        WHERE run.kind='AgentRun'
+          AND NOT EXISTS (
+            SELECT 1
+            FROM records AS closure
+            WHERE closure.lineage_id=run.id
+              AND closure.kind IN ('AgentRunClosure','AgentRunStopClosure','AgentReviewerRunClosure')
+              AND closure.lifecycle_state IN ('CLOSED','STOPPED')
+          )
+        ORDER BY run.id
+      `).all().map((row) => ({ ...row, payload: JSON.parse(row.payload_json) }));
     },
     persistDelegationGrantAuthority(input) { return persistVerifiedAgentAuthorityRecord({ ...input, writerKind: "DelegationGrant" }); },
     persistResourceCostReservationAuthority(input) { return persistVerifiedAgentAuthorityRecord({ ...input, writerKind: "ResourceCostReservation" }); },

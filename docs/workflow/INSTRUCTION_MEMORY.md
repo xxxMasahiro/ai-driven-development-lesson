@@ -50,12 +50,15 @@ scope expansion always stop for explicit direction.
 
 ## Additive Next Workflow Compatibility And Activation Boundary
 
-The fail-closed Next Workflow core is installed as an additive, reusable runtime
-and is not yet the enforced procedural authority. Its persistent activation
-record remains `planned`. The A-F procedure below therefore remains the active
-compatibility path until one immutable candidate passes the Control Center
-prerequisite, independent release and recovery proof, rollback proof,
-archive/decommission proof, required CI, merge, main CI, and local/remote sync.
+The fail-closed Next Workflow core is installed as an additive, reusable
+runtime. It is not Production authority while its protected activation record
+is not `enforced`; the A-F procedure below remains the compatibility path in
+that state. Headless Production may become authority only after one immutable
+candidate passes accepted headless-runtime prerequisites, independent release
+and recovery proof, rollback proof, archive/decommission proof, required CI,
+merge, main CI, local/remote sync, and complete signed Activation. Control
+Center acceptance may remain paused and does not block accepted headless
+Activation.
 
 The additive lifecycle uses six purpose-named stages: decide the next value,
 order tasks, review the implementation approach, decide the implementation
@@ -109,6 +112,80 @@ and owner/task limits narrow the result. The selected values are passed
 explicitly and must match the observed launch values. Paid API transport and
 production Agent launch remain unavailable until their separate gateway-owned
 network, secret, idempotency, containment, and Activation owners exist.
+
+### Development-session Agent selection
+
+Before a direct CLI launch of a Lead Agent or Task Agent for repository
+development, the Orchestrator must run
+`tools/next-workflow agent-selection plan` with the Agent identity, role, rigor,
+risk, complexity, capabilities, and any task-local model restrictions. The
+read-only planner resolves the saved nearest-scope selection policy and the
+installed adapter's bounded official model catalog. It automatically chooses a
+correctness, balanced, or efficiency objective unless the current task supplies
+one, and returns the exact model and provider-native reasoning effort.
+
+The Orchestrator must display the selected model and effort, pass both values
+explicitly to the CLI, and run `agent-selection verify-config` against the
+prepared arguments before launch. A STOP result, catalog observation failure,
+stale or malformed evidence, disallowed model, unsupported effort, or prepared
+value mismatch blocks that Agent launch without an unspecified fallback.
+
+This is a `development_advisory` bridge for direct development-session launches
+while Production Activation remains `planned`. It observes but does not certify
+providers, grants no launch, filesystem, Git, network, credential, API-spend,
+release, or Activation authority, and proves prepared CLI configuration rather
+than backend model execution. Every actual launch still requires its existing
+sandbox, scope, ownership, and tool authority.
+
+### Headless Production operation
+
+After the exact delivered candidate is activated in the protected Production
+store, use the absolute `runtime_launcher_path` returned by `runtime bootstrap`:
+`<runtime_launcher_path> <absolute-repository-path> team run --task
+<repository-relative-json>`. Direct `tools/next-workflow team run` and direct
+mutating `runtime reconcile` commands must STOP because they have not passed
+the external launcher's independent trust, Activation, and deployed-content
+checks. The service resolves the current saved selection policy, chooses the
+model and provider-native effort for each actual role, passes both exact values
+to the CLI, and reports the independently observed pinned CLI launch model and
+effort for every accepted outcome; this is not remote-backend attestation. L1
+is performed by the current Orchestrator without a Lead or Task Agent launch;
+the `team run` surface therefore stops rather than claiming a zero-launch
+success. L2-L5 instantiate only the rigor-required hierarchy. Lead,
+Orchestrator, and Validator review is performed by separate reviewer CLI runs
+rather than candidate self-report.
+
+The normal execution preference is automatic. A user may request
+single-Agent operation for work whose effective rigor remains L1; the
+Orchestrator then performs value, planning, implementation, and verification
+without Lead or Task Agent launches. A user may also prefer team operation,
+which may raise but never lower the effective rigor. Security, authentication,
+permission, destructive, major compatibility, and other hard-L5 conditions
+override a single-Agent preference. The future Control Center will expose
+`auto`, `single_agent`, and `team` without changing this safety floor.
+
+Before bootstrap, run `tools/next-workflow runtime status` only for non-mutating
+setup guidance. After bootstrap, run operational status and recovery through
+`<runtime_launcher_path> <absolute-repository-path> runtime ...`. If protected
+owner trust, Linux namespace/Bubblewrap isolation, provider credentials,
+certification, exact-candidate Activation, or recovery state is unavailable,
+follow the reported setup or recheck guidance and stop. Never replace a STOP
+with a direct uncontained launch. Control Center reconstruction remains paused
+and is not required for accepted headless operation. Paid API and local-runtime
+transports remain separate work and must not be inferred from CLI availability.
+
+Before the first bootstrap, create the explicit external Owner acceptance with
+`tools/next-workflow runtime acceptance-create --confirm`, then pass its receipt
+to `runtime bootstrap --owner-acceptance <path> --confirm`. Release candidates
+bind the complete Git tree. Final release and transition signatures require
+fresh source-evidence receipts signed by the distinct source key. Tracked or
+legacy state never replaces protected Production authority.
+
+Before every direct development-session CLI launch that is not routed through
+`team run`, continue using the advisory plan and exact prepared-configuration
+verification above. Both paths preserve the same saved model restrictions;
+neither model selection nor a successful Agent result grants filesystem, Git,
+network, credential, release, or Activation authority.
 
 ## A. Pre-Implementation Proposal
 

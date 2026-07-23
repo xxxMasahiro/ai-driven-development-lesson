@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, createPublicKey, verify } from "node:crypto";
 import { existsSync, lstatSync, readFileSync, realpathSync, statSync } from "node:fs";
 import { userInfo } from "node:os";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
@@ -19,7 +19,7 @@ function canonicalJson(value) {
 }
 
 function digest(value) {
-  return createHash("sha256").update(typeof value === "string" ? value : canonicalJson(value)).digest("hex");
+  return createHash("sha256").update(Buffer.isBuffer(value) ? value : typeof value === "string" ? value : canonicalJson(value)).digest("hex");
 }
 
 function isWithin(root, candidate) {
@@ -65,6 +65,39 @@ export function defaultOwnerTrustPath() {
   return join(userInfo().homedir, ".config", "ai-driven-development-lesson", "next-workflow", "owner-trust.json");
 }
 
+export function defaultOwnerAnchorPath() {
+  return join(userInfo().homedir, ".config", "ai-driven-development-lesson", "next-workflow", "owner-anchor.json");
+}
+
+export function loadProtectedOwnerAnchor({
+  repositoryRoot,
+  anchorPath = defaultOwnerAnchorPath(),
+  expectedUid = process.getuid?.(),
+} = {}) {
+  const canonicalPath = assertProtectedPath({ repositoryRoot, trustPath: anchorPath, expectedUid });
+  let document;
+  try {
+    document = JSON.parse(readFileSync(canonicalPath, "utf8"));
+  } catch (error) {
+    throw new Error(`OWNER_ANCHOR_DOCUMENT_INVALID:${error.message}`);
+  }
+  const { fingerprint, ...body } = document ?? {};
+  requireExactKeys(body, ["schema_version", "purpose", "revision", "owner_key_id", "owner_public_key_pem", "created_at"], "OWNER_ANCHOR_SCHEMA_INVALID");
+  if (body.schema_version !== "1.0.0"
+    || body.purpose !== "next-workflow-owner-anchor"
+    || body.revision !== 1
+    || typeof body.owner_key_id !== "string"
+    || !Number.isFinite(Date.parse(body.created_at))
+    || fingerprint !== digest(body)) throw new Error("OWNER_ANCHOR_DOCUMENT_INVALID");
+  let publicKey;
+  try { publicKey = createPublicKey(body.owner_public_key_pem); } catch { throw new Error("OWNER_ANCHOR_PUBLIC_KEY_INVALID"); }
+  if (publicKey.asymmetricKeyType !== "ed25519" || body.owner_key_id !== `headless-owner-${digest(body.owner_public_key_pem).slice(0, 24)}`) throw new Error("OWNER_ANCHOR_PUBLIC_KEY_INVALID");
+  return deepFreeze({
+    ...structuredClone(document),
+    source_path: canonicalPath,
+  });
+}
+
 export function loadProtectedRuntimeTrust({
   repositoryRoot,
   repositoryLogicalId,
@@ -81,13 +114,71 @@ export function loadProtectedRuntimeTrust({
   } catch (error) {
     throw new Error(`OWNER_TRUST_DOCUMENT_INVALID:${error.message}`);
   }
-  requireExactKeys(document, ["schema_version", "trust_source_id", "revision", "repository_logical_id", "checkout_instance_id", "issued_at", "expires_at", "release_trust", "release_prerequisites", "runtime_authorities"], "OWNER_TRUST_SCHEMA_INVALID");
+  const productionOwnerTrust = document?.trust_source_id === "headless-runtime-owner-trust";
+  requireExactKeys(document, ["schema_version", "trust_source_id", "revision", "repository_logical_id", "checkout_instance_id", "issued_at", "expires_at", "release_trust", "release_prerequisites", ...(productionOwnerTrust ? ["owner_acceptance", "owner_anchor", "production_state", "repository_identity", "runtime_launcher"] : []), "runtime_authorities"], "OWNER_TRUST_SCHEMA_INVALID");
   if (document.schema_version !== "1.0.0" || typeof document.trust_source_id !== "string" || document.trust_source_id.length === 0 || !Number.isSafeInteger(document.revision) || document.revision < 1) throw new Error("OWNER_TRUST_IDENTITY_INVALID");
   if (document.repository_logical_id !== repositoryLogicalId || document.checkout_instance_id !== checkoutInstanceId) throw new Error("OWNER_TRUST_REPOSITORY_BINDING_INVALID");
   requireTimestamp(document.issued_at, "OWNER_TRUST_ISSUED_AT_INVALID");
   requireTimestamp(document.expires_at, "OWNER_TRUST_EXPIRY_INVALID");
   if (Date.parse(document.issued_at) > Date.parse(now) || Date.parse(document.expires_at) < Date.parse(now)) throw new Error("OWNER_TRUST_NOT_CURRENT");
   if (!document.release_trust || typeof document.release_trust !== "object" || !document.release_prerequisites || typeof document.release_prerequisites !== "object" || !document.runtime_authorities || typeof document.runtime_authorities !== "object") throw new Error("OWNER_TRUST_AUTHORITIES_INVALID");
+  if (productionOwnerTrust) {
+    requireExactKeys(document.repository_identity, ["repository_logical_id", "checkout_instance_id", "origin_digest", "checkout_anchor_digest", "config_digest", "attested_at"], "OWNER_TRUST_REPOSITORY_IDENTITY_INVALID");
+    if (document.repository_identity.repository_logical_id !== repositoryLogicalId
+      || document.repository_identity.checkout_instance_id !== checkoutInstanceId
+      || ["origin_digest", "checkout_anchor_digest", "config_digest"].some((field) => !/^[a-f0-9]{64}$/u.test(document.repository_identity[field] ?? ""))
+      || !Number.isFinite(Date.parse(document.repository_identity.attested_at))) throw new Error("OWNER_TRUST_REPOSITORY_IDENTITY_INVALID");
+    requireExactKeys(document.production_state, ["generation_id", "database_relative_path"], "OWNER_TRUST_PRODUCTION_STATE_INVALID");
+    if (typeof document.production_state.generation_id !== "string" || !/^[0-9a-f-]{36}$/u.test(document.production_state.generation_id) || document.production_state.database_relative_path !== `.workflow-state/headless-production-${checkoutInstanceId}.sqlite`) throw new Error("OWNER_TRUST_PRODUCTION_STATE_INVALID");
+    requireExactKeys(document.runtime_launcher, ["path", "fingerprint", "wrapper_interpreter_path", "wrapper_interpreter_fingerprint", "script_path", "script_fingerprint", "interpreter_path", "interpreter_fingerprint"], "OWNER_TRUST_RUNTIME_LAUNCHER_INVALID");
+    const launcherPath = assertProtectedPath({ repositoryRoot, trustPath: document.runtime_launcher.path, expectedUid });
+    const launcherInfo = statSync(launcherPath);
+    if ((launcherInfo.mode & 0o277) !== 0 || !/^[a-f0-9]{64}$/u.test(document.runtime_launcher.fingerprint) || digest(readFileSync(launcherPath)) !== document.runtime_launcher.fingerprint) throw new Error("OWNER_TRUST_RUNTIME_LAUNCHER_INVALID");
+    const launcherScriptPath = assertProtectedPath({ repositoryRoot, trustPath: document.runtime_launcher.script_path, expectedUid });
+    const launcherScriptInfo = statSync(launcherScriptPath);
+    if ((launcherScriptInfo.mode & 0o277) !== 0 || !/^[a-f0-9]{64}$/u.test(document.runtime_launcher.script_fingerprint) || digest(readFileSync(launcherScriptPath)) !== document.runtime_launcher.script_fingerprint) throw new Error("OWNER_TRUST_RUNTIME_LAUNCHER_INVALID");
+    if (!isAbsolute(document.runtime_launcher.wrapper_interpreter_path) || !existsSync(document.runtime_launcher.wrapper_interpreter_path) || lstatSync(document.runtime_launcher.wrapper_interpreter_path).isSymbolicLink()) throw new Error("OWNER_TRUST_RUNTIME_LAUNCHER_INVALID");
+    const wrapperInterpreterPath = realpathSync(document.runtime_launcher.wrapper_interpreter_path);
+    const wrapperInterpreterInfo = statSync(wrapperInterpreterPath);
+    if (!wrapperInterpreterInfo.isFile() || (wrapperInterpreterInfo.mode & 0o111) === 0 || (wrapperInterpreterInfo.mode & 0o022) !== 0 || !/^[a-f0-9]{64}$/u.test(document.runtime_launcher.wrapper_interpreter_fingerprint) || digest(readFileSync(wrapperInterpreterPath)) !== document.runtime_launcher.wrapper_interpreter_fingerprint) throw new Error("OWNER_TRUST_RUNTIME_LAUNCHER_INVALID");
+    if (!isAbsolute(document.runtime_launcher.interpreter_path) || !existsSync(document.runtime_launcher.interpreter_path) || lstatSync(document.runtime_launcher.interpreter_path).isSymbolicLink()) throw new Error("OWNER_TRUST_RUNTIME_LAUNCHER_INVALID");
+    const interpreterPath = realpathSync(document.runtime_launcher.interpreter_path);
+    const interpreterInfo = statSync(interpreterPath);
+    if (!interpreterInfo.isFile() || (interpreterInfo.mode & 0o111) === 0 || (interpreterInfo.mode & 0o022) !== 0 || !/^[a-f0-9]{64}$/u.test(document.runtime_launcher.interpreter_fingerprint) || digest(readFileSync(interpreterPath)) !== document.runtime_launcher.interpreter_fingerprint) throw new Error("OWNER_TRUST_RUNTIME_LAUNCHER_INVALID");
+    if (!Array.isArray(document.release_trust?.verifiers) || document.release_trust.verifiers.length === 0 || !Array.isArray(document.release_trust?.source_verifiers) || document.release_trust.source_verifiers.length === 0) throw new Error("OWNER_TRUST_RELEASE_AUTHORITIES_INVALID");
+    const releaseKeys = new Set(document.release_trust.verifiers.map((entry) => entry?.key_id));
+    const releaseKeyMaterial = new Set();
+    for (const entry of document.release_trust.verifiers) {
+      let key;
+      try { key = createPublicKey(entry?.public_key_pem); } catch { throw new Error("OWNER_TRUST_RELEASE_AUTHORITIES_INVALID"); }
+      if (key.type !== "public" || key.asymmetricKeyType !== "ed25519") throw new Error("OWNER_TRUST_RELEASE_AUTHORITIES_INVALID");
+      const material = digest(key.export({ type: "spki", format: "der" }));
+      if (releaseKeyMaterial.has(material)) throw new Error("OWNER_TRUST_RELEASE_AUTHORITY_SEPARATION_INVALID");
+      releaseKeyMaterial.add(material);
+    }
+    const sourceKeyMaterial = new Set();
+    for (const entry of document.release_trust.source_verifiers) {
+      let key;
+      try { key = createPublicKey(entry?.public_key_pem); } catch { throw new Error("OWNER_TRUST_RELEASE_AUTHORITIES_INVALID"); }
+      if (key.type !== "public" || key.asymmetricKeyType !== "ed25519") throw new Error("OWNER_TRUST_RELEASE_AUTHORITIES_INVALID");
+      const material = digest(key.export({ type: "spki", format: "der" }));
+      if (releaseKeys.has(entry?.key_id) || releaseKeyMaterial.has(material) || sourceKeyMaterial.has(material)) throw new Error("OWNER_TRUST_RELEASE_AUTHORITY_SEPARATION_INVALID");
+      sourceKeyMaterial.add(material);
+    }
+    requireExactKeys(document.owner_anchor, ["path", "fingerprint", "owner_key_id"], "OWNER_TRUST_ANCHOR_BINDING_INVALID");
+    const ownerAnchor = loadProtectedOwnerAnchor({ repositoryRoot, anchorPath: document.owner_anchor.path, expectedUid });
+    if (ownerAnchor.fingerprint !== document.owner_anchor.fingerprint || ownerAnchor.owner_key_id !== document.owner_anchor.owner_key_id) throw new Error("OWNER_TRUST_ANCHOR_BINDING_INVALID");
+    const receipt = document.owner_acceptance;
+    const { fingerprint, signature, ...body } = receipt ?? {};
+    const expectedKeys = ["schema_version", "purpose", "decision", "repository_logical_id", "checkout_instance_id", "release_prerequisites_fingerprint", "provider_executable", "owner_key_id", "owner_public_key_pem", "owner_anchor_fingerprint", "issued_at", "expires_at"];
+    requireExactKeys(body, expectedKeys, "OWNER_ACCEPTANCE_RECEIPT_INVALID");
+    const launchAuthority = document.runtime_authorities?.["headless-launch-observer"];
+    const probeAuthority = document.runtime_authorities?.["headless-provider-probe"];
+    if (body.schema_version !== "1.0.0" || body.purpose !== "next-workflow-owner-acceptance" || body.decision !== "accepted" || body.repository_logical_id !== repositoryLogicalId || body.checkout_instance_id !== checkoutInstanceId || body.release_prerequisites_fingerprint !== digest(document.release_prerequisites) || typeof body.provider_executable?.path !== "string" || !isAbsolute(body.provider_executable.path) || !/^[a-f0-9]{64}$/u.test(body.provider_executable?.fingerprint ?? "") || !launchAuthority?.allowed_executable_paths?.includes(body.provider_executable.path) || !launchAuthority?.allowed_executable_fingerprints?.includes(body.provider_executable.fingerprint) || !probeAuthority?.allowed_executable_paths?.includes(body.provider_executable.path) || !probeAuthority?.allowed_executable_fingerprints?.includes(body.provider_executable.fingerprint) || body.owner_anchor_fingerprint !== ownerAnchor.fingerprint || body.owner_key_id !== ownerAnchor.owner_key_id || body.owner_public_key_pem !== ownerAnchor.owner_public_key_pem || !Number.isFinite(Date.parse(body.issued_at)) || !Number.isFinite(Date.parse(body.expires_at)) || Date.parse(body.issued_at) > Date.parse(now) || Date.parse(body.expires_at) <= Date.parse(now) || fingerprint !== digest(body) || typeof signature !== "string") throw new Error("OWNER_ACCEPTANCE_RECEIPT_INVALID");
+    let publicKey;
+    try { publicKey = createPublicKey(body.owner_public_key_pem); } catch { throw new Error("OWNER_ACCEPTANCE_PUBLIC_KEY_INVALID"); }
+    if (publicKey.asymmetricKeyType !== "ed25519" || body.owner_key_id !== `headless-owner-${digest(body.owner_public_key_pem).slice(0, 24)}` || verify(null, Buffer.from(canonicalJson(body)), publicKey, Buffer.from(signature, "base64url")) !== true) throw new Error("OWNER_ACCEPTANCE_SIGNATURE_INVALID");
+  }
   const core = deepFreeze(structuredClone(document));
   const canonicalRepositoryRoot = realpathSync(repositoryRoot);
   const protectedSourceDirectory = dirname(canonicalPath);
@@ -95,6 +186,9 @@ export function loadProtectedRuntimeTrust({
     document: core,
     release_trust: core.release_trust,
     release_prerequisites: core.release_prerequisites,
+    production_state: core.production_state ?? null,
+    runtime_launcher: core.runtime_launcher ?? null,
+    owner_acceptance: core.owner_acceptance ?? null,
     runtime_authorities: core.runtime_authorities,
     repository_root: canonicalRepositoryRoot,
     source_path: canonicalPath,
@@ -124,19 +218,149 @@ function runtimeAuthority(snapshot, authorityId, kind) {
 
 export function createProtectedLaunchObservationVerifier({ runtimeTrust, authorityId } = {}) {
   const authority = runtimeAuthority(runtimeTrust, authorityId, "launch_observation");
-  if (!Array.isArray(authority.allowed_executable_fingerprints) || authority.allowed_executable_fingerprints.some((value) => !/^[a-f0-9]{64}$/.test(value)) || !Array.isArray(authority.allowed_manifest_fingerprints) || authority.allowed_manifest_fingerprints.some((value) => !/^[a-f0-9]{64}$/.test(value)) || authority.source !== "pinned_process_and_certified_provider_metadata") throw new Error("LAUNCH_OBSERVATION_AUTHORITY_INVALID");
+  const allowedManifestFingerprints = Array.isArray(authority.allowed_manifest_fingerprints) ? authority.allowed_manifest_fingerprints : [];
+  const allowedAdapterIds = Array.isArray(authority.allowed_adapter_ids) ? authority.allowed_adapter_ids : [];
+  if (!Array.isArray(authority.allowed_executable_fingerprints) || authority.allowed_executable_fingerprints.some((value) => !/^[a-f0-9]{64}$/.test(value)) || allowedManifestFingerprints.some((value) => !/^[a-f0-9]{64}$/.test(value)) || allowedAdapterIds.some((value) => typeof value !== "string" || value.length === 0) || (allowedManifestFingerprints.length === 0 && allowedAdapterIds.length === 0) || authority.source !== "pinned_process_and_certified_provider_metadata") throw new Error("LAUNCH_OBSERVATION_AUTHORITY_INVALID");
   const verifier = Object.freeze({
     verifier_id: authorityId,
     observe({ plan, process_evidence: processEvidence, fingerprint }) {
       if (!processEvidence || processEvidence.verified !== true || processEvidence.contained !== true || !/^[a-f0-9]{64}$/.test(processEvidence.process_identity_fingerprint ?? "") || !Array.isArray(processEvidence.argv)) throw new Error("RUN_LIFECYCLE_PROCESS_EVIDENCE_REQUIRED");
-      if (!authority.allowed_executable_fingerprints.includes(plan.executable_fingerprint) || !authority.allowed_manifest_fingerprints.includes(plan.manifest_fingerprint)) throw new Error("RUN_LIFECYCLE_OBSERVATION_SOURCE_UNAUTHORIZED");
-      for (const expected of [plan.selected_model, plan.selected_effort]) if (!processEvidence.argv.includes(expected)) throw new Error("RUN_LIFECYCLE_SELECTED_ARGUMENT_NOT_OBSERVED");
-      const observed = { provider: plan.selected_provider, model: plan.selected_model, effort: plan.selected_effort };
+      const adapterId = plan.selected_provider?.split(":")?.[3] ?? null;
+      if (!authority.allowed_executable_fingerprints.includes(plan.executable_fingerprint) || (!allowedManifestFingerprints.includes(plan.manifest_fingerprint) && !allowedAdapterIds.includes(adapterId))) throw new Error("RUN_LIFECYCLE_OBSERVATION_SOURCE_UNAUTHORIZED");
+      const modelIndexes = processEvidence.argv.flatMap((value, index) => value === "--model" ? [index] : []);
+      const configIndexes = processEvidence.argv.flatMap((value, index) => value === "-c" ? [index] : []);
+      if (modelIndexes.length !== 1 || configIndexes.length !== 1) throw new Error("RUN_LIFECYCLE_SELECTED_ARGUMENT_NOT_OBSERVED");
+      const observedModel = processEvidence.argv[modelIndexes[0] + 1];
+      const reasoningConfiguration = processEvidence.argv[configIndexes[0] + 1];
+      const reasoningMatch = /^model_reasoning_effort="([a-z][a-z0-9_-]{0,31})"$/u.exec(reasoningConfiguration ?? "");
+      if (observedModel !== plan.selected_model || reasoningMatch?.[1] !== plan.selected_effort) throw new Error("RUN_LIFECYCLE_SELECTED_ARGUMENT_NOT_OBSERVED");
+      const observed = { provider: plan.selected_provider, model: observedModel, effort: reasoningMatch[1] };
       const proofFingerprint = digest({ authority_id: authorityId, authority_revision: authority.revision, observed, process_evidence_fingerprint: processEvidence.fingerprint, plan_fingerprint: plan.plan_fingerprint, fingerprint });
-      return { verified: true, verifier_id: authorityId, fingerprint, proof_fingerprint: proofFingerprint, actual_provider: observed.provider, actual_model: observed.model, actual_effort: observed.effort, observation_scope: "pinned_cli_launch_configuration" };
+      return { verified: true, verifier_id: authorityId, fingerprint, proof_fingerprint: proofFingerprint, actual_provider: observed.provider, actual_model: observed.model, actual_effort: observed.effort, observation_scope: "pinned_cli_launch_configuration", backend_attestation: null, backend_attestation_available: false };
     },
   });
   return brandRuntimeVerifier(verifier, "launch_observation", runtimeTrust, authority);
+}
+
+export function createProtectedProviderProbeAuthority({ runtimeTrust, authorityId } = {}) {
+  const authority = runtimeAuthority(runtimeTrust, authorityId, "provider_probe");
+  if (authority.source !== "owner_protected_provider_probe" || !Number.isSafeInteger(authority.revision) || authority.revision < 1 || !Array.isArray(authority.allowed_adapter_ids) || authority.allowed_adapter_ids.length === 0 || !Array.isArray(authority.allowed_executable_fingerprints) || authority.allowed_executable_fingerprints.some((value) => !/^[a-f0-9]{64}$/.test(value))) throw new Error("PROVIDER_PROBE_AUTHORITY_INVALID");
+  const allowedAdapters = new Set(authority.allowed_adapter_ids);
+  const verifier = {
+    trusted: true,
+    independent: true,
+    authority_id: authorityId,
+    verify({ probe, observation, fingerprint }) {
+      const candidate = probe ?? observation;
+      const executableFingerprint = candidate?.executable?.digest ?? candidate?.executable_fingerprint ?? null;
+      const adapterId = candidate?.identity_key?.split(":")?.[3] ?? candidate?.adapter_id ?? null;
+      const verified = /^[a-f0-9]{64}$/.test(fingerprint ?? "")
+        && (observation ? typeof observation.identity_key === "string" : authority.allowed_executable_fingerprints.includes(executableFingerprint))
+        && allowedAdapters.has(adapterId);
+      if (!verified) return { verified: false, authority_id: authorityId, fingerprint };
+      return {
+        verified: true,
+        authority_id: authorityId,
+        fingerprint,
+        identity_key: observation?.identity_key ?? probe?.identity_key,
+        evidence_ref: `provider-probe-${digest({ authority_id: authorityId, revision: authority.revision, fingerprint })}`,
+      };
+    },
+  };
+  return brandRuntimeVerifier(Object.freeze(verifier), "provider_probe", runtimeTrust, authority);
+}
+
+export function createProtectedProviderCertificationAuthority({ runtimeTrust, authorityId, probeAuthorityId } = {}) {
+  const authority = runtimeAuthority(runtimeTrust, authorityId, "provider_certification");
+  if (authority.source !== "owner_protected_provider_certification" || !Number.isSafeInteger(authority.revision) || authority.revision < 1 || authority.probe_authority_id !== probeAuthorityId || !Array.isArray(authority.allowed_adapter_ids) || authority.allowed_adapter_ids.length === 0) throw new Error("PROVIDER_CERTIFICATION_AUTHORITY_INVALID");
+  const allowedAdapters = new Set(authority.allowed_adapter_ids);
+  const bindingFingerprint = (candidate) => {
+    if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) return null;
+    const {
+      certification_proof_fingerprint: certificationProofFingerprint,
+      authority_fingerprint: authorityFingerprint,
+      ...binding
+    } = candidate;
+    void certificationProofFingerprint;
+    void authorityFingerprint;
+    return digest(binding);
+  };
+  const proofFor = (candidate) => {
+    const certificationFingerprint = bindingFingerprint(candidate);
+    return certificationFingerprint
+      ? digest({ authority_id: authorityId, revision: authority.revision, probe_authority_id: probeAuthorityId, certification_fingerprint: certificationFingerprint })
+      : null;
+  };
+  const certification = {
+    trusted: true,
+    independent: true,
+    authority_id: authorityId,
+    issue({ certification: candidate, fingerprint, probe_verdict: probeVerdict }) {
+      const adapterId = candidate?.identity_key?.split(":")?.[3] ?? null;
+      const issued = /^[a-f0-9]{64}$/.test(fingerprint ?? "")
+        && fingerprint === bindingFingerprint(candidate)
+        && allowedAdapters.has(adapterId)
+        && probeVerdict?.verified === true
+        && probeVerdict.authority_id === probeAuthorityId
+        && typeof probeVerdict.evidence_ref === "string";
+      return { issued, authority_id: authorityId, certification_fingerprint: fingerprint, proof_fingerprint: issued ? proofFor(candidate) : null };
+    },
+    verify({ certification: candidate, fingerprint }) {
+      const adapterId = candidate?.identity_key?.split(":")?.[3] ?? null;
+      const verified = allowedAdapters.has(adapterId)
+        && candidate?.certifier_id === authorityId
+        && candidate?.probe_authority_id === probeAuthorityId
+        && /^[a-f0-9]{64}$/.test(fingerprint ?? "")
+        && candidate?.certification_proof_fingerprint === proofFor(candidate);
+      return {
+        verified,
+        authority_id: authorityId,
+        fingerprint,
+        certification_id: candidate?.certification_id,
+        certifier_id: candidate?.certifier_id,
+        identity_key: candidate?.identity_key,
+        authority_fingerprint: candidate?.authority_fingerprint,
+      };
+    },
+  };
+  return brandRuntimeVerifier(Object.freeze(certification), "provider_certification", runtimeTrust, authority);
+}
+
+export function createProtectedAgentObservationAuthority({ runtimeTrust, authorityId } = {}) {
+  const authority = runtimeAuthority(runtimeTrust, authorityId, "agent_observation");
+  if (authority.source !== "owner_protected_agent_observation" || !Number.isSafeInteger(authority.revision) || authority.revision < 1 || typeof authority.evidence_strength !== "string" || authority.evidence_strength.length === 0) throw new Error("AGENT_OBSERVATION_AUTHORITY_INVALID");
+  const proofFor = (actualObserved) => digest({ authority_id: authorityId, revision: authority.revision, actual_observation_fingerprint: digest(actualObserved), evidence_strength: authority.evidence_strength });
+  const issue = Object.freeze((actualObserved) => {
+    const fingerprint = digest(actualObserved);
+    return Object.freeze({
+      verified: true,
+      independent: true,
+      verified_by: authorityId,
+      fingerprint,
+      evidence_strength: authority.evidence_strength,
+      authority_proof_fingerprint: proofFor(actualObserved),
+    });
+  });
+  const verifier = {
+    trusted: true,
+    independent: true,
+    verifier_id: authorityId,
+    verify({ candidate_observation: candidateObservation, candidate_proof: candidateProof }) {
+      const expected = issue(candidateObservation);
+      const verified = candidateProof?.verified === true
+        && candidateProof?.independent === true
+        && candidateProof?.verified_by === authorityId
+        && candidateProof?.fingerprint === expected.fingerprint
+        && candidateProof?.evidence_strength === authority.evidence_strength
+        && candidateProof?.authority_proof_fingerprint === expected.authority_proof_fingerprint;
+      return verified
+        ? { actual_observed: structuredClone(candidateObservation), observation_proof: structuredClone(candidateProof) }
+        : { actual_observed: null, observation_proof: null };
+    },
+  };
+  brandRuntimeVerifier(issue, "agent_observation_issuer", runtimeTrust, authority);
+  brandRuntimeVerifier(verifier, "agent_observation", runtimeTrust, authority);
+  return Object.freeze({ issue, verifier: Object.freeze(verifier) });
 }
 
 export function assertProtectedRuntimeVerifier(verifier, expectedKind = "launch_observation") {
@@ -250,6 +474,25 @@ export function createProtectedFinalizationFenceVerifier({ runtimeTrust, authori
   if (authority.source !== "owner_protected_live_fence" || !Number.isSafeInteger(authority.revision) || authority.revision < 1) throw new Error("FINALIZATION_FENCE_AUTHORITY_INVALID");
   const verifier = createFinalizationFenceVerifier({ verifierId: authorityId, activationFingerprintProvider, policyRevisionProvider, settingsRevisionProvider, authorityEpochProvider });
   return brandRuntimeVerifier(verifier, "finalization_fence", runtimeTrust, authority);
+}
+
+export function createProtectedRuntimeRecoveryAuthorizer({ runtimeTrust, authorityId } = {}) {
+  const authority = runtimeAuthority(runtimeTrust, authorityId, "runtime_recovery");
+  if (authority.source !== "owner_protected_runtime_recovery" || !Number.isSafeInteger(authority.revision) || authority.revision < 1 || !Array.isArray(authority.allowed_actions) || authority.allowed_actions.length === 0) throw new Error("RUNTIME_RECOVERY_AUTHORITY_INVALID");
+  const allowedActions = new Set(authority.allowed_actions);
+  const authorizer = Object.freeze(({ request, fingerprint }) => {
+    const valid = request
+      && typeof request.run_id === "string"
+      && request.run_id.length > 0
+      && Number.isSafeInteger(request.authority_epoch)
+      && request.authority_epoch >= 0
+      && allowedActions.has(request.requested_action)
+      && fingerprint === digest(request);
+    return valid
+      ? { decision: "ALLOW", fingerprint, run_id: request.run_id, authority_epoch: request.authority_epoch, proof_fingerprint: digest({ authority_id: authorityId, authority_revision: authority.revision, fingerprint }) }
+      : { decision: "DENY", fingerprint: fingerprint ?? null, run_id: request?.run_id ?? null, authority_epoch: request?.authority_epoch ?? null };
+  });
+  return brandRuntimeVerifier(authorizer, "runtime_recovery", runtimeTrust, authority);
 }
 
 export function protectedRuntimeAuthority(runtimeTrust, authorityId, kind) {
