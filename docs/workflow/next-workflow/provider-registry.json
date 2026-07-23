@@ -1,5 +1,5 @@
 {
-  "schema_version": "1.0.0",
+  "schema_version": "1.1.0",
   "contract_id": "next_workflow_provider_registry",
   "activation_mode": "planned",
   "identity_fields": ["execution_provider_id", "model_publisher_id", "agent_product_id", "adapter_id", "transport_id", "model_id"],
@@ -18,8 +18,31 @@
   "configuration_states": ["requested", "selected", "effective", "actual_observed"],
   "attestation": {"immutable_snapshots": true, "fields": ["identity", "reasoning_native", "normalized_effort", "source", "observed_at", "fingerprint", "evidence_strength"], "actual_absent_before_spawn": true, "copied_or_predicted_actual_refused": true},
   "reasoning": {"native_and_normalized_are_distinct": true, "normalized_mapping_requires_provenance": true, "unsupported_equivalence_must_not_be_claimed": true},
+  "automatic_effort_selection": {
+    "inputs": ["rigor", "risk", "complexity", "provider_capability", "explicit_user_override"],
+    "rigor_floor": {"L1": "minimal", "L2": "low", "L3": "medium", "L4": "high", "L5": "xhigh"},
+    "explicit_native_value_passed_to_cli": true,
+    "selected_model_and_effort_bound_to_launch": true,
+    "independent_runtime_observation_required": true,
+    "selected_actual_mismatch": "STOP",
+    "implicit_none_observation": "forbidden",
+    "per_launch_report_fields": ["provider", "model", "effort", "observation_proof_fingerprint"]
+  },
+  "selection_policy": {
+    "owner_and_task_model_policy": "restrictive_intersection",
+    "deny_lists": "union",
+    "task_policy_may_loosen_owner_policy": false,
+    "missing_or_null_policy": "fail_closed_when_present",
+    "resource_bounds_required": true,
+    "resource_bounds_must_be_nonempty": true,
+    "every_resource_bound_requires_a_matching_budget": true,
+    "estimated_cost_required": true,
+    "cost_budget_required_for_nonzero_cost": true,
+    "launch_revalidates_manifest_against_reservation": true,
+    "operational_timeout_requires_explicit_bound": true
+  },
   "custom_manifest": {
-    "common_required": ["manifest_id", "version", "transport", "identity", "capabilities", "certification_profile", "resource_bounds"],
+    "common_required": ["manifest_id", "version", "transport", "identity", "capabilities", "certification_profile", "resource_bounds", "estimated_cost"],
     "cli_required": ["canonical_executable", "executable_digest", "argv_schema", "environment_allowlist", "private_response_file"],
     "api_required": ["endpoint_policy", "method_allowlist", "request_schema", "response_schema", "secret_reference_policy"],
     "local_required": ["exact_endpoint", "service_identity", "health_contract", "start_stop_authority"],

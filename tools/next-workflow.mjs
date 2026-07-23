@@ -12,6 +12,8 @@ import { discoverBuiltinProviderInputs } from "./lib/next_workflow/provider_disc
 import { completeActivation, freezeRepositoryReleaseCandidate, persistActivationTransition, verifyEnforcedActivationRecord, verifyReleaseProofs } from "./lib/next_workflow/release.mjs";
 import { createSignedReleaseProofVerifier, createSignedTransitionVerifier } from "./lib/next_workflow/release_trust.mjs";
 import { createNextWorkflowRuntime } from "./lib/next_workflow/runtime.mjs";
+import { diagnoseLinuxIsolationPrerequisites } from "./lib/next_workflow/runtime_containment.mjs";
+import { loadProtectedRuntimeTrust } from "./lib/next_workflow/runtime_trust.mjs";
 import { createAgentSelectionSettingsManager } from "./lib/next_workflow/settings.mjs";
 import { openWorkflowStateStore } from "./lib/next_workflow/store.mjs";
 
@@ -276,11 +278,20 @@ function productionRuntime(store) {
 }
 
 function releaseTrustDocument() {
-  return readRepositoryBoundJson(process.env.NEXT_WORKFLOW_RELEASE_TRUST_FILE, "learning/NEXT_WORKFLOW_RELEASE_TRUST.json");
+  return protectedTrustBundle().release_trust;
 }
 
 function releasePrerequisites() {
-  return readRepositoryBoundJson(process.env.NEXT_WORKFLOW_RELEASE_PREREQUISITES_FILE, "learning/NEXT_WORKFLOW_RELEASE_PREREQUISITES.json");
+  return protectedTrustBundle().release_prerequisites;
+}
+
+function protectedTrustBundle() {
+  const identity = runtimeIdentity({ create: false });
+  return loadProtectedRuntimeTrust({
+    repositoryRoot: ROOT,
+    repositoryLogicalId: identity.repository_logical_id,
+    checkoutInstanceId: identity.checkout_instance_id,
+  });
 }
 
 const DEFAULT_RELEASE_ARTIFACTS = [
@@ -371,7 +382,9 @@ if (command === "projection") {
   } else throw new Error(`UNKNOWN_RELEASE_ACTION:${action}`);
 } else if (command === "runtime") {
   const action = args[1] ?? "status";
-  if (action === "status") {
+  if (action === "isolation-check") {
+    print(diagnoseLinuxIsolationPrerequisites());
+  } else if (action === "status") {
     const state = readOnlyState();
     try { print(state.store ? productionRuntime(state.store).status() : { status: state.status, activation_mode: readJson("learning/NEXT_WORKFLOW_ACTIVATION.json").mode, direct_adapter_access: false }); } finally { state.store?.close(); }
   } else if (action === "effect-preview") {
@@ -400,5 +413,5 @@ if (command === "projection") {
     } finally { store.close(); }
   }
 } else {
-  process.stdout.write("Usage: tools/next-workflow projection|contracts|activation status|identity status|identity reattest --confirm|store-health|release status|release candidate [--artifact PATH ...]|release proofs-verify --candidate FP --bundle PATH|release transition --candidate FP --mode MODE --evidence PATH --expect-revision N --confirm|release activate --candidate FP --bundle PATH --expect-revision N --confirm|runtime status|runtime effect-preview --effect PATH|runtime reconcile [--target ID] [--limit N] --confirm|settings catalog|settings dry-run --scope S --subject ID --mode auto|manual|inherit --expect-revision N [--identity KEY]|settings revert-dry-run --receipt ID --expect-revision N|settings apply --token TOKEN --confirm\n");
+  process.stdout.write("Usage: tools/next-workflow projection|contracts|activation status|identity status|identity reattest --confirm|store-health|release status|release candidate [--artifact PATH ...]|release proofs-verify --candidate FP --bundle PATH|release transition --candidate FP --mode MODE --evidence PATH --expect-revision N --confirm|release activate --candidate FP --bundle PATH --expect-revision N --confirm|runtime status|runtime isolation-check|runtime effect-preview --effect PATH|runtime reconcile [--target ID] [--limit N] --confirm|settings catalog|settings dry-run --scope S --subject ID --mode auto|manual|inherit --expect-revision N [--identity KEY]|settings revert-dry-run --receipt ID --expect-revision N|settings apply --token TOKEN --confirm\n");
 }

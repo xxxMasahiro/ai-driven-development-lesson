@@ -1,5 +1,5 @@
 {
-  "schema_version": "1.0.0",
+  "schema_version": "1.1.0",
   "contract_id": "next_workflow_authority_lifecycle",
   "activation_mode": "planned",
   "objective": {
@@ -57,6 +57,17 @@
     "required_exit_states": ["PASS", "REVISE", "ASK_OWNER", "STOP"],
     "failure_fingerprint_fields": ["phase", "action", "input", "authority", "failure", "evidence"],
     "progress_fingerprint_fields": ["accepted_weight", "evidence", "implementation", "authority", "state"]
+  },
+  "runtime_execution": {
+    "production_trust_source": "protected_owner_managed_external_file",
+    "candidate_controlled_trust": "forbidden",
+    "missing_production_trust": "fail_closed",
+    "runtime_profiles": ["production", "isolated_verification"],
+    "production_operational_effects_require_protected_store_and_verifier_brands": true,
+    "generic_or_duck_typed_runtime_is_non_operational": true,
+    "isolated_verification": {"production_authority": false, "activation_transition_allowed": false, "network_allowed": false, "git_delivery_allowed": false, "registered_child_traversal_allowed": false},
+    "activation_remains": "planned",
+    "control_center_reconstruction": "pending"
   },
   "git_approval_migration": {
     "legacy_reasons": ["git_push_operation_approval", "git_pr_creation_approval", "git_merge_operation_approval"],

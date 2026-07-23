@@ -3534,20 +3534,24 @@ evidence, blockers, and the next interval's intended work.
 
 ### Completion and activation boundary
 
-The non-Control-Center runtime and its focused local verification are complete
-only when the synchronized focused and aggregate tests pass on the current
-worktree. Overall implementation remains incomplete while the developer-paused
-Control Center presentation/acceptance scope and final same-candidate activation
-evidence are open. Resumption must finish Control Center implementation through
-its design-system authority, rerun TraceCue/browser review, and obtain developer
-acceptance before Phase 20 may freeze or activate a candidate. PR CI, merge,
-main CI, and local/remote synchronization may deliver the current scoped non-UI
-implementation now, but they are not final activation evidence. After Phase 18
-acceptance, a new exact-candidate local, CI, synchronization, recovery, fenced
-rollback, archive/decommission, and outbox drain/quarantine evidence set is
-required. This closure writes neither child repositories nor the current local
-bytes of either Git-ignored temporary memory file, and the next workflow is not
-activated by this sync.
+The implemented non-Control-Center safety foundation and the implemented
+non-UI runtime wiring are separate completion boundaries. The non-UI slice is
+not delivered until its final aggregate, PR/main CI, and synchronization pass.
+It may exercise production-shaped owners only through an explicit
+non-production authority profile; it must not enable a production launch
+surface or advance repository Activation beyond `planned`.
+
+Overall implementation remains incomplete while the developer-paused Control
+Center reconstruction/acceptance scope and final same-candidate activation
+evidence are open. After the non-UI runtime wiring is delivered, resumption must
+rebaseline and finish Control Center implementation through its design-system
+authority, rerun TraceCue/browser review, and obtain developer acceptance before
+an immutable activation candidate may be frozen. PR CI, merge, main CI, and
+local/remote synchronization may deliver the current scoped non-UI work, but
+they are not final activation evidence. A later exact-candidate local, CI,
+synchronization, recovery, fenced rollback, archive/decommission, and outbox
+drain/quarantine evidence set is required. This work writes neither child
+repositories nor either Git-ignored temporary memory file.
 
 ## Non-Control-Center Security Closure
 
@@ -3644,9 +3648,11 @@ TESTS: tools/check_developer_memory_requirements.sh,tools/check_document_organiz
   `orchestrator` / `Orchestrator Agent`, and release evidence must reconstruct
   one exact candidate head, PR identity, main merge SHA, and synchronized
   `origin/main` lineage before enforcement.
-- Agent launch must bind the executable plan's sandbox mode and canonical
-  working directory to the persisted grant and repository root before any
-  gateway effect. Reconciliation finalization must recompute the effect/
+- Agent launch must bind the executable plan's sandbox mode and private
+  authority-owned task-input working directory to the persisted grant before
+  any gateway effect. The later non-UI slice supersedes the earlier repository-
+  root working-directory boundary: the host repository, `.git`, and owner-trust
+  files are not mounted into the task runtime. Reconciliation finalization must recompute the effect/
   observation identity from the locked intent and require a separately
   configured independent proof verifier; the finalizer cannot trust a caller-
   constructed proof record. Generic commit and reconciliation revision CAS
@@ -3659,16 +3665,15 @@ TESTS: tools/check_developer_memory_requirements.sh,tools/check_document_organiz
   operational effects because it cannot make an external CLI enforce a
   downstream fencing token; only an explicitly fencing-aware executor may
   dispatch, and it must attest the same epoch and fence fingerprint.
-- This scoped delivery must not describe those hard-deny placeholders as
-  production wiring. After Control Center acceptance and before candidate
-  freeze, activation-bound owners must provide independently authenticated
-  authority sources, approval/receipt/reconciliation verification, separate
-  provider probe and certification authorities, operational observation and
-  containment, and exact CLI/Git/workflow adapter routing through the gateway.
-- Non-Control-Center completion requires the 14-suite aggregate with 192
-  focused assertions and all seven
-  contract fingerprints to pass. It does not complete the developer-paused
-  Control Center or Phase 20 remote/same-candidate activation evidence.
+- This historical security-closure requirement did not describe the hard-deny
+  placeholders as production wiring. Its successor non-UI runtime-wiring slice
+  is now implemented and isolated-tested before Control Center reconstruction;
+  externally reachable production launch authority remains deliberately
+  unavailable.
+- The historical closure passed 192 tests across 14 suites and all seven
+  contract fingerprints. That historical evidence did not complete the
+  developer-paused Control Center or Phase 20 remote/same-candidate activation
+  evidence.
 
 The currently verified non-Control-Center implementation may be delivered now
 through a scoped commit, PR CI, merge, main CI, and local/remote synchronization.
@@ -3682,3 +3687,155 @@ evidence-boundary change must carry its complete tracked authority set in the
 same integration range. Git evidence capture may recover stdout from a nested-
 sandbox post-exec error only when the child status is exactly zero and stdout
 is a real byte buffer; nonzero or unknown outcomes remain failures.
+
+## Non-UI Runtime Wiring Requirements
+
+SYNC-ID: next_workflow_non_ui_runtime_wiring
+STATUS: implemented
+ARTIFACTS: docs/as-built/IMPLEMENTATION_PLAN.md,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/HANDOFF.md,docs/workflow/TASK_TRACKER.md,docs/workflow/next-workflow/authority-lifecycle.json,docs/workflow/next-workflow/provider-registry.json,docs/workflow/next-workflow/state-store.json,docs/workflow/next-workflow/team-agent-security.json,learning/NEXT_WORKFLOW_AGENT_SELECTION_SETTINGS.json,learning/NEXT_WORKFLOW_PROVIDER_REGISTRY.json,tools/lib/next_workflow/agents.mjs,tools/lib/next_workflow/authority.mjs,tools/lib/next_workflow/contracts.mjs,tools/lib/next_workflow/migrations/003_runtime_wiring.sql,tools/lib/next_workflow/provider_discovery.mjs,tools/lib/next_workflow/providers.mjs,tools/lib/next_workflow/run_lifecycle.mjs,tools/lib/next_workflow/runtime.mjs,tools/lib/next_workflow/runtime_barrier.cjs,tools/lib/next_workflow/runtime_containment.mjs,tools/lib/next_workflow/runtime_trust.mjs,tools/lib/next_workflow/settings.mjs,tools/lib/next_workflow/store.mjs,tools/lib/next_workflow/task_delivery.mjs,tools/next-workflow.mjs,tools/test_next_workflow.sh,tools/test_next_workflow_agents.mjs,tools/test_next_workflow_authority.mjs,tools/test_next_workflow_isolated_runtime.mjs,tools/test_next_workflow_isolated_runtime.sh,tools/test_next_workflow_projection_settings.mjs,tools/test_next_workflow_providers.mjs,tools/test_next_workflow_release.mjs,tools/test_next_workflow_run_lifecycle.mjs,tools/test_next_workflow_run_lifecycle.sh,tools/test_next_workflow_saga.mjs,tools/test_next_workflow_store.mjs,tools/test_next_workflow_task_delivery.mjs,tools/test_next_workflow_task_delivery.sh
+TESTS: tools/check_next_workflow.sh,tools/test_next_workflow.sh,tools/check_security_invariants.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+The implemented runtime satisfies these requirements while preserving the
+separate production-Activation boundary:
+
+1. Candidate-controlled files, caller input, and unauthenticated environment
+   overrides cannot select runtime, Approval, Receipt, certification, release,
+   or developer-acceptance trust roots. Production trust is resolved from a
+   protected owner-managed source outside the candidate; absence fails closed.
+2. Approval is a durable, independently verified, one-use capability bound to
+   repository, checkout, task, run, operation, request digest, policy revision,
+   settings revision, authority epoch, and expiry. Replay and concurrent double
+   consumption are rejected atomically.
+3. Effect idempotency returns the existing durable state for the same key and
+   same payload without redispatch; the same key with different payload is a
+   durable conflict.
+4. Receipt finalization atomically rechecks the current Activation candidate,
+   authority epoch, approval consumption, decision expiry, policy revision, and
+   settings revision. Revoked, stale, changed, or unknown state cannot become
+   `RECONCILED` or a delivered outbox item.
+5. A provider-neutral `RunLifecyclePort` owns `start`, `observe`, `cancel`,
+   `terminate`, `collect_result`, `reconcile`, and restart `recover`. It persists process-group
+   identity, bounds runtime/output, escalates timeout termination, verifies the
+   full group is absent, and maps unknown observation only to manual recovery.
+6. Authority-owned code resolves and fingerprints applicable `AGENTS.MD` and
+   exactly one procedural instruction, constructs the Task Agent envelope, and
+   binds the envelope and exact delivered input to launch, observation, bounded
+   result, independent review, receipt, and closure. Agent/provider text cannot
+   create trusted control fields.
+7. CLI output passes a closed schema and redaction before persistence. Raw
+   prompts, secrets, absolute paths, executable commands, self-issued authority,
+   receipts, attestations, and unknown fields are rejected.
+8. One CLI vertical path must run through the common SideEffectGateway under an
+   explicit isolated profile using temporary state and bounded local fixtures.
+   That profile cannot authorize production targets, production credentials,
+   Git delivery, registered-child traversal, or external network effects.
+9. Parent tests use only isolated generic fixtures. TraceCue and FrameCue remain
+   child-owned adapters and product-success authorities; this task modifies no
+   child repository.
+10. Completion explicitly reports non-UI wiring implemented, production
+    unavailable, Activation `planned`, and Control Center reconstruction
+    pending. No release candidate is frozen and no activation trust is enrolled.
+11. Each CLI task uses real Linux user, mount, network, and PID isolation with
+    Bubblewrap, read-only private input, one private writable output root,
+    pinned executable hashes, and durable non-reusable process identity. It
+    must never fall back to an unisolated run. Docker, Podman, Kubernetes,
+    daemon services, and container images are not required.
+12. `runtime isolation-check` reports whether isolation is available, what is
+    missing or disabled, OS-specific copyable installation guidance, namespace
+    inspection commands, and the recheck command. It never installs software or
+    changes administrator-controlled OS policy.
+13. Provider contracts cover subscription CLI, metered API, and local models.
+    API secrets remain opaque references, cost/model/publisher policy applies
+    before selection, and no metered API call is allowed until a gateway-owned
+    secret-delivery, endpoint-observation, budget, retry, and idempotency
+    transport is configured. The current production API path remains unavailable.
+14. Protected runtime trust is recursively immutable after loading. Production-
+    shaped stores accept only verifier objects branded by the protected owner
+    trust factory and bind the exact protected authority fingerprint for
+    Approval issuance, Receipt proof, finalization fence, launch observation,
+    and isolated authority verification; matching method names or IDs are not
+    sufficient.
+15. Launch confirmation is scoped to the exact pinned executable, certified
+    manifest, and observed CLI argument vector. Candidate stdout/stderr and
+    model self-report are untrusted data and cannot establish the selected
+    model or effort. The launch report is explicitly a
+    `pinned_cli_launch_configuration` observation, not provider-backend
+    attestation.
+16. The controller persists PID, process-group identity, contained-process
+    identity, namespace evidence,
+    launch observation, and the `RUNNING` transition before releasing the
+    provider's two-stage startup barrier. The pinned barrier interpreter and
+    script treat controller EOF as permanent non-release; a crash before
+    release leaves provider code blocked until fenced recovery terminates the
+    persisted group.
+17. A provider-completed CLI response is persisted only as an unaccepted
+    `AgentResultCandidate`. It does not complete or close the `AgentRun` and
+    cannot become an accepted `AgentResult` until separately assigned Lead,
+    Orchestrator, and Validator review records pass the existing closure gate.
+18. Unknown or malformed model-policy fields, non-array allow/deny data,
+    missing/empty/non-finite/negative resource bounds, non-finite/negative estimated
+    cost, or budget values without a corresponding provider bound make the
+    provider ineligible. They never fall open to automatic selection.
+19. Owner and task model policies compose by restrictive allowlist intersection
+    and deny-list union. A task cannot loosen an owner denial. Explicit null or
+    malformed policy, absent required manifest bounds/cost, or missing cost
+    budget for a nonzero-cost provider fails closed.
+20. Repository, resolved Git directory/common-directory, `.agents`, `.codex`,
+    and protected owner-trust roots may not be an input/output root, ancestor,
+    or descendant of the private runtime roots. Control metadata below a root
+    and relocated Git administrative ancestors are refused before spawn.
+21. The authority-owned task delivery is verified before dispatch and again
+    after provider execution immediately before receipt finalization. Mutation
+    leaves the effect non-successful and recoverable; it cannot produce an
+    accepted receipt.
+22. `AgentRun`, `AgentResultCandidate`, `AgentResult`, and `AgentRunClosure`
+    use a dedicated lifecycle writer. Closure must load the persisted candidate
+    and bind its exact result, process, lifecycle-run, launch-report, review,
+    policy, and authority fingerprints. The writer reloads all three reviewer
+    assignments and reviews and requires the exact two relations and three
+    lifecycle events; caller-supplied replacement results are rejected.
+23. A generic or duck-typed composition may preview but cannot execute,
+    reconcile, launch, or fence production effects. Those operations require a
+    protected store plus a Receipt issuer branded by the same protected trust
+    source and the exact protected finalization authority.
+    Finding codes are bounded identifier fields, not free-form output channels.
+24. Operational CLI dispatch accepts only an authority-fenced executor created
+    from the protected `RunLifecyclePort`; mutable capability booleans are not
+    authority. Prompt fingerprinting uses positional reads so the pinned input
+    descriptor remains at byte zero when inherited as child standard input.
+25. An `AgentResultCandidate` must reload an already completed runtime run and
+    match its authority epoch, result fingerprint, process identity, launch
+    report, structured result, relation, and event topology. A caller-created
+    self-consistent candidate is insufficient provenance.
+26. Immediately before launch, the current certified manifest, its nonempty
+    resource bounds, estimated cost, and explicit execution timeout are
+    rechecked against the persisted reservation. Operational execution has no
+    implicit 30-minute fallback. Completed-run replay returns the persisted
+    result fingerprint unchanged.
+27. In a protected operational store, runtime-run creation, process binding,
+    and state transition accept only a private writer capability bound to that
+    exact store and held inside its factory-created lifecycle port. Possession
+    of the public port, another store's port, or matching methods cannot write
+    runtime state. Restart recovery carries explicit recovery-only authority
+    through every termination transition and returns the store to normal mode
+    only after no unresolved runtime row remains.
+28. Protected candidate insertion binds a deterministic AgentRun identity to
+    its durable `AgentLaunchIntent`, DelegationGrant, provider plan, exact
+    complete gateway launch-request fingerprint, completed
+    runtime effect and receipt, exact admission subject/request/decision and
+    receipt, and the authority fields on every lifecycle event. A valid tuple
+    cannot be replayed into a caller-created run lineage. Delegation,
+    reservation, reviewer-assignment, review, and Validator writers also
+    require an owner-trust-branded agent authority bound to the same protected
+    trust source; caller-created `trusted` or `independent` objects are not
+    authority.
+
+Current local conformance evidence is 217 passing tests across 17 standalone
+suites, all seven frozen contracts, and the clean-candidate canonical
+repository aggregate. PR CI, merge, main CI, and local/remote synchronization
+evidence are still required before delivery is complete.
+
+The future Control Center reconstruction must expose the isolation diagnostic,
+guided installation/recheck, provider billing mode, model and publisher policy,
+and cost ceilings in non-technical language. This requirement does not
+authorize changes to the currently paused Control Center.

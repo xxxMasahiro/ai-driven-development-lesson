@@ -25,6 +25,7 @@
         "requires_exact_adapter_version": true
       },
       "priority": 10,
+      "resource_bounds": {"cost": 0},
       "estimated_cost": 0,
       "model_catalog_source": "runtime_discovery",
       "capabilities": ["model_selection", "native_reasoning_configuration", "read_only_sandbox", "workspace_write_sandbox", "structured_jsonl_output"]

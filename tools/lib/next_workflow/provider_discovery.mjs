@@ -1,7 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { accessSync, constants as fsConstants, lstatSync, readFileSync, realpathSync } from "node:fs";
 import path from "node:path";
-import { providerDigest, providerIdentityKey, validateExecutableDescriptor } from "./providers.mjs";
+import { providerDigest, providerIdentityKey, providerManifestFingerprint, validateExecutableDescriptor } from "./providers.mjs";
 
 const CODEX_ARGUMENT_TEMPLATE = Object.freeze([
   "exec",
@@ -102,6 +102,7 @@ function requireDiscoveryAuthorities(probeAuthority, certificationAuthority) {
 function codexFamilyInputs({ family, executable, interpreterDescriptor, adapterVersion, models, observedAt, freshUntil, platform, probeAuthority, certificationAuthority }) {
   if (family.adapter_id !== "codex_cli" || family.transport_id !== "cli_process") throw new Error("PROVIDER_DISCOVERY_FAMILY_UNSUPPORTED");
   if (family.observed_adapter_version !== adapterVersion) throw new Error("PROVIDER_DISCOVERY_ADAPTER_VERSION_DRIFT");
+  if (!family.resource_bounds || typeof family.resource_bounds !== "object" || Array.isArray(family.resource_bounds) || Object.keys(family.resource_bounds).length === 0 || Object.values(family.resource_bounds).some((value) => !Number.isFinite(value) || value < 0) || !Number.isFinite(family.estimated_cost) || family.estimated_cost < 0) throw new Error("PROVIDER_DISCOVERY_RESOURCE_POLICY_REQUIRED");
   const executableDescriptor = { canonical_path: executable, digest: providerDigest(readFileSync(executable)) };
   const manifests = models.map((model) => {
     const identity = {
@@ -120,10 +121,11 @@ function codexFamilyInputs({ family, executable, interpreterDescriptor, adapterV
       native_reasoning_values: model.native_reasoning_values,
       effort_mapping: exactEffortMapping(model.native_reasoning_values),
       certification_profile: { probe_authority: "independent", certification_authority: "independent", isolated_probe: true },
-      reasoning_mapping_provenance: { kind: "exact_native_identity", catalog_source: family.model_catalog_source, observed_at: observedAt },
-      resource_bounds: {},
+      reasoning_mapping_provenance: { source_id: `${family.model_catalog_source}:${model.model_id}`, revision: adapterVersion, reviewed_by: probeAuthority.authority_id, proof_fingerprint: providerDigest({ kind: "exact_native_identity", catalog_source: family.model_catalog_source, model_id: model.model_id, observed_at: observedAt, probe_authority_id: probeAuthority.authority_id }) },
+      selection_profile: { correctness: family.selection_profile?.correctness ?? 0, safety: family.selection_profile?.safety ?? 0, efficiency: family.selection_profile?.efficiency ?? 0, roles: [...new Set(family.selection_profile?.roles ?? [])].sort() },
+      resource_bounds: { ...family.resource_bounds },
       priority: Number.isSafeInteger(family.priority) ? family.priority : 100,
-      estimated_cost: Number.isFinite(family.estimated_cost) ? family.estimated_cost : 0,
+      estimated_cost: family.estimated_cost,
       requires_observation: true,
       transport_descriptor: {
         argv_template: [...CODEX_ARGUMENT_TEMPLATE],
@@ -171,6 +173,7 @@ function codexFamilyInputs({ family, executable, interpreterDescriptor, adapterV
       manifest_version: manifest.version,
       adapter_version: adapterVersion,
       platform,
+      manifest_fingerprint: providerManifestFingerprint(manifest),
       executable: executableDescriptor,
       interpreter: interpreterDescriptor,
       model_id: manifest.identity.model_id,
@@ -187,6 +190,7 @@ function codexFamilyInputs({ family, executable, interpreterDescriptor, adapterV
       manifest_version: manifest.version,
       adapter_version: adapterVersion,
       platform,
+      manifest_fingerprint: providerManifestFingerprint(manifest),
       capability_fingerprint: providerDigest(manifest.capabilities),
       state: "CERTIFIED",
       certified_at: observedAt,
@@ -203,7 +207,7 @@ function codexFamilyInputs({ family, executable, interpreterDescriptor, adapterV
     const issued = certificationAuthority.issue({ certification: structuredClone(unsignedCertification), fingerprint: certificationRequestFingerprint, probe_verdict: structuredClone(probeVerdict) });
     if (issued?.issued !== true || issued.authority_id !== certificationAuthority.authority_id || issued.certification_fingerprint !== certificationRequestFingerprint || !/^[a-f0-9]{64}$/.test(issued.proof_fingerprint ?? "")) throw new Error("PROVIDER_CERTIFICATION_ISSUANCE_FAILED");
     const certification = { ...unsignedCertification, certification_proof_fingerprint: issued.proof_fingerprint, authority_fingerprint: providerDigest({ certifier_id: certificationAuthority.authority_id, probe_authority_id: probeAuthority.authority_id, certification_proof_fingerprint: issued.proof_fingerprint }) };
-    return { ...certification, drift_fingerprint: providerDigest({ identity_key: certification.identity_key, manifest_version: certification.manifest_version, adapter_version: certification.adapter_version, platform: certification.platform, capability_fingerprint: certification.capability_fingerprint, observation_fingerprint: certification.observation_fingerprint, revocation_epoch: certification.revocation_epoch }) };
+    return { ...certification, drift_fingerprint: providerDigest({ identity_key: certification.identity_key, manifest_version: certification.manifest_version, adapter_version: certification.adapter_version, platform: certification.platform, manifest_fingerprint: certification.manifest_fingerprint, capability_fingerprint: certification.capability_fingerprint, observation_fingerprint: certification.observation_fingerprint, revocation_epoch: certification.revocation_epoch }) };
   });
   return { manifests, certifications, observations, observationVerifier, certificationAuthority };
 }

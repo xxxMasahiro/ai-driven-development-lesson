@@ -18,15 +18,19 @@ import {
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { DatabaseSync, backup as sqliteBackup } from "node:sqlite";
+import { assertProtectedRuntimeVerifier, protectedRuntimeVerifierFingerprint, protectedRuntimeVerifierTrustFingerprint } from "./runtime_trust.mjs";
 import { assertNoSecretMaterial } from "./secret_policy.mjs";
+import { assertProtectedRunLifecycleWriter } from "./run_lifecycle.mjs";
 
 const MODULE_DIR = dirname(fileURLToPath(import.meta.url));
 const MIGRATIONS = [
   { version: 1, name: "initial", path: join(MODULE_DIR, "migrations", "001_initial.sql") },
-  { version: 2, name: "saga-replay-and-intent-time", path: join(MODULE_DIR, "migrations", "002_saga_replay.sql") }
+  { version: 2, name: "saga-replay-and-intent-time", path: join(MODULE_DIR, "migrations", "002_saga_replay.sql") },
+  { version: 3, name: "runtime-wiring", path: join(MODULE_DIR, "migrations", "003_runtime_wiring.sql") }
 ];
 const STORE_SCHEMA_VERSION = MIGRATIONS.at(-1).version;
 const OPEN_DATABASE_COUNTS = new Map();
+const PROTECTED_WORKFLOW_STATE_STORES = new WeakSet();
 const INTENT_TRANSITIONS = new Map([
   ["PREPARED", new Set(["DISPATCHING", "UNKNOWN", "MANUAL_RECOVERY_REQUIRED"])],
   ["DISPATCHING", new Set(["OBSERVED", "UNKNOWN", "CONFLICT", "MANUAL_RECOVERY_REQUIRED"])],
@@ -60,6 +64,18 @@ const ACTIVATION_TRANSITIONS = new Map([
   ["enforced", new Set(["rolled_back"])],
   ["rolled_back", new Set()]
 ]);
+const RUNTIME_RUN_TRANSITIONS = new Map([
+  ["STARTING", new Set(["RUNNING", "TERMINATING", "FAILED", "UNKNOWN"])],
+  ["RUNNING", new Set(["CANCELLING", "TERMINATING", "COMPLETED", "FAILED", "TIMED_OUT", "UNKNOWN"])],
+  ["CANCELLING", new Set(["CANCELLED", "TERMINATING", "UNKNOWN"])],
+  ["TERMINATING", new Set(["CANCELLED", "TIMED_OUT", "FAILED", "UNKNOWN"])],
+  ["UNKNOWN", new Set(["RUNNING", "COMPLETED", "FAILED", "CANCELLED", "CONFLICT"])],
+  ["CONFLICT", new Set()],
+  ["COMPLETED", new Set()],
+  ["FAILED", new Set()],
+  ["CANCELLED", new Set()],
+  ["TIMED_OUT", new Set()]
+]);
 const SAGA_DRAINING_MESSAGE_TYPES = new Set(["observation", "reconciliation", "existing_intent_delivery"]);
 const AGENT_AUTHORITY_RECORD_KINDS = new Set([
   "DelegationGrant",
@@ -70,6 +86,7 @@ const AGENT_AUTHORITY_RECORD_KINDS = new Set([
   "ValidatorDecision",
   "ResourceCostReservation"
 ]);
+const AGENT_LIFECYCLE_RECORD_KINDS = new Set(["AgentRun", "AgentResultCandidate", "AgentResult", "AgentRunClosure"]);
 const MIGRATION_LEDGER_SQL = "CREATE TABLE IF NOT EXISTS schema_migrations (version INTEGER PRIMARY KEY, name TEXT NOT NULL UNIQUE, checksum TEXT NOT NULL, state TEXT NOT NULL CHECK(state IN ('pending','applied','failed')), started_at TEXT NOT NULL, applied_at TEXT) STRICT";
 let EXPECTED_SQLITE_SCHEMA_FINGERPRINT;
 
@@ -96,6 +113,25 @@ function effectReceiptBindingFingerprint(intent, receipt) {
     expected_selector: JSON.parse(intent.expected_selector_json),
     observed_object: receipt.object_identity,
     observation_fingerprint: receipt.observation_fp
+  });
+}
+
+function runtimeApprovalBindingFingerprint(approval) {
+  return digest({
+    reason: approval.reason,
+    approval_id: approval.approval_id,
+    repository_logical_id: approval.repository_logical_id,
+    checkout_instance_id: approval.checkout_instance_id,
+    task_id: approval.task_id,
+    run_id: approval.run_id,
+    operation: approval.operation,
+    target_id: approval.target_id,
+    request_fingerprint: approval.request_fingerprint,
+    policy_revision: approval.policy_revision,
+    settings_revision: approval.settings_revision,
+    authority_epoch: approval.authority_epoch,
+    issued_at: approval.issued_at,
+    fresh_until: approval.fresh_until,
   });
 }
 
@@ -184,16 +220,54 @@ function createPreMigrationBackup(db, candidate, fromVersion, clock) {
   db.prepare("PRAGMA wal_checkpoint(TRUNCATE)").get();
   const backup = `${candidate}.pre-migration-v${fromVersion}.sqlite`;
   const manifestPath = `${backup}.manifest.json`;
-  if (existsSync(backup) || existsSync(manifestPath)) throw new Error("MIGRATION_BACKUP_DESTINATION_EXISTS");
-  copyFileSync(candidate, backup, fsConstants.COPYFILE_EXCL);
+  if (existsSync(manifestPath) && !existsSync(backup)) throw new Error("MIGRATION_BACKUP_INCOMPLETE");
+  const currentMetadata = { identity: getMeta(db, "identity"), source_revision: Number(getMeta(db, "store_revision") ?? 0), revocation_epoch: Number(getMeta(db, "revocation_epoch") ?? 0) };
+  function inspectBackup(file) {
+    const snapshot = new DatabaseSync(file, { readOnly: true, allowExtension: false });
+    try {
+      databaseChecks(snapshot, "MIGRATION_BACKUP");
+      const versions = snapshot.prepare("SELECT version,state FROM schema_migrations ORDER BY version").all();
+      if (versions.length === 0 || Math.max(...versions.map((row) => Number(row.version))) !== fromVersion || versions.some((row) => row.state !== "applied")) throw new Error("MIGRATION_BACKUP_SCHEMA_MISMATCH");
+      return { identity: getMeta(snapshot, "identity"), source_revision: Number(getMeta(snapshot, "store_revision") ?? -1), revocation_epoch: Number(getMeta(snapshot, "revocation_epoch") ?? -1) };
+    } finally {
+      snapshot.close();
+    }
+  }
+  let backupMetadata = null;
+  if (existsSync(backup)) {
+    backupMetadata = inspectBackup(backup);
+    if (canonicalJson(backupMetadata) !== canonicalJson(currentMetadata)) throw new Error("MIGRATION_BACKUP_AUTHORITY_MISMATCH");
+  }
   const manifest = {
     format: "workflow-state-pre-migration-backup-v1",
-    database_digest: digest(readFileSync(backup)),
+    database_digest: existsSync(backup) ? digest(readFileSync(backup)) : null,
+    identity: backupMetadata?.identity ?? currentMetadata.identity,
+    schema_version: fromVersion,
+    source_revision: backupMetadata?.source_revision ?? currentMetadata.source_revision,
+    revocation_epoch: backupMetadata?.revocation_epoch ?? currentMetadata.revocation_epoch,
     from_schema_version: fromVersion,
     to_schema_version: STORE_SCHEMA_VERSION,
     created_at: clock()
   };
-  writeExclusiveFile(manifestPath, `${canonicalJson(manifest)}\n`, { replace: false });
+  if (existsSync(backup)) {
+    if (existsSync(manifestPath)) {
+      const existing = JSON.parse(readFileSync(manifestPath, "utf8"));
+      if (existing.format !== manifest.format || existing.schema_version !== fromVersion || existing.from_schema_version !== fromVersion || existing.to_schema_version !== STORE_SCHEMA_VERSION || existing.database_digest !== manifest.database_digest || existing.source_revision !== manifest.source_revision || existing.revocation_epoch !== manifest.revocation_epoch || canonicalJson(existing.identity) !== canonicalJson(manifest.identity)) throw new Error("MIGRATION_BACKUP_CONFLICT");
+      return { backup, manifest_path: manifestPath, reused: true };
+    }
+    writeExclusiveFile(manifestPath, `${canonicalJson(manifest)}\n`, { replace: false });
+    fsyncDirectory(dirname(candidate));
+    return { backup, manifest_path: manifestPath, recovered_manifest: true };
+  }
+  const stagedBackup = randomSibling(backup, "pre-migration");
+  const stagedManifest = randomSibling(manifestPath, "pre-migration-manifest");
+  copyFileSync(candidate, stagedBackup, fsConstants.COPYFILE_EXCL);
+  const stagedMetadata = inspectBackup(stagedBackup);
+  if (canonicalJson(stagedMetadata) !== canonicalJson(currentMetadata)) throw new Error("MIGRATION_BACKUP_AUTHORITY_MISMATCH");
+  manifest.database_digest = digest(readFileSync(stagedBackup));
+  writeExclusiveFile(stagedManifest, `${canonicalJson(manifest)}\n`, { replace: false });
+  renameSync(stagedBackup, backup);
+  renameSync(stagedManifest, manifestPath);
   fsyncDirectory(dirname(candidate));
   return { backup, manifest_path: manifestPath };
 }
@@ -280,7 +354,8 @@ function recoveryState(db) {
     ORDER BY i.effect_id
   `).all();
   const outbox = db.prepare("SELECT outbox_id,intent_id,state FROM outbox WHERE state IN ('pending','sending') ORDER BY outbox_id").all();
-  return { required: intents.length > 0 || outbox.length > 0, intents, outbox };
+  const runs = db.prepare("SELECT run_id,idempotency_key,state,pid,process_group_id,updated_at FROM runtime_runs WHERE state NOT IN ('COMPLETED','FAILED','CANCELLED','TIMED_OUT') ORDER BY run_id").all();
+  return { required: intents.length > 0 || outbox.length > 0 || runs.length > 0, intents, outbox, runs };
 }
 
 function randomSibling(target, label) {
@@ -358,15 +433,69 @@ function normalizeRecord(record, identity, now) {
   };
 }
 
-function assertDedicatedRecordWriterKinds(records, { allowEffectReceiptProof = false } = {}) {
+function normalizeRuntimeObservation(observation = {}) {
+  assertPlainObject(observation, "RUNTIME_RUN_OBSERVATION_INVALID");
+  assertNoRawSecrets(observation);
+  const encoded = canonicalJson(observation);
+  if (Buffer.byteLength(encoded) > 8 * 1024 * 1024) throw new Error("RUNTIME_RUN_OBSERVATION_TOO_LARGE");
+  return encoded;
+}
+
+function assertClosedKeys(value, allowed, prefix) {
+  assertPlainObject(value, `${prefix}_INVALID`);
+  for (const key of Object.keys(value)) if (!allowed.has(key)) throw new Error(`${prefix}_UNKNOWN_FIELD:${key}`);
+}
+
+function normalizeRuntimeRun(run, now) {
+  const allowed = new Set(["run_id", "idempotency_key", "plan_fingerprint", "authority_epoch", "fence_fingerprint", "start_nonce", "started_at", "observation"]);
+  assertClosedKeys(run, allowed, "RUNTIME_RUN");
+  for (const field of ["run_id", "idempotency_key", "plan_fingerprint", "fence_fingerprint", "start_nonce", "started_at"]) if (typeof run[field] !== "string" || run[field].length === 0) throw new Error(`RUNTIME_RUN_FIELD_REQUIRED:${field}`);
+  if (!/^[a-f0-9]{64}$/.test(run.plan_fingerprint) || !/^[a-f0-9]{64}$/.test(run.fence_fingerprint)) throw new Error("RUNTIME_RUN_FINGERPRINT_INVALID");
+  if (!Number.isSafeInteger(run.authority_epoch) || run.authority_epoch < 0) throw new Error("RUNTIME_RUN_AUTHORITY_EPOCH_INVALID");
+  if (!Number.isFinite(Date.parse(run.started_at)) || Date.parse(run.started_at) > Date.parse(now)) throw new Error("RUNTIME_RUN_START_TIME_INVALID");
+  return {
+    run_id: run.run_id,
+    idempotency_key: run.idempotency_key,
+    plan_fp: run.plan_fingerprint,
+    authority_epoch: run.authority_epoch,
+    fence_fp: run.fence_fingerprint,
+    state: "STARTING",
+    pid: null,
+    process_group_id: null,
+    start_nonce: run.start_nonce,
+    started_at: run.started_at,
+    updated_at: now,
+    exit_code: null,
+    signal: null,
+    result_fp: null,
+    result_size: null,
+    observation_json: normalizeRuntimeObservation(run.observation ?? {})
+  };
+}
+
+function decodeRuntimeRun(row) {
+  return row ? { ...row, observation: JSON.parse(row.observation_json) } : undefined;
+}
+
+function assertDedicatedRecordWriterKinds(records, { allowEffectReceiptProof = false, allowAgentLifecycle = false } = {}) {
   if (records.some((record) => record.kind === "Relationship")) throw new Error("RELATIONSHIP_LIFECYCLE_WRITER_REQUIRED");
   if (records.some((record) => record.kind === "NextWorkflowActivation")) throw new Error("ACTIVATION_LIFECYCLE_WRITER_REQUIRED");
   if (records.some((record) => AGENT_AUTHORITY_RECORD_KINDS.has(record.kind))) throw new Error("AGENT_AUTHORITY_RECORD_WRITER_REQUIRED");
+  if (!allowAgentLifecycle && records.some((record) => AGENT_LIFECYCLE_RECORD_KINDS.has(record.kind))) throw new Error("AGENT_LIFECYCLE_RECORD_WRITER_REQUIRED");
   if (!allowEffectReceiptProof && records.some((record) => record.kind === "EffectReceiptProof")) throw new Error("RECONCILIATION_PROOF_WRITER_REQUIRED");
 }
 
-export function openWorkflowStateStore({ repositoryRoot, databasePath, expectedIdentity, mode = "readwrite", receiptProofVerifier, clock = () => new Date().toISOString() }) {
+export function openWorkflowStateStore({ repositoryRoot, databasePath, expectedIdentity, mode = "readwrite", receiptProofVerifier, finalizationFenceVerifier, protectedRuntimeVerifiers = false, clock = () => new Date().toISOString() }) {
   const identity = normalizeIdentity(expectedIdentity);
+  if (typeof protectedRuntimeVerifiers !== "boolean") throw new Error("STORE_PROTECTED_RUNTIME_VERIFIER_MODE_INVALID");
+  const receiptProofVerifierFingerprint = protectedRuntimeVerifiers ? protectedRuntimeVerifierFingerprint(receiptProofVerifier, "receipt_proof") : null;
+  const finalizationFenceVerifierFingerprint = protectedRuntimeVerifiers ? protectedRuntimeVerifierFingerprint(finalizationFenceVerifier, "finalization_fence") : null;
+  const receiptRuntimeTrustFingerprint = protectedRuntimeVerifiers ? protectedRuntimeVerifierTrustFingerprint(receiptProofVerifier, "receipt_proof") : null;
+  const finalizationRuntimeTrustFingerprint = protectedRuntimeVerifiers ? protectedRuntimeVerifierTrustFingerprint(finalizationFenceVerifier, "finalization_fence") : null;
+  if (protectedRuntimeVerifiers && receiptRuntimeTrustFingerprint !== finalizationRuntimeTrustFingerprint) throw new Error("STORE_PROTECTED_RUNTIME_TRUST_MISMATCH");
+  const requireProtectedRunLifecycleWriter = (lifecycleWriter) => {
+    if (protectedRuntimeVerifiers) assertProtectedRunLifecycleWriter(lifecycleWriter, api);
+  };
   const defaultPath = join(realpathSync(repositoryRoot), ".workflow-state", "workflow.sqlite");
   const { root, candidate } = resolveSafePath(repositoryRoot, databasePath ?? defaultPath);
   if (mode !== "readwrite" && mode !== "readonly") throw new Error("STORE_MODE_INVALID");
@@ -375,7 +504,7 @@ export function openWorkflowStateStore({ repositoryRoot, databasePath, expectedI
   if (mode === "readonly" && !existsSync(candidate)) throw new Error("STORE_NOT_FOUND");
   const db = new DatabaseSync(candidate, { readOnly: mode === "readonly", allowExtension: false });
   let closed = false;
-  let startupRecovery = { required: false, intents: [], outbox: [] };
+  let startupRecovery = { required: false, intents: [], outbox: [], runs: [] };
   if (mode === "readwrite") {
     let migrationResult;
     let schemaBefore;
@@ -554,6 +683,12 @@ export function openWorkflowStateStore({ repositoryRoot, databasePath, expectedI
     assertWritable();
     if (!Number.isInteger(expectedRevision) || expectedRevision < 0 || !record || !event) throw new Error("AGENT_AUTHORITY_RECORD_INPUT_INVALID");
     if (!verifier || verifier.trusted !== true || verifier.independent !== true || typeof verifier.authority_id !== "string" || typeof verifier.verify !== "function") throw new Error("AGENT_AUTHORITY_RECORD_VERIFIER_REQUIRED");
+    let authorityVerifierFingerprint = null;
+    if (protectedRuntimeVerifiers) {
+      assertProtectedRuntimeVerifier(verifier, "agent_authority");
+      if (protectedRuntimeVerifierTrustFingerprint(verifier, "agent_authority") !== receiptRuntimeTrustFingerprint) throw new Error("AGENT_AUTHORITY_RUNTIME_TRUST_MISMATCH");
+      authorityVerifierFingerprint = protectedRuntimeVerifierFingerprint(verifier, "agent_authority");
+    }
     assertNoRawSecrets({ record, event });
     const now = clock();
     db.exec("BEGIN IMMEDIATE");
@@ -565,9 +700,10 @@ export function openWorkflowStateStore({ repositoryRoot, databasePath, expectedI
       const verdict = verifier.verify({ record: structuredClone(record), fingerprint: authorityFingerprint, locked_revision: lockedRevision, now });
       if (verdict && typeof verdict.then === "function") throw new Error("AGENT_AUTHORITY_RECORD_ASYNC_VERIFIER_UNSUPPORTED");
       if (verdict?.verified !== true || verdict.authority_id !== verifier.authority_id || verdict.fingerprint !== authorityFingerprint || !/^[a-f0-9]{64}$/.test(verdict.proof_fingerprint ?? "")) throw new Error("AGENT_AUTHORITY_RECORD_VERIFICATION_FAILED");
-      const normalized = normalizeRecord({ ...record, payload: { ...record.payload, authority_id: verifier.authority_id, authority_proof_fingerprint: verdict.proof_fingerprint } }, identity, now);
+      const authorityBinding = protectedRuntimeVerifiers ? { authority_verifier_fingerprint: authorityVerifierFingerprint, authority_trust_fingerprint: receiptRuntimeTrustFingerprint } : {};
+      const normalized = normalizeRecord({ ...record, payload: { ...record.payload, authority_id: verifier.authority_id, authority_proof_fingerprint: verdict.proof_fingerprint, ...authorityBinding } }, identity, now);
       db.prepare(`INSERT INTO records(id,kind,schema_version,record_revision,repository_id,checkout_id,authority_scope,lineage_id,lifecycle_state,payload_json,source_revision,policy_fp,input_fp,content_fp,sensitivity,fresh_until,created_at,superseded_by) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(...Object.values(normalized));
-      db.prepare("INSERT INTO events(event_id,aggregate_id,event_type,payload_json,authority_decision_id,created_at) VALUES(?,?,?,?,?,?)").run(event.event_id, event.aggregate_id ?? normalized.id, event.event_type, canonicalJson({ ...(event.payload ?? {}), authority_proof_fingerprint: verdict.proof_fingerprint }), event.authority_decision_id ?? verifier.authority_id, event.created_at ?? now);
+      db.prepare("INSERT INTO events(event_id,aggregate_id,event_type,payload_json,authority_decision_id,created_at) VALUES(?,?,?,?,?,?)").run(event.event_id, event.aggregate_id ?? normalized.id, event.event_type, canonicalJson({ ...(event.payload ?? {}), authority_proof_fingerprint: verdict.proof_fingerprint, ...authorityBinding }), event.authority_decision_id ?? verifier.authority_id, event.created_at ?? now);
       setMeta(db, "store_revision", lockedRevision + 1);
       db.exec("COMMIT");
       return { revision: lockedRevision + 1, record_id: normalized.id, kind: normalized.kind, authority_id: verifier.authority_id, proof_fingerprint: verdict.proof_fingerprint };
@@ -577,24 +713,128 @@ export function openWorkflowStateStore({ repositoryRoot, databasePath, expectedI
     }
   }
 
+  function validateAgentLifecycleCommit({ authorityEpoch, records, relations = [], events = [] }) {
+    if (!Number.isSafeInteger(authorityEpoch) || authorityEpoch !== Number(getMeta(db, "revocation_epoch") ?? 0) || !Array.isArray(records) || !Array.isArray(relations) || !Array.isArray(events)) throw new Error("AGENT_LIFECYCLE_AUTHORITY_REQUIRED");
+    if (records.length < 1 || records.some((record) => !AGENT_LIFECYCLE_RECORD_KINDS.has(record.kind))) throw new Error("AGENT_LIFECYCLE_RECORD_SET_INVALID");
+    const byKind = new Map(records.map((record) => [record.kind, record]));
+    if (byKind.has("AgentRun")) {
+      if (byKind.has("AgentResult") || byKind.has("AgentRunClosure") || records.length > 2) throw new Error("AGENT_LIFECYCLE_REPORT_SET_INVALID");
+      const run = byKind.get("AgentRun");
+      const candidateRecord = byKind.get("AgentResultCandidate") ?? null;
+      if (!run || !["RUNNING", "FAILED", "TIMED_OUT", "STOPPED"].includes(run.lifecycle_state) || run.payload?.authority_epoch !== authorityEpoch || typeof run.policy_fp !== "string" || run.policy_fp.length === 0) throw new Error("AGENT_LIFECYCLE_RUN_INVALID");
+      if (protectedRuntimeVerifiers && (run.id !== `agent-run-${run.lineage_id}` || run.payload?.intent_id !== run.lineage_id || run.input_fp !== run.payload?.launch_intent_fingerprint)) throw new Error("AGENT_LIFECYCLE_RUN_INTENT_BINDING_INVALID");
+      const grant = persistedAgentRecord("DelegationGrant", (record) => record.lifecycle_state === "AUTHORIZED" && record.payload?.fingerprint === run.source_revision && record.payload?.authority_epoch === authorityEpoch);
+      if (!grant || grant.policy_fp !== run.policy_fp || Date.parse(grant.fresh_until) < Date.parse(clock())) throw new Error("AGENT_LIFECYCLE_GRANT_INVALID");
+      if (candidateRecord) {
+        const candidateFingerprint = candidateRecord.payload?.result_fingerprint;
+        if (run.lifecycle_state !== "RUNNING" || run.payload?.result_candidate_record_id !== candidateRecord.id || run.payload?.lifecycle_run_id !== candidateRecord.payload?.lifecycle_run_id || candidateRecord.lifecycle_state !== "REPORTED" || candidateRecord.lineage_id !== run.id || candidateRecord.policy_fp !== run.policy_fp || candidateRecord.source_revision !== candidateFingerprint || candidateRecord.input_fp !== candidateFingerprint || candidateRecord.payload?.accepted !== false || !/^[a-f0-9]{64}$/.test(candidateFingerprint ?? "") || digest(candidateRecord.payload?.result) !== candidateFingerprint || !/^[a-f0-9]{64}$/.test(candidateRecord.payload?.process_identity_fingerprint ?? "") || !candidateRecord.payload?.launch_report || [candidateRecord.payload.launch_report.provider, candidateRecord.payload.launch_report.model, candidateRecord.payload.launch_report.effort].some((value) => typeof value !== "string" || value.length === 0) || candidateRecord.payload.launch_report.effort === "none") throw new Error("AGENT_RESULT_CANDIDATE_RECORD_INVALID");
+        const runtimeRun = api.getRuntimeRun({ runId: candidateRecord.payload.lifecycle_run_id });
+        if (runtimeRun?.state !== "COMPLETED" || runtimeRun.authority_epoch !== authorityEpoch || runtimeRun.result_fp !== candidateFingerprint || runtimeRun.observation?.process_identity_fingerprint !== candidateRecord.payload.process_identity_fingerprint || canonicalJson(runtimeRun.observation?.launch_report) !== canonicalJson(candidateRecord.payload.launch_report) || digest(runtimeRun.observation?.agent_result) !== candidateFingerprint || candidateRecord.payload.result?.run_id !== runtimeRun.run_id) throw new Error("AGENT_RESULT_CANDIDATE_RUNTIME_PROVENANCE_INVALID");
+        if (protectedRuntimeVerifiers) {
+          const launchIntentRecord = api.get({ id: `agent-launch-intent-${run.lineage_id}` });
+          const launchIntent = api.getIntent(runtimeRun.run_id);
+          const launchReceipt = api.getReceipt(runtimeRun.run_id);
+          const admissionIntent = api.getIntent(run.payload?.admission_effect_id);
+          const admissionReceipt = api.getReceipt(run.payload?.admission_effect_id);
+          const grantRecordId = `delegation-grant-${grant.payload?.grant_id}`;
+          if (launchIntentRecord?.kind !== "AgentLaunchIntent" || launchIntentRecord.lifecycle_state !== "PREPARED" || launchIntentRecord.lineage_id !== run.lineage_id || launchIntentRecord.payload?.intent_id !== run.lineage_id || launchIntentRecord.payload?.fingerprint !== run.input_fp || launchIntentRecord.payload?.fingerprint !== run.payload?.launch_intent_fingerprint || launchIntentRecord.payload?.grant_record_id !== grantRecordId || launchIntentRecord.payload?.grant_fingerprint !== grant.payload?.fingerprint || launchIntentRecord.payload?.provider_plan_fingerprint !== runtimeRun.plan_fp || launchIntentRecord.source_revision !== grant.payload?.fingerprint || launchIntentRecord.policy_fp !== run.policy_fp) throw new Error("AGENT_RESULT_CANDIDATE_LAUNCH_INTENT_PROVENANCE_INVALID");
+          if (candidateRecord.id !== `agent-result-candidate-${run.id}` || launchIntent?.state !== "RECONCILED" || launchIntent.effect_id !== runtimeRun.run_id || launchIntent.operation !== "agent_launch:spawn" || launchIntent.authority_epoch !== authorityEpoch || launchIntent.policy_revision !== run.policy_fp || launchIntent.request_fp !== launchIntentRecord.payload?.launch_request_fingerprint || !/^[a-f0-9]{64}$/.test(launchIntentRecord.payload?.launch_request_fingerprint ?? "") || !launchReceipt || launchReceipt.intent_id !== launchIntent.effect_id || launchReceipt.receipt_id !== `receipt-${launchIntent.effect_id}` || admissionIntent?.state !== "RECONCILED" || admissionIntent.operation !== "agent_run_admission:admit" || admissionIntent.target_id !== run.lineage_id || admissionIntent.authority_epoch !== authorityEpoch || admissionIntent.policy_revision !== run.policy_fp || admissionIntent.request_fp !== digest({ attestation_fingerprint: run.payload?.attestation_fingerprint }) || !admissionReceipt || admissionReceipt.intent_id !== admissionIntent.effect_id || admissionReceipt.receipt_id !== run.payload?.admission_receipt_id || admissionReceipt.receipt_id !== `receipt-${admissionIntent.effect_id}`) throw new Error("AGENT_RESULT_CANDIDATE_ADMISSION_PROVENANCE_INVALID");
+        }
+        const expectedStates = ["PLANNED", "AUTHORIZED", "STARTING", "RUNNING"];
+        if (canonicalJson(run.payload?.state_history) !== canonicalJson(expectedStates) || relations.length !== 1 || relations[0]?.from_id !== run.id || relations[0]?.relation_kind !== "reported_candidate" || relations[0]?.to_id !== candidateRecord.id || events.length !== expectedStates.length + 1) throw new Error("AGENT_RESULT_CANDIDATE_TOPOLOGY_INVALID");
+        for (let index = 0; index < expectedStates.length; index += 1) {
+          const state = expectedStates[index];
+          const event = events[index];
+          const expectedAuthorityDecision = protectedRuntimeVerifiers && ["AUTHORIZED", "RUNNING"].includes(state) ? api.getIntent(run.payload.admission_effect_id)?.authority_fp : null;
+          if (event?.event_id !== `event-${run.id}-${index + 1}` || event.aggregate_id !== run.id || event.event_type !== `AGENT_RUN_${state}` || event.payload?.state !== state || event.payload?.launch_effect_id !== runtimeRun.run_id || (protectedRuntimeVerifiers && (event.authority_decision_id !== expectedAuthorityDecision || event.payload?.admission_effect_id !== run.payload?.admission_effect_id || event.payload?.admission_receipt_id !== run.payload?.admission_receipt_id))) throw new Error("AGENT_RESULT_CANDIDATE_EVENT_INVALID");
+        }
+        const reportEvent = events.at(-1);
+        if (reportEvent?.event_id !== `event-${candidateRecord.id}` || reportEvent.aggregate_id !== run.id || reportEvent.event_type !== "AGENT_RESULT_CANDIDATE_REPORTED" || (protectedRuntimeVerifiers && reportEvent.authority_decision_id !== api.getIntent(run.payload?.admission_effect_id)?.authority_fp) || reportEvent.payload?.result_candidate_record_id !== candidateRecord.id || reportEvent.payload?.result_fingerprint !== candidateFingerprint || reportEvent.payload?.review_required !== true) throw new Error("AGENT_RESULT_CANDIDATE_EVENT_INVALID");
+      } else if (run.payload?.result_candidate_record_id) throw new Error("AGENT_RESULT_CANDIDATE_RECORD_REQUIRED");
+      return;
+    }
+    if (records.length !== 2 || !byKind.has("AgentResult") || !byKind.has("AgentRunClosure")) throw new Error("AGENT_LIFECYCLE_CLOSURE_SET_INVALID");
+    const result = byKind.get("AgentResult");
+    const closure = byKind.get("AgentRunClosure");
+    const run = api.get({ id: result.lineage_id });
+    const candidateRecord = run?.payload?.result_candidate_record_id ? api.get({ id: run.payload.result_candidate_record_id }) : null;
+    const candidateFingerprint = candidateRecord?.payload?.result_fingerprint;
+    if (run?.kind !== "AgentRun" || run.lifecycle_state !== "RUNNING" || run.payload?.authority_epoch !== authorityEpoch || candidateRecord?.kind !== "AgentResultCandidate" || candidateRecord.lifecycle_state !== "REPORTED" || result.lifecycle_state !== "accepted" || closure.lifecycle_state !== "CLOSED" || closure.lineage_id !== run.id || result.payload?.candidate_record_id !== candidateRecord.id || result.payload?.candidate_result_fingerprint !== candidateFingerprint || closure.payload?.result_candidate_record_id !== candidateRecord.id || closure.payload?.candidate_result_fingerprint !== candidateFingerprint || closure.payload?.result_id !== result.id || result.source_revision !== candidateRecord.id || closure.source_revision !== candidateRecord.id || result.policy_fp !== run.policy_fp || closure.policy_fp !== run.policy_fp || closure.payload?.authority_epoch !== authorityEpoch || canonicalJson(closure.payload?.state_history) !== canonicalJson(["REPORTED", "REVIEWED", "CLOSED"])) throw new Error("AGENT_LIFECYCLE_CLOSURE_BINDING_INVALID");
+    if (!/^[a-f0-9]{64}$/.test(candidateFingerprint ?? "") || digest(candidateRecord.payload?.result) !== candidateFingerprint || result.payload?.provenance?.source_fingerprint !== candidateFingerprint) throw new Error("AGENT_LIFECYCLE_RESULT_PROVENANCE_INVALID");
+    const assignmentIds = closure.payload?.reviewer_assignment_ids;
+    const reviewIds = closure.payload?.review_record_ids;
+    const roles = ["lead", "orchestrator", "validator"];
+    const exactRoleMap = (value) => value && typeof value === "object" && !Array.isArray(value) && Object.keys(value).sort().join("\0") === roles.slice().sort().join("\0") && Object.values(value).every((id) => typeof id === "string" && id.length > 0);
+    if (!exactRoleMap(assignmentIds) || !exactRoleMap(reviewIds)) throw new Error("AGENT_LIFECYCLE_REVIEW_TOPOLOGY_INVALID");
+    for (const role of roles) {
+      if (assignmentIds[role] !== `agent-reviewer-assignment-${run.id}-${role}` || reviewIds[role] !== `agent-review-${run.id}-${role}`) throw new Error("AGENT_LIFECYCLE_REVIEW_TOPOLOGY_INVALID");
+    }
+    const grant = persistedAgentRecord("DelegationGrant", (record) => record.lifecycle_state === "AUTHORIZED" && record.payload?.fingerprint === run.source_revision && record.payload?.authority_epoch === authorityEpoch);
+    if (!grant || grant.policy_fp !== run.policy_fp || Date.parse(grant.fresh_until) < Date.parse(clock())) throw new Error("AGENT_LIFECYCLE_GRANT_INVALID");
+    const assignmentKinds = { lead: ["Value Design Lead", "Planning Design Lead", "Implementation Lead", "Independent Review Lead", "Safety and Acceptance Decision Lead"], orchestrator: ["Orchestrator Agent"], validator: ["Safety and Acceptance Decision Lead"] };
+    const reviewKinds = { lead: "AgentLeadReview", orchestrator: "AgentOrchestratorReview", validator: "AgentValidatorDisposition" };
+    const resultReviewFields = { lead: "lead_review", orchestrator: "orchestrator_review", validator: "validator_disposition" };
+    const closureReviewFields = { lead: "lead_review_fingerprint", orchestrator: "orchestrator_review_fingerprint", validator: "validator_disposition_fingerprint" };
+    const evidenceFingerprint = digest({ run_id: result.payload?.run_id, candidate_record_id: result.payload?.candidate_record_id, provenance: result.payload?.provenance, scope_fingerprint: result.payload?.scope_fingerprint, conclusion: result.payload?.conclusion ?? null, evidence_references: result.payload?.evidence_references ?? [], changed_artifact_manifest: result.payload?.changed_artifact_manifest ?? [], unresolved_items: result.payload?.unresolved_items ?? [] });
+    if (result.payload?.run_id !== run.id || result.payload?.evidence_fingerprint !== evidenceFingerprint) throw new Error("AGENT_LIFECYCLE_RESULT_EVIDENCE_INVALID");
+    const assignedAgents = [];
+    for (const role of roles) {
+      const assignment = api.get({ id: assignmentIds[role] });
+      const review = api.get({ id: reviewIds[role] });
+      if (assignment?.kind !== "AgentReviewerAssignment" || assignment.lifecycle_state !== "AUTHORIZED" || assignment.lineage_id !== run.id || assignment.source_revision !== grant.payload.fingerprint || assignment.policy_fp !== run.policy_fp || Date.parse(assignment.fresh_until) < Date.parse(clock()) || assignment.payload?.run_id !== run.id || assignment.payload?.assignment_kind !== role || assignment.payload?.grant_fingerprint !== grant.payload.fingerprint || assignment.payload?.authority_epoch !== authorityEpoch || assignment.payload?.read_only !== true || !assignmentKinds[role].includes(assignment.payload?.agent_role) || typeof assignment.payload?.authority_proof_fingerprint !== "string" || (protectedRuntimeVerifiers && (assignment.payload?.authority_trust_fingerprint !== receiptRuntimeTrustFingerprint || !/^[a-f0-9]{64}$/.test(assignment.payload?.authority_verifier_fingerprint ?? "")))) throw new Error("AGENT_LIFECYCLE_REVIEWER_ASSIGNMENT_INVALID");
+      assignedAgents.push(assignment.payload.agent_id);
+      const reviewPayload = result.payload?.[resultReviewFields[role]];
+      if (review?.kind !== reviewKinds[role] || review.lifecycle_state !== "accepted" || review.lineage_id !== run.id || review.source_revision !== assignment.id || review.policy_fp !== run.policy_fp || Date.parse(review.fresh_until) < Date.parse(clock()) || review.payload?.assignment_kind !== role || review.payload?.agent_id !== assignment.payload.agent_id || review.payload?.assignment_fingerprint !== digest(assignment.payload) || review.payload?.authority_epoch !== authorityEpoch || review.payload?.accepted !== true || review.payload?.result_fingerprint !== evidenceFingerprint || typeof review.payload?.authority_proof_fingerprint !== "string" || (protectedRuntimeVerifiers && (review.payload?.authority_trust_fingerprint !== receiptRuntimeTrustFingerprint || !/^[a-f0-9]{64}$/.test(review.payload?.authority_verifier_fingerprint ?? ""))) || (role === "validator" && review.payload?.decision !== "PASS") || canonicalJson(reviewPayload) !== canonicalJson(review.payload) || closure.payload?.[closureReviewFields[role]] !== digest(review.payload)) throw new Error("AGENT_LIFECYCLE_REVIEW_RECORD_INVALID");
+    }
+    if (new Set(assignedAgents).size !== roles.length || assignedAgents.includes(grant.payload.child_agent_id)) throw new Error("AGENT_LIFECYCLE_REVIEWER_INDEPENDENCE_INVALID");
+    const authoritativeResult = structuredClone(result.payload);
+    delete authoritativeResult.candidate_result_fingerprint;
+    delete authoritativeResult.evidence_fingerprint;
+    delete authoritativeResult.validator_disposition_fingerprint;
+    const authoritativeResultFingerprint = digest(authoritativeResult);
+    if (result.input_fp !== authoritativeResultFingerprint || closure.input_fp !== authoritativeResultFingerprint || result.payload.validator_disposition_fingerprint !== digest(result.payload.validator_disposition)) throw new Error("AGENT_LIFECYCLE_RESULT_FINGERPRINT_INVALID");
+    const expectedRelations = [{ from_id: run.id, relation_kind: "produced_result", to_id: result.id }, { from_id: result.id, relation_kind: "closed_by", to_id: closure.id }];
+    if (canonicalJson(relations) !== canonicalJson(expectedRelations)) throw new Error("AGENT_LIFECYCLE_RELATION_TOPOLOGY_INVALID");
+    const expectedEvents = ["REPORTED", "REVIEWED", "CLOSED"].map((state, index) => ({ event_id: `event-${closure.id}-${index + 1}`, aggregate_id: run.id, event_type: `AGENT_RUN_${state}`, payload: { run_id: run.id, result_id: result.id, state, validator_disposition_fingerprint: digest(result.payload.validator_disposition) } }));
+    if (canonicalJson(events) !== canonicalJson(expectedEvents)) throw new Error("AGENT_LIFECYCLE_EVENT_TOPOLOGY_INVALID");
+  }
+
   const api = {
     get path() { return candidate; },
     get repository_root() { return root; },
     get identity() { return structuredClone(identity); },
+    get receipt_proof_verifier_id() { return receiptProofVerifier?.verifier_id ?? null; },
+    get finalization_fence_verifier_id() { return finalizationFenceVerifier?.verifier_id ?? null; },
+    get protected_runtime_verifiers() { return protectedRuntimeVerifiers; },
+    get receipt_proof_verifier_fingerprint() { return receiptProofVerifierFingerprint; },
+    get finalization_fence_verifier_fingerprint() { return finalizationFenceVerifierFingerprint; },
+    get runtime_trust_fingerprint() { return receiptRuntimeTrustFingerprint; },
     get mode() { assertOpen(); return mode === "readonly" ? "readonly" : startupRecovery.required ? "recovery-only" : "readwrite"; },
     get recovery_only() { assertOpen(); return startupRecovery.required; },
     get recovery_state() { assertOpen(); return structuredClone(startupRecovery); },
     get revision() { assertOpen(); return Number(getMeta(db, "store_revision") ?? 0); },
     get revocation_epoch() { assertOpen(); return Number(getMeta(db, "revocation_epoch") ?? 0); },
-    commit({ expectedRevision, authorityEpoch, records = [], relations = [], events = [], evidenceRefs = [], effectIntent, outboxItem, receipt, settingsPlan, settingsPlanUse } = {}) {
+    commit({ expectedRevision, authorityEpoch, records = [], relations = [], events = [], evidenceRefs = [], effectIntent, outboxItem, receipt, settingsPlan, settingsPlanUse, approvalUses = [] } = {}) {
       assertWritable();
       if (!Number.isInteger(expectedRevision) || expectedRevision < 0) throw new Error("EXPECTED_REVISION_REQUIRED");
       if (authorityEpoch !== undefined && (!Number.isSafeInteger(authorityEpoch) || authorityEpoch < 0)) throw new Error("AUTHORITY_EPOCH_INVALID");
       if (Boolean(effectIntent) !== Boolean(outboxItem) || (effectIntent && outboxItem.intent_id !== effectIntent.effect_id)) throw new Error("EFFECT_OUTBOX_ATOMIC_PAIR_REQUIRED");
       if (effectIntent && authorityEpoch === undefined) throw new Error("EFFECT_AUTHORITY_EPOCH_REQUIRED");
-      assertNoRawSecrets({ records, relations, events, evidenceRefs, effectIntent, outboxItem, receipt, settingsPlan, settingsPlanUse });
+      if (!Array.isArray(approvalUses) || (approvalUses.length > 0 && !effectIntent)) throw new Error("RUNTIME_APPROVAL_USE_INVALID");
+      assertNoRawSecrets({ records, relations, events, evidenceRefs, effectIntent, outboxItem, receipt, settingsPlan, settingsPlanUse, approvalUses });
       const currentRevision = api.revision;
       if (currentRevision !== expectedRevision) throw new Error("REVISION_CONFLICT");
+      if (effectIntent) {
+        const existingBeforeLock = db.prepare("SELECT * FROM effect_intents WHERE effect_key=?").get(effectIntent.effect_key);
+        if (existingBeforeLock) {
+          const incomingFingerprint = digest({ request_fp: effectIntent.request_fp, target_id: effectIntent.target_id, operation: effectIntent.operation, expected_selector: effectIntent.expected_selector ?? {}, binding_fp: effectIntent.binding_fingerprint });
+          const existingFingerprint = digest({ request_fp: existingBeforeLock.request_fp, target_id: existingBeforeLock.target_id, operation: existingBeforeLock.operation, expected_selector: JSON.parse(existingBeforeLock.expected_selector_json), binding_fp: existingBeforeLock.binding_fp });
+          if (incomingFingerprint !== existingFingerprint) {
+            api.recordRuntimeConflict({ conflictKind: "effect", idempotencyKey: effectIntent.effect_key, existingId: existingBeforeLock.effect_id, existingFingerprint, incomingFingerprint, details: { target_id: effectIntent.target_id, operation: effectIntent.operation } });
+            throw new Error("EFFECT_IDEMPOTENCY_PAYLOAD_CONFLICT");
+          }
+        }
+      }
       assertDedicatedRecordWriterKinds(records);
       const now = clock();
       db.exec("BEGIN IMMEDIATE");
@@ -602,6 +842,22 @@ export function openWorkflowStateStore({ repositoryRoot, databasePath, expectedI
         const lockedRevision = Number(getMeta(db, "store_revision") ?? 0);
         if (lockedRevision !== expectedRevision) throw new Error("REVISION_CONFLICT");
         if (authorityEpoch !== undefined && Number(getMeta(db, "revocation_epoch") ?? 0) !== authorityEpoch) throw new Error("AUTHORITY_EPOCH_STALE");
+        if (effectIntent) {
+          const existing = db.prepare("SELECT * FROM effect_intents WHERE effect_key=?").get(effectIntent.effect_key);
+          if (existing) {
+            const same = existing.request_fp === effectIntent.request_fp
+              && existing.target_id === effectIntent.target_id
+              && existing.operation === effectIntent.operation
+              && existing.expected_selector_json === canonicalJson(effectIntent.expected_selector ?? {})
+              && existing.binding_fp === effectIntent.binding_fingerprint;
+            if (!same) throw new Error("EFFECT_IDEMPOTENCY_PAYLOAD_CONFLICT");
+            if (records.length > 0 || relations.length > 0 || events.length > 0 || evidenceRefs.length > 0 || receipt || settingsPlan || settingsPlanUse) throw new Error("EFFECT_IDEMPOTENCY_REUSE_MIXED_COMMIT_FORBIDDEN");
+            const existingOutbox = db.prepare("SELECT outbox_id,state FROM outbox WHERE intent_id=?").get(existing.effect_id);
+            if (!existingOutbox) throw new Error("EFFECT_IDEMPOTENCY_OUTBOX_MISSING");
+            db.exec("COMMIT");
+            return { revision: lockedRevision, committed_at: now, reused: true, effect_id: existing.effect_id, intent_state: existing.state, outbox_id: existingOutbox.outbox_id, outbox_state: existingOutbox.state };
+          }
+        }
         const insertRecord = db.prepare(`INSERT INTO records(id,kind,schema_version,record_revision,repository_id,checkout_id,authority_scope,lineage_id,lifecycle_state,payload_json,source_revision,policy_fp,input_fp,content_fp,sensitivity,fresh_until,created_at,superseded_by) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`);
         for (const input of records) insertRecord.run(...Object.values(normalizeRecord(input, identity, now)));
         const insertRelation = db.prepare("INSERT INTO relations(from_id,relation_kind,to_id) VALUES(?,?,?)");
@@ -613,7 +869,16 @@ export function openWorkflowStateStore({ repositoryRoot, databasePath, expectedI
         }
         if (effectIntent) {
           if (effectIntent.state !== undefined && effectIntent.state !== "PREPARED") throw new Error("EFFECT_INITIAL_STATE_INVALID");
-          db.prepare("INSERT INTO effect_intents(effect_id,effect_key,request_fp,authority_fp,target_id,operation,expected_selector_json,attempt_lineage,state,created_at) VALUES(?,?,?,?,?,?,?,?,?,?)").run(effectIntent.effect_id, effectIntent.effect_key, effectIntent.request_fp, effectIntent.authority_fp, effectIntent.target_id, effectIntent.operation, canonicalJson(effectIntent.expected_selector ?? {}), effectIntent.attempt_lineage, effectIntent.state ?? "PREPARED", effectIntent.created_at ?? now);
+          if (!Number.isSafeInteger(effectIntent.authority_epoch) || effectIntent.authority_epoch !== authorityEpoch || typeof effectIntent.decision_expires_at !== "string" || !Number.isFinite(Date.parse(effectIntent.decision_expires_at)) || typeof effectIntent.settings_revision !== "string" || typeof effectIntent.policy_revision !== "string" || typeof effectIntent.activation_fp !== "string" || !/^[a-f0-9]{64}$/.test(effectIntent.binding_fingerprint ?? "")) throw new Error("EFFECT_DECISION_FENCE_REQUIRED");
+          const approvalIds = [...new Set(effectIntent.approval_ids ?? [])].sort();
+          if (approvalIds.length !== approvalUses.length || approvalIds.some((id, index) => id !== [...approvalUses].sort()[index])) throw new Error("RUNTIME_APPROVAL_USE_MISMATCH");
+          db.prepare("INSERT INTO effect_intents(effect_id,effect_key,request_fp,authority_fp,target_id,operation,expected_selector_json,attempt_lineage,state,created_at,authority_epoch,decision_expires_at,settings_revision,policy_revision,activation_fp,approval_ids_json,binding_fp) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)").run(effectIntent.effect_id, effectIntent.effect_key, effectIntent.request_fp, effectIntent.authority_fp, effectIntent.target_id, effectIntent.operation, canonicalJson(effectIntent.expected_selector ?? {}), effectIntent.attempt_lineage, effectIntent.state ?? "PREPARED", effectIntent.created_at ?? now, effectIntent.authority_epoch, effectIntent.decision_expires_at, effectIntent.settings_revision, effectIntent.policy_revision, effectIntent.activation_fp, canonicalJson(approvalIds), effectIntent.binding_fingerprint);
+          for (const approvalId of approvalIds) {
+            const approval = db.prepare("SELECT * FROM runtime_approvals WHERE approval_id=?").get(approvalId);
+            if (!approval || approval.state !== "pending" || approval.repository_id !== identity.repository_logical_id || approval.checkout_id !== identity.checkout_instance_id || approval.task_id !== effectIntent.task_id || approval.run_id !== effectIntent.run_id || approval.operation !== effectIntent.operation || approval.target_id !== effectIntent.target_id || approval.request_fp !== effectIntent.request_fp || approval.policy_revision !== effectIntent.policy_revision || approval.settings_revision !== effectIntent.settings_revision || Number(approval.authority_epoch) !== authorityEpoch || Date.parse(approval.expires_at) < Date.parse(now)) throw new Error("RUNTIME_APPROVAL_CONSUMPTION_BINDING_INVALID");
+            const consumed = db.prepare("UPDATE runtime_approvals SET state='consumed',consumed_by=?,consumed_at=? WHERE approval_id=? AND state='pending'").run(effectIntent.effect_id, now, approvalId);
+            if (Number(consumed.changes) !== 1) throw new Error("RUNTIME_APPROVAL_ALREADY_CONSUMED");
+          }
         }
         if (outboxItem) {
           if (outboxItem.state !== undefined && outboxItem.state !== "pending") throw new Error("OUTBOX_INITIAL_STATE_INVALID");
@@ -640,7 +905,34 @@ export function openWorkflowStateStore({ repositoryRoot, databasePath, expectedI
         setMeta(db, "store_revision", lockedRevision + 1);
         if (evidenceRefs.length > 0) setMeta(db, `evidence_refs:${lockedRevision + 1}`, evidenceRefs);
         db.exec("COMMIT");
-        return { revision: lockedRevision + 1, committed_at: now };
+        return { revision: lockedRevision + 1, committed_at: now, reused: false, effect_id: effectIntent?.effect_id ?? null };
+      } catch (error) {
+        try { db.exec("ROLLBACK"); } catch {}
+        throw error;
+      }
+    },
+    commitAgentLifecycle(input = {}) {
+      assertWritable();
+      validateAgentLifecycleCommit(input);
+      const { expectedRevision, authorityEpoch, records = [], relations = [], events = [], evidenceRefs = [] } = input;
+      if (!Number.isInteger(expectedRevision) || expectedRevision < 0 || api.revision !== expectedRevision) throw new Error("REVISION_CONFLICT");
+      assertNoRawSecrets({ records, relations, events, evidenceRefs });
+      const now = clock();
+      db.exec("BEGIN IMMEDIATE");
+      try {
+        const lockedRevision = Number(getMeta(db, "store_revision") ?? 0);
+        if (lockedRevision !== expectedRevision) throw new Error("REVISION_CONFLICT");
+        if (Number(getMeta(db, "revocation_epoch") ?? 0) !== authorityEpoch) throw new Error("AUTHORITY_EPOCH_STALE");
+        const insertRecord = db.prepare(`INSERT INTO records(id,kind,schema_version,record_revision,repository_id,checkout_id,authority_scope,lineage_id,lifecycle_state,payload_json,source_revision,policy_fp,input_fp,content_fp,sensitivity,fresh_until,created_at,superseded_by) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`);
+        for (const record of records) insertRecord.run(...Object.values(normalizeRecord(record, identity, now)));
+        const insertRelation = db.prepare("INSERT INTO relations(from_id,relation_kind,to_id) VALUES(?,?,?)");
+        for (const relation of relations) insertRelation.run(relation.from_id, relation.relation_kind, relation.to_id);
+        const insertEvent = db.prepare("INSERT INTO events(event_id,aggregate_id,event_type,payload_json,authority_decision_id,created_at) VALUES(?,?,?,?,?,?)");
+        for (const event of events) insertEvent.run(event.event_id, event.aggregate_id ?? null, event.event_type, canonicalJson(event.payload ?? {}), event.authority_decision_id ?? null, event.created_at ?? now);
+        for (const evidenceRef of evidenceRefs) if (typeof evidenceRef !== "string" || evidenceRef.length === 0) throw new Error("EVIDENCE_REFERENCE_INVALID");
+        setMeta(db, "store_revision", lockedRevision + 1);
+        db.exec("COMMIT");
+        return { revision: lockedRevision + 1 };
       } catch (error) {
         try { db.exec("ROLLBACK"); } catch {}
         throw error;
@@ -674,6 +966,197 @@ export function openWorkflowStateStore({ repositoryRoot, databasePath, expectedI
       if (!/^[a-f0-9]{64}$/.test(tokenHash)) throw new Error("SETTINGS_TOKEN_INVALID");
       const row = db.prepare("SELECT * FROM settings_change_plans WHERE token_hash=?").get(tokenHash);
       return row ? { ...row, plan: JSON.parse(row.plan_json) } : undefined;
+    },
+    issueRuntimeApproval({ expectedRevision, approval, verifier }) {
+      assertWritable();
+      assertPlainObject(approval, "RUNTIME_APPROVAL_REQUIRED");
+      const requiredStrings = ["reason", "approval_id", "repository_logical_id", "checkout_instance_id", "task_id", "run_id", "operation", "target_id", "request_fingerprint", "policy_revision", "settings_revision", "issued_at", "fresh_until", "proof_fingerprint"];
+      for (const field of requiredStrings) if (typeof approval[field] !== "string" || approval[field].length === 0) throw new Error(`RUNTIME_APPROVAL_FIELD_REQUIRED:${field}`);
+      if (!Number.isSafeInteger(approval.authority_epoch) || approval.authority_epoch < 0 || !Number.isFinite(Date.parse(approval.issued_at)) || !Number.isFinite(Date.parse(approval.fresh_until)) || Date.parse(approval.issued_at) >= Date.parse(approval.fresh_until)) throw new Error("RUNTIME_APPROVAL_TIME_OR_EPOCH_INVALID");
+      if (approval.repository_logical_id !== identity.repository_logical_id || approval.checkout_instance_id !== identity.checkout_instance_id) throw new Error("RUNTIME_APPROVAL_REPOSITORY_BINDING_INVALID");
+      if (!verifier || verifier.trusted !== true || verifier.independent !== true || typeof verifier.verifier_id !== "string" || typeof verifier.verify !== "function") throw new Error("RUNTIME_APPROVAL_ISSUER_VERIFIER_REQUIRED");
+      if (protectedRuntimeVerifiers) protectedRuntimeVerifierFingerprint(verifier, "approval_issuer");
+      if (!Number.isSafeInteger(expectedRevision) || api.revision !== expectedRevision) throw new Error("REVISION_CONFLICT");
+      const bindingFingerprint = runtimeApprovalBindingFingerprint(approval);
+      const now = clock();
+      db.exec("BEGIN IMMEDIATE");
+      try {
+        const lockedRevision = Number(getMeta(db, "store_revision") ?? 0);
+        const lockedEpoch = Number(getMeta(db, "revocation_epoch") ?? 0);
+        if (lockedRevision !== expectedRevision) throw new Error("REVISION_CONFLICT");
+        if (lockedEpoch !== approval.authority_epoch) throw new Error("AUTHORITY_EPOCH_STALE");
+        if (Date.parse(approval.issued_at) > Date.parse(now) || Date.parse(approval.fresh_until) < Date.parse(now)) throw new Error("RUNTIME_APPROVAL_NOT_CURRENT");
+        const verificationFingerprint = digest({ approval, binding_fingerprint: bindingFingerprint, locked_revision: lockedRevision, authority_epoch: lockedEpoch });
+        const verdict = verifier.verify({ approval: structuredClone(approval), binding_fingerprint: bindingFingerprint, fingerprint: verificationFingerprint, now });
+        if (verdict && typeof verdict.then === "function") throw new Error("RUNTIME_APPROVAL_ASYNC_VERIFIER_UNSUPPORTED");
+        if (verdict?.verified !== true || verdict.verifier_id !== verifier.verifier_id || verdict.fingerprint !== verificationFingerprint || verdict.binding_fingerprint !== bindingFingerprint || verdict.proof_fingerprint !== approval.proof_fingerprint) throw new Error("RUNTIME_APPROVAL_ISSUER_VERIFICATION_FAILED");
+        db.prepare("INSERT INTO runtime_approvals(approval_id,reason,repository_id,checkout_id,task_id,run_id,operation,target_id,request_fp,policy_revision,settings_revision,authority_epoch,issued_at,expires_at,verifier_id,proof_fp,binding_fp,state,consumed_by,consumed_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'pending',NULL,NULL)").run(approval.approval_id, approval.reason, approval.repository_logical_id, approval.checkout_instance_id, approval.task_id, approval.run_id, approval.operation, approval.target_id, approval.request_fingerprint, approval.policy_revision, approval.settings_revision, approval.authority_epoch, approval.issued_at, approval.fresh_until, verifier.verifier_id, approval.proof_fingerprint, bindingFingerprint);
+        setMeta(db, "store_revision", lockedRevision + 1);
+        db.exec("COMMIT");
+        return { approval_id: approval.approval_id, state: "pending", binding_fingerprint: bindingFingerprint, revision: lockedRevision + 1 };
+      } catch (error) {
+        try { db.exec("ROLLBACK"); } catch {}
+        throw error;
+      }
+    },
+    getRuntimeApproval({ approvalId }) {
+      assertOpen();
+      if (typeof approvalId !== "string" || approvalId.length === 0) throw new Error("RUNTIME_APPROVAL_ID_REQUIRED");
+      const row = db.prepare("SELECT * FROM runtime_approvals WHERE approval_id=?").get(approvalId);
+      return row ? { ...row } : undefined;
+    },
+    runtimeApprovalVerifier() {
+      assertOpen();
+      return Object.freeze({
+        trusted: true,
+        independent: true,
+        verifier_id: "workflow-state-runtime-approval",
+        verify({ approval, binding_fingerprint: bindingFingerprint, decision_time: decisionTime }) {
+          const row = db.prepare("SELECT * FROM runtime_approvals WHERE approval_id=?").get(approval?.approval_id);
+          if (!row || row.state !== "pending" || row.binding_fp !== bindingFingerprint || row.proof_fp !== approval?.proof_fingerprint || Date.parse(row.expires_at) < Date.parse(decisionTime)) return { verified: false };
+          const reconstructed = {
+            reason: row.reason,
+            approval_id: row.approval_id,
+            repository_logical_id: row.repository_id,
+            checkout_instance_id: row.checkout_id,
+            task_id: row.task_id,
+            run_id: row.run_id,
+            operation: row.operation,
+            target_id: row.target_id,
+            request_fingerprint: row.request_fp,
+            policy_revision: row.policy_revision,
+            settings_revision: row.settings_revision,
+            authority_epoch: Number(row.authority_epoch),
+            issued_at: row.issued_at,
+            fresh_until: row.expires_at,
+            proof_fingerprint: row.proof_fp,
+          };
+          if (canonicalJson(reconstructed) !== canonicalJson(approval) || runtimeApprovalBindingFingerprint(reconstructed) !== bindingFingerprint) return { verified: false };
+          return { verified: true, verifier_id: "workflow-state-runtime-approval", approval_id: row.approval_id, proof_fingerprint: row.proof_fp, binding_fingerprint: row.binding_fp };
+        },
+      });
+    },
+    createRuntimeRun({ expectedRevision, run, lifecycleWriter }) {
+      assertWritable();
+      requireProtectedRunLifecycleWriter(lifecycleWriter);
+      if (!Number.isSafeInteger(expectedRevision) || expectedRevision < 0 || api.revision !== expectedRevision) throw new Error("REVISION_CONFLICT");
+      const now = clock();
+      const normalized = normalizeRuntimeRun(run, now);
+      const existingBeforeLock = db.prepare("SELECT * FROM runtime_runs WHERE idempotency_key=? OR run_id=? ORDER BY run_id LIMIT 1").get(normalized.idempotency_key, normalized.run_id);
+      if (existingBeforeLock) {
+        const existingFingerprint = digest({ run_id: existingBeforeLock.run_id, idempotency_key: existingBeforeLock.idempotency_key, plan_fp: existingBeforeLock.plan_fp, authority_epoch: Number(existingBeforeLock.authority_epoch), fence_fp: existingBeforeLock.fence_fp, start_nonce: existingBeforeLock.start_nonce });
+        const incomingFingerprint = digest({ run_id: normalized.run_id, idempotency_key: normalized.idempotency_key, plan_fp: normalized.plan_fp, authority_epoch: normalized.authority_epoch, fence_fp: normalized.fence_fp, start_nonce: normalized.start_nonce });
+        if (existingFingerprint !== incomingFingerprint) {
+          api.recordRuntimeConflict({ conflictKind: "runtime_run", idempotencyKey: normalized.idempotency_key, existingId: existingBeforeLock.run_id, existingFingerprint, incomingFingerprint, details: { requested_run_id: normalized.run_id } });
+          throw new Error("RUNTIME_RUN_IDEMPOTENCY_CONFLICT");
+        }
+      }
+      db.exec("BEGIN IMMEDIATE");
+      try {
+        const lockedRevision = Number(getMeta(db, "store_revision") ?? 0);
+        const lockedEpoch = Number(getMeta(db, "revocation_epoch") ?? 0);
+        if (lockedRevision !== expectedRevision) throw new Error("REVISION_CONFLICT");
+        if (lockedEpoch !== normalized.authority_epoch) throw new Error("AUTHORITY_EPOCH_STALE");
+        const existing = db.prepare("SELECT * FROM runtime_runs WHERE idempotency_key=? OR run_id=? ORDER BY run_id LIMIT 1").get(normalized.idempotency_key, normalized.run_id);
+        if (existing) {
+          const same = existing.run_id === normalized.run_id
+            && existing.idempotency_key === normalized.idempotency_key
+            && existing.plan_fp === normalized.plan_fp
+            && Number(existing.authority_epoch) === normalized.authority_epoch
+            && existing.fence_fp === normalized.fence_fp
+            && existing.start_nonce === normalized.start_nonce;
+          if (!same) throw new Error("RUNTIME_RUN_IDEMPOTENCY_CONFLICT");
+          db.exec("COMMIT");
+          return { revision: lockedRevision, reused: true, run: decodeRuntimeRun(existing) };
+        }
+        db.prepare("INSERT INTO runtime_runs(run_id,idempotency_key,plan_fp,authority_epoch,fence_fp,state,pid,process_group_id,start_nonce,started_at,updated_at,exit_code,signal,result_fp,result_size,observation_json) VALUES(?,?,?,?,?,'STARTING',NULL,NULL,?,?,?,NULL,NULL,NULL,NULL,?)").run(normalized.run_id, normalized.idempotency_key, normalized.plan_fp, normalized.authority_epoch, normalized.fence_fp, normalized.start_nonce, normalized.started_at, normalized.updated_at, normalized.observation_json);
+        setMeta(db, "store_revision", lockedRevision + 1);
+        db.exec("COMMIT");
+        return { revision: lockedRevision + 1, reused: false, run: decodeRuntimeRun(db.prepare("SELECT * FROM runtime_runs WHERE run_id=?").get(normalized.run_id)) };
+      } catch (error) {
+        try { db.exec("ROLLBACK"); } catch {}
+        throw error;
+      }
+    },
+    bindRuntimeProcess({ expectedRevision, runId, pid, processGroupId, processIdentityFingerprint, processEvidence, lifecycleWriter }) {
+      assertWritable();
+      requireProtectedRunLifecycleWriter(lifecycleWriter);
+      if (!Number.isSafeInteger(expectedRevision) || expectedRevision < 0 || api.revision !== expectedRevision) throw new Error("REVISION_CONFLICT");
+      if (typeof runId !== "string" || runId.length === 0 || !Number.isSafeInteger(pid) || pid < 1 || !Number.isSafeInteger(processGroupId) || processGroupId < 1 || !/^[a-f0-9]{64}$/.test(processIdentityFingerprint ?? "") || processEvidence?.verified !== true || processEvidence?.barrier_ready !== true || processEvidence.process_identity_fingerprint !== processIdentityFingerprint || processEvidence.process_identity?.pid !== pid || processEvidence.process_identity?.process_group_id !== processGroupId) throw new Error("RUNTIME_RUN_PROCESS_BINDING_INVALID");
+      const now = clock();
+      db.exec("BEGIN IMMEDIATE");
+      try {
+        const lockedRevision = Number(getMeta(db, "store_revision") ?? 0);
+        if (lockedRevision !== expectedRevision) throw new Error("REVISION_CONFLICT");
+        const current = db.prepare("SELECT * FROM runtime_runs WHERE run_id=?").get(runId);
+        if (!current || current.state !== "STARTING" || current.pid !== null || current.process_group_id !== null) throw new Error("RUNTIME_RUN_PROCESS_BINDING_CONFLICT");
+        const observation = { ...JSON.parse(current.observation_json), process_identity_fingerprint: processIdentityFingerprint, process_identity: structuredClone(processEvidence.process_identity), barrier_evidence_fingerprint: processEvidence.fingerprint, containment_profile_id: processEvidence.profile_id, containment_authority_id: processEvidence.authority_id };
+        const updated = db.prepare("UPDATE runtime_runs SET pid=?,process_group_id=?,updated_at=?,observation_json=? WHERE run_id=? AND state='STARTING' AND pid IS NULL AND process_group_id IS NULL").run(pid, processGroupId, now, normalizeRuntimeObservation(observation), runId);
+        if (Number(updated.changes) !== 1) throw new Error("RUNTIME_RUN_PROCESS_BINDING_CONFLICT");
+        setMeta(db, "store_revision", lockedRevision + 1);
+        db.exec("COMMIT");
+        return { revision: lockedRevision + 1, run: decodeRuntimeRun(db.prepare("SELECT * FROM runtime_runs WHERE run_id=?").get(runId)) };
+      } catch (error) {
+        try { db.exec("ROLLBACK"); } catch {}
+        throw error;
+      }
+    },
+    transitionRuntimeRun({ expectedRevision, runId, expectedStates, nextState, patch = {}, recovery = false, lifecycleWriter }) {
+      assertWritable({ recovery });
+      requireProtectedRunLifecycleWriter(lifecycleWriter);
+      if (!Number.isSafeInteger(expectedRevision) || expectedRevision < 0 || api.revision !== expectedRevision) throw new Error("REVISION_CONFLICT");
+      if (typeof runId !== "string" || runId.length === 0 || !Array.isArray(expectedStates) || expectedStates.length === 0 || expectedStates.some((state) => !RUNTIME_RUN_TRANSITIONS.has(state)) || !RUNTIME_RUN_TRANSITIONS.has(nextState)) throw new Error("RUNTIME_RUN_TRANSITION_INPUT_INVALID");
+      if (!expectedStates.every((state) => RUNTIME_RUN_TRANSITIONS.get(state)?.has(nextState))) throw new Error("RUNTIME_RUN_TRANSITION_INVALID");
+      const allowedPatch = new Set(["pid", "process_group_id", "exit_code", "signal", "result_fingerprint", "result_size", "observation", "updated_at"]);
+      assertClosedKeys(patch, allowedPatch, "RUNTIME_RUN_PATCH");
+      if (patch.pid !== undefined && patch.pid !== null && (!Number.isSafeInteger(patch.pid) || patch.pid < 1)) throw new Error("RUNTIME_RUN_PID_INVALID");
+      if (patch.process_group_id !== undefined && patch.process_group_id !== null && (!Number.isSafeInteger(patch.process_group_id) || patch.process_group_id < 1)) throw new Error("RUNTIME_RUN_PROCESS_GROUP_INVALID");
+      if (patch.exit_code !== undefined && patch.exit_code !== null && !Number.isSafeInteger(patch.exit_code)) throw new Error("RUNTIME_RUN_EXIT_CODE_INVALID");
+      if (patch.signal !== undefined && patch.signal !== null && (typeof patch.signal !== "string" || !/^SIG[A-Z0-9]+$/.test(patch.signal))) throw new Error("RUNTIME_RUN_SIGNAL_INVALID");
+      if (patch.result_fingerprint !== undefined && patch.result_fingerprint !== null && !/^[a-f0-9]{64}$/.test(patch.result_fingerprint)) throw new Error("RUNTIME_RUN_RESULT_FINGERPRINT_INVALID");
+      if (patch.result_size !== undefined && patch.result_size !== null && (!Number.isSafeInteger(patch.result_size) || patch.result_size < 0)) throw new Error("RUNTIME_RUN_RESULT_SIZE_INVALID");
+      const now = patch.updated_at ?? clock();
+      if (!Number.isFinite(Date.parse(now))) throw new Error("RUNTIME_RUN_UPDATE_TIME_INVALID");
+      db.exec("BEGIN IMMEDIATE");
+      try {
+        const lockedRevision = Number(getMeta(db, "store_revision") ?? 0);
+        if (lockedRevision !== expectedRevision) throw new Error("REVISION_CONFLICT");
+        const current = db.prepare("SELECT * FROM runtime_runs WHERE run_id=?").get(runId);
+        if (!current) throw new Error("RUNTIME_RUN_NOT_FOUND");
+        if (!expectedStates.includes(current.state) || !RUNTIME_RUN_TRANSITIONS.get(current.state)?.has(nextState)) throw new Error("RUNTIME_RUN_STATE_CONFLICT");
+        const observationJson = patch.observation === undefined ? current.observation_json : normalizeRuntimeObservation(patch.observation);
+        const updated = db.prepare("UPDATE runtime_runs SET state=?,pid=?,process_group_id=?,updated_at=?,exit_code=?,signal=?,result_fp=?,result_size=?,observation_json=? WHERE run_id=? AND state=?").run(
+          nextState,
+          patch.pid === undefined ? current.pid : patch.pid,
+          patch.process_group_id === undefined ? current.process_group_id : patch.process_group_id,
+          now,
+          patch.exit_code === undefined ? current.exit_code : patch.exit_code,
+          patch.signal === undefined ? current.signal : patch.signal,
+          patch.result_fingerprint === undefined ? current.result_fp : patch.result_fingerprint,
+          patch.result_size === undefined ? current.result_size : patch.result_size,
+          observationJson,
+          runId,
+          current.state
+        );
+        if (Number(updated.changes) !== 1) throw new Error("RUNTIME_RUN_STATE_CONFLICT");
+        setMeta(db, "store_revision", lockedRevision + 1);
+        db.exec("COMMIT");
+        if (recovery) startupRecovery = recoveryState(db);
+        return { revision: lockedRevision + 1, run: decodeRuntimeRun(db.prepare("SELECT * FROM runtime_runs WHERE run_id=?").get(runId)) };
+      } catch (error) {
+        try { db.exec("ROLLBACK"); } catch {}
+        throw error;
+      }
+    },
+    getRuntimeRun({ runId, idempotencyKey } = {}) {
+      assertOpen();
+      if (Boolean(runId) === Boolean(idempotencyKey)) throw new Error("RUNTIME_RUN_SELECTOR_REQUIRED");
+      const row = runId ? db.prepare("SELECT * FROM runtime_runs WHERE run_id=?").get(runId) : db.prepare("SELECT * FROM runtime_runs WHERE idempotency_key=?").get(idempotencyKey);
+      return decodeRuntimeRun(row);
+    },
+    listUnresolvedRuntimeRuns() {
+      assertOpen();
+      return db.prepare("SELECT * FROM runtime_runs WHERE state NOT IN ('COMPLETED','FAILED','CANCELLED','TIMED_OUT') ORDER BY run_id").all().map(decodeRuntimeRun);
     },
     persistDelegationGrantAuthority(input) { return persistVerifiedAgentAuthorityRecord({ ...input, writerKind: "DelegationGrant" }); },
     persistResourceCostReservationAuthority(input) { return persistVerifiedAgentAuthorityRecord({ ...input, writerKind: "ResourceCostReservation" }); },
@@ -722,6 +1205,36 @@ export function openWorkflowStateStore({ repositoryRoot, databasePath, expectedI
       assertOpen();
       const row = db.prepare("SELECT * FROM effect_intents WHERE effect_id=?").get(effectId);
       return row ? { ...row, expected_selector: JSON.parse(row.expected_selector_json) } : undefined;
+    },
+    findIntentByEffectKey(effectKey) {
+      assertOpen();
+      if (!/^[a-f0-9]{64}$/.test(effectKey ?? "")) throw new Error("EFFECT_KEY_INVALID");
+      const row = db.prepare("SELECT * FROM effect_intents WHERE effect_key=?").get(effectKey);
+      return row ? { ...row, expected_selector: JSON.parse(row.expected_selector_json) } : undefined;
+    },
+    recordRuntimeConflict({ conflictKind, idempotencyKey, existingId, existingFingerprint, incomingFingerprint, details = {} }) {
+      assertWritable();
+      if (!new Set(["effect", "runtime_run"]).has(conflictKind) || typeof idempotencyKey !== "string" || idempotencyKey.length === 0 || typeof existingId !== "string" || existingId.length === 0 || !/^[a-f0-9]{64}$/.test(existingFingerprint ?? "") || !/^[a-f0-9]{64}$/.test(incomingFingerprint ?? "")) throw new Error("RUNTIME_CONFLICT_INVALID");
+      assertNoRawSecrets(details);
+      const now = clock();
+      const conflictId = `runtime-conflict-${digest({ conflict_kind: conflictKind, idempotency_key: idempotencyKey, incoming_fingerprint: incomingFingerprint })}`;
+      db.exec("BEGIN IMMEDIATE");
+      try {
+        const lockedRevision = Number(getMeta(db, "store_revision") ?? 0);
+        const inserted = db.prepare("INSERT OR IGNORE INTO runtime_conflicts(conflict_id,conflict_kind,idempotency_key,existing_id,existing_fingerprint,incoming_fingerprint,details_json,observed_at) VALUES(?,?,?,?,?,?,?,?)").run(conflictId, conflictKind, idempotencyKey, existingId, existingFingerprint, incomingFingerprint, canonicalJson(details), now);
+        if (Number(inserted.changes) === 1) setMeta(db, "store_revision", lockedRevision + 1);
+        db.exec("COMMIT");
+        return { conflict_id: conflictId, recorded: Number(inserted.changes) === 1, revision: lockedRevision + Number(inserted.changes) };
+      } catch (error) {
+        try { db.exec("ROLLBACK"); } catch {}
+        throw error;
+      }
+    },
+    listRuntimeConflicts({ conflictKind } = {}) {
+      assertOpen();
+      if (conflictKind !== undefined && !new Set(["effect", "runtime_run"]).has(conflictKind)) throw new Error("RUNTIME_CONFLICT_KIND_INVALID");
+      const rows = conflictKind === undefined ? db.prepare("SELECT * FROM runtime_conflicts ORDER BY observed_at,conflict_id").all() : db.prepare("SELECT * FROM runtime_conflicts WHERE conflict_kind=? ORDER BY observed_at,conflict_id").all(conflictKind);
+      return rows.map((row) => ({ ...row, details: JSON.parse(row.details_json) }));
     },
     getReceipt(effectId) {
       assertOpen();
@@ -916,7 +1429,7 @@ export function openWorkflowStateStore({ repositoryRoot, databasePath, expectedI
       if (recovery) startupRecovery = recoveryState(db);
       return { outbox_id: outboxId, state: nextState };
     },
-    finalizeReconciliation({ expectedRevision, effectId, records = [], receipt, events = [], recovery = false }) {
+    finalizeReconciliation({ expectedRevision, effectId, records = [], receipt, events = [], recovery = false, finalizationFence }) {
       assertWritable({ recovery });
       if (!Number.isInteger(expectedRevision) || expectedRevision < 0) throw new Error("EXPECTED_REVISION_REQUIRED");
       if (api.revision !== expectedRevision) throw new Error("REVISION_CONFLICT");
@@ -935,6 +1448,22 @@ export function openWorkflowStateStore({ repositoryRoot, databasePath, expectedI
         if (lockedRevision !== expectedRevision) throw new Error("REVISION_CONFLICT");
         const lockedIntent = db.prepare("SELECT * FROM effect_intents WHERE effect_id=?").get(effectId);
         if (!lockedIntent || lockedIntent.state !== "OBSERVED") throw new Error("EFFECT_STATE_CONFLICT");
+        if (lockedIntent.activation_fp === "legacy" || lockedIntent.binding_fp === "legacy" || lockedIntent.policy_revision === "legacy" || lockedIntent.settings_revision === "legacy") throw new Error("LEGACY_INTENT_REAUTHORIZATION_REQUIRED");
+        {
+          if (!finalizationFence || finalizationFence.activation_fingerprint !== lockedIntent.activation_fp || finalizationFence.policy_revision !== lockedIntent.policy_revision || finalizationFence.settings_revision !== lockedIntent.settings_revision || finalizationFence.authority_epoch !== Number(lockedIntent.authority_epoch) || finalizationFence.decision_expires_at !== lockedIntent.decision_expires_at) throw new Error("EFFECT_FINALIZATION_FENCE_BINDING_INVALID");
+          if (Number(getMeta(db, "revocation_epoch") ?? 0) !== Number(lockedIntent.authority_epoch)) throw new Error("EFFECT_FINALIZATION_AUTHORITY_EPOCH_STALE");
+          if (!Number.isFinite(Date.parse(lockedIntent.decision_expires_at)) || Date.parse(lockedIntent.decision_expires_at) < Date.parse(now)) throw new Error("EFFECT_FINALIZATION_DECISION_EXPIRED");
+          const approvalIds = JSON.parse(lockedIntent.approval_ids_json);
+          for (const approvalId of approvalIds) {
+            const approval = db.prepare("SELECT state,consumed_by,expires_at,authority_epoch,policy_revision,settings_revision FROM runtime_approvals WHERE approval_id=?").get(approvalId);
+            if (!approval || approval.state !== "consumed" || approval.consumed_by !== effectId || Date.parse(approval.expires_at) < Date.parse(now) || Number(approval.authority_epoch) !== Number(lockedIntent.authority_epoch) || approval.policy_revision !== lockedIntent.policy_revision || approval.settings_revision !== lockedIntent.settings_revision) throw new Error("EFFECT_FINALIZATION_APPROVAL_INVALID");
+          }
+          if (!finalizationFenceVerifier || finalizationFenceVerifier.trusted !== true || finalizationFenceVerifier.independent !== true || typeof finalizationFenceVerifier.verifier_id !== "string" || typeof finalizationFenceVerifier.verify !== "function") throw new Error("EFFECT_FINALIZATION_FENCE_VERIFIER_REQUIRED");
+          const fenceFingerprint = digest({ effect_id: effectId, intent: lockedIntent, finalization_fence: finalizationFence, locked_revision: lockedRevision, now });
+          const fenceVerdict = finalizationFenceVerifier.verify({ effect_id: effectId, intent: structuredClone(lockedIntent), finalization_fence: structuredClone(finalizationFence), fingerprint: fenceFingerprint, now });
+          if (fenceVerdict && typeof fenceVerdict.then === "function") throw new Error("EFFECT_FINALIZATION_ASYNC_VERIFIER_UNSUPPORTED");
+          if (fenceVerdict?.verified !== true || fenceVerdict.verifier_id !== finalizationFenceVerifier.verifier_id || fenceVerdict.fingerprint !== fenceFingerprint || fenceVerdict.activation_fingerprint !== lockedIntent.activation_fp || fenceVerdict.policy_revision !== lockedIntent.policy_revision || fenceVerdict.settings_revision !== lockedIntent.settings_revision || fenceVerdict.authority_epoch !== Number(lockedIntent.authority_epoch)) throw new Error("EFFECT_FINALIZATION_FENCE_VERIFICATION_FAILED");
+        }
         const effectIdentityFingerprint = effectReceiptBindingFingerprint(lockedIntent, receipt);
         if (proof.payload.effect_identity_fingerprint !== effectIdentityFingerprint || proof.policy_fp !== lockedIntent.authority_fp) throw new Error("RECONCILIATION_PROOF_BINDING_INVALID");
         const verificationFingerprint = digest({ effect_id: effectId, intent: lockedIntent, receipt, proof_record: proof, effect_identity_fingerprint: effectIdentityFingerprint, locked_revision: lockedRevision });
@@ -1001,7 +1530,7 @@ export function openWorkflowStateStore({ repositoryRoot, databasePath, expectedI
       if (db.prepare("SELECT 1 FROM records WHERE sensitivity='restricted' LIMIT 1").get()) throw new Error("CANONICAL_EXPORT_RESTRICTED_DATA_REQUIRES_SECURE_BACKUP");
       const safe = resolveSafePath(root, destination).candidate;
       mkdirSync(dirname(safe), { recursive: true, mode: 0o700 });
-      const sections = ["store_meta", "records", "relations", "events", "effect_intents", "outbox", "receipts", "settings_change_plans", "saga_replay_state", "saga_nonces"];
+      const sections = ["store_meta", "records", "relations", "events", "effect_intents", "outbox", "receipts", "settings_change_plans", "saga_replay_state", "saga_nonces", "runtime_approvals", "runtime_runs", "runtime_conflicts"];
       const lines = [{ type: "manifest", format: "workflow-state-jsonl-v1", identity, schema_version: STORE_SCHEMA_VERSION, revision: api.revision }];
       for (const table of sections) {
         for (const row of db.prepare(`SELECT * FROM ${table} ORDER BY rowid`).all()) lines.push({ type: table, value: row });
@@ -1050,12 +1579,20 @@ export function openWorkflowStateStore({ repositoryRoot, databasePath, expectedI
       if (!closed) { db.close(); closed = true; decrementOpenCount(candidate); }
     }
   };
+  if (protectedRuntimeVerifiers) PROTECTED_WORKFLOW_STATE_STORES.add(api);
   return api;
+}
+
+export function assertProtectedWorkflowStateStore(store) {
+  if (!PROTECTED_WORKFLOW_STATE_STORES.has(store)) throw new Error("PROTECTED_WORKFLOW_STATE_STORE_REQUIRED");
+  return store;
 }
 
 export function verifyBackupManifest({ backup, manifestPath, expectedIdentity }) {
   const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
-  if (manifest.format !== "workflow-state-backup-v1" || manifest.schema_version !== STORE_SCHEMA_VERSION || !Number.isSafeInteger(manifest.source_revision) || manifest.source_revision < 0 || !Number.isSafeInteger(manifest.revocation_epoch) || manifest.revocation_epoch < 0 || !Number.isFinite(Date.parse(manifest.created_at))) throw new Error("BACKUP_MANIFEST_INVALID");
+  const regular = manifest.format === "workflow-state-backup-v1" && manifest.schema_version === STORE_SCHEMA_VERSION;
+  const preMigration = manifest.format === "workflow-state-pre-migration-backup-v1" && Number.isSafeInteger(manifest.from_schema_version) && manifest.schema_version === manifest.from_schema_version && manifest.to_schema_version === STORE_SCHEMA_VERSION;
+  if ((!regular && !preMigration) || !Number.isSafeInteger(manifest.source_revision) || manifest.source_revision < 0 || !Number.isSafeInteger(manifest.revocation_epoch) || manifest.revocation_epoch < 0 || !Number.isFinite(Date.parse(manifest.created_at))) throw new Error("BACKUP_MANIFEST_INVALID");
   if (manifest.database_digest !== digest(readFileSync(backup))) throw new Error("BACKUP_DIGEST_MISMATCH");
   if (canonicalJson(manifest.identity) !== canonicalJson(normalizeIdentity(expectedIdentity))) throw new Error("BACKUP_IDENTITY_MISMATCH");
   return manifest;
@@ -1081,7 +1618,8 @@ export function restoreWorkflowStateStore({ repositoryRoot, databasePath, backup
     const checkpoint = restored.prepare("PRAGMA wal_checkpoint(TRUNCATE)").get();
     if (Number(checkpoint?.busy ?? 0) !== 0) throw new Error("RESTORE_CHECKPOINT_FAILURE");
     databaseChecks(restored, "RESTORE");
-    assertMigrationIdentity(restored, identity, "RESTORE");
+    if (manifest.format === "workflow-state-backup-v1") assertMigrationIdentity(restored, identity, "RESTORE");
+    else if (canonicalJson(getMeta(restored, "identity")) !== canonicalJson(identity)) throw new Error("RESTORE_IDENTITY_MISMATCH");
     if (Number(getMeta(restored, "store_revision") ?? -1) !== manifest.source_revision || Number(getMeta(restored, "revocation_epoch") ?? -1) !== manifest.revocation_epoch) throw new Error("RESTORE_AUTHORITY_METADATA_MISMATCH");
   } catch (error) {
     validationError = error;
@@ -1150,7 +1688,7 @@ export function importWorkflowStateStore({ repositoryRoot, databasePath, exportP
   if (manifest?.type !== "manifest" || manifest.format !== "workflow-state-jsonl-v1" || manifest.schema_version !== STORE_SCHEMA_VERSION || canonicalJson(manifest.identity) !== canonicalJson(identity)) throw new Error("STATE_IMPORT_IDENTITY_OR_FORMAT_INVALID");
   if (canonicalJson(transferManifest.identity) !== canonicalJson(identity) || transferManifest.source_revision !== manifest.revision || transferManifest.records !== lines.length) throw new Error("STATE_IMPORT_MANIFEST_INVALID");
   const transferVerification = verifyStateTransferAuthority({ operation: "import", manifest: transferManifest, contentDigest: transferManifest.export_digest, identity, verifier: stateTransferVerifier });
-  const allowedTables = new Set(["store_meta", "records", "relations", "events", "effect_intents", "outbox", "receipts", "settings_change_plans", "saga_replay_state", "saga_nonces"]);
+  const allowedTables = new Set(["store_meta", "records", "relations", "events", "effect_intents", "outbox", "receipts", "settings_change_plans", "saga_replay_state", "saga_nonces", "runtime_approvals", "runtime_runs", "runtime_conflicts"]);
   if (lines.some((line) => !allowedTables.has(line?.type) || !line.value || typeof line.value !== "object" || Array.isArray(line.value))) throw new Error("STATE_IMPORT_SECTION_INVALID");
   assertNoRawSecrets(lines);
   mkdirSync(dirname(candidate), { recursive: true, mode: 0o700 });
@@ -1162,7 +1700,7 @@ export function importWorkflowStateStore({ repositoryRoot, databasePath, exportP
   try {
     configure(imported);
     imported.exec("BEGIN IMMEDIATE");
-    for (const table of ["full_text_documents", "saga_nonces", "saga_replay_state", "receipts", "outbox", "effect_intents", "relations", "events", "settings_change_plans", "records", "store_meta"]) imported.exec(`DELETE FROM ${table}`);
+    for (const table of ["full_text_documents", "runtime_conflicts", "runtime_runs", "runtime_approvals", "saga_nonces", "saga_replay_state", "receipts", "outbox", "effect_intents", "relations", "events", "settings_change_plans", "records", "store_meta"]) imported.exec(`DELETE FROM ${table}`);
     for (const line of lines) insertExportRow(imported, line.type, line.value);
     imported.exec("COMMIT");
     assertMigrationIdentity(imported, identity, "IMPORT");

@@ -38,10 +38,11 @@ test("the production composition root fails closed before provider observation w
   const effect = { variant: "provider_effect", action: "invoke", subject: {}, bindings: { target_id: "provider" }, target: {}, request: {} };
   const preview = await runtime.previewEffect(effect);
   assert.equal(preview.decision.code, "NEXT_WORKFLOW_NOT_ENFORCED");
-  await assert.rejects(() => runtime.executeEffect(effect), /SIDE_EFFECT_DENIED:NEXT_WORKFLOW_NOT_ENFORCED/);
+  await assert.rejects(() => runtime.executeEffect(effect), /PROTECTED_RUNTIME_AUTHORITY_REQUIRED/);
   assert.equal(observed(), 0);
   assert.equal(store.listUnresolvedEffects().length, 0);
   assert.equal(runtime.status().direct_adapter_access, false);
+  assert.equal(runtime.status().operational_authority_protected, false);
   store.close();
 });
 

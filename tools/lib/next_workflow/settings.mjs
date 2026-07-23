@@ -3,6 +3,7 @@ import { isAuthorityDecisionAllowed } from "./authority.mjs";
 import { selectAgentConfiguration } from "./providers.mjs";
 
 const SCOPES = ["agent", "role", "team", "repository", "context", "global"];
+const MODEL_POLICY_FIELDS = ["allowed_model_ids", "denied_model_ids", "allowed_model_publishers", "denied_model_publishers", "denied_model_prefixes"];
 
 function canonicalJson(value) {
   if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
@@ -29,6 +30,7 @@ function validateSettings(settings) {
     keys.add(key);
     if (entry.mode === "manual" && typeof entry.identity_key !== "string") throw new Error("MANUAL_SELECTION_IDENTITY_REQUIRED");
     if (entry.mode !== "manual" && entry.identity_key !== null) throw new Error("NON_MANUAL_IDENTITY_FORBIDDEN");
+    for (const field of MODEL_POLICY_FIELDS) if (entry.model_policy?.[field] !== undefined && (!Array.isArray(entry.model_policy[field]) || entry.model_policy[field].some((value) => typeof value !== "string" || value.length === 0))) throw new Error("MODEL_SELECTION_POLICY_INVALID");
   }
   return settings;
 }
@@ -90,7 +92,7 @@ function resolveAgentSelectionPolicy(settings, agent) {
     const entry = subjectId === null ? null : settings.values.find((value) => value.scope === scope && value.subject_id === subjectId) ?? null;
     trace.push({ scope, subject_id: subjectId, state: entry === null ? "absent" : entry.mode === "inherit" ? "inherit" : "selected_source" });
     if (entry === null || entry.mode === "inherit") continue;
-    return { decision: "PASS", policy: { mode: entry.mode, identity_key: entry.identity_key }, source: entry, trace };
+    return { decision: "PASS", policy: { mode: entry.mode, identity_key: entry.identity_key, model_policy: structuredClone(entry.model_policy ?? {}) }, source: entry, trace };
   }
   return { decision: "STOP", code: "NO_INHERITED_SELECTION", trace };
 }

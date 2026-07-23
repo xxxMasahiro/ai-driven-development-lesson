@@ -52,6 +52,13 @@ function pathContains(parentPath, childPath) {
   return parentPath === childPath || childPath.startsWith(`${parentPath}/`);
 }
 
+function absolutePathsOverlap(left, right) {
+  const leftToRight = path.relative(left, right);
+  const rightToLeft = path.relative(right, left);
+  const within = (relative) => relative === "" || (relative !== ".." && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative));
+  return within(leftToRight) || within(rightToLeft);
+}
+
 function isSubset(childValues, parentValues) {
   const parent = new Set(parentValues ?? []);
   return (childValues ?? []).every((value) => parent.has(value));
@@ -382,7 +389,7 @@ export function evaluateAgentRetry({ failureFingerprint, previousFailureFingerpr
 }
 
 export function agentResultEvidenceFingerprint(result) {
-  return digest({ run_id: result?.run_id, provenance: result?.provenance, scope_fingerprint: result?.scope_fingerprint, conclusion: result?.conclusion ?? null, evidence_references: result?.evidence_references ?? [], changed_artifact_manifest: result?.changed_artifact_manifest ?? [], unresolved_items: result?.unresolved_items ?? [] });
+  return digest({ run_id: result?.run_id, candidate_record_id: result?.candidate_record_id, provenance: result?.provenance, scope_fingerprint: result?.scope_fingerprint, conclusion: result?.conclusion ?? null, evidence_references: result?.evidence_references ?? [], changed_artifact_manifest: result?.changed_artifact_manifest ?? [], unresolved_items: result?.unresolved_items ?? [] });
 }
 
 export function validateAgentResult({ result, grant, leadAgentId, orchestratorAgentId, validatorAgentId }) {
@@ -398,12 +405,31 @@ export function validateAgentResult({ result, grant, leadAgentId, orchestratorAg
 }
 
 export function acceptAgentResult({ store, result, grant, leadAgentId, orchestratorAgentId, validatorAgentId, authorityBindings, now = new Date().toISOString() }) {
-  if (!store || typeof store.get !== "function" || typeof store.commit !== "function") throw new Error("AGENT_RESULT_STORE_REQUIRED");
+  if (!store || typeof store.get !== "function" || typeof store.commitAgentLifecycle !== "function") throw new Error("AGENT_RESULT_STORE_REQUIRED");
   const validatedGrant = validateDelegationGrant(grant, { now });
   validateAgentAuthorityBindings(authorityBindings, now, "AGENT_RESULT_AUTHORITY_BINDINGS_REQUIRED");
   assertCurrentAuthorityEpoch(store, authorityBindings, "AGENT_RESULT_AUTHORITY_EPOCH_STALE");
   const run = store.get({ id: result?.run_id });
   if (!run || run.kind !== "AgentRun" || run.lifecycle_state !== "RUNNING" || run.source_revision !== validatedGrant.fingerprint || run.payload?.authority_epoch !== authorityBindings.authority_epoch) return { decision: "STOP", code: "AGENT_RUN_NOT_ACCEPTABLE" };
+  const candidateId = run.payload?.result_candidate_record_id;
+  const candidate = typeof candidateId === "string" ? store.get({ id: candidateId }) : null;
+  const candidateFingerprint = candidate?.payload?.result_fingerprint;
+  const launchReport = candidate?.payload?.launch_report;
+  if (result?.candidate_record_id !== candidateId
+    || candidate?.kind !== "AgentResultCandidate"
+    || candidate.lifecycle_state !== "REPORTED"
+    || candidate.lineage_id !== result.run_id
+    || candidate.policy_fp !== authorityBindings.policy_fingerprint
+    || candidate.source_revision !== candidateFingerprint
+    || candidate.input_fp !== candidateFingerprint
+    || candidate.payload?.accepted !== false
+    || !/^[a-f0-9]{64}$/.test(candidateFingerprint ?? "")
+    || digest(candidate.payload?.result) !== candidateFingerprint
+    || result?.provenance?.source_fingerprint !== candidateFingerprint
+    || candidate.payload?.lifecycle_run_id !== run.payload?.lifecycle_run_id
+    || !/^[a-f0-9]{64}$/.test(candidate.payload?.process_identity_fingerprint ?? "")
+    || !launchReport || [launchReport.provider, launchReport.model, launchReport.effort].some((value) => typeof value !== "string" || value.length === 0)
+    || launchReport.effort === "none") return { decision: "STOP", code: "AGENT_RESULT_CANDIDATE_BINDING_REQUIRED" };
   const assignmentIds = {
     lead: `agent-reviewer-assignment-${result.run_id}-lead`,
     orchestrator: `agent-reviewer-assignment-${result.run_id}-orchestrator`,
@@ -443,12 +469,12 @@ export function acceptAgentResult({ store, result, grant, leadAgentId, orchestra
   const resultId = `agent-result-${result.run_id}`;
   const closureId = `agent-run-closure-${result.run_id}`;
   const stateHistory = ["REPORTED", "REVIEWED", "CLOSED"];
-  store.commit({
+  store.commitAgentLifecycle({
     expectedRevision: store.revision,
     authorityEpoch: authorityBindings.authority_epoch,
     records: [
-      { id: resultId, kind: "AgentResult", schema_version: "1.0.0", authority_scope: authorityBindings.task_id, lineage_id: result.run_id, lifecycle_state: "accepted", payload: { ...authoritativeResult, evidence_fingerprint: verdict.evidence_fingerprint, validator_disposition_fingerprint: digest(authoritativeResult.validator_disposition) }, source_revision: validatedGrant.fingerprint, policy_fp: authorityBindings.policy_fingerprint, input_fp: verdict.result_fingerprint },
-      { id: closureId, kind: "AgentRunClosure", schema_version: "1.0.0", authority_scope: authorityBindings.task_id, lineage_id: result.run_id, lifecycle_state: "CLOSED", payload: { run_id: result.run_id, result_id: resultId, state_history: stateHistory, lead_review_fingerprint: digest(authoritativeResult.lead_review), orchestrator_review_fingerprint: digest(authoritativeResult.orchestrator_review), validator_disposition_fingerprint: digest(authoritativeResult.validator_disposition), reviewer_assignment_ids: assignmentIds, review_record_ids: reviewIds, authority_epoch: authorityBindings.authority_epoch, closed_at: now }, source_revision: validatedGrant.fingerprint, policy_fp: authorityBindings.policy_fingerprint, input_fp: verdict.result_fingerprint }
+      { id: resultId, kind: "AgentResult", schema_version: "1.0.0", authority_scope: authorityBindings.task_id, lineage_id: result.run_id, lifecycle_state: "accepted", payload: { ...authoritativeResult, candidate_record_id: candidateId, candidate_result_fingerprint: candidateFingerprint, evidence_fingerprint: verdict.evidence_fingerprint, validator_disposition_fingerprint: digest(authoritativeResult.validator_disposition) }, source_revision: candidateId, policy_fp: authorityBindings.policy_fingerprint, input_fp: verdict.result_fingerprint },
+      { id: closureId, kind: "AgentRunClosure", schema_version: "1.0.0", authority_scope: authorityBindings.task_id, lineage_id: result.run_id, lifecycle_state: "CLOSED", payload: { run_id: result.run_id, result_id: resultId, result_candidate_record_id: candidateId, candidate_result_fingerprint: candidateFingerprint, state_history: stateHistory, lead_review_fingerprint: digest(authoritativeResult.lead_review), orchestrator_review_fingerprint: digest(authoritativeResult.orchestrator_review), validator_disposition_fingerprint: digest(authoritativeResult.validator_disposition), reviewer_assignment_ids: assignmentIds, review_record_ids: reviewIds, authority_epoch: authorityBindings.authority_epoch, closed_at: now }, source_revision: candidateId, policy_fp: authorityBindings.policy_fingerprint, input_fp: verdict.result_fingerprint }
     ],
     relations: [{ from_id: result.run_id, relation_kind: "produced_result", to_id: resultId }, { from_id: resultId, relation_kind: "closed_by", to_id: closureId }],
     events: stateHistory.map((state, index) => ({ event_id: `event-${closureId}-${index + 1}`, aggregate_id: result.run_id, event_type: `AGENT_RUN_${state}`, payload: { run_id: result.run_id, result_id: resultId, state, validator_disposition_fingerprint: digest(authoritativeResult.validator_disposition) } })),
@@ -499,12 +525,13 @@ function persistAdmissionFailure({ store, intent, grant, authorityBindings, laun
   return { failure_id: failureId, fence };
 }
 
-export function createAgentLauncher({ gateway, store, registryProvider, observationVerifier, containment, clock = () => new Date().toISOString(), idFactory = randomUUID }) {
+export function createAgentLauncher({ gateway, store, registryProvider, observationVerifier, containment, taskDeliveryPreparer, clock = () => new Date().toISOString(), idFactory = randomUUID }) {
   if (!gateway || typeof gateway.execute !== "function") throw new Error("AGENT_AUTHORITY_GATEWAY_REQUIRED");
-  if (!store || typeof store.commit !== "function" || typeof store.fence !== "function" || typeof store.get !== "function" || !Number.isSafeInteger(store.revocation_epoch)) throw new Error("AGENT_STORE_REQUIRED");
+  if (!store || typeof store.commit !== "function" || typeof store.commitAgentLifecycle !== "function" || typeof store.fence !== "function" || typeof store.get !== "function" || !Number.isSafeInteger(store.revocation_epoch)) throw new Error("AGENT_STORE_REQUIRED");
   if (typeof registryProvider !== "function") throw new Error("AGENT_PROVIDER_REGISTRY_REQUIRED");
   const verifier = requireIndependentVerifier(observationVerifier);
   if (!containment || typeof containment.quarantineOrTerminate !== "function") throw new Error("AGENT_CONTAINMENT_ACTION_REQUIRED");
+  if (typeof taskDeliveryPreparer !== "function") throw new Error("AGENT_TASK_DELIVERY_PREPARER_REQUIRED");
 
   async function stopLaunched({ intent, grant, authorityBindings, launch, code }) {
     let contained;
@@ -527,7 +554,7 @@ export function createAgentLauncher({ gateway, store, registryProvider, observat
   }
 
   return {
-    async launch({ grant, selection, context, reservation, targets, authorityBindings, providerExecution, expectedSelector = {} }) {
+    async launch({ grant, selection, context, reservation, targets, authorityBindings, providerExecution, taskData = [], expectedSelector = {} }) {
       const launchTime = clock();
       const validatedGrant = validateDelegationGrant(grant, { now: launchTime });
       validateAgentAuthorityBindings(authorityBindings, launchTime, "AGENT_LAUNCH_AUTHORITY_BINDINGS_REQUIRED");
@@ -537,11 +564,13 @@ export function createAgentLauncher({ gateway, store, registryProvider, observat
         || normalizedTargets.some((target) => !validatedGrant.scope.paths.some((scopePath) => pathContains(scopePath, target)))
         || (validatedGrant.ownership.read_only === false && normalizedTargets.some((target) => !validatedGrant.ownership.paths.some((ownedPath) => pathContains(ownedPath, target))))) throw new Error("AGENT_LAUNCH_TARGETS_OUTSIDE_GRANT");
       if (!providerExecution || typeof providerExecution !== "object" || typeof providerExecution.identity_key !== "string" || providerExecution.plan?.fingerprint !== providerExecution.plan_fingerprint) throw new Error("AGENT_PROVIDER_EXECUTION_REQUIRED");
+      if (providerExecution.plan.stdin_fingerprint !== undefined && providerExecution.plan.stdin_fingerprint !== null) throw new Error("AGENT_TASK_DELIVERY_MUST_BE_AUTHORITY_OWNED");
       const persistedChain = resolvePersistedGrantChain(store, validatedGrant, launchTime, authorityBindings.authority_epoch);
       const persistedGrant = persistedChain.at(-1);
       const expectedPlanSandbox = { read_only: "read-only", workspace_write: "workspace-write" }[persistedGrant.payload.sandbox.mode];
       if (providerExecution.plan.sandbox !== expectedPlanSandbox) throw new Error("AGENT_PROVIDER_PLAN_SANDBOX_OUTSIDE_GRANT");
-      if (typeof store.repository_root !== "string" || !path.isAbsolute(store.repository_root) || !path.isAbsolute(providerExecution.plan.working_directory) || path.resolve(providerExecution.plan.working_directory) !== path.resolve(store.repository_root)) throw new Error("AGENT_PROVIDER_PLAN_WORKING_DIRECTORY_OUTSIDE_REPOSITORY");
+      const taskInputDirectory = path.dirname(providerExecution.plan.stdin_file ?? "");
+      if (typeof store.repository_root !== "string" || !path.isAbsolute(store.repository_root) || !path.isAbsolute(providerExecution.plan.working_directory) || !path.isAbsolute(providerExecution.plan.stdin_file ?? "") || path.resolve(providerExecution.plan.working_directory) !== path.resolve(taskInputDirectory) || absolutePathsOverlap(path.resolve(providerExecution.plan.working_directory), path.resolve(store.repository_root))) throw new Error("AGENT_PROVIDER_PLAN_WORKING_DIRECTORY_NOT_PRIVATE_INPUT");
       if (selection?.decision !== "PASS" || selection.selected !== selection.effective || providerExecution.identity_key !== selection.effective) throw new Error("AGENT_PROVIDER_SELECTION_BINDING_INVALID");
       const { fingerprint: selectionFingerprint, ...selectionCore } = selection;
       if (!/^[a-f0-9]{64}$/.test(selectionFingerprint ?? "") || digest(selectionCore) !== selectionFingerprint) throw new Error("AGENT_PROVIDER_SELECTION_FINGERPRINT_INVALID");
@@ -549,33 +578,74 @@ export function createAgentLauncher({ gateway, store, registryProvider, observat
       if (!registry || typeof registry.fingerprint !== "string" || providerExecution.registry_fingerprint !== registry.fingerprint) throw new Error("AGENT_PROVIDER_REGISTRY_BINDING_INVALID");
       const registryEntry = registry.entries?.find((entry) => entry.eligible === true && entry.manifest?.identity_key === selection.effective);
       if (!registryEntry || providerExecution.manifest_fingerprint !== digest(registryEntry.manifest) || providerExecution.certification_fingerprint !== digest(registryEntry.certification)) throw new Error("AGENT_PROVIDER_CURRENT_CERTIFICATION_INVALID");
+      if (!selection.manifest || digest(selection.manifest) !== digest(registryEntry.manifest)) throw new Error("AGENT_PROVIDER_SELECTION_MANIFEST_BINDING_INVALID");
+      if (providerExecution.plan.model_id !== selection.selected_model || providerExecution.plan.native_reasoning !== selection.selected_native_reasoning || registryEntry.manifest?.effort_mapping?.[providerExecution.plan.native_reasoning] !== selection.selected_normalized_effort) throw new Error("AGENT_PROVIDER_MODEL_OR_EFFORT_BINDING_INVALID");
       if (!selection.selection_lineage?.some((entry) => entry.identity_key === selection.effective && entry.eligible === true && entry.registry_fingerprint === registry.fingerprint)) throw new Error("AGENT_PROVIDER_SELECTION_LINEAGE_INVALID");
       const reservationRecord = store.get({ id: reservation?.reservation_id });
       if (reservationRecord?.kind !== "ResourceCostReservation" || reservationRecord.lifecycle_state !== "AUTHORIZED" || reservationRecord.policy_fp !== authorityBindings.policy_fingerprint || Date.parse(reservationRecord.fresh_until) < Date.parse(launchTime) || reservationRecord.payload?.purpose !== "launch" || reservationRecord.payload?.grant_fingerprint !== validatedGrant.fingerprint || reservationRecord.payload?.child_agent_id !== validatedGrant.child_agent_id || reservationRecord.payload?.authority_epoch !== authorityBindings.authority_epoch || reservationRecord.payload?.consumed !== false || typeof reservationRecord.payload?.authority_proof_fingerprint !== "string" || digest(reservationRecord.payload.targets) !== digest(normalizedTargets)) throw new Error("AGENT_LAUNCH_RESERVATION_INVALID");
       for (const field of ["max_runtime_ms", "max_tokens", "max_cost", "max_retries"]) if (reservationRecord.payload.budget[field] > validatedGrant.budget[field]) throw new Error(`AGENT_LAUNCH_RESERVATION_EXCEEDS_GRANT:${field}`);
+      const resourceToReservation = { cost: "max_cost", runtime_ms: "max_runtime_ms", tokens: "max_tokens", retries: "max_retries" };
+      const resourceBounds = registryEntry.manifest.resource_bounds;
+      if (!resourceBounds || typeof resourceBounds !== "object" || Array.isArray(resourceBounds) || Object.keys(resourceBounds).length === 0) throw new Error("AGENT_PROVIDER_RESOURCE_BOUNDS_REQUIRED");
+      for (const [resource, bound] of Object.entries(resourceBounds)) {
+        const reservationField = resourceToReservation[resource];
+        if (!reservationField || !Number.isFinite(bound) || bound < 0 || !Number.isFinite(reservationRecord.payload.budget[reservationField]) || bound > reservationRecord.payload.budget[reservationField]) throw new Error(`AGENT_PROVIDER_RESOURCE_BOUND_OUTSIDE_RESERVATION:${resource}`);
+      }
+      if (!Number.isFinite(registryEntry.manifest.estimated_cost) || registryEntry.manifest.estimated_cost < 0 || registryEntry.manifest.estimated_cost > reservationRecord.payload.budget.max_cost) throw new Error("AGENT_PROVIDER_ESTIMATED_COST_OUTSIDE_RESERVATION");
+      const executionPolicy = providerExecution.plan.execution_policy;
+      if (!executionPolicy || !Number.isSafeInteger(executionPolicy.timeout_ms) || executionPolicy.timeout_ms < 1 || executionPolicy.timeout_ms > reservationRecord.payload.budget.max_runtime_ms) throw new Error("AGENT_PROVIDER_RUNTIME_BOUND_OUTSIDE_RESERVATION");
+      const providerBudgetBindingFingerprint = digest({ resource_bounds: resourceBounds, estimated_cost: registryEntry.manifest.estimated_cost, reservation_budget: reservationRecord.payload.budget, execution_timeout_ms: executionPolicy.timeout_ms });
       if (store.get({ id: `resource-reservation-consumption-${reservation.reservation_id}` })) throw new Error("AGENT_LAUNCH_RESERVATION_SPENT");
+      const delivery = await taskDeliveryPreparer({ grant: structuredClone(validatedGrant), repositoryRoot: store.repository_root, promptFile: providerExecution.plan.stdin_file, data: structuredClone(taskData), authorityBindings: structuredClone(authorityBindings), providerIdentityKey: providerExecution.identity_key });
+      const deliveryFields = ["invariant_fingerprint", "instruction_fingerprint", "envelope_fingerprint", "delivery_fingerprint"];
+      if (!delivery || delivery.prompt_file !== providerExecution.plan.stdin_file || delivery.envelope?.grant_fingerprint !== validatedGrant.fingerprint || deliveryFields.some((field) => !/^[a-f0-9]{64}$/.test(delivery[field] ?? "")) || typeof delivery.verify !== "function" || typeof delivery.cleanup !== "function") {
+        try { delivery?.cleanup?.(); } catch {}
+        throw new Error("AGENT_TASK_DELIVERY_INVALID");
+      }
+      delivery.verify();
+      const { fingerprint: ignoredProviderPlanFingerprint, ...providerPlanCore } = providerExecution.plan;
+      const boundProviderPlanCore = { ...structuredClone(providerPlanCore), stdin_fingerprint: delivery.delivery_fingerprint };
+      const boundProviderPlan = { ...boundProviderPlanCore, fingerprint: digest(boundProviderPlanCore) };
+      const effectiveProviderExecution = { ...structuredClone(providerExecution), plan: boundProviderPlan, plan_fingerprint: boundProviderPlan.fingerprint, invariant_fingerprint: delivery.invariant_fingerprint, instruction_fingerprint: delivery.instruction_fingerprint, envelope_fingerprint: delivery.envelope_fingerprint, delivery_fingerprint: delivery.delivery_fingerprint };
       const intentId = `launch-${idFactory()}`;
-      const intent = createLaunchIntent({ grant: validatedGrant, selection, context, reservation, targets: normalizedTargets, authorityEpoch: authorityBindings.authority_epoch, intentId, createdAt: launchTime });
+      const taskEnvelopeBindings = Object.fromEntries(deliveryFields.map((field) => [field, delivery[field]]));
+      const intent = createLaunchIntent({ grant: validatedGrant, selection, context, reservation, targets: normalizedTargets, authorityEpoch: authorityBindings.authority_epoch, intentId, createdAt: launchTime, taskEnvelope: taskEnvelopeBindings });
+      const launchRequest = { intent: structuredClone(intent), provider_execution: structuredClone(effectiveProviderExecution) };
+      const launchRequestFingerprint = digest(launchRequest);
       const selectionId = `agent-selection-${intentId}`;
       const contextId = `agent-context-${intentId}`;
       const budgetId = reservationRecord.id;
       const launchIntentId = `agent-launch-intent-${intentId}`;
+      const invariantId = `agent-invariant-${intentId}`;
+      const instructionId = `agent-instruction-${intentId}`;
+      const envelopeId = `agent-task-envelope-${intentId}`;
+      const deliveryId = `agent-task-delivery-${intentId}`;
       const selectionPayload = { ...structuredClone(selection), fingerprint: selection.fingerprint ?? digest(selection) };
       const contextPayload = { ...structuredClone(context), fingerprint: context.fingerprint ?? digest(context) };
       const recordBase = { schema_version: "1.0.0", record_revision: 1, authority_scope: authorityBindings.task_id, lineage_id: intentId, lifecycle_state: "PREPARED", source_revision: validatedGrant.fingerprint, policy_fp: authorityBindings.policy_fingerprint };
-      store.commit({
+      try {
+        store.commit({
         expectedRevision: store.revision,
         authorityEpoch: authorityBindings.authority_epoch,
         records: [
           { ...recordBase, id: selectionId, kind: "AgentSelectionDecision", payload: selectionPayload, input_fp: selectionPayload.fingerprint },
           { ...recordBase, id: contextId, kind: "AgentContextSnapshot", payload: contextPayload, input_fp: contextPayload.fingerprint },
-          { ...recordBase, id: launchIntentId, kind: "AgentLaunchIntent", payload: { ...intent, grant_record_id: persistedGrant.id, selection_record_id: selectionId, context_record_id: contextId, budget_record_id: budgetId, registry_fingerprint: registry.fingerprint, provider_identity_key: providerExecution.identity_key, provider_plan_fingerprint: providerExecution.plan_fingerprint, provider_plan_sandbox: providerExecution.plan.sandbox, provider_plan_working_directory: providerExecution.plan.working_directory }, input_fp: intent.fingerprint },
+          { ...recordBase, id: invariantId, kind: "AgentInvariantSnapshot", payload: { source: delivery.envelope.control.invariant.source, invariant_fingerprint: delivery.invariant_fingerprint }, input_fp: delivery.invariant_fingerprint },
+          { ...recordBase, id: instructionId, kind: "AgentInstructionSnapshot", payload: { source: delivery.envelope.control.procedural_instruction.source, source_profile: delivery.envelope.control.procedural_instruction.source_profile, instruction_fingerprint: delivery.instruction_fingerprint }, input_fp: delivery.instruction_fingerprint },
+          { ...recordBase, id: envelopeId, kind: "AgentTaskEnvelope", payload: { envelope_fingerprint: delivery.envelope_fingerprint, grant_fingerprint: validatedGrant.fingerprint, invariant_fingerprint: delivery.invariant_fingerprint, instruction_fingerprint: delivery.instruction_fingerprint, data_fingerprint: digest(delivery.envelope.data) }, input_fp: delivery.envelope_fingerprint },
+          { ...recordBase, id: deliveryId, kind: "AgentTaskDelivery", payload: { delivery_fingerprint: delivery.delivery_fingerprint, delivery_size: delivery.delivery_size, envelope_fingerprint: delivery.envelope_fingerprint, invariant_fingerprint: delivery.invariant_fingerprint, instruction_fingerprint: delivery.instruction_fingerprint }, input_fp: delivery.delivery_fingerprint },
+          { ...recordBase, id: launchIntentId, kind: "AgentLaunchIntent", payload: { ...intent, grant_record_id: persistedGrant.id, selection_record_id: selectionId, context_record_id: contextId, budget_record_id: budgetId, invariant_record_id: invariantId, instruction_record_id: instructionId, envelope_record_id: envelopeId, delivery_record_id: deliveryId, registry_fingerprint: registry.fingerprint, provider_identity_key: effectiveProviderExecution.identity_key, provider_plan_fingerprint: effectiveProviderExecution.plan_fingerprint, provider_plan_sandbox: effectiveProviderExecution.plan.sandbox, provider_plan_working_directory: effectiveProviderExecution.plan.working_directory, provider_budget_binding_fingerprint: providerBudgetBindingFingerprint, launch_request_fingerprint: launchRequestFingerprint }, input_fp: intent.fingerprint },
           { ...recordBase, id: `resource-reservation-consumption-${reservation.reservation_id}`, kind: "ResourceCostReservationConsumption", lineage_id: reservation.reservation_id, lifecycle_state: "CONSUMED", payload: { reservation_id: reservation.reservation_id, purpose: "launch", child_agent_id: validatedGrant.child_agent_id, launch_intent_id: intentId, authority_epoch: authorityBindings.authority_epoch, consumed_at: launchTime }, source_revision: reservationRecord.content_fp, input_fp: intent.fingerprint }
         ],
-        events: [{ event_id: `event-${launchIntentId}`, aggregate_id: launchIntentId, event_type: "AGENT_LAUNCH_INTENT_PREPARED", payload: { intent_id: intentId, grant_record_id: persistedGrant.id, selection_record_id: selectionId, context_record_id: contextId, budget_record_id: budgetId, provider_plan_fingerprint: providerExecution.plan_fingerprint } }]
-      });
-      const persistedInputs = [selectionId, contextId, launchIntentId, `resource-reservation-consumption-${reservation.reservation_id}`].map((id) => store.get({ id }));
-      if (persistedInputs.some((record) => !record) || persistedInputs[0].payload.fingerprint !== selectionPayload.fingerprint || persistedInputs[1].payload.fingerprint !== contextPayload.fingerprint || persistedInputs[2].payload.fingerprint !== intent.fingerprint || persistedInputs[3].lifecycle_state !== "CONSUMED") throw new Error("AGENT_LAUNCH_PREPARATION_NOT_DURABLE");
+        relations: [{ from_id: launchIntentId, relation_kind: "uses_invariant", to_id: invariantId }, { from_id: launchIntentId, relation_kind: "uses_instruction", to_id: instructionId }, { from_id: launchIntentId, relation_kind: "uses_task_envelope", to_id: envelopeId }, { from_id: launchIntentId, relation_kind: "uses_task_delivery", to_id: deliveryId }],
+        events: [{ event_id: `event-${launchIntentId}`, aggregate_id: launchIntentId, event_type: "AGENT_LAUNCH_INTENT_PREPARED", payload: { intent_id: intentId, grant_record_id: persistedGrant.id, selection_record_id: selectionId, context_record_id: contextId, budget_record_id: budgetId, provider_plan_fingerprint: effectiveProviderExecution.plan_fingerprint, provider_budget_binding_fingerprint: providerBudgetBindingFingerprint, launch_request_fingerprint: launchRequestFingerprint, invariant_fingerprint: delivery.invariant_fingerprint, instruction_fingerprint: delivery.instruction_fingerprint, envelope_fingerprint: delivery.envelope_fingerprint, delivery_fingerprint: delivery.delivery_fingerprint } }]
+        });
+        const persistedInputs = [selectionId, contextId, invariantId, instructionId, envelopeId, deliveryId, launchIntentId, `resource-reservation-consumption-${reservation.reservation_id}`].map((id) => store.get({ id }));
+        if (persistedInputs.some((record) => !record) || persistedInputs[0].payload.fingerprint !== selectionPayload.fingerprint || persistedInputs[1].payload.fingerprint !== contextPayload.fingerprint || persistedInputs[2].payload.invariant_fingerprint !== delivery.invariant_fingerprint || persistedInputs[3].payload.instruction_fingerprint !== delivery.instruction_fingerprint || persistedInputs[4].payload.envelope_fingerprint !== delivery.envelope_fingerprint || persistedInputs[5].payload.delivery_fingerprint !== delivery.delivery_fingerprint || persistedInputs[6].payload.fingerprint !== intent.fingerprint || persistedInputs[7].lifecycle_state !== "CONSUMED") throw new Error("AGENT_LAUNCH_PREPARATION_NOT_DURABLE");
+      } catch (error) {
+        try { delivery.cleanup(); } catch {}
+        throw error;
+      }
       const launchSubject = {
         grant_fingerprint: validatedGrant.fingerprint,
         launch_intent_fingerprint: intent.fingerprint,
@@ -586,13 +656,23 @@ export function createAgentLauncher({ gateway, store, registryProvider, observat
         effective_configuration_fingerprint: digest(selection.effective),
         actual_observed: null,
         context_fingerprint: context.fingerprint,
+        invariant_fingerprint: delivery.invariant_fingerprint,
+        instruction_fingerprint: delivery.instruction_fingerprint,
+        task_envelope_fingerprint: delivery.envelope_fingerprint,
+        task_delivery_fingerprint: delivery.delivery_fingerprint,
         budget_reservation_id: reservation.reservation_id,
         sandbox_fingerprint: digest(validatedGrant.sandbox),
         capability_fingerprint: digest(validatedGrant.capabilities),
         authority_epoch: authorityBindings.authority_epoch,
         owned_targets: normalizedTargets
       };
-      const launch = await gateway.execute({ variant: "agent_launch", action: "spawn", subject: launchSubject, bindings: authorityBindings, target: { targets: normalizedTargets }, request: { intent, provider_execution: structuredClone(providerExecution) }, expected_selector: expectedSelector });
+      let launch;
+      try {
+        delivery.verify();
+        launch = await gateway.execute({ variant: "agent_launch", action: "spawn", subject: launchSubject, bindings: authorityBindings, target: { targets: normalizedTargets }, request: structuredClone(launchRequest), expected_selector: expectedSelector }, { beforeFinalize: () => delivery.verify() });
+      } finally {
+        delivery.cleanup();
+      }
       try {
         assertCurrentAuthorityEpoch(store, authorityBindings, "AGENT_LAUNCH_AUTHORITY_EPOCH_STALE_AFTER_SPAWN");
       } catch {
@@ -620,10 +700,17 @@ export function createAgentLauncher({ gateway, store, registryProvider, observat
       } catch {
         return stopLaunched({ intent, grant: validatedGrant, authorityBindings, launch, code: "AGENT_LAUNCH_AUTHORITY_EPOCH_STALE_AFTER_ADMISSION" });
       }
-      const runId = `run-${idFactory()}`;
+      const runId = `agent-run-${intentId}`;
+      const resultReported = launch.result?.agent_result !== undefined && typeof launch.result?.result_fingerprint === "string" && typeof launch.result?.lifecycle_run_id === "string";
+      if (resultReported && (!/^[a-f0-9]{64}$/.test(launch.result.result_fingerprint) || digest(launch.result.agent_result) !== launch.result.result_fingerprint || !/^[a-f0-9]{64}$/.test(launch.result.lifecycle_process_identity_fingerprint ?? "") || !launch.result.launch_report || [launch.result.launch_report.provider, launch.result.launch_report.model, launch.result.launch_report.effort].some((value) => typeof value !== "string" || value.length === 0) || launch.result.launch_report.effort === "none")) return stopLaunched({ intent, grant: validatedGrant, authorityBindings, launch, code: "AGENT_RESULT_CANDIDATE_INVALID" });
       const stateHistory = ["PLANNED", "AUTHORIZED", "STARTING", "RUNNING"];
-      store.commit({ expectedRevision: store.revision, authorityEpoch: authorityBindings.authority_epoch, records: [{ id: runId, kind: "AgentRun", schema_version: "1.0.0", authority_scope: authorityBindings.task_id, lineage_id: intentId, lifecycle_state: "RUNNING", payload: { intent_id: intentId, parent_agent_id: validatedGrant.parent_agent_id, child_agent_id: validatedGrant.child_agent_id, depth: validatedGrant.child_depth, authority_epoch: authorityBindings.authority_epoch, attestation_fingerprint: admission.attestation.fingerprint, admission_effect_id: admissionEffect.effect_id, admission_receipt_id: admissionEffect.receipt_id, ownership: validatedGrant.ownership, state_history: stateHistory, actual_observed: admission.attestation.actual_observed }, source_revision: validatedGrant.fingerprint, policy_fp: authorityBindings.policy_fingerprint, input_fp: intent.fingerprint }], events: stateHistory.map((state, index) => ({ event_id: `event-${runId}-${index + 1}`, aggregate_id: runId, event_type: `AGENT_RUN_${state}`, authority_decision_id: state === "AUTHORIZED" || state === "RUNNING" ? admissionEffect.decision.fingerprint : null, payload: { launch_effect_id: launch.effect_id, admission_effect_id: admissionEffect.effect_id, admission_receipt_id: admissionEffect.receipt_id, state } })) });
-      return { decision: "PASS", run_id: runId, state: "RUNNING", intent, attestation: admission.attestation, launch_effect_id: launch.effect_id, admission_effect_id: admissionEffect.effect_id, admission_receipt_id: admissionEffect.receipt_id, admission_decision: admissionEffect.decision };
+      const candidateResultId = resultReported ? `agent-result-candidate-${runId}` : null;
+      const runRecord = { id: runId, kind: "AgentRun", schema_version: "1.0.0", authority_scope: authorityBindings.task_id, lineage_id: intentId, lifecycle_state: "RUNNING", payload: { intent_id: intentId, launch_intent_fingerprint: intent.fingerprint, parent_agent_id: validatedGrant.parent_agent_id, child_agent_id: validatedGrant.child_agent_id, depth: validatedGrant.child_depth, authority_epoch: authorityBindings.authority_epoch, attestation_fingerprint: admission.attestation.fingerprint, admission_effect_id: admissionEffect.effect_id, admission_receipt_id: admissionEffect.receipt_id, ownership: validatedGrant.ownership, state_history: stateHistory, actual_observed: admission.attestation.actual_observed, lifecycle_run_id: launch.result?.lifecycle_run_id ?? null, result_candidate_record_id: candidateResultId, review_required: resultReported }, source_revision: validatedGrant.fingerprint, policy_fp: authorityBindings.policy_fingerprint, input_fp: intent.fingerprint };
+      const candidateResultRecord = resultReported ? { id: candidateResultId, kind: "AgentResultCandidate", schema_version: "1.0.0", authority_scope: authorityBindings.task_id, lineage_id: runId, lifecycle_state: "REPORTED", payload: { result: structuredClone(launch.result.agent_result), result_fingerprint: launch.result.result_fingerprint, lifecycle_run_id: launch.result.lifecycle_run_id, process_identity_fingerprint: launch.result.lifecycle_process_identity_fingerprint, launch_report: structuredClone(launch.result.launch_report), accepted: false }, source_revision: launch.result.result_fingerprint, policy_fp: authorityBindings.policy_fingerprint, input_fp: launch.result.result_fingerprint } : null;
+      const events = stateHistory.map((state, index) => ({ event_id: `event-${runId}-${index + 1}`, aggregate_id: runId, event_type: `AGENT_RUN_${state}`, authority_decision_id: ["AUTHORIZED", "RUNNING"].includes(state) ? admissionEffect.decision.fingerprint : null, payload: { launch_effect_id: launch.effect_id, admission_effect_id: admissionEffect.effect_id, admission_receipt_id: admissionEffect.receipt_id, state } }));
+      if (candidateResultRecord) events.push({ event_id: `event-${candidateResultId}`, aggregate_id: runId, event_type: "AGENT_RESULT_CANDIDATE_REPORTED", authority_decision_id: admissionEffect.decision.fingerprint, payload: { result_candidate_record_id: candidateResultId, result_fingerprint: launch.result.result_fingerprint, review_required: true } });
+      store.commitAgentLifecycle({ expectedRevision: store.revision, authorityEpoch: authorityBindings.authority_epoch, records: [runRecord, ...(candidateResultRecord ? [candidateResultRecord] : [])], relations: candidateResultRecord ? [{ from_id: runId, relation_kind: "reported_candidate", to_id: candidateResultId }] : [], events });
+      return { decision: "PASS", run_id: runId, state: "RUNNING", intent, attestation: admission.attestation, launch_effect_id: launch.effect_id, admission_effect_id: admissionEffect.effect_id, admission_receipt_id: admissionEffect.receipt_id, admission_decision: admissionEffect.decision, ...(resultReported ? { result: structuredClone(launch.result.agent_result), result_fingerprint: launch.result.result_fingerprint, result_candidate_record_id: candidateResultId, review_required: true } : {}) };
     }
   };
 }

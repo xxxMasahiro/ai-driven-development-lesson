@@ -5659,13 +5659,15 @@ approvals in covered fixtures.
     are compared, and complete data recovery, fenced rollback, relationship
     archive/decommission, outbox drain/quarantine, and restoration verification
     before activation can be considered.
-20. **Pending integration and evidence: complete production wiring, release proof, performance comparison, and activation.** After Control Center acceptance,
-    configure independently authenticated runtime authority, approval/receipt/
-    reconciliation verification, separate provider probe and certification
-    authorities, operational observation/containment, and exact CLI/Git/
-    workflow adapters through the common gateway. Prove that the current fail-
-    closed placeholders have been replaced by those owners before candidate
-    freeze. Then run focused checks first, followed by contract-required medium and aggregate checks
+20. **Split runtime wiring from later activation evidence.** Before Control
+    Center reconstruction, configure and isolated-test independently
+    authenticated runtime authority, approval/receipt/reconciliation
+    verification, separate provider probe and certification authorities,
+    operational observation/containment, and one exact CLI adapter path through
+    the common gateway. Prove that the current fail-closed placeholders are
+    replaced by production-shaped owners under an explicit non-production
+    authority profile, while the normal production surface remains unavailable
+    and Activation remains `planned`. Then run focused checks first, followed by contract-required medium and aggregate checks
     with one owner per logical inspection. Collect full/no-cache and final-gate
     evidence only in the release phase, bind PR CI to head SHA and main CI to
     merge SHA, verify local/remote synchronization, freeze one release-candidate
@@ -5680,8 +5682,11 @@ approvals in covered fixtures.
     remains proposal-only until exact-target approval. Candidate freezing,
     signed-proof verification, ordered transition commands, and fail-closed
     public-verifier trust are implemented; no candidate is frozen and no
-    transition is permitted while Phase 18 is paused or the trust/evidence set
-    is incomplete.
+    transition is permitted while the Control Center is paused or the later
+    trust/evidence set is incomplete. After this non-UI delivery, rebaseline the
+    Control Center reconstruction and collect final activation evidence against
+    a new immutable candidate only after that reconstructed experience is
+    accepted.
 
 P2 exit: every implementation SYNC-ID is `implemented`; all required evidence
 is current and exact; correctness metrics meet the zero-miss/non-regression
@@ -5825,7 +5830,8 @@ Implementation order completed without modifying Control Center code:
    preview, and confirmation-bound reconciliation, with unavailable owners
    failing closed.
 7. Added the Next Workflow check and aggregate to the repository aggregate and
-   passed 192 assertions across all 14 suites plus all seven contracts.
+   passed a historical closure baseline of 192 tests across all 14 suites plus
+   all seven contracts.
 8. Closed the final independent security-audit findings: read-only sandbox and
    persisted-parent-chain enforcement, unified authority/revocation epochs,
    kind-specific protected-record writers, verified Relationship initialization,
@@ -5866,7 +5872,9 @@ Implementation order completed without modifying Control Center code:
     PR repository/number, main merge SHA, and local/remote `origin/main`
     synchronization as one signed release lineage.
 15. Closed the final execution-boundary re-audit by binding each Agent CLI plan
-    to the persisted grant sandbox and canonical repository root, making the
+    to the persisted grant sandbox. The successor non-UI runtime slice later
+    replaced repository-root execution with a private task-envelope directory,
+    while retaining the exact grant binding. It also made the
     receipt-proof verifier a store-configured independent owner with locked
     effect-identity reconstruction, repeating revision CAS inside SQLite write
     transactions (including the revocation writer), and carrying the gateway
@@ -5882,13 +5890,12 @@ Implementation order completed without modifying Control Center code:
     real stdout buffer with exact status zero is accepted. The final-gate test
     passed five consecutive runs after the correction.
 
-This scoped delivery does not claim activation-bound production wiring. The
-currently composed source, observer, approval/receipt, reconciliation, provider-
-certification, run-admission, and containment owners remain deliberately
-unavailable. After Control Center acceptance and before candidate freeze, a
-separate implementation slice must configure independently authenticated
-owners and route the exact CLI, Git, workflow, provider, and Agent effects
-through the gateway; checked-in labels or self-attestation cannot satisfy it.
+This historical security-closure delivery did not claim activation-bound
+production wiring. Its successor non-UI slice now configures and isolated-tests
+independently authenticated owners and routes one exact CLI Agent path through
+the gateway. The externally reachable production entry point remains
+unavailable and Activation remains `planned`; checked-in labels or self-
+attestation still cannot satisfy production authority.
 
 Deferred product boundaries are unchanged: Phase 18 Control Center implementation,
 TraceCue/browser review, and developer acceptance remain an explicitly
@@ -5898,3 +5905,92 @@ non-Control-Center scope may nevertheless be delivered through a separate
 scoped PR, main CI, and synchronization now; that delivery cannot be reused as
 the later activation candidate. Activation remains `planned`, no activation
 candidate was frozen, and no branch/worktree was deleted.
+
+## Non-UI Runtime Wiring Implementation Plan
+
+SYNC-ID: next_workflow_non_ui_runtime_wiring
+STATUS: implemented
+ARTIFACTS: docs/as-built/IMPLEMENTATION_PLAN.md,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/HANDOFF.md,docs/workflow/TASK_TRACKER.md,docs/workflow/next-workflow/authority-lifecycle.json,docs/workflow/next-workflow/provider-registry.json,docs/workflow/next-workflow/state-store.json,docs/workflow/next-workflow/team-agent-security.json,learning/NEXT_WORKFLOW_AGENT_SELECTION_SETTINGS.json,learning/NEXT_WORKFLOW_PROVIDER_REGISTRY.json,tools/lib/next_workflow/agents.mjs,tools/lib/next_workflow/authority.mjs,tools/lib/next_workflow/contracts.mjs,tools/lib/next_workflow/migrations/003_runtime_wiring.sql,tools/lib/next_workflow/provider_discovery.mjs,tools/lib/next_workflow/providers.mjs,tools/lib/next_workflow/run_lifecycle.mjs,tools/lib/next_workflow/runtime.mjs,tools/lib/next_workflow/runtime_barrier.cjs,tools/lib/next_workflow/runtime_containment.mjs,tools/lib/next_workflow/runtime_trust.mjs,tools/lib/next_workflow/settings.mjs,tools/lib/next_workflow/store.mjs,tools/lib/next_workflow/task_delivery.mjs,tools/next-workflow.mjs,tools/test_next_workflow.sh,tools/test_next_workflow_agents.mjs,tools/test_next_workflow_authority.mjs,tools/test_next_workflow_isolated_runtime.mjs,tools/test_next_workflow_isolated_runtime.sh,tools/test_next_workflow_projection_settings.mjs,tools/test_next_workflow_providers.mjs,tools/test_next_workflow_release.mjs,tools/test_next_workflow_run_lifecycle.mjs,tools/test_next_workflow_run_lifecycle.sh,tools/test_next_workflow_saga.mjs,tools/test_next_workflow_store.mjs,tools/test_next_workflow_task_delivery.mjs,tools/test_next_workflow_task_delivery.sh
+TESTS: tools/check_next_workflow.sh,tools/test_next_workflow.sh,tools/check_security_invariants.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+Implementation uses dependency-driven slices rather than a fixed phase count:
+
+1. **Canonical contract correction.** Synchronize the revised dependency order,
+   separate non-UI implementation from production availability and Activation,
+   update the four affected machine contracts, and preserve all paused Control
+   Center paths unchanged.
+2. **Protected trust and durable decision fences.** Add a protected external
+   trust-source resolver, exact one-use Approval issuance/consumption, safe
+   same-payload idempotent replay, and finalization-time Activation/authority/
+   expiry/policy/settings checks inside the SQLite transaction.
+3. **Run lifecycle.** Implement the minimal reusable lifecycle owner with
+   durable run/process-group identity, start/observe/cancel/terminate/
+   collect-result/reconcile/recover, bounded files/output, timeout escalation, absence
+   verification, and fail-closed unknown recovery.
+   Use a protected two-stage barrier whose controller channel treats EOF as
+   permanent non-release. Persist the barrier and contained-process identities
+   before release, observe namespace evidence, persist `RUNNING`, and only then
+   send the distinct release signal. Keep result IO bound to the exact pinned,
+   owner-controlled `0700` output directory even if its pathname is replaced.
+4. **Trusted task-envelope lineage and automatic execution selection.** Resolve
+   `AGENTS.MD` and the exact procedural instruction at launch, build and persist
+   the authority-owned envelope, automatically select an eligible model and
+   reasoning effort from role/rigor/capability/risk, pass those exact values to
+   the CLI, compare them to runtime observation, report both values at every
+   launch, and bind all fingerprints through admission, result validation,
+   independent review, receipt, and closure.
+5. **Isolated CLI vertical wiring.** Compose protected source, Approval,
+   observer, Receipt, reconciliation, containment, and fencing-aware lifecycle
+   owners through the existing gateway. Exercise one provider-neutral CLI path
+   only under an isolated profile; do not expose a production launch command.
+   Use Linux user, mount, network, and PID namespaces plus Bubblewrap for each
+   run; do not add Docker, Podman, Kubernetes, a daemon, or container images.
+   Reject private runtime roots that overlap, contain, or are contained by the
+   repository, resolved Git/control metadata, or protected owner-trust roots.
+   Add a non-installing prerequisite diagnostic that reports missing packages,
+   OS namespace policy, OS-appropriate install commands, and a recheck command.
+6. **Conformance, recovery, and freeze.** Prove success and adversarial denial,
+   cancellation, termination, timeout, crash, replay, race, mismatch, redaction,
+   and parent-child isolation. Final independent CLI audit must also prove deep
+   trust immutability, protected verifier identity, process-identity durability
+   before startup release, private task-input working directories, launch-
+   argument observation without self-report trust, review-gated result
+   candidates, finalization-time task-delivery revalidation, dedicated Agent
+   lifecycle writers that reload the complete independent-review topology,
+   protected operational gateway brands, restrictive owner/task model-policy
+   composition, fail-closed nonempty resource/cost policy parsing, protected
+   lifecycle/executor factory brands, and non-consuming prompt fingerprint
+   reads. Reload completed runtime provenance before accepting a candidate,
+   require its reconciled launch/admission receipts and a private lifecycle
+   writer bound to the exact protected store,
+   revalidate provider resource/cost/timeout bounds against the launch
+   reservation, and preserve the result fingerprint on completed-run replay.
+   Bind protected runtime writes to an unexposed writer capability for the
+   exact store, carry recovery-only authority through restart termination,
+   bind every candidate to the exact frozen launch request and a deterministic
+   durable launch/admission lineage,
+   and require same-trust protected agent-authority brands for grants,
+   reviewer assignments, reviews, reservations, and Validator decisions.
+   Current local evidence is 217 passing tests in 17 suites, all seven frozen
+   contracts, and a passing clean-candidate canonical repository aggregate.
+   Deliver the unchanged candidate via PR/main CI and synchronization.
+
+Rollback is additive and fail-closed at every slice: remove the isolated profile
+and unregister its lifecycle/trust owners, quarantine unresolved fixture runs,
+and retain the current production hard-deny composition. No rollback may restore
+candidate-controlled trust, reusable Approval, unfenced finalization, direct
+adapter access, registered child traversal, or a Control Center dependency.
+
+The implementation exit is intentionally not production Activation. It is:
+non-UI runtime wiring implemented; isolated vertical evidence current;
+production unavailable; Activation `planned`; Control Center reconstruction,
+TraceCue/browser acceptance, immutable candidate freeze, and full Activation
+pending.
+
+The later Control Center reconstruction must present the same isolation
+diagnostic in non-technical language, show copyable installation and recheck
+steps, and never install packages or change administrator policy without an
+explicit developer action. It must also distinguish subscription CLI, metered
+API, and local-model providers and expose model/publisher deny lists and cost
+ceilings. This is a deferred UI requirement only; no paused Control Center file
+is changed by this implementation.
