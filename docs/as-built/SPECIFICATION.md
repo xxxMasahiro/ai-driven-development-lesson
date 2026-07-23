@@ -4828,3 +4828,9 @@ synchronous recovery authorizer, and exact-compares request and authorization.
 Only accepted, stopped, or reviewer closures are terminal. Positive launcher
 tests create complete signed source, release, transition, repository, and store
 lineage and prove execution from the immutable snapshot.
+
+The repository range checker evaluates PR merge-base-to-head and every
+before-to-after push independently. A headless-core range therefore includes
+the complete additive parent authority groups in that same range; deleted
+documents, earlier-only changes, temporary memory, generated evidence, and
+paused Control Center artifacts cannot satisfy the set.

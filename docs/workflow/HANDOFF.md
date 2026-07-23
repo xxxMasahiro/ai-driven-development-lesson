@@ -3878,3 +3878,9 @@ Independent CLI security (`gpt-5.6-sol` / `max`), architecture/recovery
 re-audits pass. The remaining work is immutable GitHub delivery, exact
 merged-candidate Activation, and one bounded installed-launcher smoke task.
 Control Center and the separately deferred plans remain unchanged.
+
+The PR-only document gate correctly exposed that the first delivery candidate
+did not include every required parent authority. The complete 17-document
+authority set is now synchronized with the headless Production boundary, and
+both PR merge-base and incremental push ranges are treated as independent
+fail-closed release inputs rather than bypassed or weakened.

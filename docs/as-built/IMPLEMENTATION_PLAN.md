@@ -6156,3 +6156,7 @@ TESTS: tools/check_next_workflow.sh,tools/test_next_workflow.sh,tools/check_as_b
 7. Prove both forged-launch rejection and a complete positive signed launch,
    then rerun aggregate, documentation, repository workflow, and independent
    CLI audit gates before immutable GitHub delivery and Activation.
+8. Treat the PR range and every incremental push range as independent
+   synchronization units; keep the complete parent as-built, instruction,
+   verification, Security, CI/hook, workflow-pair, scaffold, and free-
+   development authority set current without weakening the range gate.

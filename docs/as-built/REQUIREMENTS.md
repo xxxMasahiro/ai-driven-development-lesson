@@ -4052,6 +4052,12 @@ interpreter, installed launcher script, signed snapshot root, and original
 repository root. Direct repository entry points cannot acquire Production
 write authority by setting environment variables.
 
+Every PR and incremental push that changes the headless runtime or its
+authority must contain the complete parent document-sync authority set required
+for that exact range. Passing an earlier push, changing only a partial
+authority subset later, or relying on Control Center documents must not satisfy
+the release gate.
+
 The installed wrapper must remain as the launcher's live parent rather than
 replace itself. Protected trust must pin its shell interpreter, and the
 launcher must match the parent executable, canonical wrapper path, and complete

@@ -237,3 +237,7 @@ Production Agent launch remains unavailable while Activation is not `enforced`.
 After the complete signed release lineage is enforced, Production Agent launch
 is authorized only through the owner-protected external launcher recorded in
 the protected runtime trust; direct repository entry points remain fail-closed.
+Changes to that launcher, protected runtime, model-selection policy, signed
+release chain, or Activation boundary must satisfy the complete parent
+document-sync authority set in the same PR and in every incremental push range;
+neither a prior branch commit nor paused Control Center work is a substitute.

@@ -3703,5 +3703,8 @@ TESTS: tools/check_next_workflow.sh,tools/test_next_workflow.sh,tools/check_as_b
 - [x] Pass aggregate local tests and a positive complete signed-launch test.
 - [x] Obtain PASS from the final independent CLI security, architecture, and
   operations audits with explicit observed model and effort.
+- [x] Close the PR-only omission found by CI by synchronizing the complete
+  parent authority set, and require both PR and incremental push ranges to pass
+  without weakening the document gate.
 - [ ] Deliver, merge, pass main CI, synchronize, activate the exact merge, and
   run the bounded Production smoke task.

@@ -59,6 +59,10 @@ and recovery proof, rollback proof, archive/decommission proof, required CI,
 merge, main CI, local/remote sync, and complete signed Activation. Control
 Center acceptance may remain paused and does not block accepted headless
 Activation.
+The immutable candidate is eligible only when the exact PR and each
+incremental push range also pass the complete parent document-synchronization
+gate; an authority changed only in an earlier range does not satisfy a later
+runtime-bearing push.
 
 The additive lifecycle uses six purpose-named stages: decide the next value,
 order tasks, review the implementation approach, decide the implementation
