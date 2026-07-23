@@ -1,15 +1,18 @@
 import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
-import { closeSync, constants as fsConstants, existsSync, fstatSync, lstatSync, openSync, readFileSync, realpathSync, unlinkSync } from "node:fs";
+import { closeSync, constants as fsConstants, existsSync, fstatSync, lstatSync, openSync, readFileSync, readSync, realpathSync, unlinkSync } from "node:fs";
 import { basename, dirname, isAbsolute, relative, resolve, sep } from "node:path";
 import { isIP } from "node:net";
 import { assertNoSecretMaterial, redactSecretText, validateSecretReferenceShape } from "./secret_policy.mjs";
+import { assertProtectedRunLifecyclePort } from "./run_lifecycle.mjs";
 
 const IDENTITY_FIELDS = ["execution_provider_id", "model_publisher_id", "agent_product_id", "adapter_id", "transport_id", "model_id"];
 const TRANSPORTS = new Set(["cli_process", "api_request", "local_runtime"]);
 const CERTIFICATION_STATES = new Set(["CANDIDATE", "CERTIFIED", "EXPIRED", "REVOKED", "FAILED", "DEGRADED", "UNAVAILABLE", "REPROBE_REQUIRED"]);
 const INHERITANCE_ORDER = ["agent", "role", "team", "repository", "context", "global"];
 const OBSERVATION_TRUST_CLASS = "trusted_runtime_observation";
+const NORMALIZED_REASONING_VALUES = new Set(["none", "minimal", "low", "medium", "balanced", "high", "enhanced", "xhigh", "max"]);
+const AUTHORITY_FENCED_CLI_EXECUTORS = new WeakSet();
 
 function canonicalJson(value) {
   if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
@@ -20,6 +23,22 @@ function canonicalJson(value) {
 function digest(value) {
   const input = Buffer.isBuffer(value) ? value : Buffer.from(typeof value === "string" ? value : canonicalJson(value));
   return createHash("sha256").update(input).digest("hex");
+}
+
+function readPinnedFile(fd, size) {
+  const bytes = Buffer.allocUnsafe(size);
+  let offset = 0;
+  while (offset < size) {
+    const count = readSync(fd, bytes, offset, size - offset, offset);
+    if (count === 0) throw new Error("CLI_PINNED_FILE_SHORT_READ");
+    offset += count;
+  }
+  return bytes;
+}
+
+export function assertProtectedAuthorityFencedCliExecutor(executor) {
+  if (!executor || !AUTHORITY_FENCED_CLI_EXECUTORS.has(executor)) throw new Error("PROTECTED_AUTHORITY_FENCED_CLI_EXECUTOR_REQUIRED");
+  return executor;
 }
 
 function hasSecretKey(value) {
@@ -144,24 +163,37 @@ function normalizeManifest(manifest) {
   if (!Array.isArray(manifest.capabilities)) throw new Error("PROVIDER_CAPABILITIES_REQUIRED");
   if (!Array.isArray(manifest.native_reasoning_values)) throw new Error("PROVIDER_REASONING_VALUES_REQUIRED");
   if (!manifest.effort_mapping || typeof manifest.effort_mapping !== "object") throw new Error("PROVIDER_EFFORT_MAPPING_REQUIRED");
+  const nativeValues = [...new Set(manifest.native_reasoning_values)].sort();
+  if (nativeValues.some((value) => typeof value !== "string" || value.length === 0) || Object.keys(manifest.effort_mapping).sort().join("\0") !== nativeValues.join("\0") || Object.values(manifest.effort_mapping).some((value) => !NORMALIZED_REASONING_VALUES.has(value))) throw new Error("PROVIDER_EFFORT_MAPPING_INVALID");
+  const mappingProvenance = manifest.reasoning_mapping_provenance;
+  if (!mappingProvenance || typeof mappingProvenance.source_id !== "string" || typeof mappingProvenance.revision !== "string" || typeof mappingProvenance.reviewed_by !== "string" || !/^[a-f0-9]{64}$/.test(mappingProvenance.proof_fingerprint ?? "")) throw new Error("PROVIDER_EFFORT_MAPPING_PROVENANCE_REQUIRED");
+  const selectionProfile = manifest.selection_profile ?? { correctness: 0, safety: 0, efficiency: 0, roles: [] };
+  if (![selectionProfile.correctness, selectionProfile.safety, selectionProfile.efficiency].every((value) => Number.isSafeInteger(value) && value >= 0 && value <= 100) || !Array.isArray(selectionProfile.roles) || selectionProfile.roles.some((role) => typeof role !== "string" || role.length === 0)) throw new Error("PROVIDER_SELECTION_PROFILE_INVALID");
   const certificationProfile = manifest.certification_profile;
   if (!certificationProfile || certificationProfile.probe_authority !== "independent" || certificationProfile.certification_authority !== "independent" || certificationProfile.isolated_probe !== true) throw new Error("PROVIDER_CERTIFICATION_PROFILE_INVALID");
+  if (!Object.hasOwn(manifest, "resource_bounds")) throw new Error("PROVIDER_RESOURCE_BOUNDS_REQUIRED");
+  const resourceBounds = manifest.resource_bounds;
+  if (!resourceBounds || typeof resourceBounds !== "object" || Array.isArray(resourceBounds) || Object.keys(resourceBounds).length === 0 || Object.entries(resourceBounds).some(([key, value]) => typeof key !== "string" || key.length === 0 || !Number.isFinite(value) || value < 0)) throw new Error("PROVIDER_RESOURCE_BOUNDS_INVALID");
+  if (!Object.hasOwn(manifest, "estimated_cost")) throw new Error("PROVIDER_ESTIMATED_COST_REQUIRED");
+  const estimatedCost = manifest.estimated_cost;
+  if (!Number.isFinite(estimatedCost) || estimatedCost < 0) throw new Error("PROVIDER_ESTIMATED_COST_INVALID");
   return {
     manifest_id: requireString(manifest.manifest_id, "PROVIDER_MANIFEST_ID_REQUIRED"),
     version: requireString(manifest.version, "PROVIDER_MANIFEST_VERSION_REQUIRED"),
     identity,
     identity_key: providerIdentityKey(identity),
     capabilities: [...new Set(manifest.capabilities)].sort(),
-    native_reasoning_values: [...new Set(manifest.native_reasoning_values)].sort(),
+    native_reasoning_values: nativeValues,
     effort_mapping: { ...manifest.effort_mapping },
     certification_profile: structuredClone(certificationProfile),
-    resource_bounds: { ...(manifest.resource_bounds ?? {}) },
+    resource_bounds: { ...resourceBounds },
     transport_descriptor: structuredClone(manifest.transport_descriptor ?? {}),
-    reasoning_mapping_provenance: structuredClone(manifest.reasoning_mapping_provenance ?? null),
+    reasoning_mapping_provenance: structuredClone(mappingProvenance),
+    selection_profile: { correctness: selectionProfile.correctness, safety: selectionProfile.safety, efficiency: selectionProfile.efficiency, roles: [...new Set(selectionProfile.roles)].sort() },
     custom: manifest.custom === true,
     requires_observation: manifest.custom === true || manifest.requires_observation === true,
     priority: manifest.priority ?? 100,
-    estimated_cost: manifest.estimated_cost ?? 0
+    estimated_cost: estimatedCost
   };
 }
 
@@ -173,7 +205,7 @@ function normalizeCertification(certification) {
   const revocationEpoch = Number(certification.revocation_epoch ?? 0);
   if (!Number.isFinite(Date.parse(certifiedAt)) || !Number.isFinite(Date.parse(expiresAt)) || Date.parse(certifiedAt) >= Date.parse(expiresAt)) throw new Error("CERTIFICATION_TIME_INVALID");
   if (!Number.isSafeInteger(revocationEpoch) || revocationEpoch < 0) throw new Error("CERTIFICATION_REVOCATION_EPOCH_INVALID");
-  for (const [field, code] of [["capability_fingerprint", "CERTIFICATION_CAPABILITY_FINGERPRINT_INVALID"], ["observation_fingerprint", "CERTIFICATION_OBSERVATION_FINGERPRINT_INVALID"], ["probe_fingerprint", "CERTIFICATION_PROBE_FINGERPRINT_INVALID"], ["clock_fingerprint", "CERTIFICATION_CLOCK_FINGERPRINT_INVALID"], ["authority_fingerprint", "CERTIFICATION_AUTHORITY_FINGERPRINT_INVALID"], ["drift_fingerprint", "CERTIFICATION_DRIFT_FINGERPRINT_INVALID"]]) {
+  for (const [field, code] of [["manifest_fingerprint", "CERTIFICATION_MANIFEST_FINGERPRINT_INVALID"], ["capability_fingerprint", "CERTIFICATION_CAPABILITY_FINGERPRINT_INVALID"], ["observation_fingerprint", "CERTIFICATION_OBSERVATION_FINGERPRINT_INVALID"], ["probe_fingerprint", "CERTIFICATION_PROBE_FINGERPRINT_INVALID"], ["clock_fingerprint", "CERTIFICATION_CLOCK_FINGERPRINT_INVALID"], ["authority_fingerprint", "CERTIFICATION_AUTHORITY_FINGERPRINT_INVALID"], ["drift_fingerprint", "CERTIFICATION_DRIFT_FINGERPRINT_INVALID"]]) {
     if (!/^[a-f0-9]{64}$/.test(requireString(certification[field], code))) throw new Error(code);
   }
   if (certification.revocation_state !== "active" && certification.revocation_state !== "revoked") throw new Error("CERTIFICATION_REVOCATION_STATE_INVALID");
@@ -187,6 +219,7 @@ function normalizeCertification(certification) {
     manifest_version: requireString(certification.manifest_version, "CERTIFICATION_MANIFEST_VERSION_REQUIRED"),
     adapter_version: requireString(certification.adapter_version, "CERTIFICATION_ADAPTER_VERSION_REQUIRED"),
     platform: requireString(certification.platform, "CERTIFICATION_PLATFORM_REQUIRED"),
+    manifest_fingerprint: certification.manifest_fingerprint,
     capability_fingerprint: requireString(certification.capability_fingerprint, "CERTIFICATION_CAPABILITY_FINGERPRINT_REQUIRED"),
     state,
     certified_at: certifiedAt,
@@ -205,7 +238,7 @@ function normalizeCertification(certification) {
   if (normalized.probe_authority_id === normalized.certifier_id) throw new Error("CERTIFICATION_AUTHORITIES_NOT_INDEPENDENT");
   if (!/^[a-f0-9]{64}$/.test(normalized.certification_proof_fingerprint)) throw new Error("CERTIFICATION_PROOF_INVALID");
   if (normalized.authority_fingerprint !== digest({ certifier_id: normalized.certifier_id, probe_authority_id: normalized.probe_authority_id, certification_proof_fingerprint: normalized.certification_proof_fingerprint })) throw new Error("CERTIFICATION_AUTHORITY_EVIDENCE_MISMATCH");
-  const expectedDrift = digest({ identity_key: normalized.identity_key, manifest_version: normalized.manifest_version, adapter_version: normalized.adapter_version, platform: normalized.platform, capability_fingerprint: normalized.capability_fingerprint, observation_fingerprint: normalized.observation_fingerprint, revocation_epoch: normalized.revocation_epoch });
+  const expectedDrift = digest({ identity_key: normalized.identity_key, manifest_version: normalized.manifest_version, adapter_version: normalized.adapter_version, platform: normalized.platform, manifest_fingerprint: normalized.manifest_fingerprint, capability_fingerprint: normalized.capability_fingerprint, observation_fingerprint: normalized.observation_fingerprint, revocation_epoch: normalized.revocation_epoch });
   if (normalized.drift_fingerprint !== expectedDrift) throw new Error("CERTIFICATION_DRIFT_EVIDENCE_MISMATCH");
   return normalized;
 }
@@ -516,6 +549,7 @@ export function loadProviderRegistry({ manifests, certifications, observations =
       if (!certificationTrusted) reasons.push("CERTIFICATION_PROVENANCE_UNTRUSTED");
       if (certification.state !== "CERTIFIED") reasons.push(`CERTIFICATION_${certification.state}`);
       if (certification.manifest_version !== manifest.version) reasons.push("MANIFEST_VERSION_DRIFT");
+      if (certification.manifest_fingerprint !== digest(manifest)) reasons.push("MANIFEST_CONTENT_DRIFT");
       if (certification.platform !== platform) reasons.push("PLATFORM_MISMATCH");
       if (certification.capability_fingerprint !== digest(manifest.capabilities)) reasons.push("CAPABILITY_DRIFT");
       if (Number.isNaN(Date.parse(certification.expires_at)) || Date.parse(certification.expires_at) < Date.parse(now)) reasons.push("CERTIFICATION_EXPIRED");
@@ -532,14 +566,123 @@ function eligibility(entry, requirements, authority, budget) {
   for (const capability of requirements.capabilities ?? []) if (!entry.manifest.capabilities.includes(capability)) blockers.push(`CAPABILITY_MISSING:${capability}`);
   if (requirements.native_reasoning && !entry.manifest.native_reasoning_values.includes(requirements.native_reasoning)) blockers.push("NATIVE_REASONING_UNSUPPORTED");
   if (requirements.normalized_effort && !Object.values(entry.manifest.effort_mapping).includes(requirements.normalized_effort)) blockers.push("NORMALIZED_EFFORT_UNSUPPORTED");
+  const modelPolicy = Object.hasOwn(requirements, "model_policy") ? requirements.model_policy : {};
+  const modelId = entry.manifest.identity.model_id;
+  const publisherId = entry.manifest.identity.model_publisher_id;
+  const modelPolicyFields = ["allowed_model_ids", "denied_model_ids", "allowed_model_publishers", "denied_model_publishers", "denied_model_prefixes"];
+  const modelPolicyInvalid = !modelPolicy || typeof modelPolicy !== "object" || Array.isArray(modelPolicy)
+    || Object.keys(modelPolicy).some((field) => !modelPolicyFields.includes(field))
+    || modelPolicyFields.some((field) => modelPolicy[field] !== undefined && (!Array.isArray(modelPolicy[field]) || modelPolicy[field].some((value) => typeof value !== "string" || value.length === 0)));
+  if (modelPolicyInvalid) blockers.push("MODEL_POLICY_INVALID");
+  else {
+    for (const [field, code] of [["allowed_model_ids", "MODEL_NOT_ALLOWLISTED"], ["allowed_model_publishers", "MODEL_PUBLISHER_NOT_ALLOWLISTED"]]) {
+      const values = modelPolicy[field];
+      if (Array.isArray(values) && values.length > 0 && !values.includes(field === "allowed_model_ids" ? modelId : publisherId)) blockers.push(code);
+    }
+    if (modelPolicy.denied_model_ids?.includes(modelId)) blockers.push("MODEL_DENIED");
+    if (modelPolicy.denied_model_publishers?.includes(publisherId)) blockers.push("MODEL_PUBLISHER_DENIED");
+    if (modelPolicy.denied_model_prefixes?.some((prefix) => modelId.startsWith(prefix))) blockers.push("MODEL_PREFIX_DENIED");
+  }
   if (authority?.decision !== "ALLOW") blockers.push("AUTHORITY_DENIED");
-  for (const [key, value] of Object.entries(budget ?? {})) if (Number.isFinite(entry.manifest.resource_bounds[key]) && entry.manifest.resource_bounds[key] > value) blockers.push(`BUDGET_EXCEEDED:${key}`);
+  if (!budget || typeof budget !== "object" || Array.isArray(budget)) blockers.push("BUDGET_INPUT_INVALID");
+  else {
+    for (const [key, bound] of Object.entries(entry.manifest.resource_bounds)) {
+      if (!Object.hasOwn(budget, key)) blockers.push(`BUDGET_BOUND_REQUIRED:${key}`);
+      else if (!Number.isFinite(budget[key]) || budget[key] < 0) blockers.push(`BUDGET_INPUT_INVALID:${key}`);
+      else if (bound > budget[key]) blockers.push(`BUDGET_EXCEEDED:${key}`);
+    }
+    for (const [key, value] of Object.entries(budget)) {
+      if (!Number.isFinite(value) || value < 0) blockers.push(`BUDGET_INPUT_INVALID:${key}`);
+      else if (!Object.hasOwn(entry.manifest.resource_bounds, key)) blockers.push(`RESOURCE_BOUND_MISSING:${key}`);
+    }
+    if (entry.manifest.estimated_cost > 0 && !Object.hasOwn(budget, "cost")) blockers.push("BUDGET_COST_REQUIRED");
+    if (Object.hasOwn(budget, "cost") && entry.manifest.estimated_cost > budget.cost) blockers.push("BUDGET_ESTIMATED_COST_EXCEEDED");
+  }
   return [...new Set(blockers)].sort();
+}
+
+const MODEL_POLICY_FIELDS = Object.freeze(["allowed_model_ids", "denied_model_ids", "allowed_model_publishers", "denied_model_publishers", "denied_model_prefixes"]);
+
+function normalizeModelPolicySource(container) {
+  if (!Object.hasOwn(container, "model_policy")) return { present: false, valid: true, value: {} };
+  const value = container.model_policy;
+  const valid = value && typeof value === "object" && !Array.isArray(value)
+    && Object.keys(value).every((field) => MODEL_POLICY_FIELDS.includes(field))
+    && MODEL_POLICY_FIELDS.every((field) => value[field] === undefined || (Array.isArray(value[field]) && value[field].every((item) => typeof item === "string" && item.length > 0)));
+  return { present: true, valid, value: valid ? value : null };
+}
+
+function composeModelPolicy(ownerContainer, taskContainer) {
+  const owner = normalizeModelPolicySource(ownerContainer);
+  const task = normalizeModelPolicySource(taskContainer);
+  if (!owner.valid || !task.valid) return null;
+  const result = {};
+  for (const field of ["allowed_model_ids", "allowed_model_publishers"]) {
+    const left = [...new Set(owner.value[field] ?? [])];
+    const right = [...new Set(task.value[field] ?? [])];
+    let values = left.length > 0 && right.length > 0 ? left.filter((item) => right.includes(item)) : left.length > 0 ? left : right;
+    if (left.length > 0 && right.length > 0 && values.length === 0) values = [`urn:next-workflow:no-${field}-matches`];
+    if (values.length > 0 || (left.length > 0 && right.length > 0)) result[field] = values.sort();
+  }
+  for (const field of ["denied_model_ids", "denied_model_publishers", "denied_model_prefixes"]) {
+    const values = [...new Set([...(owner.value[field] ?? []), ...(task.value[field] ?? [])])].sort();
+    if (values.length > 0) result[field] = values;
+  }
+  return result;
+}
+
+const NORMALIZED_EFFORT_ORDER = Object.freeze(["none", "minimal", "low", "medium", "high", "xhigh", "max"]);
+const NORMALIZED_EFFORT_RANK = Object.freeze({
+  none: 0,
+  minimal: 1,
+  low: 2,
+  medium: 3,
+  balanced: 3,
+  high: 4,
+  enhanced: 4,
+  xhigh: 5,
+  max: 6,
+});
+const RIGOR_EFFORT_FLOOR = Object.freeze({ L1: "minimal", L2: "low", L3: "medium", L4: "high", L5: "xhigh" });
+
+function automaticEffortFloor(requirements, authority) {
+  const rigor = requirements.rigor ?? authority?.rigor ?? "L3";
+  if (!Object.hasOwn(RIGOR_EFFORT_FLOOR, rigor)) throw new Error("SELECTION_RIGOR_INVALID");
+  let rank = NORMALIZED_EFFORT_RANK[RIGOR_EFFORT_FLOOR[rigor]];
+  const risk = requirements.risk ?? "normal";
+  const complexity = requirements.complexity ?? "normal";
+  if (!new Set(["low", "normal", "high", "critical"]).has(risk) || !new Set(["low", "normal", "high", "extreme"]).has(complexity)) throw new Error("SELECTION_RISK_OR_COMPLEXITY_INVALID");
+  if (risk === "high") rank += 1;
+  if (risk === "critical") rank += 2;
+  if (complexity === "high") rank += 1;
+  if (complexity === "extreme") rank += 2;
+  return { rigor, risk, complexity, normalized_floor: NORMALIZED_EFFORT_ORDER[Math.min(rank, NORMALIZED_EFFORT_ORDER.length - 1)] };
+}
+
+function selectManifestEffort(manifest, { requirements, authority, requestedNativeReasoning }) {
+  const criteria = automaticEffortFloor(requirements, authority);
+  const floorRank = NORMALIZED_EFFORT_ORDER.indexOf(criteria.normalized_floor);
+  const explicitNative = requirements.native_reasoning ?? requestedNativeReasoning ?? null;
+  const explicitNormalized = requirements.normalized_effort ?? null;
+  if (explicitNormalized !== null && !Object.hasOwn(NORMALIZED_EFFORT_RANK, explicitNormalized)) return { blockers: ["NORMALIZED_EFFORT_UNKNOWN"], criteria };
+  const candidates = manifest.native_reasoning_values.map((nativeReasoning) => ({ native_reasoning: nativeReasoning, normalized_effort: manifest.effort_mapping[nativeReasoning] })).filter((candidate) => typeof candidate.normalized_effort === "string" && Object.hasOwn(NORMALIZED_EFFORT_RANK, candidate.normalized_effort));
+  let filtered = candidates;
+  if (explicitNative !== null) filtered = filtered.filter((candidate) => candidate.native_reasoning === explicitNative);
+  if (explicitNormalized !== null) filtered = filtered.filter((candidate) => candidate.normalized_effort === explicitNormalized);
+  filtered = filtered.filter((candidate) => NORMALIZED_EFFORT_RANK[candidate.normalized_effort] >= floorRank);
+  filtered.sort((left, right) => NORMALIZED_EFFORT_RANK[left.normalized_effort] - NORMALIZED_EFFORT_RANK[right.normalized_effort] || left.native_reasoning.localeCompare(right.native_reasoning));
+  const selected = filtered[0];
+  const blockers = [];
+  if (explicitNative !== null && !manifest.native_reasoning_values.includes(explicitNative)) blockers.push("NATIVE_REASONING_UNSUPPORTED");
+  if (explicitNormalized !== null && !Object.values(manifest.effort_mapping).includes(explicitNormalized)) blockers.push("NORMALIZED_EFFORT_UNSUPPORTED");
+  if (!selected && blockers.length === 0) blockers.push("EFFORT_BELOW_REQUIRED_FLOOR");
+  return { ...selected, blockers, criteria, requested_native_reasoning: explicitNative, requested_normalized_effort: explicitNormalized };
 }
 
 export function selectAgentConfiguration({ registry, policy, inheritanceChain = [], requirements = {}, authority, budget = {} }) {
   if (!registry?.entries || !policy || !new Set(["auto", "manual", "inherit"]).has(policy.mode)) throw new Error("SELECTION_INPUT_INVALID");
   let requested;
+  let requestedNativeReasoning = policy.native_reasoning ?? null;
   const trace = [];
   if (policy.mode === "manual") requested = policy.identity_key;
   if (policy.mode === "inherit") {
@@ -550,12 +693,28 @@ export function selectAgentConfiguration({ registry, policy, inheritanceChain = 
       if (!entry) continue;
       if (entry.valid !== true || typeof entry.identity_key !== "string") return { decision: "STOP", code: "NEAREST_INHERITED_SOURCE_INVALID", inheritance_trace: trace };
       requested = entry.identity_key;
+      requestedNativeReasoning = entry.native_reasoning ?? requestedNativeReasoning;
       break;
     }
     if (!requested) return { decision: "STOP", code: "NO_INHERITED_SELECTION", inheritance_trace: trace };
   }
-  const evaluated = registry.entries.map((entry) => ({ entry, blockers: eligibility(entry, requirements, authority, budget) }));
-  const ranked = [...evaluated].sort((a, b) => a.entry.manifest.priority - b.entry.manifest.priority || a.entry.manifest.estimated_cost - b.entry.manifest.estimated_cost || a.entry.manifest.identity_key.localeCompare(b.entry.manifest.identity_key));
+  const effectiveRequirements = { ...requirements, model_policy: composeModelPolicy(policy, requirements) };
+  const evaluated = registry.entries.map((entry) => {
+    const effort = selectManifestEffort(entry.manifest, { requirements: effectiveRequirements, authority, requestedNativeReasoning });
+    return { entry, effort, blockers: [...new Set([...eligibility(entry, effectiveRequirements, authority, budget), ...effort.blockers])].sort() };
+  });
+  const role = effectiveRequirements.role ?? null;
+  const ranked = [...evaluated].sort((a, b) => {
+    const aRole = role !== null && a.entry.manifest.selection_profile.roles.includes(role) ? 1 : 0;
+    const bRole = role !== null && b.entry.manifest.selection_profile.roles.includes(role) ? 1 : 0;
+    return b.entry.manifest.selection_profile.correctness - a.entry.manifest.selection_profile.correctness
+      || b.entry.manifest.selection_profile.safety - a.entry.manifest.selection_profile.safety
+      || bRole - aRole
+      || b.entry.manifest.selection_profile.efficiency - a.entry.manifest.selection_profile.efficiency
+      || a.entry.manifest.priority - b.entry.manifest.priority
+      || a.entry.manifest.estimated_cost - b.entry.manifest.estimated_cost
+      || a.entry.manifest.identity_key.localeCompare(b.entry.manifest.identity_key);
+  });
   const selectionLineage = ranked.map((item, index) => ({ rank: index + 1, identity_key: item.entry.manifest.identity_key, eligible: item.blockers.length === 0, blockers: [...item.blockers], registry_fingerprint: registry.fingerprint, observed_at: registry.observed_at }));
   let selected;
   if (policy.mode === "auto") selected = ranked.find((item) => item.blockers.length === 0);
@@ -567,7 +726,7 @@ export function selectAgentConfiguration({ registry, policy, inheritanceChain = 
   if (selected.blockers.length) return { decision: "STOP", code: "SELECTION_INELIGIBLE", requested: selected.entry.manifest.identity_key, blockers: selected.blockers, inheritance_trace: trace };
   if (policy.previous_effective && policy.previous_effective !== selected.entry.manifest.identity_key && (typeof policy.reselection_reason !== "string" || policy.reselection_reason.length === 0)) return { decision: "STOP", code: "RESELECTION_REASON_REQUIRED", requested: requested ?? "auto", previous_effective: policy.previous_effective, proposed_effective: selected.entry.manifest.identity_key, selection_lineage: selectionLineage };
   const selectedRank = selectionLineage.find((item) => item.identity_key === selected.entry.manifest.identity_key)?.rank ?? 1;
-  const result = { decision: "PASS", mode: policy.mode, requested: requested ?? "auto", selected: selected.entry.manifest.identity_key, effective: selected.entry.manifest.identity_key, previous_effective: policy.previous_effective ?? null, reselection_reason: policy.reselection_reason ?? null, fallback_count: policy.mode === "auto" ? selectedRank - 1 : 0, selection_lineage: selectionLineage, manifest: selected.entry.manifest, inheritance_trace: trace, actual_observed: null };
+  const result = { decision: "PASS", mode: policy.mode, requested: requested ?? "auto", selected: selected.entry.manifest.identity_key, effective: selected.entry.manifest.identity_key, selected_model: selected.entry.manifest.identity.model_id, selected_native_reasoning: selected.effort.native_reasoning, selected_normalized_effort: selected.effort.normalized_effort, effort_criteria: selected.effort.criteria, previous_effective: policy.previous_effective ?? null, reselection_reason: policy.reselection_reason ?? null, fallback_count: policy.mode === "auto" ? selectedRank - 1 : 0, selection_lineage: selectionLineage, manifest: selected.entry.manifest, inheritance_trace: trace, actual_observed: null };
   return { ...result, fingerprint: digest(result) };
 }
 
@@ -576,12 +735,19 @@ export function createSelectionDryRun({ change, baseRevision, before, after, aff
   return { ...result, fingerprint: digest(result) };
 }
 
-export function createLaunchIntent({ grant, selection, effective, context, reservation, targets, authorityEpoch, intentId, createdAt }) {
+export function createLaunchIntent({ grant, selection, effective, context, reservation, targets, authorityEpoch, intentId, createdAt, taskEnvelope = null }) {
   if (selection?.decision !== "PASS") throw new Error("SELECTION_NOT_ADMITTED");
   if (!Array.isArray(targets) || targets.length === 0 || targets.some((target) => typeof target !== "string" || target.length === 0)) throw new Error("LAUNCH_TARGETS_REQUIRED");
   const normalizedTargets = [...new Set(targets)].sort();
   if (!Number.isSafeInteger(authorityEpoch) || authorityEpoch < 0) throw new Error("LAUNCH_AUTHORITY_EPOCH_REQUIRED");
-  const intent = { schema_version: "1.0.0", intent_id: requireString(intentId, "LAUNCH_INTENT_ID_REQUIRED"), grant_fingerprint: requireString(grant?.fingerprint, "GRANT_FINGERPRINT_REQUIRED"), requested: selection.requested, selected: selection.selected, effective: effective ?? selection.effective, actual_observed: null, context_fingerprint: requireString(context?.fingerprint, "CONTEXT_FINGERPRINT_REQUIRED"), reservation_id: requireString(reservation?.reservation_id, "RESERVATION_REQUIRED"), authority_epoch: authorityEpoch, targets: normalizedTargets, created_at: requireString(createdAt, "LAUNCH_TIME_REQUIRED") };
+  if (taskEnvelope !== null) {
+    const required = ["invariant_fingerprint", "instruction_fingerprint", "envelope_fingerprint", "delivery_fingerprint"];
+    if (required.some((field) => !/^[a-f0-9]{64}$/.test(taskEnvelope?.[field] ?? ""))) throw new Error("LAUNCH_TASK_ENVELOPE_BINDING_INVALID");
+  }
+  const selectedModel = requireString(selection.selected_model, "LAUNCH_SELECTED_MODEL_REQUIRED");
+  const selectedNativeReasoning = requireString(selection.selected_native_reasoning, "LAUNCH_SELECTED_REASONING_REQUIRED");
+  const selectedNormalizedEffort = requireString(selection.selected_normalized_effort, "LAUNCH_SELECTED_NORMALIZED_EFFORT_REQUIRED");
+  const intent = { schema_version: "1.0.0", intent_id: requireString(intentId, "LAUNCH_INTENT_ID_REQUIRED"), grant_fingerprint: requireString(grant?.fingerprint, "GRANT_FINGERPRINT_REQUIRED"), requested: selection.requested, selected: selection.selected, effective: effective ?? selection.effective, selected_model: selectedModel, selected_native_reasoning: selectedNativeReasoning, selected_normalized_effort: selectedNormalizedEffort, actual_observed: null, context_fingerprint: requireString(context?.fingerprint, "CONTEXT_FINGERPRINT_REQUIRED"), reservation_id: requireString(reservation?.reservation_id, "RESERVATION_REQUIRED"), authority_epoch: authorityEpoch, targets: normalizedTargets, created_at: requireString(createdAt, "LAUNCH_TIME_REQUIRED"), ...(taskEnvelope ? { task_envelope: structuredClone(taskEnvelope) } : {}) };
   return { ...intent, fingerprint: digest(intent) };
 }
 
@@ -610,6 +776,7 @@ export function admitAgentRun({ intent, grant, actualObserved, observationProof,
   if (grantBoundaryFailure) return { decision: "STOP", code: grantBoundaryFailure };
   const actualKey = providerIdentityKey(verifiedObserved.identity);
   if (actualKey !== intent.effective) return { decision: "STOP", code: "ACTUAL_CONFIGURATION_MISMATCH", expected: intent.effective, actual: actualKey };
+  if (verifiedObserved.native_reasoning !== intent.selected_native_reasoning || verifiedObserved.normalized_effort !== intent.selected_normalized_effort) return { decision: "STOP", code: "ACTUAL_MODEL_OR_EFFORT_MISMATCH", expected: { model: intent.selected_model, native_reasoning: intent.selected_native_reasoning, normalized_effort: intent.selected_normalized_effort }, actual: { model: verifiedObserved.identity?.model_id ?? null, native_reasoning: verifiedObserved.native_reasoning ?? null, normalized_effort: verifiedObserved.normalized_effort ?? null } };
   const observationFingerprint = digest(verifiedObserved);
   if (!verifiedProof || verifiedProof.verified !== true || verifiedProof.independent !== true || verifiedProof.verified_by !== verifier.verifier_id || verifiedProof.fingerprint !== observationFingerprint || typeof verifiedProof.evidence_strength !== "string" || verifiedProof.evidence_strength.length === 0) return { decision: "STOP", code: "ACTUAL_OBSERVATION_PROOF_INVALID" };
   const proofFingerprint = digest({ verifier_id: verifier.verifier_id, observation_fingerprint: observationFingerprint, evidence_strength: verifiedProof.evidence_strength });
@@ -617,7 +784,7 @@ export function admitAgentRun({ intent, grant, actualObserved, observationProof,
   return { decision: "PASS", attestation: { ...attestation, fingerprint: digest(attestation) } };
 }
 
-export function buildCliLaunchPlan({ manifest, promptFile, responseFile, modelId, nativeReasoning, sandbox, workingDirectory }) {
+export function buildCliLaunchPlan({ manifest, promptFile, promptFingerprint = null, responseFile, modelId, nativeReasoning, sandbox, workingDirectory }) {
   const normalized = normalizeManifest(manifest);
   if (normalized.identity.transport_id !== "cli_process") throw new Error("CLI_TRANSPORT_REQUIRED");
   for (const value of [promptFile, responseFile, workingDirectory]) if (!isAbsolute(value)) throw new Error("CLI_PATH_MUST_BE_ABSOLUTE");
@@ -642,7 +809,8 @@ export function buildCliLaunchPlan({ manifest, promptFile, responseFile, modelId
     stdin_marker: "-",
   };
   const argv = descriptor.argv_template.map((token) => /^\{\{[a-z_]+\}\}$/.test(token) ? values[token.slice(2, -2)] : token);
-  const core = { transport: "cli_process", executable, executable_descriptor: structuredClone(descriptor.executable), interpreter_descriptor: structuredClone(descriptor.interpreter ?? null), model_id: modelId, native_reasoning: nativeReasoning, sandbox, argv, working_directory: workingDirectory, stdin_file: promptFile, response_file: responseFile, shell: false, environment: {}, environment_allowlist: [...descriptor.environment_allowlist], execution_policy: structuredClone(descriptor.execution_policy ?? null), implicit_network_authority: false, requires_executable_revalidation: true };
+  if (promptFingerprint !== null && !/^[a-f0-9]{64}$/.test(promptFingerprint)) throw new Error("CLI_PROMPT_FINGERPRINT_INVALID");
+  const core = { transport: "cli_process", executable, executable_descriptor: structuredClone(descriptor.executable), interpreter_descriptor: structuredClone(descriptor.interpreter ?? null), model_id: modelId, native_reasoning: nativeReasoning, sandbox, argv, working_directory: workingDirectory, stdin_file: promptFile, stdin_fingerprint: promptFingerprint, response_file: responseFile, shell: false, environment: {}, environment_allowlist: [...descriptor.environment_allowlist], execution_policy: structuredClone(descriptor.execution_policy ?? null), implicit_network_authority: false, requires_executable_revalidation: true };
   return { ...core, fingerprint: digest(core) };
 }
 
@@ -697,8 +865,11 @@ export function pinExecutableDescriptor({ descriptor, observation } = {}) {
 
 export async function dispatchCliLaunchPlan({ manifest, plan, executableObservation, executor, inheritedEnvironment = process.env, authorityFence } = {}) {
   if (!executor || executor.descriptor_pinned !== true || typeof executor.execute !== "function") throw new Error("DESCRIPTOR_PINNED_EXECUTOR_REQUIRED");
-  if (authorityFence !== undefined && authorityFence !== null && executor.authority_fence_enforced !== true) throw new Error("CLI_AUTHORITY_FENCE_ENFORCEMENT_UNAVAILABLE");
-  const rebuilt = buildCliLaunchPlan({ manifest, promptFile: plan?.stdin_file, responseFile: plan?.response_file, modelId: plan?.model_id, nativeReasoning: plan?.native_reasoning, sandbox: plan?.sandbox, workingDirectory: plan?.working_directory });
+  if (authorityFence !== undefined && authorityFence !== null) {
+    assertProtectedAuthorityFencedCliExecutor(executor);
+    if (executor.authority_fence_enforced !== true) throw new Error("CLI_AUTHORITY_FENCE_ENFORCEMENT_UNAVAILABLE");
+  }
+  const rebuilt = buildCliLaunchPlan({ manifest, promptFile: plan?.stdin_file, promptFingerprint: plan?.stdin_fingerprint ?? null, responseFile: plan?.response_file, modelId: plan?.model_id, nativeReasoning: plan?.native_reasoning, sandbox: plan?.sandbox, workingDirectory: plan?.working_directory });
   if (rebuilt.fingerprint !== plan?.fingerprint) throw new Error("CLI_EXECUTION_PLAN_NOT_CANONICAL");
   const admission = authorizeCliLaunchPlan({ manifest, plan, executableObservation });
   const pinned = pinExecutableDescriptor({ descriptor: plan.executable_descriptor, observation: executableObservation });
@@ -717,12 +888,17 @@ export async function dispatchCliLaunchPlan({ manifest, plan, executableObservat
       argv: [...plan.argv],
       working_directory: plan.working_directory,
       stdin_file: plan.stdin_file,
+      stdin_fingerprint: plan.stdin_fingerprint,
       response_file: plan.response_file,
       environment,
       execution_policy: structuredClone(plan.execution_policy),
       authority_fence: authorityFence ?? null,
+      selected_provider: manifest.identity_key,
+      selected_model: plan.model_id,
+      selected_effort: plan.native_reasoning,
       shell: false,
       plan_fingerprint: admission.plan_fingerprint,
+      manifest_fingerprint: digest(manifest),
     });
     if (!result || result.descriptor_pinned !== true || result.plan_fingerprint !== admission.plan_fingerprint || !Number.isSafeInteger(result.exit_code)) throw new Error("CLI_EXECUTOR_RESULT_INVALID");
     assertNoSecretMaterial(result, "CLI_EXECUTOR_SECRET_RESULT_FORBIDDEN");
@@ -771,6 +947,7 @@ export function createNodeDescriptorPinnedExecutor({ spawnRunner = spawnSync, ti
         promptFd = openSync(input.stdin_file, fsConstants.O_RDONLY | (fsConstants.O_NOFOLLOW ?? 0));
         const promptStat = fstatSync(promptFd);
         if (!promptStat.isFile() || promptStat.size > effectivePromptBytes || (promptStat.mode & 0o077) !== 0) throw new Error("CLI_PROMPT_FILE_INVALID");
+        if (input.stdin_fingerprint !== null && input.stdin_fingerprint !== undefined && (!/^[a-f0-9]{64}$/.test(input.stdin_fingerprint) || digest(readPinnedFile(promptFd, promptStat.size)) !== input.stdin_fingerprint)) throw new Error("CLI_PROMPT_FINGERPRINT_MISMATCH");
         responseFd = openSync(pinnedResponsePath, fsConstants.O_WRONLY | fsConstants.O_CREAT | fsConstants.O_EXCL | (fsConstants.O_NOFOLLOW ?? 0), 0o600);
         responseCreated = true;
         const createdResponseStat = fstatSync(responseFd);
@@ -810,6 +987,87 @@ export function createNodeDescriptorPinnedExecutor({ spawnRunner = spawnSync, ti
       }
     },
   };
+}
+
+export function createRunLifecycleCliExecutor({ lifecyclePort, observationBuilder } = {}) {
+  if (!lifecyclePort || typeof lifecyclePort.start !== "function" || typeof lifecyclePort.collect_result !== "function" || (observationBuilder !== undefined && typeof observationBuilder !== "function")) throw new Error("RUN_LIFECYCLE_CLI_EXECUTOR_CONFIGURATION_INVALID");
+  assertProtectedRunLifecyclePort(lifecyclePort);
+  const executor = Object.freeze({
+    descriptor_pinned: true,
+    authority_fence_enforced: true,
+    async execute(input) {
+      if (!input || input.shell !== false || !input.authority_fence || typeof input.authority_fence.guard !== "function" || !Number.isSafeInteger(input.authority_fence.authority_epoch) || typeof input.authority_fence.fencing_token !== "string" || typeof input.authority_fence.effect_id !== "string" || typeof input.authority_fence.effect_key !== "string" || !/^[a-f0-9]{64}$/.test(input.stdin_fingerprint ?? "") || !/^[a-f0-9]{64}$/.test(input.manifest_fingerprint ?? "") || typeof input.selected_provider !== "string" || typeof input.selected_model !== "string" || typeof input.selected_effort !== "string") throw new Error("RUN_LIFECYCLE_CLI_EXECUTOR_INPUT_INVALID");
+      const guarded = await input.authority_fence.guard({ authority_epoch: input.authority_fence.authority_epoch, fencing_token: input.authority_fence.fencing_token, effect_id: input.authority_fence.effect_id, effect_key: input.authority_fence.effect_key });
+      if (guarded?.current !== true || guarded.authority_epoch !== input.authority_fence.authority_epoch || guarded.fencing_token !== input.authority_fence.fencing_token) throw new Error("RUN_LIFECYCLE_CLI_AUTHORITY_FENCE_DENIED");
+      const policy = input.execution_policy;
+      if (!policy || !Number.isSafeInteger(policy.timeout_ms) || policy.timeout_ms < 1 || !Number.isSafeInteger(policy.max_response_bytes) || policy.max_response_bytes < 1 || !Number.isSafeInteger(policy.max_stderr_bytes) || policy.max_stderr_bytes < 1 || !Number.isSafeInteger(policy.max_prompt_bytes) || policy.max_prompt_bytes < 1) throw new Error("RUN_LIFECYCLE_CLI_EXECUTOR_BOUNDS_REQUIRED");
+      const started = await lifecyclePort.start({
+        run_id: input.authority_fence.effect_id,
+        idempotency_key: input.authority_fence.effect_key,
+        plan_fingerprint: input.plan_fingerprint,
+        manifest_fingerprint: input.manifest_fingerprint,
+        authority_epoch: input.authority_fence.authority_epoch,
+        fence_fingerprint: digest(input.authority_fence.fencing_token),
+        executable_path: input.executable_identity.path,
+        executable_fingerprint: input.executable_identity.digest,
+        ...(input.interpreter_identity ? { interpreter_path: input.interpreter_identity.path, interpreter_fingerprint: input.interpreter_identity.digest } : {}),
+        argv: [...input.argv],
+        working_directory: input.working_directory,
+        stdin_file: input.stdin_file,
+        stdin_fingerprint: input.stdin_fingerprint,
+        response_file: input.response_file,
+        environment: { ...input.environment },
+        timeout_ms: policy.timeout_ms,
+        max_result_bytes: policy.max_response_bytes,
+        max_stderr_bytes: policy.max_stderr_bytes,
+        selected_provider: input.selected_provider,
+        selected_model: input.selected_model,
+        selected_effort: input.selected_effort,
+      });
+      const collected = await lifecyclePort.collect_result(started.run_id);
+      if (collected.state !== "COMPLETED" || collected.exit_code !== 0 || !collected.launch_report || !collected.result_fingerprint) throw new Error("RUN_LIFECYCLE_CLI_EXECUTION_INCOMPLETE");
+      const attestation = observationBuilder ? await observationBuilder({ input: structuredClone({ ...input, authority_fence: { ...input.authority_fence, guard: undefined } }), started: structuredClone(started), collected: structuredClone(collected) }) : null;
+      if (attestation !== null) assertNoSecretMaterial(attestation, "RUN_LIFECYCLE_ATTESTATION_SECRET_FORBIDDEN");
+      return {
+        descriptor_pinned: true,
+        plan_fingerprint: input.plan_fingerprint,
+        exit_code: collected.exit_code,
+        signal: collected.signal,
+        executable_fingerprint: input.executable_identity.digest,
+        interpreter_fingerprint: input.interpreter_identity?.digest ?? null,
+        response_fingerprint: collected.result_fingerprint,
+        result_fingerprint: collected.result_fingerprint,
+        response_size: Buffer.byteLength(canonicalJson(collected.result)),
+        stderr: "",
+        fencing_enforced: true,
+        authority_epoch: input.authority_fence.authority_epoch,
+        fence_fingerprint: digest(input.authority_fence.fencing_token),
+        lifecycle_run_id: started.run_id,
+        lifecycle_process_identity_fingerprint: started.process_identity_fingerprint,
+        launch_report: structuredClone(collected.launch_report),
+        agent_result: structuredClone(collected.result),
+        ...(attestation ?? {}),
+      };
+    },
+  });
+  AUTHORITY_FENCED_CLI_EXECUTORS.add(executor);
+  return executor;
+}
+
+export function createObservedAuthorityFencedCliExecutor({ executor, onResult } = {}) {
+  assertProtectedAuthorityFencedCliExecutor(executor);
+  if (typeof onResult !== "function") throw new Error("CLI_EXECUTOR_RESULT_OBSERVER_REQUIRED");
+  const observed = Object.freeze({
+    descriptor_pinned: true,
+    authority_fence_enforced: true,
+    async execute(input) {
+      const result = await executor.execute(input);
+      onResult(structuredClone(result), structuredClone({ effect_id: input.authority_fence?.effect_id, effect_key: input.authority_fence?.effect_key }));
+      return result;
+    },
+  });
+  AUTHORITY_FENCED_CLI_EXECUTORS.add(observed);
+  return observed;
 }
 
 export function buildApiRequestPlan({ manifest, method, requestBody, endpointObservation, now = new Date().toISOString() }) {
@@ -890,4 +1148,8 @@ export function createOperationalProviderAdapter({ registryProvider, observer, c
 
 export function providerDigest(value) {
   return digest(value);
+}
+
+export function providerManifestFingerprint(manifest) {
+  return digest(normalizeManifest(manifest));
 }

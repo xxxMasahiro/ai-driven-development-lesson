@@ -134,6 +134,15 @@ instruction, verification, Security, CI/hook, and workflow-state authority set.
 This strict synchronization remains local to the parent repository and does
 not inspect TraceCue, FrameCue, or another registered child checkout.
 
+The protected non-UI runtime is implemented by migration
+`tools/lib/next_workflow/migrations/003_runtime_wiring.sql` and the runtime,
+trust, containment, lifecycle, and task-delivery owners under
+`tools/lib/next_workflow/`. `./tools/next-workflow runtime isolation-check`
+reports prerequisites without installing them. `tools/test_next_workflow.sh`
+is the focused aggregate; environments with real isolation run containment
+fixtures, while environments without it must pass the explicit guided-refusal
+path. Production launch and Control Center Activation remain unavailable.
+
 ## Memory Documents
 
 The lesson memory documents live in `docs/memory/`.

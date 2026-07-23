@@ -3374,18 +3374,22 @@ fail-closed and must not advance on partial Control Center evidence.
   outbox drain/quarantine verification; emit 15-minute verified-weight
   implementation progress reports; then and only then activate the new
   workflow explicitly and atomically.
-- [ ] After Control Center acceptance and before candidate freeze, configure
-  and verify the activation-bound production owners: authoritative runtime
+- [x] Before Control Center reconstruction and before candidate freeze,
+  configure and isolated-test the production-shaped non-UI owners:
+  authoritative runtime
   sources, independently verified approvals and receipts, reconciliation
   authority, separate provider probe/certification authorities, operational
   observation and containment, and the exact CLI/Git/workflow adapters that
-  route effects through the common gateway. The current hard-deny placeholders
-  are intentional and cannot be counted as production wiring.
+  route effects through the common gateway. This is complete only for the
+  isolated non-production profile; production launch and external-effect
+  adapters remain intentionally unavailable and are not Activation evidence.
 - [ ] Propose cleanup candidates separately; execute no branch or worktree
   deletion without exact-target developer approval.
 
-Current release state: non-Control-Center implementation and its focused local
-validation are complete. Control Center implementation and its final TraceCue/
+Current release state: the non-Control-Center safety foundation and protected
+non-UI runtime wiring are implemented and focused validation is current. Final
+aggregate, Git/CI delivery, and local/remote synchronization remain the current
+delivery task. Control Center implementation and its final TraceCue/
 browser review are explicitly paused as an unfinished task for later
 resumption. The activation record remains in fail-closed planned mode until
 that deferred scope is resumed and accepted and a clean candidate is explicitly
@@ -3437,7 +3441,7 @@ TESTS: tools/check_developer_memory_requirements.sh,tools/check_document_organiz
   bound reconciliation in the executable CLI. Non-enforced activation is
   rejected before provider observation; unconfigured authority, observer,
   receipt, API, and local-runtime owners fail closed.
-- [x] Pass the complete non-Control-Center aggregate: 192 assertions across 14
+- [x] Pass the historical non-Control-Center closure aggregate: 192 tests across 14
   standalone suites, plus all seven frozen contract fingerprints.
 - [x] Recheck migration identity in read-only store mode, block parsed
   versionless/unknown instruction profiles, and require an injected independent
@@ -3484,6 +3488,92 @@ TESTS: tools/check_developer_memory_requirements.sh,tools/check_document_organiz
 - [ ] Deliver the currently verified non-Control-Center scope through a scoped
   commit, PR CI, merge, main CI, and local/remote synchronization. This delivery
   is allowed while Phase 18 remains paused and is not activation evidence.
-- [ ] After Phase 18 acceptance, collect a new Phase 20 immutable-candidate
+- [ ] After the later reconstructed Control Center acceptance, collect a new
+  immutable-candidate
   local/no-cache, PR CI, main CI, synchronization, recovery, rollback, archive,
   and outbox evidence set; activation remains `planned` until then.
+
+### Non-UI runtime wiring before Control Center reconstruction (2026-07-23)
+
+SYNC-ID: next_workflow_non_ui_runtime_wiring
+STATUS: implemented
+ARTIFACTS: docs/as-built/IMPLEMENTATION_PLAN.md,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/HANDOFF.md,docs/workflow/TASK_TRACKER.md,docs/workflow/next-workflow/authority-lifecycle.json,docs/workflow/next-workflow/provider-registry.json,docs/workflow/next-workflow/state-store.json,docs/workflow/next-workflow/team-agent-security.json,learning/NEXT_WORKFLOW_AGENT_SELECTION_SETTINGS.json,learning/NEXT_WORKFLOW_PROVIDER_REGISTRY.json,tools/lib/next_workflow/agents.mjs,tools/lib/next_workflow/authority.mjs,tools/lib/next_workflow/contracts.mjs,tools/lib/next_workflow/migrations/003_runtime_wiring.sql,tools/lib/next_workflow/provider_discovery.mjs,tools/lib/next_workflow/providers.mjs,tools/lib/next_workflow/run_lifecycle.mjs,tools/lib/next_workflow/runtime.mjs,tools/lib/next_workflow/runtime_barrier.cjs,tools/lib/next_workflow/runtime_containment.mjs,tools/lib/next_workflow/runtime_trust.mjs,tools/lib/next_workflow/settings.mjs,tools/lib/next_workflow/store.mjs,tools/lib/next_workflow/task_delivery.mjs,tools/next-workflow.mjs,tools/test_next_workflow.sh,tools/test_next_workflow_agents.mjs,tools/test_next_workflow_authority.mjs,tools/test_next_workflow_isolated_runtime.mjs,tools/test_next_workflow_isolated_runtime.sh,tools/test_next_workflow_projection_settings.mjs,tools/test_next_workflow_providers.mjs,tools/test_next_workflow_release.mjs,tools/test_next_workflow_run_lifecycle.mjs,tools/test_next_workflow_run_lifecycle.sh,tools/test_next_workflow_saga.mjs,tools/test_next_workflow_store.mjs,tools/test_next_workflow_task_delivery.mjs,tools/test_next_workflow_task_delivery.sh
+TESTS: tools/check_next_workflow.sh,tools/test_next_workflow.sh,tools/check_security_invariants.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+- [x] Freeze the protected runtime-trust, one-use approval, finalization-fence,
+  lifecycle-port, task-envelope lineage, and isolated-execution contracts in
+  English canonical documents and the existing versioned machine contracts.
+- [x] Resolve release trust and owner acceptance only from a protected
+  owner-managed source outside candidate-controlled repository artifacts.
+  Repository and environment-selected candidate files must not create
+  Activation authority.
+- [x] Persist exact approval issuance and atomic one-use consumption, binding
+  repository, checkout, task, run, operation, request digest, policy/settings
+  revisions, authority epoch, and expiry.
+- [x] Recheck Activation, candidate, approval consumption, authority epoch,
+  decision expiry, policy revision, and settings revision in the same locked
+  transaction that finalizes a receipt. Unknown or stale state must not become
+  success.
+- [x] Implement the reusable `RunLifecyclePort` operations `start`, `observe`,
+  `cancel`, `terminate`, `collect_result`, `reconcile`, and restart `recover`, including durable
+  process-group identity, bounded output, timeout escalation, and verified
+  process-group absence.
+- [x] Construct the Task Agent envelope inside the authority-owned launcher and
+  bind the exact `AGENTS.MD`, resolved procedural instruction, envelope,
+  delivered input, provider observation, result, and receipt fingerprints in
+  one immutable lineage.
+- [x] Connect one provider-neutral CLI path through the common gateway under an
+  isolated non-production authority profile. The normal production command
+  must remain unavailable while repository Activation is `planned`.
+- [x] Add adversarial success/refusal/cancel/terminate/timeout/crash/reconcile,
+  approval replay, finalization race, output-schema, trust-root, parent-child
+  isolation, and idempotent replay coverage without reading registered child
+  repositories from parent CI.
+- [x] Add real per-run Linux namespace and Bubblewrap containment, adversarially
+  prove repository/Git/owner-trust/network/input-write denial, and add the
+  non-installing `runtime isolation-check` diagnostic with OS-specific guidance.
+- [x] Close the independent final-audit findings: deep-freeze protected trust;
+  require protected verifier brands and exact authority fingerprints; derive
+  launch confirmation from the pinned CLI argv rather than task self-report;
+  persist process identity before releasing provider execution; use a private
+  task-input working directory with no repository/Git mount; retain CLI output
+  only as an unaccepted result candidate until independent review; and reject
+  malformed model-policy, resource-bound, or estimated-cost data.
+- [x] Close the post-fix adversarial findings with a crash-proof two-stage
+  startup barrier, repository/control-root overlap refusal, finalization-time
+  task-delivery revalidation, dedicated candidate-bound Agent lifecycle writes,
+  protected-only production operations, restrictive owner/task model-policy
+  composition, required cost budgets, bounded finding identifiers, protected
+  lifecycle/executor factory brands, and byte-zero CLI stdin after prompt
+  fingerprinting. Candidate reporting reloads completed runtime provenance and
+  exact report topology plus protected launch/admission receipts, and protected-
+  store runtime writes require a private writer capability bound to the exact
+  store; restart recovery carries recovery-only transition authority; candidate
+  insertion binds the exact frozen launch request plus a deterministic durable
+  launch/admission lineage and every
+  authority-record writer requires a same-trust protected agent-authority
+  brand; launch rechecks current manifest bounds, estimated
+  cost, and explicit timeout against the persisted reservation; completed
+  replay preserves its result fingerprint. The
+  17-suite Next Workflow aggregate passes 217 tests and all seven contracts.
+- [x] Pass the final aggregate in a clean candidate checkout with the canonical
+  repository name, origin identity, and dependency layout.
+- [x] Make containment verification environment-honest: always verify the
+  prerequisite diagnostic, run real Bubblewrap/namespace cases when available,
+  and explicitly skip only those cases on unsupported hosts without creating an
+  unisolated runtime fallback.
+- [ ] Deliver the unchanged candidate through PR and main CI, and finish
+  synchronization with non-UI wiring implemented, production unavailable,
+  Activation `planned`, and Control Center reconstruction still pending.
+- [ ] When Control Center reconstruction resumes, add plain-language isolation
+  status, installation and recheck guidance, subscription/API/local billing
+  mode, model/publisher restrictions, and API cost ceilings. Do not modify the
+  paused Control Center in this delivery.
+- [ ] When a production AgentLauncher composition is intentionally enabled,
+  add one protected happy-path integration fixture that covers launch through
+  accepted review closure. This coverage follow-up grants no Activation or
+  production authority in the current planned state.
+
+This block supersedes only the earlier dependency ordering that placed runtime
+wiring after Phase 18. It does not reopen, rewrite, or authorize any paused
+Control Center code, schema, design, test, package, Vite, or MCP surface.

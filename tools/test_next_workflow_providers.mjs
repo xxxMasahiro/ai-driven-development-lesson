@@ -4,7 +4,7 @@ import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSy
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { admitAgentRun, authorizeCliLaunchPlan, buildApiRequestPlan, buildCliLaunchPlan, buildLocalRuntimePlan, createLaunchIntent, createNodeDescriptorPinnedExecutor, createOperationalProviderAdapter, createSelectionDryRun, dispatchApiRequestPlan, dispatchCliLaunchPlan, loadProviderRegistry, providerDigest, providerIdentityKey, selectAgentConfiguration, simulateAgentStart, transitionProviderCertification, validateCustomManifest, validateEndpointObservation, validateSecretReference } from "./lib/next_workflow/providers.mjs";
+import { admitAgentRun, authorizeCliLaunchPlan, buildApiRequestPlan, buildCliLaunchPlan, buildLocalRuntimePlan, createLaunchIntent, createNodeDescriptorPinnedExecutor, createOperationalProviderAdapter, createSelectionDryRun, dispatchApiRequestPlan, dispatchCliLaunchPlan, loadProviderRegistry, providerDigest, providerIdentityKey, providerManifestFingerprint, selectAgentConfiguration, simulateAgentStart, transitionProviderCertification, validateCustomManifest, validateEndpointObservation, validateSecretReference } from "./lib/next_workflow/providers.mjs";
 import { discoverBuiltinProviderInputs } from "./lib/next_workflow/provider_discovery.mjs";
 
 const temporaryRoots = [];
@@ -14,14 +14,14 @@ const identity = { execution_provider_id: "fixture-provider", model_publisher_id
 const identityKey = providerIdentityKey(identity);
 const codexArgvTemplate = ["exec", "--ephemeral", "--sandbox", "{{sandbox}}", "--model", "{{model_id}}", "-c", "{{reasoning_config}}", "--cd", "{{working_directory}}", "--output-last-message", "{{response_file}}", "{{stdin_marker}}"];
 const codexArgvSchema = ["sandbox", "model_id", "reasoning_config", "working_directory", "response_file", "stdin_marker"];
-const manifest = { manifest_id: "fixture", version: "1.0.0", identity, capabilities: ["read", "structured_output"], native_reasoning_values: ["high"], effort_mapping: { high: "enhanced" }, certification_profile: { probe_authority: "independent", certification_authority: "independent", isolated_probe: true }, resource_bounds: { cost: 2 }, priority: 1, estimated_cost: 1, transport_descriptor: { argv_template: codexArgvTemplate, argv_schema: codexArgvSchema, environment_allowlist: [], private_response_file: true, executable: { canonical_path: "/usr/bin/fixture", digest: "digest" } } };
+const manifest = { manifest_id: "fixture", version: "1.0.0", identity, capabilities: ["read", "structured_output"], native_reasoning_values: ["high"], effort_mapping: { high: "enhanced" }, reasoning_mapping_provenance: { source_id: "fixture-reviewed-mapping", revision: "1", reviewed_by: "fixture-independent-reviewer", proof_fingerprint: providerDigest("fixture-mapping-proof") }, selection_profile: { correctness: 90, safety: 90, efficiency: 70, roles: ["Independent Review Lead"] }, certification_profile: { probe_authority: "independent", certification_authority: "independent", isolated_probe: true }, resource_bounds: { cost: 2 }, priority: 1, estimated_cost: 1, transport_descriptor: { argv_template: codexArgvTemplate, argv_schema: codexArgvSchema, environment_allowlist: [], private_response_file: true, executable: { canonical_path: "/usr/bin/fixture", digest: "digest" } } };
 const fixtureCertificationProof = providerDigest("fixture-certification-proof");
-const certificationCore = { certification_id: "cert", certifier_id: "fixture-certifier", identity_key: identityKey, manifest_version: "1.0.0", adapter_version: "1", platform: "linux-x64", capability_fingerprint: providerDigest(manifest.capabilities.slice().sort()), state: "CERTIFIED", certified_at: "2028-01-01T00:00:00.000Z", expires_at: "2030-01-01T00:00:00.000Z", revocation_epoch: 0, revocation_state: "active", observation_fingerprint: providerDigest("observation"), probe_lineage: "fixture-probe-1", probe_authority_id: "fixture-probe-authority", probe_fingerprint: providerDigest("fixture-probe"), certification_proof_fingerprint: fixtureCertificationProof, clock_fingerprint: providerDigest({ certified_at: "2028-01-01T00:00:00.000Z", expires_at: "2030-01-01T00:00:00.000Z" }), authority_fingerprint: providerDigest({ certifier_id: "fixture-certifier", probe_authority_id: "fixture-probe-authority", certification_proof_fingerprint: fixtureCertificationProof }) };
-const certification = { ...certificationCore, drift_fingerprint: providerDigest({ identity_key: certificationCore.identity_key, manifest_version: certificationCore.manifest_version, adapter_version: certificationCore.adapter_version, platform: certificationCore.platform, capability_fingerprint: certificationCore.capability_fingerprint, observation_fingerprint: certificationCore.observation_fingerprint, revocation_epoch: certificationCore.revocation_epoch }) };
+const certificationCore = { certification_id: "cert", certifier_id: "fixture-certifier", identity_key: identityKey, manifest_version: "1.0.0", adapter_version: "1", platform: "linux-x64", manifest_fingerprint: providerManifestFingerprint(manifest), capability_fingerprint: providerDigest(manifest.capabilities.slice().sort()), state: "CERTIFIED", certified_at: "2028-01-01T00:00:00.000Z", expires_at: "2030-01-01T00:00:00.000Z", revocation_epoch: 0, revocation_state: "active", observation_fingerprint: providerDigest("observation"), probe_lineage: "fixture-probe-1", probe_authority_id: "fixture-probe-authority", probe_fingerprint: providerDigest("fixture-probe"), certification_proof_fingerprint: fixtureCertificationProof, clock_fingerprint: providerDigest({ certified_at: "2028-01-01T00:00:00.000Z", expires_at: "2030-01-01T00:00:00.000Z" }), authority_fingerprint: providerDigest({ certifier_id: "fixture-certifier", probe_authority_id: "fixture-probe-authority", certification_proof_fingerprint: fixtureCertificationProof }) };
+const certification = { ...certificationCore, drift_fingerprint: providerDigest({ identity_key: certificationCore.identity_key, manifest_version: certificationCore.manifest_version, adapter_version: certificationCore.adapter_version, platform: certificationCore.platform, manifest_fingerprint: certificationCore.manifest_fingerprint, capability_fingerprint: certificationCore.capability_fingerprint, observation_fingerprint: certificationCore.observation_fingerprint, revocation_epoch: certificationCore.revocation_epoch }) };
 
 function certificationWith(overrides = {}) {
   const value = { ...certification, ...overrides };
-  return { ...value, clock_fingerprint: providerDigest({ certified_at: value.certified_at, expires_at: value.expires_at }), drift_fingerprint: providerDigest({ identity_key: value.identity_key, manifest_version: value.manifest_version, adapter_version: value.adapter_version, platform: value.platform, capability_fingerprint: value.capability_fingerprint, observation_fingerprint: value.observation_fingerprint, revocation_epoch: value.revocation_epoch }) };
+  return { ...value, clock_fingerprint: providerDigest({ certified_at: value.certified_at, expires_at: value.expires_at }), drift_fingerprint: providerDigest({ identity_key: value.identity_key, manifest_version: value.manifest_version, adapter_version: value.adapter_version, platform: value.platform, manifest_fingerprint: value.manifest_fingerprint, capability_fingerprint: value.capability_fingerprint, observation_fingerprint: value.observation_fingerprint, revocation_epoch: value.revocation_epoch }) };
 }
 
 function runtimeObservation(overrides = {}) {
@@ -73,21 +73,86 @@ test("Auto and Manual use the same eligibility floor", () => {
   assert.equal(selectAgentConfiguration({ registry: registry(), policy: { mode: "manual", identity_key: identityKey }, requirements: { capabilities: ["missing"] }, authority, budget: { cost: 5 } }).code, "SELECTION_INELIGIBLE");
   const selected = selectAgentConfiguration({ registry: registry(), policy: { mode: "auto" }, requirements: { capabilities: ["read"] }, authority, budget: { cost: 5 } });
   assert.equal(selected.selection_lineage[0].registry_fingerprint, registry().fingerprint);
-  assert.equal(selectAgentConfiguration({ registry: registry(), policy: { mode: "auto", previous_effective: "previous" }, authority }).code, "RESELECTION_REASON_REQUIRED");
-  assert.equal(selectAgentConfiguration({ registry: registry(), policy: { mode: "auto", previous_effective: "previous", reselection_reason: "previous provider became ineligible" }, authority }).previous_effective, "previous");
+  assert.equal(selected.selected_model, "fixture-model");
+  assert.equal(selected.selected_native_reasoning, "high");
+  assert.equal(selected.selected_normalized_effort, "enhanced");
+  assert.equal(selected.effort_criteria.normalized_floor, "medium");
+  const tooStrict = selectAgentConfiguration({ registry: registry(), policy: { mode: "auto" }, requirements: { capabilities: ["read"], rigor: "L5" }, authority, budget: { cost: 5 } });
+  assert.equal(tooStrict.code, "SELECTION_INELIGIBLE");
+  assert.ok(tooStrict.blockers.includes("EFFORT_BELOW_REQUIRED_FLOOR"));
+  const implicitOnlyRegistry = structuredClone(registry());
+  implicitOnlyRegistry.entries[0].manifest.native_reasoning_values = ["none"];
+  implicitOnlyRegistry.entries[0].manifest.effort_mapping = { none: "none" };
+  const implicitOnly = selectAgentConfiguration({ registry: implicitOnlyRegistry, policy: { mode: "auto" }, requirements: { capabilities: ["read"], rigor: "L1" }, authority, budget: { cost: 5 } });
+  assert.equal(implicitOnly.code, "SELECTION_INELIGIBLE");
+  assert.ok(implicitOnly.blockers.includes("EFFORT_BELOW_REQUIRED_FLOOR"));
+  assert.equal(selectAgentConfiguration({ registry: registry(), policy: { mode: "auto", previous_effective: "previous" }, authority, budget: { cost: 5 } }).code, "RESELECTION_REASON_REQUIRED");
+  assert.equal(selectAgentConfiguration({ registry: registry(), policy: { mode: "auto", previous_effective: "previous", reselection_reason: "previous provider became ineligible" }, authority, budget: { cost: 5 } }).previous_effective, "previous");
+});
+
+test("automatic model ranking remains policy constrained and effort mappings require reviewed provenance", () => {
+  const multi = structuredClone(registry());
+  const alternate = structuredClone(multi.entries[0]);
+  alternate.manifest.identity.model_id = "gpt-5.6-luna";
+  alternate.manifest.identity_key = providerIdentityKey(alternate.manifest.identity);
+  alternate.manifest.selection_profile = { correctness: 99, safety: 98, efficiency: 85, roles: ["Independent Review Lead"] };
+  multi.entries.push(alternate);
+  multi.fingerprint = providerDigest({ entries: multi.entries.map((entry) => entry.manifest.identity_key) });
+  const automatic = selectAgentConfiguration({ registry: multi, policy: { mode: "auto" }, requirements: { capabilities: ["read"], role: "Independent Review Lead" }, authority: { decision: "ALLOW" }, budget: { cost: 5 } });
+  assert.equal(automatic.selected_model, "gpt-5.6-luna");
+  const denied = selectAgentConfiguration({ registry: multi, policy: { mode: "auto", model_policy: { denied_model_prefixes: ["gpt-5.6-luna"], denied_model_ids: ["gpt-5.5"] } }, requirements: { capabilities: ["read"], role: "Independent Review Lead" }, authority: { decision: "ALLOW" }, budget: { cost: 5 } });
+  assert.equal(denied.selected_model, "fixture-model");
+  assert.ok(denied.selection_lineage.find((entry) => entry.identity_key === alternate.manifest.identity_key).blockers.includes("MODEL_PREFIX_DENIED"));
+  const allowOnly = selectAgentConfiguration({ registry: multi, policy: { mode: "auto", model_policy: { allowed_model_ids: ["fixture-model"] } }, requirements: { capabilities: ["read"] }, authority: { decision: "ALLOW" }, budget: { cost: 5 } });
+  assert.equal(allowOnly.selected_model, "fixture-model");
+  const taskCannotLoosenOwner = selectAgentConfiguration({ registry: multi, policy: { mode: "auto", model_policy: { denied_model_ids: ["gpt-5.6-luna"] } }, requirements: { capabilities: ["read"], model_policy: { allowed_model_ids: ["gpt-5.6-luna", "fixture-model"] } }, authority: { decision: "ALLOW" }, budget: { cost: 5 } });
+  assert.equal(taskCannotLoosenOwner.selected_model, "fixture-model");
+  const disjointAllowlists = selectAgentConfiguration({ registry: multi, policy: { mode: "auto", model_policy: { allowed_model_ids: ["fixture-model"] } }, requirements: { capabilities: ["read"], model_policy: { allowed_model_ids: ["gpt-5.6-luna"] } }, authority: { decision: "ALLOW" }, budget: { cost: 5 } });
+  assert.equal(disjointAllowlists.code, "SELECTION_INELIGIBLE");
+  assert.ok(disjointAllowlists.blockers.includes("MODEL_NOT_ALLOWLISTED"));
+  const nullOwnerPolicy = selectAgentConfiguration({ registry: multi, policy: { mode: "auto", model_policy: null }, requirements: { capabilities: ["read"] }, authority: { decision: "ALLOW" }, budget: { cost: 5 } });
+  assert.ok(nullOwnerPolicy.blockers.includes("MODEL_POLICY_INVALID"));
+  const malformedPolicy = selectAgentConfiguration({ registry: multi, policy: { mode: "auto", model_policy: { denied_model_ids: "gpt-5.5" } }, requirements: { capabilities: ["read"] }, authority: { decision: "ALLOW" }, budget: { cost: 5 } });
+  assert.equal(malformedPolicy.code, "SELECTION_INELIGIBLE");
+  assert.ok(malformedPolicy.blockers.includes("MODEL_POLICY_INVALID"));
+  const unknownPolicyField = selectAgentConfiguration({ registry: multi, policy: { mode: "auto", model_policy: { preferred_model_ids: ["fixture-model"] } }, requirements: { capabilities: ["read"] }, authority: { decision: "ALLOW" }, budget: { cost: 5 } });
+  assert.ok(unknownPolicyField.blockers.includes("MODEL_POLICY_INVALID"));
+  const missingBound = structuredClone(registry());
+  delete missingBound.entries[0].manifest.resource_bounds.cost;
+  const missingBoundResult = selectAgentConfiguration({ registry: missingBound, policy: { mode: "auto" }, requirements: { capabilities: ["read"] }, authority: { decision: "ALLOW" }, budget: { cost: 5 } });
+  assert.ok(missingBoundResult.blockers.includes("RESOURCE_BOUND_MISSING:cost"));
+  const underestimated = structuredClone(registry());
+  underestimated.entries[0].manifest.estimated_cost = 6;
+  const underestimatedResult = selectAgentConfiguration({ registry: underestimated, policy: { mode: "auto" }, requirements: { capabilities: ["read"] }, authority: { decision: "ALLOW" }, budget: { cost: 5 } });
+  assert.ok(underestimatedResult.blockers.includes("BUDGET_ESTIMATED_COST_EXCEEDED"));
+  const noProvenance = structuredClone(manifest);
+  delete noProvenance.reasoning_mapping_provenance;
+  assert.throws(() => buildCliLaunchPlan({ manifest: noProvenance, promptFile: "/tmp/prompt", responseFile: "/tmp/response", modelId: "fixture-model", nativeReasoning: "high", sandbox: "read-only", workingDirectory: "/tmp" }), /PROVIDER_EFFORT_MAPPING_PROVENANCE_REQUIRED/);
+  assert.throws(() => buildCliLaunchPlan({ manifest: { ...manifest, reasoning_mapping_provenance: { ...manifest.reasoning_mapping_provenance, proof_fingerprint: "self-asserted" } }, promptFile: "/tmp/prompt", responseFile: "/tmp/response", modelId: "fixture-model", nativeReasoning: "high", sandbox: "read-only", workingDirectory: "/tmp" }), /PROVIDER_EFFORT_MAPPING_PROVENANCE_REQUIRED/);
+  assert.throws(() => loadProviderRegistry({ manifests: [{ ...manifest, resource_bounds: { cost: Number.NaN } }], certifications: [], platform: "linux-x64" }), /PROVIDER_RESOURCE_BOUNDS_INVALID/);
+  assert.throws(() => loadProviderRegistry({ manifests: [{ ...manifest, resource_bounds: {} }], certifications: [], platform: "linux-x64" }), /PROVIDER_RESOURCE_BOUNDS_INVALID/);
+  assert.throws(() => loadProviderRegistry({ manifests: [{ ...manifest, estimated_cost: Number.POSITIVE_INFINITY }], certifications: [], platform: "linux-x64" }), /PROVIDER_ESTIMATED_COST_INVALID/);
+  const missingResourceBounds = structuredClone(manifest);
+  delete missingResourceBounds.resource_bounds;
+  assert.throws(() => loadProviderRegistry({ manifests: [missingResourceBounds], certifications: [], platform: "linux-x64" }), /PROVIDER_RESOURCE_BOUNDS_REQUIRED/);
+  const missingEstimatedCost = structuredClone(manifest);
+  delete missingEstimatedCost.estimated_cost;
+  assert.throws(() => loadProviderRegistry({ manifests: [missingEstimatedCost], certifications: [], platform: "linux-x64" }), /PROVIDER_ESTIMATED_COST_REQUIRED/);
+  const noCostBudget = selectAgentConfiguration({ registry: registry(), policy: { mode: "auto" }, requirements: { capabilities: ["read"] }, authority: { decision: "ALLOW" }, budget: {} });
+  assert.ok(noCostBudget.blockers.includes("BUDGET_COST_REQUIRED"));
 });
 
 test("Inherit selects the nearest present source and never skips an invalid one", () => {
   const authority = { decision: "ALLOW" };
   const blocked = selectAgentConfiguration({ registry: registry(), policy: { mode: "inherit" }, inheritanceChain: [{ scope: "agent", valid: false, identity_key: identityKey }, { scope: "global", valid: true, identity_key: identityKey }], authority });
   assert.equal(blocked.code, "NEAREST_INHERITED_SOURCE_INVALID");
-  const selected = selectAgentConfiguration({ registry: registry(), policy: { mode: "inherit" }, inheritanceChain: [{ scope: "role", valid: true, identity_key: identityKey }, { scope: "global", valid: true, identity_key: "other" }], authority });
+  const selected = selectAgentConfiguration({ registry: registry(), policy: { mode: "inherit" }, inheritanceChain: [{ scope: "role", valid: true, identity_key: identityKey }, { scope: "global", valid: true, identity_key: "other" }], authority, budget: { cost: 5 } });
   assert.equal(selected.selected, identityKey);
 });
 
 test("launch intent keeps actual absent until a verified observation admits the run", () => {
   const grant = { fingerprint: "grant", sandbox: { mode: "read_only", network: false, writable_paths: [] }, capabilities: ["read", "structured_output"], allowed_actions: ["read"], allowed_tools: ["rg"], budget: { max_runtime_ms: 100, max_tokens: 100, max_cost: 1, max_retries: 1 } };
-  const selection = selectAgentConfiguration({ registry: registry(), policy: { mode: "manual", identity_key: identityKey }, authority: { decision: "ALLOW" } });
+  const selection = selectAgentConfiguration({ registry: registry(), policy: { mode: "manual", identity_key: identityKey }, authority: { decision: "ALLOW" }, budget: { cost: 5 } });
   const intent = createLaunchIntent({ grant, selection, context: { fingerprint: "context" }, reservation: { reservation_id: "reservation" }, targets: ["repo"], authorityEpoch: 0, intentId: "intent", createdAt: "2029-01-01T00:00:00.000Z" });
   assert.equal(intent.actual_observed, null);
   assert.equal(simulateAgentStart({ intent }).process_spawned, false);
@@ -99,6 +164,10 @@ test("launch intent keeps actual absent until a verified observation admits the 
   const admitted = admitAgentRun({ intent, grant, actualObserved, observationProof: proof, verifier, admittedAt: "2029-01-01T00:00:01.000Z" });
   assert.equal(admitted.decision, "PASS");
   assert.match(admitted.attestation.observation_proof_fingerprint, /^[a-f0-9]{64}$/);
+  const wrongEffort = runtimeObservation({ native_reasoning: "medium", normalized_effort: "balanced" });
+  const wrongEffortProof = { ...proof, fingerprint: providerDigest(wrongEffort) };
+  const wrongEffortVerifier = { ...verifier, verify: () => ({ actual_observed: wrongEffort, observation_proof: wrongEffortProof }) };
+  assert.equal(admitAgentRun({ intent, grant, actualObserved: wrongEffort, observationProof: wrongEffortProof, verifier: wrongEffortVerifier, admittedAt: "2029-01-01T00:00:01.000Z" }).code, "ACTUAL_MODEL_OR_EFFORT_MISMATCH");
   assert.equal(admitAgentRun({ intent, grant, actualObserved: { ...actualObserved, placeholder: true }, observationProof: proof, verifier }).code, "INDEPENDENT_OBSERVATION_MISMATCH");
   const wrongTarget = runtimeObservation({ targets: ["other"] });
   const wrongTargetProof = { ...proof, fingerprint: providerDigest(wrongTarget) };
@@ -167,7 +236,7 @@ test("custom providers remain ineligible without a trusted fresh executable obse
     identity: customIdentity,
     transport_descriptor: { argv_template: codexArgvTemplate, argv_schema: codexArgvSchema, environment_allowlist: [], private_response_file: true, executable: { canonical_path: executable, digest: providerDigest(Buffer.from("#!/bin/sh\nexit 0\n")) }, execution_policy: { allowed_owner_uids: [process.getuid()], executable_mode_mask: 0o700, allowed_working_roots: [root], allowed_response_roots: [root], timeout_ms: 30000, max_prompt_bytes: 1048576, max_response_bytes: 1048576, max_stderr_bytes: 262144 } }
   };
-  const customCertification = certificationWith({ identity_key: customKey, capability_fingerprint: providerDigest(customManifest.capabilities.slice().sort()), observation_fingerprint: providerDigest("unbound") });
+  const customCertification = certificationWith({ identity_key: customKey, manifest_fingerprint: providerManifestFingerprint(customManifest), capability_fingerprint: providerDigest(customManifest.capabilities.slice().sort()), observation_fingerprint: providerDigest("unbound") });
   const trustedCertificationVerifier = { trusted: true, verify: ({ certification: value, fingerprint }) => ({ verified: true, fingerprint, certification_id: value.certification_id, certifier_id: value.certifier_id, identity_key: value.identity_key, authority_fingerprint: value.authority_fingerprint }) };
   const unobserved = loadProviderRegistry({ manifests: [customManifest], certifications: [customCertification], certificationVerifier: trustedCertificationVerifier, platform: "linux-x64", clock: () => "2029-01-01T00:00:00.000Z" });
   assert.equal(unobserved.entries[0].eligible, false);
@@ -307,12 +376,12 @@ test("the default descriptor-pinned executor fails closed when downstream fencin
     executor,
     inheritedEnvironment: {},
     authorityFence: { authority_epoch: 3, fencing_token: "fence-token", effect_id: "effect-1", effect_key: "effect-key", guard: () => ({ current: false, authority_epoch: 4, fencing_token: "fence-token" }) }
-  }), /CLI_AUTHORITY_FENCE_ENFORCEMENT_UNAVAILABLE/);
+  }), /PROTECTED_AUTHORITY_FENCED_CLI_EXECUTOR_REQUIRED/);
   assert.equal(spawned, false);
   assert.equal(existsSync(response), false);
 });
 
-test("the operational provider adapter carries the exact authority fence into a fencing-aware executor", async () => {
+test("the operational provider adapter rejects a forged boolean-only fencing executor", async () => {
   const root = mkdtempSync(path.join(tmpdir(), "next-provider-enforced-fence-"));
   temporaryRoots.push(root);
   const executable = path.join(root, "fixture-cli");
@@ -339,9 +408,8 @@ test("the operational provider adapter carries the exact authority fence into a 
   const effectKey = "effect-key";
   const decision = { fingerprint: "authority-decision" };
   const fencingToken = providerDigest({ effect_id: effectId, authority_fingerprint: decision.fingerprint, authority_epoch: authorityEpoch });
-  const result = await adapter.dispatch({ effect: { request: { provider_execution: { identity_key: identityKey, plan, plan_fingerprint: plan.fingerprint, executable_observation: { path: executable }, inherited_environment: {} } } }, decision, effect_id: effectId, effect_key: effectKey, authority_epoch: authorityEpoch, fencing_token: fencingToken });
-  assert.equal(result.fencing_enforced, true);
-  assert.equal(guarded.fencing_token, fencingToken);
+  await assert.rejects(() => adapter.dispatch({ effect: { request: { provider_execution: { identity_key: identityKey, plan, plan_fingerprint: plan.fingerprint, executable_observation: { path: executable }, inherited_environment: {} } } }, decision, effect_id: effectId, effect_key: effectKey, authority_epoch: authorityEpoch, fencing_token: fencingToken }), /PROTECTED_AUTHORITY_FENCED_CLI_EXECUTOR_REQUIRED/);
+  assert.equal(guarded, undefined);
 });
 
 test("default CLI executor pins both script and interpreter and writes only a private response file", async () => {
@@ -350,7 +418,7 @@ test("default CLI executor pins both script and interpreter and writes only a pr
   const executable = path.join(root, "fixture-cli");
   const prompt = path.join(root, "prompt");
   const response = path.join(root, "response");
-  writeFileSync(executable, "#!/bin/sh\nprintf completed > \"$1\"\n", { mode: 0o700 });
+  writeFileSync(executable, "#!/bin/sh\nIFS= read -r task\n[ \"$task\" = \"safe prompt\" ] || exit 9\nprintf completed > \"$1\"\n", { mode: 0o700 });
   writeFileSync(prompt, "safe prompt\n", { mode: 0o600 });
   const interpreter = realpathSync("/bin/sh");
   const executableDescriptor = { canonical_path: executable, digest: providerDigest(readFileSync(executable)) };
@@ -437,7 +505,7 @@ test("Codex discovery creates only direct-observation-bound eligible model entri
   temporaryRoots.push(root);
   const executable = path.join(root, "codex");
   writeFileSync(executable, "fixture-binary", { mode: 0o700 });
-  const family = { family_id: "codex-openai", execution_provider_id: "openai", model_publisher_id: "openai", agent_product_id: "codex", adapter_id: "codex_cli", transport_id: "cli_process", observed_adapter_version: "1.2.3", certification_state: "CERTIFIED", model_catalog_source: "runtime_discovery", capabilities: ["read"], priority: 1 };
+  const family = { family_id: "codex-openai", execution_provider_id: "openai", model_publisher_id: "openai", agent_product_id: "codex", adapter_id: "codex_cli", transport_id: "cli_process", observed_adapter_version: "1.2.3", certification_state: "CERTIFIED", model_catalog_source: "runtime_discovery", capabilities: ["read"], resource_bounds: { cost: 0 }, estimated_cost: 0, priority: 1 };
   const runner = (_executable, argv) => argv[0] === "--version"
     ? "codex-cli 1.2.3\n"
     : JSON.stringify({ models: [{ slug: "fixture-model", visibility: "list", default_reasoning_level: "high", supported_reasoning_levels: [{ effort: "low" }, { effort: "high" }] }] });

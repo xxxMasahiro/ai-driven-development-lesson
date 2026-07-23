@@ -8,6 +8,7 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
 import { buildNextWorkflowProjection, loadDefaultNextWorkflowProjection, permittedControlsForMode, projectValidatedProviderRegistry, validateActivationRecord } from "./lib/next_workflow/projection.mjs";
+import { providerManifestFingerprint } from "./lib/next_workflow/providers.mjs";
 import { createAgentSelectionSettingsManager, decodeSettingsPlanToken } from "./lib/next_workflow/settings.mjs";
 import { createDelegationGrant, persistDelegationGrant, persistResourceCostReservation, teamDigest } from "./lib/next_workflow/agents.mjs";
 import { persistRelationshipInitialization } from "./lib/next_workflow/saga.mjs";
@@ -61,7 +62,7 @@ test("default projection derives runs, delegations, relationships, and store hea
   const authorityVerifier = { trusted: true, independent: true, authority_id: "projection-agent-authority", verify: ({ fingerprint }) => ({ verified: true, authority_id: "projection-agent-authority", fingerprint, proof_fingerprint: teamDigest({ fingerprint, authority: "projection-agent-authority" }) }) };
   persistDelegationGrant({ store, grant, authorityBindings, verifier: authorityVerifier, now: "2029-01-01T00:00:00.000Z" });
   const grantFingerprint = grant.fingerprint;
-  store.commit({ expectedRevision: store.revision, authorityEpoch: 0, records: [
+  store.commitAgentLifecycle({ expectedRevision: store.revision, authorityEpoch: 0, records: [
     { id: "run-observed", kind: "AgentRun", schema_version: "1.0.0", record_revision: 1, authority_scope: "task", lineage_id: "run-lineage", lifecycle_state: "RUNNING", payload: { parent_agent_id: "orchestrator", child_agent_id: "lead", depth: 1, authority_epoch: 0, state_history: ["PLANNED", "RUNNING"], attestation_fingerprint: "attestation", admission_receipt_id: "receipt" }, source_revision: grantFingerprint, policy_fp: "policy", input_fp: "intent" },
   ] });
   const relationship = { relationship_id: "relationship-one", parent_logical_id: "parent", child_logical_id: "child", state: "ACTIVE", authority_epoch: 0, policy_fingerprint: "policy" };
@@ -83,7 +84,7 @@ function managerFixture() {
   mkdirSync(path.join(root, ".workflow-state"));
   const store = openWorkflowStateStore({ repositoryRoot: root, expectedIdentity: { repository_logical_id: "repo", checkout_instance_id: "checkout" } });
   const defaults = { schema_version: "1.0.0", revision: 0, values: [{ scope: "global", subject_id: "default", mode: "auto", identity_key: null, source: "default" }] };
-  const registry = { fingerprint: "registry", entries: [{ manifest: { identity_key: "provider", priority: 1, estimated_cost: 0, resource_bounds: {}, capabilities: [], native_reasoning_values: [], effort_mapping: {} }, blockers: [], eligible: true }] };
+  const registry = { fingerprint: "registry", entries: [{ manifest: { identity_key: "provider", identity: { model_id: "fixture-model" }, priority: 1, estimated_cost: 0, resource_bounds: {}, capabilities: [], native_reasoning_values: ["high"], effort_mapping: { high: "enhanced" } }, blockers: [], eligible: true }] };
   const authority = { decision: "ALLOW", fingerprint: "authority" };
   let now = "2029-01-01T00:00:00.000Z";
   let tokenSequence = 0;
@@ -127,7 +128,7 @@ test("opaque plans cannot be forged, decoded into authority, replayed, or applie
   assert.throws(() => manager.apply({ token: "settings-plan-forged-token-that-was-never-persisted", confirm: true }), /SETTINGS_PLAN_NOT_FOUND/);
   registry.entries = [];
   assert.throws(() => manager.apply({ token: plan.token, confirm: true, recompute: false }), /SETTINGS_(?:AUTHORITY_REGISTRY_OR_TEAM_DRIFT|PLAN_LIVE_BLOCKED)/);
-  registry.entries = [{ manifest: { identity_key: "provider", priority: 1, estimated_cost: 0, resource_bounds: {}, capabilities: [], native_reasoning_values: [], effort_mapping: {} }, blockers: [], eligible: true }];
+  registry.entries = [{ manifest: { identity_key: "provider", identity: { model_id: "fixture-model" }, priority: 1, estimated_cost: 0, resource_bounds: {}, capabilities: [], native_reasoning_values: ["high"], effort_mapping: { high: "enhanced" } }, blockers: [], eligible: true }];
   authority.decision = "DENY";
   assert.throws(() => manager.apply({ token: plan.token, confirm: true, recompute: false }), /SETTINGS_AUTHORITY_REGISTRY_OR_TEAM_DRIFT/);
   authority.decision = "ALLOW";
@@ -186,7 +187,7 @@ test("apply rechecks live provider eligibility and rejects certification expiry 
   mkdirSync(path.join(root, ".workflow-state"));
   const store = openWorkflowStateStore({ repositoryRoot: root, expectedIdentity: { repository_logical_id: "repo", checkout_instance_id: "checkout" } });
   const defaults = { schema_version: "1.0.0", revision: 0, values: [{ scope: "global", subject_id: "default", mode: "auto", identity_key: null, source: "default" }] };
-  const manifest = { identity_key: "provider", priority: 1, estimated_cost: 0, resource_bounds: {}, capabilities: [], native_reasoning_values: [], effort_mapping: {} };
+  const manifest = { identity_key: "provider", identity: { model_id: "fixture-model" }, priority: 1, estimated_cost: 0, resource_bounds: {}, capabilities: [], native_reasoning_values: ["high"], effort_mapping: { high: "enhanced" } };
   const authority = { decision: "ALLOW", fingerprint: "authority" };
   let now = "2029-01-01T00:00:00.000Z";
   const registryProvider = ({ issuedAt } = {}) => {
@@ -209,11 +210,11 @@ test("separate CLI processes preserve the untrusted-provider blocker", () => {
   const databasePath = path.join(root, "workflow.sqlite");
   const registryPath = path.join(root, "provider-registry.json");
   const identity = { execution_provider_id: "settings-fixture", model_publisher_id: "fixture", agent_product_id: "fixture-agent", adapter_id: "fixture-cli", transport_id: "cli_process", model_id: "fixture-model" };
-  const manifest = { manifest_id: "settings-cli-fixture", version: "1.0.0", identity, capabilities: [], native_reasoning_values: [], effort_mapping: {}, certification_profile: { probe_authority: "independent", certification_authority: "independent", isolated_probe: true }, resource_bounds: {}, priority: 1, estimated_cost: 0, transport_descriptor: { argv_template: ["exec", "--ephemeral", "--sandbox", "{{sandbox}}", "--model", "{{model_id}}", "-c", "{{reasoning_config}}", "--cd", "{{working_directory}}", "--output-last-message", "{{response_file}}", "{{stdin_marker}}"], argv_schema: ["sandbox", "model_id", "reasoning_config", "working_directory", "response_file", "stdin_marker"], environment_allowlist: [], private_response_file: true, executable: { canonical_path: "/usr/bin/true", digest: "not-launched" } } };
+  const manifest = { manifest_id: "settings-cli-fixture", version: "1.0.0", identity, capabilities: [], native_reasoning_values: [], effort_mapping: {}, reasoning_mapping_provenance: { source_id: "settings-cli-fixture", revision: "1", reviewed_by: "fixture-reviewer", proof_fingerprint: teamDigest("settings-cli-fixture-effort-mapping") }, selection_profile: { correctness: 0, safety: 0, efficiency: 0, roles: [] }, certification_profile: { probe_authority: "independent", certification_authority: "independent", isolated_probe: true }, resource_bounds: { cost: 0 }, priority: 1, estimated_cost: 0, transport_descriptor: { argv_template: ["exec", "--ephemeral", "--sandbox", "{{sandbox}}", "--model", "{{model_id}}", "-c", "{{reasoning_config}}", "--cd", "{{working_directory}}", "--output-last-message", "{{response_file}}", "{{stdin_marker}}"], argv_schema: ["sandbox", "model_id", "reasoning_config", "working_directory", "response_file", "stdin_marker"], environment_allowlist: [], private_response_file: true, executable: { canonical_path: "/usr/bin/true", digest: "not-launched" } } };
   const identityKey = Object.values(identity).join(":");
   const certificationProof = teamDigest("settings-fixture-certification-proof");
-  const certificationCore = { certification_id: "settings-cli-fixture-certification", certifier_id: "settings-fixture-certifier", identity_key: identityKey, manifest_version: "1.0.0", adapter_version: "1", platform: `${process.platform}-${process.arch}`, capability_fingerprint: createHash("sha256").update(JSON.stringify([])).digest("hex"), state: "CERTIFIED", certified_at: "2026-01-01T00:00:00.000Z", expires_at: "2030-01-01T00:00:00.000Z", revocation_epoch: 0, revocation_state: "active", observation_fingerprint: createHash("sha256").update(JSON.stringify("fixture-observation")).digest("hex"), probe_lineage: "settings-fixture-probe", probe_authority_id: "settings-fixture-probe-authority", probe_fingerprint: createHash("sha256").update(JSON.stringify("probe")).digest("hex"), certification_proof_fingerprint: certificationProof, clock_fingerprint: createHash("sha256").update(JSON.stringify({ certified_at: "2026-01-01T00:00:00.000Z", expires_at: "2030-01-01T00:00:00.000Z" }, Object.keys({ certified_at: 1, expires_at: 1 }).sort())).digest("hex"), authority_fingerprint: teamDigest({ certifier_id: "settings-fixture-certifier", probe_authority_id: "settings-fixture-probe-authority", certification_proof_fingerprint: certificationProof }) };
-  const driftEvidence = { identity_key: certificationCore.identity_key, manifest_version: certificationCore.manifest_version, adapter_version: certificationCore.adapter_version, platform: certificationCore.platform, capability_fingerprint: certificationCore.capability_fingerprint, observation_fingerprint: certificationCore.observation_fingerprint, revocation_epoch: certificationCore.revocation_epoch };
+  const certificationCore = { certification_id: "settings-cli-fixture-certification", certifier_id: "settings-fixture-certifier", identity_key: identityKey, manifest_version: "1.0.0", adapter_version: "1", platform: `${process.platform}-${process.arch}`, manifest_fingerprint: providerManifestFingerprint(manifest), capability_fingerprint: createHash("sha256").update(JSON.stringify([])).digest("hex"), state: "CERTIFIED", certified_at: "2026-01-01T00:00:00.000Z", expires_at: "2030-01-01T00:00:00.000Z", revocation_epoch: 0, revocation_state: "active", observation_fingerprint: createHash("sha256").update(JSON.stringify("fixture-observation")).digest("hex"), probe_lineage: "settings-fixture-probe", probe_authority_id: "settings-fixture-probe-authority", probe_fingerprint: createHash("sha256").update(JSON.stringify("probe")).digest("hex"), certification_proof_fingerprint: certificationProof, clock_fingerprint: createHash("sha256").update(JSON.stringify({ certified_at: "2026-01-01T00:00:00.000Z", expires_at: "2030-01-01T00:00:00.000Z" }, Object.keys({ certified_at: 1, expires_at: 1 }).sort())).digest("hex"), authority_fingerprint: teamDigest({ certifier_id: "settings-fixture-certifier", probe_authority_id: "settings-fixture-probe-authority", certification_proof_fingerprint: certificationProof }) };
+  const driftEvidence = { identity_key: certificationCore.identity_key, manifest_version: certificationCore.manifest_version, adapter_version: certificationCore.adapter_version, platform: certificationCore.platform, manifest_fingerprint: certificationCore.manifest_fingerprint, capability_fingerprint: certificationCore.capability_fingerprint, observation_fingerprint: certificationCore.observation_fingerprint, revocation_epoch: certificationCore.revocation_epoch };
   const certification = { ...certificationCore, drift_fingerprint: createHash("sha256").update(JSON.stringify(driftEvidence, Object.keys(driftEvidence).sort())).digest("hex") };
   writeFileSync(registryPath, `${JSON.stringify({ schema_version: "1.0.0", registry_id: "settings-cli-test", revision: 1, activation_mode: "planned", entries: [{ manifest, certification }], custom_entries: [] })}\n`, { mode: 0o600 });
   const toolPath = path.join(REPOSITORY_ROOT, "tools", "next-workflow.mjs");
@@ -231,7 +232,7 @@ test("separate CLI processes preserve the untrusted-provider blocker", () => {
   assert.ok(plan.blockers.includes("CERTIFICATION_PROVENANCE_UNTRUSTED"));
   const refused = spawnSync(process.execPath, ["--no-warnings", toolPath, "settings", "apply", "--token", plan.token, "--confirm"], { cwd: REPOSITORY_ROOT, env: environment, encoding: "utf8" });
   assert.notEqual(refused.status, 0);
-  assert.match(refused.stderr, /SETTINGS_PLAN_BLOCKED:CERTIFICATION_PROVENANCE_UNTRUSTED/);
+  assert.match(refused.stderr, /SETTINGS_PLAN_BLOCKED:[^\n]*CERTIFICATION_PROVENANCE_UNTRUSTED/);
 });
 
 test("CLI provider-registry overrides remain repository-bound and reject symlinks", () => {

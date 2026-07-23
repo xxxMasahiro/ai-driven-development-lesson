@@ -3532,21 +3532,19 @@ Restart context after local implementation:
 
 Next safe action:
 
-- Preserve the locally verified non-Control-Center implementation without
-  changing Control Center code, and deliver that scoped implementation through
-  PR CI, merge, main CI, and synchronization now. This delivery is not the final
-  activation candidate. When the developer later resumes the paused
-  scope, return to Phase 18, complete its design-system-owned work, and rerun
-  required browser and TraceCue review plus developer acceptance before release
-  activation.
-- After Phase 18 is explicitly resumed, completed, reviewed, and accepted,
-  begin Phase 20 with the activation-bound production-wiring slice. Configure
-  independently authenticated runtime sources and approval/receipt/
-  reconciliation verifiers, separate provider probe/certification authorities,
-  operational observation and containment, and exact CLI/Git/workflow adapters
-  through the common gateway. The present hard-deny placeholders are safe but
-  are not implementation evidence for that slice. Then complete Phase 20
-  against one immutable candidate: final local aggregate and
+- Preserve the locally verified non-Control-Center safety foundation without
+  changing Control Center code, then complete and deliver the protected non-UI
+  runtime-wiring slice through PR CI, merge, main CI, and synchronization. This
+  delivery is not the final activation candidate.
+- The isolated non-production profile now configures and tests protected
+  runtime, Approval, Receipt, finalization, observation, containment, and CLI
+  lifecycle owners through the common gateway. Keep externally reachable
+  production adapters unavailable and Activation `planned`; isolated evidence
+  is not production authority.
+- When the developer later resumes the paused scope, rebaseline and reconstruct
+  its design-system-owned Control Center work, rerun required browser and
+  TraceCue review, and obtain developer acceptance. Only then complete the
+  activation release against one immutable candidate: final local aggregate and
   no-cache evidence, PR CI, merge, main CI, and local/remote synchronization,
   plus recovery, fenced rollback, archive/decommission, and outbox-disposition
   proofs. If they all bind the same candidate and correctness remains green,
@@ -3556,6 +3554,91 @@ Next safe action:
   repeat the configured delivery proof for the final activation-only change.
   Any material drift returns to shadow under a new candidate.
 
+## Non-UI Runtime Wiring Handoff
+
+SYNC-ID: next_workflow_non_ui_runtime_wiring
+STATUS: implemented
+ARTIFACTS: docs/as-built/IMPLEMENTATION_PLAN.md,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/HANDOFF.md,docs/workflow/TASK_TRACKER.md,docs/workflow/next-workflow/authority-lifecycle.json,docs/workflow/next-workflow/provider-registry.json,docs/workflow/next-workflow/state-store.json,docs/workflow/next-workflow/team-agent-security.json,learning/NEXT_WORKFLOW_AGENT_SELECTION_SETTINGS.json,learning/NEXT_WORKFLOW_PROVIDER_REGISTRY.json,tools/lib/next_workflow/agents.mjs,tools/lib/next_workflow/authority.mjs,tools/lib/next_workflow/contracts.mjs,tools/lib/next_workflow/migrations/003_runtime_wiring.sql,tools/lib/next_workflow/provider_discovery.mjs,tools/lib/next_workflow/providers.mjs,tools/lib/next_workflow/run_lifecycle.mjs,tools/lib/next_workflow/runtime.mjs,tools/lib/next_workflow/runtime_barrier.cjs,tools/lib/next_workflow/runtime_containment.mjs,tools/lib/next_workflow/runtime_trust.mjs,tools/lib/next_workflow/settings.mjs,tools/lib/next_workflow/store.mjs,tools/lib/next_workflow/task_delivery.mjs,tools/next-workflow.mjs,tools/test_next_workflow.sh,tools/test_next_workflow_agents.mjs,tools/test_next_workflow_authority.mjs,tools/test_next_workflow_isolated_runtime.mjs,tools/test_next_workflow_isolated_runtime.sh,tools/test_next_workflow_projection_settings.mjs,tools/test_next_workflow_providers.mjs,tools/test_next_workflow_release.mjs,tools/test_next_workflow_run_lifecycle.mjs,tools/test_next_workflow_run_lifecycle.sh,tools/test_next_workflow_saga.mjs,tools/test_next_workflow_store.mjs,tools/test_next_workflow_task_delivery.mjs,tools/test_next_workflow_task_delivery.sh
+TESTS: tools/check_next_workflow.sh,tools/test_next_workflow.sh,tools/check_security_invariants.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+Next Step:
+
+- Deliver the completed dependency-ordered non-UI slices through the configured
+  commit, PR CI, merge, main CI, and local/remote synchronization route.
+- Use the clean isolated checkout created from current `origin/main`. Do not
+  touch the developer-owned dirty Control Center checkout or include any
+  Control Center, Dashboard schema/design/test, package, Vite, browser, or MCP
+  path in this delivery.
+- Keep the production composition and externally reachable launch surfaces
+  unavailable. The isolated authority profile may exercise production-shaped
+  owners only against explicit fixture repositories, temporary state, bounded
+  local processes, and no production credentials, Git delivery, registered
+  child traversal, or external network effect.
+- The non-UI runtime uses per-run Linux namespaces and Bubblewrap rather than a
+  container platform. `node tools/next-workflow.mjs runtime isolation-check`
+  reports availability and non-installing OS-specific guidance. Missing
+  isolation stops only dependent CLI work and never enables an unisolated
+  fallback.
+- Protected trust is recursively immutable; the production-shaped store and
+  isolated composition require exact protected verifier fingerprints, not
+  matching IDs or duck-typed methods. PID/process-group identity and launch
+  evidence are durable before provider execution is released. A pinned
+  two-stage barrier treats controller EOF as permanent non-release and keeps
+  provider code blocked until fenced recovery. The contained-process identity
+  and descriptor-pinned private output directory remain independently
+  verifiable across controller restart and pathname replacement.
+- The provider-neutral lifecycle port and authority-fenced CLI executor are
+  accepted only when created by their protected factories; matching booleans
+  or method names grant no execution authority. Prompt fingerprinting uses
+  positional reads, so the exact pinned task input still reaches child stdin
+  from byte zero.
+- Each CLI task starts in a private task-envelope directory without a repository
+  or Git mount. Launch confirmation is limited to the pinned executable,
+  certified manifest, and observed CLI arguments; task self-report never
+  authenticates the selected model or effort.
+- A completed CLI response remains an unaccepted `AgentResultCandidate` until
+  independent Lead, Orchestrator, and Validator records close the run. The
+  dedicated lifecycle writer reloads the exact three assignments and reviews,
+  relations, and events and cannot be bypassed through generic or direct
+  lifecycle commit. Owner/task model policy is restrictively composed,
+  nonempty bounds and matching budgets fail closed, and delivery is rechecked
+  immediately before receipt finalization. Candidate insertion reloads the
+  completed runtime run, exact relation/event topology, and protected launch/
+  admission receipts. Protected stores accept runtime writes only through an
+  unexposed capability bound to that exact store, recovery-only authority is
+  preserved across restart termination, candidates bind the exact frozen
+  launch request and deterministic durable launch/admission lineage, and agent authority records require a same-trust
+  protected verifier; launch revalidates
+  current resource, cost, and explicit timeout bounds against its persisted
+  reservation; completed-run replay preserves the stored result fingerprint.
+- Metered API providers are represented by the same registry and selection
+  contracts, including secret references, endpoint policy, cost ceilings, and
+  model/publisher deny lists. Actual paid API transport remains unavailable
+  until its gateway-owned security and idempotency owners are configured.
+- Treat the checked-in release trust and prerequisite documents as descriptive
+  candidate data only. Activation trust and owner acceptance must be supplied
+  by a protected owner-managed source outside the candidate and remain absent
+  for this delivery.
+- The 17-suite Next Workflow aggregate currently passes 217 tests, and the
+  clean-candidate canonical repository aggregate passes. The final delivery
+  gate still requires PR CI, merge, main CI, and local/remote synchronization.
+  The resulting state is non-UI wiring implemented, production unavailable,
+  Activation `planned`, and Control Center reconstruction pending.
+- When a production AgentLauncher composition is intentionally enabled, add a
+  protected happy-path launch-through-review-closure integration fixture. This
+  future coverage item does not authorize Activation or a production adapter
+  in the current planned state.
+
+The earlier handoff instruction to wait for Phase 18 before beginning runtime
+wiring is superseded by this block. Phase 18 remains a later, separately
+rebaselined Control Center reconstruction and acceptance task; full Activation
+and immutable same-candidate release evidence remain later still.
+
+When Control Center work resumes, add a plain-language isolation status,
+copyable installation guidance, a recheck action, provider billing-mode
+selection, model/publisher restrictions, and API cost ceilings. Do not
+auto-install packages or change administrator-controlled namespace policy.
+
 Non-Control-Center closure evidence on 2026-07-22:
 
 SYNC-ID: next_development_workflow_non_ui_security_closure
@@ -3563,7 +3646,7 @@ STATUS: implemented
 ARTIFACTS: docs/as-built/IMPLEMENTATION_PLAN.md,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/HANDOFF.md,docs/workflow/TASK_TRACKER.md,learning/NEXT_WORKFLOW_RELEASE_PREREQUISITES.json,tools/check_document_organization.sh,tools/lib/document_paths.sh,tools/lib/next_workflow/agents.mjs,tools/lib/next_workflow/authority.mjs,tools/lib/next_workflow/compatibility.mjs,tools/lib/next_workflow/contracts.mjs,tools/lib/next_workflow/identity.mjs,tools/lib/next_workflow/projection.mjs,tools/lib/next_workflow/provider_discovery.mjs,tools/lib/next_workflow/providers.mjs,tools/lib/next_workflow/release.mjs,tools/lib/next_workflow/runtime.mjs,tools/lib/next_workflow/saga.mjs,tools/lib/next_workflow/store.mjs,tools/next-workflow.mjs,tools/test_lesson_repository.sh,tools/test_next_workflow_agents.mjs,tools/test_next_workflow_authority.mjs,tools/test_next_workflow_compatibility.mjs,tools/test_next_workflow_contracts.mjs,tools/test_next_workflow_identity.mjs,tools/test_next_workflow_projection_settings.mjs,tools/test_next_workflow_providers.mjs,tools/test_next_workflow_release.mjs,tools/test_next_workflow_runtime.mjs,tools/test_next_workflow_saga.mjs,tools/test_next_workflow_store.mjs
 TESTS: tools/check_developer_memory_requirements.sh,tools/check_document_organization.sh,tools/check_lesson_structure.sh,tools/check_lesson14_structure.sh,tools/check_next_workflow.sh,tools/test_next_workflow.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
 
-- The complete local aggregate passed 192 assertions across 14 standalone
+- The historical closure aggregate passed 192 tests across 14 standalone
   suites, and the seven frozen P0 contracts passed fingerprint validation.
 - Relationship initialization, Relationship transitions, and activation
   lifecycles now have dedicated atomic store writers; generic record insertion
@@ -3602,8 +3685,9 @@ TESTS: tools/check_developer_memory_requirements.sh,tools/check_document_organiz
   stale non-revoking Relationship transitions stop after a fence, and release
   proofs bind candidate HEAD through the same PR number to the main merge and
   synchronized `origin/main` heads.
-- Agent launch now resolves the persisted grant before binding the CLI sandbox
-  and canonical repository root. Receipt finalization recomputes the locked
+- Agent launch resolves the persisted grant before binding the CLI sandbox.
+  The successor non-UI slice replaced this closure's repository-root execution
+  with a private task-envelope directory and no repository/Git mount. Receipt finalization recomputes the locked
   effect/observation identity and reruns a store-configured independent
   verifier, while generic commits and finalization repeat revision CAS inside
   `BEGIN IMMEDIATE`. The provider adapter carries the exact epoch/fence to the
@@ -3651,3 +3735,8 @@ TESTS: tools/check_developer_memory_requirements.sh,tools/check_document_organiz
   handles the observed nested-sandbox status-zero/post-exec-`EPERM` condition
   without accepting nonzero or ambiguous output, and its final-gate regression
   passed five consecutive runs.
+- Follow-up verification is environment-honest: the isolation diagnostic always
+  runs, real containment cases run on capable hosts, and incapable hosts report
+  those cases as explicit skips after verifying installation or OS-policy
+  guidance. This is a test portability correction only; runtime containment
+  still fails closed and no unisolated fallback exists.

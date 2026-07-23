@@ -10,6 +10,13 @@
       "subject_id": "default",
       "mode": "auto",
       "identity_key": null,
+      "model_policy": {
+        "allowed_model_ids": [],
+        "denied_model_ids": [],
+        "allowed_model_publishers": [],
+        "denied_model_publishers": [],
+        "denied_model_prefixes": []
+      },
       "source": "repository_default"
     }
   ],

@@ -1,6 +1,8 @@
 import { createHash, randomUUID } from "node:crypto";
 import { validateActivationRecord } from "./projection.mjs";
 import { reconcileEffect } from "./saga.mjs";
+import { assertProtectedWorkflowStateStore } from "./store.mjs";
+import { assertProtectedRuntimeVerifier, protectedRuntimeVerifierTrustFingerprint } from "./runtime_trust.mjs";
 
 const AUTHORITY_VARIANTS = new Set(["git_effect", "provider_effect", "agent_launch", "agent_run_admission", "filesystem_write", "adapter_send", "runtime_service", "artifact_dependency", "resource_cost"]);
 const APPROVAL_REASONS = new Set(["sandbox_boundary", "network_access", "credential_or_secret", "destructive_operation", "l5_scope_approval", "scope_expansion", "unowned_change_conflict", "ambiguous_owner_decision", "git_push_operation_approval", "git_pr_creation_approval", "git_merge_operation_approval"]);
@@ -71,7 +73,7 @@ function normalizeSubject(variant, input) {
   } else if (variant === "provider_effect") {
     requireSubjectFields(subject, ["provider_identity_fingerprint", "configuration_fingerprint", "request_fingerprint", "expected_provider_object"], variant);
   } else if (variant === "agent_launch") {
-    requireSubjectFields(subject, ["grant_fingerprint", "launch_intent_fingerprint", "parent_agent_id", "parent_role", "requested_configuration_fingerprint", "selected_configuration_fingerprint", "effective_configuration_fingerprint", "context_fingerprint", "budget_reservation_id", "sandbox_fingerprint", "capability_fingerprint"], variant);
+    requireSubjectFields(subject, ["grant_fingerprint", "launch_intent_fingerprint", "parent_agent_id", "parent_role", "requested_configuration_fingerprint", "selected_configuration_fingerprint", "effective_configuration_fingerprint", "context_fingerprint", "invariant_fingerprint", "instruction_fingerprint", "task_envelope_fingerprint", "task_delivery_fingerprint", "budget_reservation_id", "sandbox_fingerprint", "capability_fingerprint"], variant);
     if (subject.actual_observed !== null) throw new Error("AUTHORITY_AGENT_LAUNCH_ACTUAL_MUST_BE_ABSENT");
     if (!Number.isSafeInteger(subject.authority_epoch) || subject.authority_epoch < 0) throw new Error("AUTHORITY_AGENT_LAUNCH_EPOCH_INVALID");
     subject.owned_targets = requireStringArray(subject.owned_targets, "AUTHORITY_AGENT_LAUNCH_TARGETS_REQUIRED");
@@ -141,7 +143,7 @@ function normalizeSource(source) {
   return normalized;
 }
 
-function normalizeApprovalGrants(approvals, bindings, decisionTime, approvalVerifier) {
+function normalizeApprovalGrants(approvals, bindings, decisionTime, approvalVerifier, { variant, action, subject }) {
   if (approvals === undefined) return [];
   if (!Array.isArray(approvals)) throw new Error("AUTHORITY_APPROVAL_GRANTS_INVALID");
   if (approvals.length > 0 && (!approvalVerifier || approvalVerifier.trusted !== true || approvalVerifier.independent !== true || typeof approvalVerifier.verifier_id !== "string" || typeof approvalVerifier.verify !== "function")) throw new Error("AUTHORITY_APPROVAL_VERIFIER_REQUIRED");
@@ -150,15 +152,23 @@ function normalizeApprovalGrants(approvals, bindings, decisionTime, approvalVeri
     const normalized = {
       reason: requireString(approval.reason, "AUTHORITY_APPROVAL_REASON_REQUIRED"),
       approval_id: requireString(approval.approval_id, "AUTHORITY_APPROVAL_ID_REQUIRED"),
+      repository_logical_id: requireString(approval.repository_logical_id, "AUTHORITY_APPROVAL_REPOSITORY_REQUIRED"),
+      checkout_instance_id: requireString(approval.checkout_instance_id, "AUTHORITY_APPROVAL_CHECKOUT_REQUIRED"),
       target_id: requireString(approval.target_id, "AUTHORITY_APPROVAL_TARGET_REQUIRED"),
       task_id: requireString(approval.task_id, "AUTHORITY_APPROVAL_TASK_REQUIRED"),
+      run_id: requireString(approval.run_id, "AUTHORITY_APPROVAL_RUN_REQUIRED"),
+      operation: requireString(approval.operation, "AUTHORITY_APPROVAL_OPERATION_REQUIRED"),
+      request_fingerprint: requireString(approval.request_fingerprint, "AUTHORITY_APPROVAL_REQUEST_REQUIRED"),
+      policy_revision: requireString(approval.policy_revision, "AUTHORITY_APPROVAL_POLICY_REQUIRED"),
+      settings_revision: requireString(approval.settings_revision, "AUTHORITY_APPROVAL_SETTINGS_REQUIRED"),
       authority_epoch: requireEpoch(approval.authority_epoch, "AUTHORITY_APPROVAL_EPOCH_INVALID"),
+      issued_at: requireTimestamp(approval.issued_at, "AUTHORITY_APPROVAL_ISSUED_AT_INVALID"),
       fresh_until: requireTimestamp(approval.fresh_until, "AUTHORITY_APPROVAL_FRESHNESS_INVALID"),
       proof_fingerprint: requireString(approval.proof_fingerprint, "AUTHORITY_APPROVAL_PROOF_REQUIRED")
     };
     if (!APPROVAL_REASONS.has(normalized.reason)) throw new Error(`APPROVAL_REASON_INVALID:${normalized.reason}`);
-    if (normalized.target_id !== bindings.target_id || normalized.task_id !== bindings.task_id || normalized.authority_epoch !== bindings.revocation_epoch || Date.parse(normalized.fresh_until) < Date.parse(decisionTime)) throw new Error("AUTHORITY_APPROVAL_BINDING_INVALID");
-    const bindingFingerprint = fingerprint({ reason: normalized.reason, approval_id: normalized.approval_id, target_id: normalized.target_id, task_id: normalized.task_id, authority_epoch: normalized.authority_epoch, fresh_until: normalized.fresh_until });
+    if (normalized.repository_logical_id !== bindings.repository_logical_id || normalized.checkout_instance_id !== bindings.checkout_instance_id || normalized.target_id !== bindings.target_id || normalized.task_id !== bindings.task_id || normalized.run_id !== bindings.run_id || normalized.operation !== `${variant}:${action}` || normalized.request_fingerprint !== subject.request_fingerprint || normalized.policy_revision !== bindings.policy_fingerprint || normalized.settings_revision !== bindings.settings_revision || normalized.authority_epoch !== bindings.revocation_epoch || Date.parse(normalized.issued_at) > Date.parse(decisionTime) || Date.parse(normalized.fresh_until) < Date.parse(decisionTime)) throw new Error("AUTHORITY_APPROVAL_BINDING_INVALID");
+    const bindingFingerprint = fingerprint({ reason: normalized.reason, approval_id: normalized.approval_id, repository_logical_id: normalized.repository_logical_id, checkout_instance_id: normalized.checkout_instance_id, task_id: normalized.task_id, run_id: normalized.run_id, operation: normalized.operation, target_id: normalized.target_id, request_fingerprint: normalized.request_fingerprint, policy_revision: normalized.policy_revision, settings_revision: normalized.settings_revision, authority_epoch: normalized.authority_epoch, issued_at: normalized.issued_at, fresh_until: normalized.fresh_until });
     const verification = approvalVerifier.verify({ approval: structuredClone(normalized), binding_fingerprint: bindingFingerprint, decision_time: decisionTime });
     if (verification?.verified !== true || verification.verifier_id !== approvalVerifier.verifier_id || verification.approval_id !== normalized.approval_id || verification.proof_fingerprint !== normalized.proof_fingerprint || verification.binding_fingerprint !== bindingFingerprint) throw new Error("AUTHORITY_APPROVAL_PROOF_INVALID");
     return normalized;
@@ -205,7 +215,7 @@ export function composeAuthorityDecision({ variant, action, subject, bindings, s
   const targetDenied = normalized.filter((source) => source.targets.length > 0 && !source.targets.includes("*") && !source.targets.includes(bindings.target_id)).map((source) => source.source_id);
   if (targetDenied.length) return deny("TARGET_OUTSIDE_INTERSECTION", targetDenied, basis);
   const requiredApprovals = [...new Set(normalized.flatMap((source) => source.required_approvals))].sort();
-  const approvalGrants = normalizeApprovalGrants(bindings.approvals, bindings, decisionTime, approvalVerifier);
+  const approvalGrants = normalizeApprovalGrants(bindings.approvals, bindings, decisionTime, approvalVerifier, { variant, action, subject: normalizedSubject });
   const grantedApprovals = new Set(approvalGrants.map((approval) => approval.reason));
   const missingApprovals = requiredApprovals.filter((reason) => !grantedApprovals.has(reason));
   if (missingApprovals.length) return deny("APPROVAL_REQUIRED", missingApprovals, basis);
@@ -236,6 +246,7 @@ export function composeAuthorityDecision({ variant, action, subject, bindings, s
     policy_fingerprint: bindings.policy_fingerprint,
     settings_revision: bindings.settings_revision,
     approval_fingerprint: fingerprint(approvalGrants),
+    approval_ids: approvalGrants.map((approval) => approval.approval_id).sort(),
     runtime_capability_fingerprint: bindings.runtime_capability_fingerprint,
     rigor,
     required_approvals: requiredApprovals,
@@ -288,6 +299,8 @@ function canonicalizeGatewayEffect(input) {
     request_fingerprint: fingerprint(request),
     expected_selector_fingerprint: fingerprint(expectedSelector)
   };
+  const idempotencyKey = effect.idempotency_key;
+  if (idempotencyKey !== undefined && (typeof idempotencyKey !== "string" || idempotencyKey.length === 0 || idempotencyKey.length > 256)) throw new Error("EFFECT_IDEMPOTENCY_KEY_INVALID");
   return {
     ...effect,
     target,
@@ -300,7 +313,7 @@ function canonicalizeGatewayEffect(input) {
       expected_selector_fingerprint: intentBinding.expected_selector_fingerprint,
       effect_intent_fingerprint: fingerprint(intentBinding)
     },
-    effect_key: fingerprint(intentBinding)
+    effect_key: idempotencyKey === undefined ? fingerprint(intentBinding) : fingerprint({ variant: effect.variant, target_id: effect.bindings.target_id, idempotency_key: idempotencyKey })
   };
 }
 
@@ -318,8 +331,8 @@ function canonicalReconciliationVerdict(intent, observation) {
   });
 }
 
-export function createSideEffectGateway({ composer = composeAuthorityDecision, store, sourceProvider, activationProvider, activationVerifier, currentCandidateProvider, reconciliationAuthorizer, adapters, receiptVerifier, approvalVerifier, clock = () => new Date().toISOString(), idFactory = randomUUID }) {
-  if (!store || typeof store.commit !== "function" || typeof store.getIntent !== "function" || typeof store.claimEffectDispatch !== "function" || typeof store.assertAuthorityEpoch !== "function") throw new Error("GATEWAY_STORE_REQUIRED");
+export function createSideEffectGateway({ composer = composeAuthorityDecision, store, sourceProvider, activationProvider, activationVerifier, currentCandidateProvider, reconciliationAuthorizer, adapters, receiptVerifier, approvalVerifier, runtimeProfile = "production", isolatedVerificationAuthorityProvider, isolatedVerificationVerifier, isolatedEffectGuard, clock = () => new Date().toISOString(), idFactory = randomUUID }) {
+  if (!store || typeof store.commit !== "function" || typeof store.getIntent !== "function" || typeof store.findIntentByEffectKey !== "function" || typeof store.recordRuntimeConflict !== "function" || typeof store.claimEffectDispatch !== "function" || typeof store.assertAuthorityEpoch !== "function") throw new Error("GATEWAY_STORE_REQUIRED");
   if (typeof sourceProvider !== "function") throw new Error("GATEWAY_SOURCE_PROVIDER_REQUIRED");
   if (typeof activationProvider !== "function") throw new Error("GATEWAY_ACTIVATION_PROVIDER_REQUIRED");
   if (typeof activationVerifier !== "function") throw new Error("GATEWAY_ACTIVATION_VERIFIER_REQUIRED");
@@ -327,8 +340,30 @@ export function createSideEffectGateway({ composer = composeAuthorityDecision, s
   if (typeof reconciliationAuthorizer !== "function") throw new Error("GATEWAY_RECONCILIATION_AUTHORIZER_REQUIRED");
   if (!adapters || typeof adapters !== "object") throw new Error("GATEWAY_ADAPTERS_REQUIRED");
   if (typeof receiptVerifier !== "function") throw new Error("GATEWAY_INDEPENDENT_RECEIPT_VERIFIER_REQUIRED");
+  if (!new Set(["production", "isolated_verification"]).has(runtimeProfile)) throw new Error("GATEWAY_RUNTIME_PROFILE_INVALID");
+  if (runtimeProfile === "isolated_verification" && (typeof isolatedVerificationAuthorityProvider !== "function" || !isolatedVerificationVerifier || isolatedVerificationVerifier.trusted !== true || isolatedVerificationVerifier.independent !== true || typeof isolatedVerificationVerifier.verifier_id !== "string" || typeof isolatedVerificationVerifier.verify !== "function" || typeof isolatedEffectGuard !== "function")) throw new Error("GATEWAY_ISOLATED_AUTHORITY_REQUIRED");
+  let protectedOperationalAuthority = false;
+  try {
+    assertProtectedWorkflowStateStore(store);
+    assertProtectedRuntimeVerifier(receiptVerifier, "receipt_issuer");
+    protectedOperationalAuthority = store.runtime_trust_fingerprint === protectedRuntimeVerifierTrustFingerprint(receiptVerifier, "receipt_issuer");
+  } catch {}
+  const requireProtectedOperationalAuthority = () => {
+    if (!protectedOperationalAuthority) throw new Error("PROTECTED_GATEWAY_OPERATIONAL_AUTHORITY_REQUIRED");
+  };
 
   async function activationSnapshot({ effect, phase }) {
+    if (runtimeProfile === "isolated_verification") {
+      const guard = await isolatedEffectGuard({ effect: structuredClone(effect), phase, now: clock() });
+      if (guard?.allowed !== true || typeof guard.guard_fingerprint !== "string") return { allowed: false, decision: deny("ISOLATED_EFFECT_OUTSIDE_PROFILE", [guard?.code ?? "guard_denied"], { phase, runtime_profile: runtimeProfile }) };
+      const authority = await isolatedVerificationAuthorityProvider({ effect: structuredClone(effect), phase, guard_fingerprint: guard.guard_fingerprint });
+      if (!authority || authority.schema_version !== "1.0.0" || authority.profile !== "isolated_verification" || typeof authority.authority_id !== "string" || typeof authority.repository_logical_id !== "string" || typeof authority.checkout_instance_id !== "string" || typeof authority.fixture_root_fingerprint !== "string" || typeof authority.candidate_fingerprint !== "string" || !/^[a-f0-9]{64}$/.test(authority.candidate_fingerprint) || !/^[a-f0-9]{40,64}$/.test(authority.repository_head ?? "") || !Number.isSafeInteger(authority.authority_epoch) || authority.authority_epoch < 0 || !Number.isFinite(Date.parse(authority.fresh_until)) || Date.parse(authority.fresh_until) < Date.parse(clock()) || authority.production_authority === true || authority.activation_transition_allowed !== false) return { allowed: false, decision: deny("ISOLATED_AUTHORITY_INVALID", [authority?.authority_id ?? "missing"], { phase, runtime_profile: runtimeProfile }) };
+      const authorityFingerprint = fingerprint(authority);
+      const verification = await isolatedVerificationVerifier.verify({ authority: structuredClone(authority), authority_fingerprint: authorityFingerprint, guard_fingerprint: guard.guard_fingerprint, phase, now: clock() });
+      if (verification?.verified !== true || verification.verifier_id !== isolatedVerificationVerifier.verifier_id || verification.authority_fingerprint !== authorityFingerprint || verification.guard_fingerprint !== guard.guard_fingerprint || typeof verification.proof_fingerprint !== "string") return { allowed: false, decision: deny("ISOLATED_AUTHORITY_UNTRUSTED", [authority.authority_id], { phase, runtime_profile: runtimeProfile }) };
+      const snapshot = { mode: "isolated_verification", authority_id: authority.authority_id, candidate_fingerprint: authority.candidate_fingerprint, repository_head: authority.repository_head, authority_epoch: authority.authority_epoch, fixture_root_fingerprint: authority.fixture_root_fingerprint, guard_fingerprint: guard.guard_fingerprint };
+      return { allowed: true, fingerprint: fingerprint(snapshot), snapshot };
+    }
     const activation = await activationProvider({ effect: structuredClone(effect), phase });
     try {
       validateActivationRecord(activation);
@@ -410,8 +445,30 @@ export function createSideEffectGateway({ composer = composeAuthorityDecision, s
     };
   }
 
-  async function execute(effect) {
-    const first = await preview(effect);
+  async function execute(effect, { beforeFinalize } = {}) {
+    requireProtectedOperationalAuthority();
+    if (beforeFinalize !== undefined && typeof beforeFinalize !== "function") throw new Error("SIDE_EFFECT_BEFORE_FINALIZE_HOOK_INVALID");
+    const canonicalInput = canonicalizeGatewayEffect(effect);
+    const operation = `${canonicalInput.variant}:${canonicalInput.action}`;
+    const bindingFingerprint = fingerprint({ variant: canonicalInput.variant, action: canonicalInput.action, subject: canonicalInput.subject, bindings: canonicalInput.bindings, target: canonicalInput.target, request: canonicalInput.request, expected_selector: canonicalInput.expected_selector });
+    const existing = store.findIntentByEffectKey(canonicalInput.effect_key);
+    if (existing) {
+      const incomingFingerprint = fingerprint({ request_fp: fingerprint(canonicalInput.request), target_id: canonicalInput.bindings.target_id, operation, expected_selector: canonicalInput.expected_selector, binding_fp: bindingFingerprint });
+      const existingFingerprint = fingerprint({ request_fp: existing.request_fp, target_id: existing.target_id, operation: existing.operation, expected_selector: existing.expected_selector, binding_fp: existing.binding_fp });
+      if (incomingFingerprint !== existingFingerprint) {
+        const conflict = store.recordRuntimeConflict({ conflictKind: "effect", idempotencyKey: canonicalInput.effect_key, existingId: existing.effect_id, existingFingerprint, incomingFingerprint, details: { target_id: canonicalInput.bindings.target_id, operation } });
+        const error = new Error("EFFECT_IDEMPOTENCY_PAYLOAD_CONFLICT");
+        error.conflict_id = conflict.conflict_id;
+        throw error;
+      }
+      if (existing.state === "RECONCILED") {
+        const verifiedReplay = await reconcile(existing.effect_id);
+        return { ...verifiedReplay, effect_key: canonicalInput.effect_key, reused: true, result: null };
+      }
+      const receipt = store.getReceipt(existing.effect_id);
+      return { effect_id: existing.effect_id, effect_key: canonicalInput.effect_key, reused: true, state: existing.state, receipt_id: receipt?.receipt_id ?? null, proof_record_id: receipt?.proof_record_id ?? null, result: null };
+    }
+    const first = await preview(canonicalInput);
     if (!isAuthorityDecisionAllowed(first.decision)) {
       const error = new Error(`SIDE_EFFECT_DENIED:${first.decision.code}`);
       error.decision = first.decision;
@@ -436,7 +493,7 @@ export function createSideEffectGateway({ composer = composeAuthorityDecision, s
     const effectId = canonicalEffect.effect_id ?? `effect-${idFactory()}`;
     const effectKey = canonicalEffect.effect_key;
     const messageFingerprint = fingerprint({ effect_id: effectId, effect_key: effectKey, decision: secondDecision.fingerprint, request: canonicalEffect.request });
-    store.commit({
+    const prepared = store.commit({
       expectedRevision: store.revision,
       authorityEpoch: secondDecision.revocation_epoch,
       effectIntent: {
@@ -448,10 +505,26 @@ export function createSideEffectGateway({ composer = composeAuthorityDecision, s
         operation: `${canonicalEffect.variant}:${canonicalEffect.action}`,
         expected_selector: canonicalEffect.expected_selector,
         attempt_lineage: canonicalEffect.attempt_lineage ?? effectId,
-        state: "PREPARED"
+        state: "PREPARED",
+        repository_logical_id: secondDecision.repository_logical_id,
+        checkout_instance_id: secondDecision.checkout_instance_id,
+        task_id: secondDecision.task_id,
+        run_id: secondDecision.run_id,
+        authority_epoch: secondDecision.revocation_epoch,
+        decision_expires_at: secondDecision.expires_at,
+        settings_revision: secondDecision.settings_revision,
+        policy_revision: secondDecision.policy_fingerprint,
+        activation_fp: first.activation_fingerprint,
+        approval_ids: secondDecision.approval_ids ?? [],
+        binding_fingerprint: bindingFingerprint,
       },
-      outboxItem: { outbox_id: `outbox-${effectId}`, intent_id: effectId, message_fp: messageFingerprint, sequence: effect.sequence ?? 1, state: "pending" }
+      outboxItem: { outbox_id: `outbox-${effectId}`, intent_id: effectId, message_fp: messageFingerprint, sequence: effect.sequence ?? 1, state: "pending" },
+      approvalUses: secondDecision.approval_ids ?? [],
     });
+    if (prepared.reused === true) {
+      const receipt = store.getReceipt(prepared.effect_id);
+      return { effect_id: prepared.effect_id, effect_key: canonicalEffect.effect_key, reused: true, state: prepared.intent_state, receipt_id: receipt?.receipt_id ?? null, proof_record_id: receipt?.proof_record_id ?? null, result: null };
+    }
     const outboxId = `outbox-${effectId}`;
     store.claimEffectDispatch({ effectId, outboxId, authorityEpoch: secondDecision.revocation_epoch });
     try {
@@ -482,18 +555,23 @@ export function createSideEffectGateway({ composer = composeAuthorityDecision, s
       throw new Error(`SIDE_EFFECT_RECONCILIATION_${reconciliation.code}`);
     }
     const verified = await verifyReceipt({ mode: "dispatch", effect: { ...canonicalEffect, effect_id: effectId }, intent: persistedIntent, observation: finalObservation, dispatchResult, decision: secondDecision });
+    const finalActivation = await activationSnapshot({ effect: canonicalEffect, phase: "finalize" });
+    if (!finalActivation.allowed || finalActivation.fingerprint !== first.activation_fingerprint) throw new Error("SIDE_EFFECT_ACTIVATION_CHANGED_BEFORE_FINALIZATION");
+    if (beforeFinalize) await beforeFinalize({ effect_id: effectId, effect_key: effectKey, final_observation: structuredClone(finalObservation) });
     store.transitionIntent({ effectId, expectedState: "DISPATCHING", nextState: "OBSERVED" });
     store.finalizeReconciliation({
       expectedRevision: store.revision,
       effectId,
       records: [verified.record],
       receipt: { receipt_id: `receipt-${effectId}`, intent_id: effectId, object_identity: finalObservation.object_identity ?? canonicalEffect.bindings.target_id, observation_fp: finalObservation.fingerprint, proof_record_id: verified.proof_record_id, result: "matched" },
-      events: [{ event_id: `event-${effectId}`, event_type: "SIDE_EFFECT_RECONCILED", payload: { effect_id: effectId, effect_key: effectKey, authority_fingerprint: secondDecision.fingerprint, proof_record_id: verified.proof_record_id } }]
+      events: [{ event_id: `event-${effectId}`, event_type: "SIDE_EFFECT_RECONCILED", payload: { effect_id: effectId, effect_key: effectKey, authority_fingerprint: secondDecision.fingerprint, proof_record_id: verified.proof_record_id } }],
+      finalizationFence: { activation_fingerprint: finalActivation.fingerprint, policy_revision: secondDecision.policy_fingerprint, settings_revision: secondDecision.settings_revision, authority_epoch: secondDecision.revocation_epoch, decision_expires_at: secondDecision.expires_at },
     });
     return { effect_id: effectId, effect_key: effectKey, decision: secondDecision, receipt_id: `receipt-${effectId}`, proof_record_id: verified.proof_record_id, result: dispatchResult };
   }
 
   async function reconcile(effectId) {
+    requireProtectedOperationalAuthority();
     const intent = store.getIntent(effectId);
     if (!intent) throw new Error("EFFECT_INTENT_NOT_FOUND");
     const [variant, action] = intent.operation.split(":");
@@ -533,7 +611,7 @@ export function createSideEffectGateway({ composer = composeAuthorityDecision, s
       if (intent.state === "PREPARED") store.transitionIntent({ effectId, expectedState: "PREPARED", nextState: "UNKNOWN", recovery: true });
       const observedFrom = intent.state === "PREPARED" ? "UNKNOWN" : intent.state;
       if (["UNKNOWN", "CONFLICT", "DISPATCHING", "MANUAL_RECOVERY_REQUIRED"].includes(observedFrom)) store.transitionIntent({ effectId, expectedState: observedFrom, nextState: "OBSERVED", recovery: true });
-      store.finalizeReconciliation({ expectedRevision: store.revision, effectId, recovery: true, records: [verified.record], receipt: { receipt_id: `receipt-${effectId}`, intent_id: effectId, object_identity: result.object_identity, observation_fp: result.observation_fingerprint, proof_record_id: verified.proof_record_id, result: "reconstructed" } });
+      store.finalizeReconciliation({ expectedRevision: store.revision, effectId, recovery: true, records: [verified.record], receipt: { receipt_id: `receipt-${effectId}`, intent_id: effectId, object_identity: result.object_identity, observation_fp: result.observation_fingerprint, proof_record_id: verified.proof_record_id, result: "reconstructed" }, finalizationFence: { activation_fingerprint: secondActivation.fingerprint, policy_revision: intent.policy_revision, settings_revision: intent.settings_revision, authority_epoch: Number(intent.authority_epoch), decision_expires_at: intent.decision_expires_at } });
       return { effect_id: effectId, state: "RECONCILED", reconstructed: true, proof_record_id: verified.proof_record_id };
     }
     const next = result.state === "conflict" ? "CONFLICT" : "MANUAL_RECOVERY_REQUIRED";
@@ -550,6 +628,7 @@ export function createSideEffectGateway({ composer = composeAuthorityDecision, s
     execute,
     reconcile,
     fence({ scope, reason, expectedEpoch }) {
+      requireProtectedOperationalAuthority();
       requireString(scope, "FENCE_SCOPE_REQUIRED");
       return store.fence({ reason: `${scope}:${reason}`, expectedEpoch });
     }

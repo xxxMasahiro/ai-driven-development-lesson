@@ -2,12 +2,13 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { generateKeyPairSync, sign } from "node:crypto";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { completeActivation, evaluateCorrectness, evaluatePerformance, freezeReleaseCandidate, freezeRepositoryReleaseCandidate, persistActivationTransition, releaseDigest, rollbackActivation, verifyEnforcedActivationRecord, verifyReleaseProofs } from "./lib/next_workflow/release.mjs";
 import { createSignedReleaseProofVerifier, createSignedTransitionVerifier, releaseSignaturePayload } from "./lib/next_workflow/release_trust.mjs";
+import { loadProtectedRuntimeTrust } from "./lib/next_workflow/runtime_trust.mjs";
 import { validateActivationRecord } from "./lib/next_workflow/projection.mjs";
 import { openWorkflowStateStore } from "./lib/next_workflow/store.mjs";
 
@@ -19,13 +20,41 @@ const candidate = freezeReleaseCandidate({ repositoryHead: "a".repeat(40), artif
 const roots = [];
 test.after(() => roots.forEach((root) => rmSync(root, { recursive: true, force: true })));
 
-test("release proofs-verify CLI reaches the signed verifier without a missing import", () => {
+test("release proofs-verify CLI refuses missing protected identity or trust before signed verification", () => {
   const repositoryRoot = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
   const { NODE_TEST_CONTEXT: ignoredNodeTestContext, ...childEnvironment } = process.env;
   const result = spawnSync(process.execPath, [path.join(repositoryRoot, "tools/next-workflow.mjs"), "release", "proofs-verify", "--candidate", "a".repeat(64), "--bundle", "learning/NEXT_WORKFLOW_RELEASE_PREREQUISITES.json"], { cwd: repositoryRoot, encoding: "utf8", env: childEnvironment });
-  assert.equal(result.status, 0, result.stderr);
+  assert.notEqual(result.status, 0, result.stdout);
   assert.doesNotMatch(result.stderr, /ReferenceError|verifyReleaseProofs is not defined/);
-  assert.equal(JSON.parse(result.stdout).status, "failed");
+  assert.match(result.stderr, /CHECKOUT_IDENTITY_MISSING|OWNER_TRUST/);
+});
+
+test("protected runtime trust is external, private, closed-schema, current, and repository-bound", () => {
+  const repositoryRoot = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
+  const ownerRoot = mkdtempSync(path.join(tmpdir(), "next-workflow-owner-trust-"));
+  roots.push(ownerRoot);
+  const trustPath = path.join(ownerRoot, "owner-trust.json");
+  const document = {
+    schema_version: "1.0.0",
+    trust_source_id: "owner-source",
+    revision: 1,
+    repository_logical_id: "repo",
+    checkout_instance_id: "checkout",
+    issued_at: "2028-12-31T00:00:00.000Z",
+    expires_at: "2029-01-02T00:00:00.000Z",
+    release_trust: { schema_version: "1.0.0", verifiers: [] },
+    release_prerequisites: PAUSED_PREREQUISITES,
+    runtime_authorities: { source_verifiers: [], receipt_verifiers: [], approval_verifiers: [] },
+  };
+  writeFileSync(trustPath, `${JSON.stringify(document)}\n`, { mode: 0o600 });
+  chmodSync(trustPath, 0o600);
+  const loaded = loadProtectedRuntimeTrust({ repositoryRoot, repositoryLogicalId: "repo", checkoutInstanceId: "checkout", trustPath, now: NOW });
+  assert.equal(loaded.document.trust_source_id, "owner-source");
+  assert.equal(loaded.release_prerequisites.control_center.state, "paused");
+  assert.match(loaded.fingerprint, /^[a-f0-9]{64}$/);
+  assert.throws(() => loadProtectedRuntimeTrust({ repositoryRoot, repositoryLogicalId: "other", checkoutInstanceId: "checkout", trustPath, now: NOW }), /OWNER_TRUST_REPOSITORY_BINDING_INVALID/);
+  writeFileSync(trustPath, `${JSON.stringify({ ...document, unexpected: true })}\n`, { mode: 0o600 });
+  assert.throws(() => loadProtectedRuntimeTrust({ repositoryRoot, repositoryLogicalId: "repo", checkoutInstanceId: "checkout", trustPath, now: NOW }), /OWNER_TRUST_SCHEMA_INVALID/);
 });
 
 function proofEvidence(kind) {
@@ -320,7 +349,7 @@ test("rollback fences first and persists manual recovery when real unresolved ef
   const store = fixtureStore();
   const readyRevision = await prepareReady(store);
   const activation = await completeActivation({ candidateFingerprint: candidate.candidate_fingerprint, proofs: proofs(), proofVerifier: independentVerifier, transitionVerifier, store, expectedRevision: readyRevision, releasePrerequisites: ACCEPTED_PREREQUISITES, now: NOW });
-  store.commit({ expectedRevision: activation.store_revision, authorityEpoch: store.revocation_epoch, effectIntent: { effect_id: "effect-pending", effect_key: "pending-key", request_fp: "request", authority_fp: "authority", target_id: "target", operation: "git_effect:push", expected_selector: {}, attempt_lineage: "attempt" }, outboxItem: { outbox_id: "outbox-pending", intent_id: "effect-pending", message_fp: "pending-message", sequence: 1 } });
+  store.commit({ expectedRevision: activation.store_revision, authorityEpoch: store.revocation_epoch, effectIntent: { effect_id: "effect-pending", effect_key: "pending-key", request_fp: "request", authority_fp: "authority", target_id: "target", operation: "git_effect:push", expected_selector: {}, attempt_lineage: "attempt", task_id: "task", run_id: "run", authority_epoch: store.revocation_epoch, decision_expires_at: "2030-01-01T00:00:00.000Z", settings_revision: "settings", policy_revision: "policy", activation_fp: "legacy", approval_ids: [], binding_fingerprint: releaseDigest({ effect_key: "pending-key", target_id: "target", operation: "git_effect:push" }) }, outboxItem: { outbox_id: "outbox-pending", intent_id: "effect-pending", message_fp: "pending-message", sequence: 1 } });
   await assert.rejects(() => rollbackActivation({ store, expectedRevision: store.revision, candidateFingerprint: activation.candidate_fingerprint, evidence: { reason: "emergency" }, rollbackVerifier, stateRestorer: async () => ({ restored: true, fingerprint: "must-not-run" }), legacyVerifier: async () => ({ verified: true, fingerprint: "must-not-run" }), now: NOW }), /ACTIVATION_ROLLBACK_UNRESOLVED_EFFECTS/);
   const checkpoints = store.query({ kind: "RollbackCheckpoint", limit: 1000 }).records;
   assert.ok(checkpoints.some((record) => record.lifecycle_state === "blocked" && record.payload.blocker === "UNRESOLVED_EFFECTS"));

@@ -1,12 +1,13 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { DatabaseSync } from "node:sqlite";
 import { effectReceiptBindingFingerprint } from "./lib/next_workflow/authority.mjs";
+import { createFinalizationFenceVerifier } from "./lib/next_workflow/runtime_trust.mjs";
 import { importLegacyRecords, importWorkflowStateStore, openWorkflowStateStore, readLegacyJsonlState, readLegacyTsvState, restoreWorkflowStateStore, verifyBackupManifest } from "./lib/next_workflow/store.mjs";
 
 const roots = [];
@@ -26,7 +27,7 @@ function record(id = "record-1") {
 }
 
 function effect(effectId = "effect-1") {
-  return { effect_id: effectId, effect_key: `key-${effectId}`, request_fp: `request-${effectId}`, authority_fp: `authority-${effectId}`, target_id: "target-1", operation: "push", expected_selector: {}, attempt_lineage: `attempt-${effectId}` };
+  return { effect_id: effectId, effect_key: `key-${effectId}`, request_fp: `request-${effectId}`, authority_fp: `authority-${effectId}`, target_id: "target-1", operation: "push", expected_selector: {}, attempt_lineage: `attempt-${effectId}`, task_id: "task-1", run_id: "run-1", authority_epoch: 0, decision_expires_at: "2030-01-01T00:00:00.000Z", settings_revision: "settings-1", policy_revision: "policy-1", activation_fp: "b".repeat(64), approval_ids: [], binding_fingerprint: createHash("sha256").update(`binding:${effectId}`).digest("hex") };
 }
 
 function receiptProof(id, effectId = "effect-1", observationFingerprint = "observation", verificationMode = "dispatch") {
@@ -64,6 +65,12 @@ const receiptProofVerifier = {
   }
 };
 
+const defaultFinalizationFenceVerifier = createFinalizationFenceVerifier({ verifierId: "default-finalization-owner", activationFingerprintProvider: () => "b".repeat(64), policyRevisionProvider: () => "policy-1", settingsRevisionProvider: () => "settings-1", authorityEpochProvider: () => 0 });
+
+function finalizationFenceFor(value = effect()) {
+  return { activation_fingerprint: value.activation_fp, policy_revision: value.policy_revision, settings_revision: value.settings_revision, authority_epoch: value.authority_epoch, decision_expires_at: value.decision_expires_at };
+}
+
 function updateBackupManifestDigest(backup) {
   const manifest = JSON.parse(readFileSync(backup.manifest_path, "utf8"));
   manifest.database_digest = createHash("sha256").update(readFileSync(backup.destination)).digest("hex");
@@ -88,7 +95,7 @@ test("store atomically commits canonical state, event, intent, and outbox", () =
     records: [record()],
     events: [{ event_id: "event-1", aggregate_id: "record-1", event_type: "TASK_PLANNED", payload: { safe: true } }],
     evidenceRefs: ["evidence-1"],
-    effectIntent: { effect_id: "effect-1", effect_key: "key-1", request_fp: "request-1", authority_fp: "authority-1", target_id: "target-1", operation: "push", expected_selector: { ref: "refs/heads/feature" }, attempt_lineage: "attempt-1" },
+    effectIntent: { ...effect("effect-1"), effect_key: "key-1", request_fp: "request-1", authority_fp: "authority-1", expected_selector: { ref: "refs/heads/feature" }, attempt_lineage: "attempt-1" },
     outboxItem: { outbox_id: "outbox-1", intent_id: "effect-1", message_fp: "message-1", sequence: 1 }
   });
   assert.equal(result.revision, 1);
@@ -149,6 +156,107 @@ test("optimistic revision and duplicate idempotency keys fail closed", () => {
   fenceOwner.close();
 });
 
+test("runtime approvals are exact-bound, independently issued, atomically one-use, and replay-safe", () => {
+  const f = fixture();
+  const now = "2029-01-01T00:00:00.000Z";
+  const store = openWorkflowStateStore({ repositoryRoot: f.root, databasePath: f.databasePath, expectedIdentity: f.identity, clock: () => now });
+  const approval = {
+    reason: "l5_scope_approval",
+    approval_id: "approval-1",
+    repository_logical_id: f.identity.repository_logical_id,
+    checkout_instance_id: f.identity.checkout_instance_id,
+    task_id: "task-1",
+    run_id: "run-1",
+    operation: "provider_effect:invoke",
+    target_id: "target-1",
+    request_fingerprint: "request-1",
+    policy_revision: "policy-1",
+    settings_revision: "settings-1",
+    authority_epoch: 0,
+    issued_at: "2028-12-31T00:00:00.000Z",
+    fresh_until: "2030-01-01T00:00:00.000Z",
+    proof_fingerprint: "a".repeat(64),
+  };
+  const issuer = { trusted: true, independent: true, verifier_id: "owner-approval-verifier", verify: ({ binding_fingerprint: bindingFingerprint, fingerprint }) => ({ verified: true, verifier_id: "owner-approval-verifier", fingerprint, binding_fingerprint: bindingFingerprint, proof_fingerprint: approval.proof_fingerprint }) };
+  store.issueRuntimeApproval({ expectedRevision: 0, approval, verifier: issuer });
+  const verifier = store.runtimeApprovalVerifier();
+  const stored = store.getRuntimeApproval({ approvalId: approval.approval_id });
+  const verified = verifier.verify({ approval, binding_fingerprint: stored.binding_fp, decision_time: now });
+  assert.equal(verified.verified, true);
+
+  const approvedEffect = { ...effect("effect-approved"), effect_key: "approval-key", request_fp: approval.request_fingerprint, operation: approval.operation, target_id: approval.target_id, task_id: approval.task_id, run_id: approval.run_id, policy_revision: approval.policy_revision, settings_revision: approval.settings_revision, approval_ids: [approval.approval_id] };
+  store.commit({ expectedRevision: 1, authorityEpoch: 0, effectIntent: approvedEffect, outboxItem: { outbox_id: "outbox-approved", intent_id: approvedEffect.effect_id, message_fp: "message-approved", sequence: 1 }, approvalUses: [approval.approval_id] });
+  assert.equal(store.getRuntimeApproval({ approvalId: approval.approval_id }).state, "consumed");
+  assert.equal(verifier.verify({ approval, binding_fingerprint: stored.binding_fp, decision_time: now }).verified, false);
+
+  const replay = store.commit({ expectedRevision: 2, authorityEpoch: 0, effectIntent: { ...approvedEffect, effect_id: "effect-retry" }, outboxItem: { outbox_id: "outbox-retry", intent_id: "effect-retry", message_fp: "message-retry", sequence: 1 }, approvalUses: [approval.approval_id] });
+  assert.equal(replay.reused, true);
+  assert.equal(replay.effect_id, approvedEffect.effect_id);
+  assert.throws(() => store.commit({ expectedRevision: 2, authorityEpoch: 0, effectIntent: { ...approvedEffect, effect_id: "effect-conflict", request_fp: "different-request" }, outboxItem: { outbox_id: "outbox-conflict", intent_id: "effect-conflict", message_fp: "message-conflict", sequence: 1 }, approvalUses: [approval.approval_id] }), /EFFECT_IDEMPOTENCY_PAYLOAD_CONFLICT/);
+  assert.equal(store.listRuntimeConflicts({ conflictKind: "effect" }).length, 1);
+  assert.throws(() => store.commit({ expectedRevision: 3, authorityEpoch: 0, effectIntent: { ...approvedEffect, effect_id: "effect-second", effect_key: "second-key" }, outboxItem: { outbox_id: "outbox-second", intent_id: "effect-second", message_fp: "message-second", sequence: 1 }, approvalUses: [approval.approval_id] }), /RUNTIME_APPROVAL_CONSUMPTION_BINDING_INVALID/);
+  store.close();
+});
+
+test("receipt finalization atomically rejects live settings or authority fence changes", () => {
+  const f = fixture();
+  let settingsRevision = "settings-1";
+  let authorityEpoch = 0;
+  const activationFingerprint = "b".repeat(64);
+  const finalizationFenceVerifier = createFinalizationFenceVerifier({ verifierId: "finalization-owner", activationFingerprintProvider: () => activationFingerprint, policyRevisionProvider: () => "policy-1", settingsRevisionProvider: () => settingsRevision, authorityEpochProvider: () => authorityEpoch });
+  const store = openWorkflowStateStore({ repositoryRoot: f.root, databasePath: f.databasePath, expectedIdentity: f.identity, receiptProofVerifier, finalizationFenceVerifier, clock: () => "2029-01-01T00:00:00.000Z" });
+  const fencedEffect = { ...effect(), activation_fp: activationFingerprint };
+  store.commit({ expectedRevision: 0, authorityEpoch: 0, effectIntent: fencedEffect, outboxItem: { outbox_id: "outbox-1", intent_id: "effect-1", message_fp: "message-1", sequence: 1 } });
+  store.claimEffectDispatch({ effectId: "effect-1", outboxId: "outbox-1", authorityEpoch: 0 });
+  store.transitionIntent({ effectId: "effect-1", expectedState: "DISPATCHING", nextState: "OBSERVED" });
+  const proof = receiptProof("proof-finalization");
+  const receipt = { receipt_id: "receipt-finalization", intent_id: "effect-1", object_identity: "object", observation_fp: "observation", proof_record_id: proof.id, result: "matched" };
+  const finalizationFence = { activation_fingerprint: activationFingerprint, policy_revision: "policy-1", settings_revision: "settings-1", authority_epoch: 0, decision_expires_at: fencedEffect.decision_expires_at };
+  settingsRevision = "settings-2";
+  assert.throws(() => store.finalizeReconciliation({ expectedRevision: 1, effectId: "effect-1", records: [proof], receipt, finalizationFence }), /EFFECT_FINALIZATION_FENCE_VERIFICATION_FAILED/);
+  assert.equal(store.getIntent("effect-1").state, "OBSERVED");
+  settingsRevision = "settings-1";
+  store.fence({ reason: "revoke-before-finalization", expectedEpoch: 0 });
+  authorityEpoch = 1;
+  assert.throws(() => store.finalizeReconciliation({ expectedRevision: 2, effectId: "effect-1", records: [proof], receipt, finalizationFence }), /EFFECT_FINALIZATION_AUTHORITY_EPOCH_STALE/);
+  assert.equal(store.getReceipt("effect-1"), undefined);
+  store.close();
+});
+
+test("runtime runs are idempotent, compare-and-set, and recovered before ordinary writes", () => {
+  const f = fixture();
+  const now = "2029-01-01T00:00:00.000Z";
+  const run = {
+    run_id: "runtime-run-1",
+    idempotency_key: "runtime-idempotency-1",
+    plan_fingerprint: createHash("sha256").update("runtime-plan-1").digest("hex"),
+    authority_epoch: 0,
+    fence_fingerprint: createHash("sha256").update("runtime-fence-1").digest("hex"),
+    start_nonce: "runtime-start-nonce-1",
+    started_at: now,
+    observation: { selected_model: "gpt-5.6-sol", selected_effort: "high" },
+  };
+  let store = openWorkflowStateStore({ repositoryRoot: f.root, databasePath: f.databasePath, expectedIdentity: f.identity, clock: () => now });
+  const created = store.createRuntimeRun({ expectedRevision: 0, run });
+  assert.equal(created.run.state, "STARTING");
+  assert.equal(store.createRuntimeRun({ expectedRevision: 1, run }).reused, true);
+  assert.throws(() => store.createRuntimeRun({ expectedRevision: 1, run: { ...run, plan_fingerprint: createHash("sha256").update("different-runtime-plan").digest("hex") } }), /RUNTIME_RUN_IDEMPOTENCY_CONFLICT/);
+  assert.equal(store.listRuntimeConflicts({ conflictKind: "runtime_run" }).length, 1);
+  const running = store.transitionRuntimeRun({ expectedRevision: 2, runId: run.run_id, expectedStates: ["STARTING"], nextState: "RUNNING", patch: { pid: 1234, process_group_id: 1234, observation: { selected_model: "gpt-5.6-sol", selected_effort: "high", actual_model: "gpt-5.6-sol", actual_effort: "high" } } });
+  assert.equal(running.run.process_group_id, 1234);
+  assert.throws(() => store.transitionRuntimeRun({ expectedRevision: 3, runId: run.run_id, expectedStates: ["STARTING"], nextState: "FAILED" }), /RUNTIME_RUN_STATE_CONFLICT/);
+  store.close();
+
+  store = openWorkflowStateStore({ repositoryRoot: f.root, databasePath: f.databasePath, expectedIdentity: f.identity, clock: () => now });
+  assert.equal(store.recovery_only, true);
+  assert.equal(store.recovery_state.runs[0].run_id, run.run_id);
+  assert.throws(() => store.commit({ expectedRevision: 3, records: [record("blocked-during-runtime-recovery")] }), /STORE_RECOVERY_ONLY/);
+  const completed = store.transitionRuntimeRun({ expectedRevision: 3, runId: run.run_id, expectedStates: ["RUNNING"], nextState: "COMPLETED", patch: { exit_code: 0, result_fingerprint: createHash("sha256").update("runtime-result-1").digest("hex"), result_size: 42 }, recovery: true });
+  assert.equal(completed.run.state, "COMPLETED");
+  assert.equal(store.recovery_only, false);
+  store.close();
+});
+
 test("raw secret-shaped fields are refused before a transaction", () => {
   const f = fixture();
   const store = openWorkflowStateStore({ repositoryRoot: f.root, databasePath: f.databasePath, expectedIdentity: f.identity });
@@ -162,7 +270,7 @@ test("raw secret-shaped fields are refused before a transaction", () => {
 test("intent transitions are compare-and-set and fencing increments the epoch", () => {
   const f = fixture();
   const store = openWorkflowStateStore({ repositoryRoot: f.root, databasePath: f.databasePath, expectedIdentity: f.identity });
-  store.commit({ expectedRevision: 0, authorityEpoch: 0, effectIntent: { effect_id: "effect-1", effect_key: "key-1", request_fp: "request-1", authority_fp: "authority-1", target_id: "target-1", operation: "push", expected_selector: {}, attempt_lineage: "attempt-1" }, outboxItem: { outbox_id: "outbox-1", intent_id: "effect-1", message_fp: "message-1", sequence: 1 } });
+  store.commit({ expectedRevision: 0, authorityEpoch: 0, effectIntent: { ...effect("effect-1"), effect_key: "key-1", request_fp: "request-1", authority_fp: "authority-1", operation: "push", attempt_lineage: "attempt-1" }, outboxItem: { outbox_id: "outbox-1", intent_id: "effect-1", message_fp: "message-1", sequence: 1 } });
   assert.equal(store.transitionIntent({ effectId: "effect-1", expectedState: "PREPARED", nextState: "DISPATCHING" }).state, "DISPATCHING");
   assert.throws(() => store.transitionIntent({ effectId: "effect-1", expectedState: "PREPARED", nextState: "OBSERVED" }), /EFFECT_STATE_TRANSITION_INVALID/);
   assert.throws(() => store.transitionIntent({ effectId: "effect-1", expectedState: "DISPATCHING", nextState: "PREPARED" }), /EFFECT_STATE_TRANSITION_INVALID/);
@@ -201,7 +309,7 @@ test("outbox delivery and RECONCILED are one transaction and cannot be bypassed"
   const f = fixture();
   let competitor;
   let injectRace = false;
-  const store = openWorkflowStateStore({ repositoryRoot: f.root, databasePath: f.databasePath, expectedIdentity: f.identity, receiptProofVerifier, clock: () => {
+  const store = openWorkflowStateStore({ repositoryRoot: f.root, databasePath: f.databasePath, expectedIdentity: f.identity, receiptProofVerifier, finalizationFenceVerifier: defaultFinalizationFenceVerifier, clock: () => {
     if (injectRace) {
       injectRace = false;
       competitor.commit({ expectedRevision: competitor.revision, records: [record("competing-finalizer-commit")] });
@@ -222,13 +330,13 @@ test("outbox delivery and RECONCILED are one transaction and cannot be bypassed"
   }
   assert.equal(store.getIntent("effect-1").state, "OBSERVED");
   assert.equal(store.getOutbox({ intentId: "effect-1" }).state, "sending");
-  const unverifiedStore = openWorkflowStateStore({ repositoryRoot: f.root, databasePath: f.databasePath, expectedIdentity: f.identity });
+  const unverifiedStore = openWorkflowStateStore({ repositoryRoot: f.root, databasePath: f.databasePath, expectedIdentity: f.identity, finalizationFenceVerifier: defaultFinalizationFenceVerifier });
   assert.throws(() => unverifiedStore.finalizeReconciliation({ expectedRevision: unverifiedStore.revision, effectId: "effect-1", recovery: true, records: [receiptProof("proof-unverified")], receipt: { receipt_id: "receipt-unverified", intent_id: "effect-1", object_identity: "object", observation_fp: "observation", proof_record_id: "proof-unverified", result: "matched" } }), /RECONCILIATION_PROOF_VERIFIER_REQUIRED/);
   unverifiedStore.close();
   injectRace = true;
   assert.throws(() => store.finalizeReconciliation({ expectedRevision: store.revision, effectId: "effect-1", records: [receiptProof("proof-raced")], receipt: { receipt_id: "receipt-raced", intent_id: "effect-1", object_identity: "object", observation_fp: "observation", proof_record_id: "proof-raced", result: "matched" } }), /REVISION_CONFLICT/);
   assert.equal(store.get({ id: "proof-raced" }), undefined);
-  store.finalizeReconciliation({ expectedRevision: store.revision, effectId: "effect-1", records: [receiptProof("proof-1")], receipt: { receipt_id: "receipt-1", intent_id: "effect-1", object_identity: "object", observation_fp: "observation", proof_record_id: "proof-1", result: "matched" } });
+  store.finalizeReconciliation({ expectedRevision: store.revision, effectId: "effect-1", records: [receiptProof("proof-1")], receipt: { receipt_id: "receipt-1", intent_id: "effect-1", object_identity: "object", observation_fp: "observation", proof_record_id: "proof-1", result: "matched" }, finalizationFence: finalizationFenceFor() });
   assert.equal(store.getOutbox({ intentId: "effect-1" }).state, "delivered");
   assert.equal(store.getIntent("effect-1").state, "RECONCILED");
   competitor.close();
@@ -342,12 +450,12 @@ test("a fully reconciled recovery refreshes the store back to normal writes", ()
   let store = openWorkflowStateStore({ repositoryRoot: f.root, databasePath: f.databasePath, expectedIdentity: f.identity });
   store.commit({ expectedRevision: 0, authorityEpoch: 0, effectIntent: effect(), outboxItem: { outbox_id: "outbox-1", intent_id: "effect-1", message_fp: "message-1", sequence: 1 } });
   store.close();
-  store = openWorkflowStateStore({ repositoryRoot: f.root, databasePath: f.databasePath, expectedIdentity: f.identity, receiptProofVerifier });
+  store = openWorkflowStateStore({ repositoryRoot: f.root, databasePath: f.databasePath, expectedIdentity: f.identity, receiptProofVerifier, finalizationFenceVerifier: defaultFinalizationFenceVerifier });
   assert.equal(store.recovery_only, true);
   store.transitionIntent({ effectId: "effect-1", expectedState: "PREPARED", nextState: "DISPATCHING", recovery: true });
   store.transitionOutbox({ outboxId: "outbox-1", expectedState: "pending", nextState: "sending", recovery: true });
   store.transitionIntent({ effectId: "effect-1", expectedState: "DISPATCHING", nextState: "OBSERVED", recovery: true });
-  store.finalizeReconciliation({ expectedRevision: store.revision, effectId: "effect-1", recovery: true, records: [receiptProof("proof-recovered", "effect-1", "observation", "reconcile")], receipt: { receipt_id: "receipt-recovered", intent_id: "effect-1", object_identity: "object", observation_fp: "observation", proof_record_id: "proof-recovered", result: "reconstructed" } });
+  store.finalizeReconciliation({ expectedRevision: store.revision, effectId: "effect-1", recovery: true, records: [receiptProof("proof-recovered", "effect-1", "observation", "reconcile")], receipt: { receipt_id: "receipt-recovered", intent_id: "effect-1", object_identity: "object", observation_fp: "observation", proof_record_id: "proof-recovered", result: "reconstructed" }, finalizationFence: finalizationFenceFor() });
   assert.equal(store.recovery_only, false);
   assert.equal(store.mode, "readwrite");
   assert.doesNotThrow(() => store.commit({ expectedRevision: store.revision, records: [record("normal-write-after-recovery")] }));
@@ -395,6 +503,7 @@ test("agent authority records cannot bypass their dedicated verified writers", (
   assert.throws(() => store.commit({ expectedRevision: 0, records: [{ ...record("forged-validator"), kind: "ValidatorDecision" }] }), /AGENT_AUTHORITY_RECORD_WRITER_REQUIRED/);
   assert.throws(() => store.commit({ expectedRevision: 0, records: [{ ...record("forged-delegation"), kind: "DelegationGrant" }] }), /AGENT_AUTHORITY_RECORD_WRITER_REQUIRED/);
   assert.throws(() => store.commit({ expectedRevision: 0, records: [{ ...record("forged-receipt-proof"), kind: "EffectReceiptProof" }] }), /RECONCILIATION_PROOF_WRITER_REQUIRED/);
+  assert.throws(() => store.commit({ expectedRevision: 0, records: [{ ...record("forged-agent-run"), kind: "AgentRun" }] }), /AGENT_LIFECYCLE_RECORD_WRITER_REQUIRED/);
   assert.equal(store.persistAgentAuthorityRecord, undefined);
   assert.throws(() => store.persistResourceCostReservationAuthority({ expectedRevision: 0, record: { ...record("wrong-kind"), kind: "ValidatorDecision" }, event: { event_id: "wrong-kind", event_type: "RESOURCE_COST_RESERVED" }, verifier: { trusted: true, independent: true, authority_id: "authority", verify: () => ({}) } }), /AGENT_AUTHORITY_RECORD_KIND_MISMATCH/);
   assert.equal(store.revision, 0);
@@ -598,7 +707,7 @@ test("a pre-created empty SQLite container remains a legitimate first run", () =
   store.close();
 });
 
-test("an ordered schema upgrade creates a durable pre-migration backup first", () => {
+test("an ordered schema upgrade safely reuses an interrupted backup and quarantines unresolved legacy effects", () => {
   const f = fixture();
   const initialSql = readFileSync(path.join(path.dirname(new URL(import.meta.url).pathname), "lib", "next_workflow", "migrations", "001_initial.sql"), "utf8");
   const initialChecksum = createHash("sha256").update(initialSql).digest("hex");
@@ -607,10 +716,22 @@ test("an ordered schema upgrade creates a durable pre-migration backup first", (
   db.exec(initialSql);
   db.prepare("INSERT INTO schema_migrations(version,name,checksum,state,started_at,applied_at) VALUES(1,'initial',?,'applied',?,?)").run(initialChecksum, "2028-01-01T00:00:00.000Z", "2028-01-01T00:00:00.000Z");
   db.prepare("INSERT INTO store_meta(key,value_json) VALUES('identity',?),('store_revision','0'),('schema',?),('revocation_epoch','0')").run(JSON.stringify(f.identity), JSON.stringify({ version: 1, migration_checksum: initialChecksum }));
+  db.prepare("INSERT INTO effect_intents(effect_id,effect_key,request_fp,authority_fp,target_id,operation,expected_selector_json,attempt_lineage,state) VALUES('legacy-effect','legacy-key','legacy-request','legacy-authority','legacy-target','provider_effect:invoke','{}','legacy-lineage','DISPATCHING')").run();
+  db.prepare("INSERT INTO outbox(outbox_id,intent_id,message_fp,sequence,state,attempts) VALUES('legacy-outbox','legacy-effect','legacy-message',1,'sending',1)").run();
   db.close();
+  const interruptedBackup = `${f.databasePath}.pre-migration-v1.sqlite`;
+  copyFileSync(f.databasePath, interruptedBackup);
   const store = openWorkflowStateStore({ repositoryRoot: f.root, databasePath: f.databasePath, expectedIdentity: f.identity, clock: () => "2029-01-01T00:00:00.000Z" });
   assert.equal(store.health().ok, true);
-  assert.equal(existsSync(`${f.databasePath}.pre-migration-v1.sqlite`), true);
-  assert.equal(existsSync(`${f.databasePath}.pre-migration-v1.sqlite.manifest.json`), true);
+  assert.equal(store.recovery_only, true);
+  assert.equal(store.getIntent("legacy-effect").state, "MANUAL_RECOVERY_REQUIRED");
+  assert.equal(existsSync(interruptedBackup), true);
+  assert.equal(existsSync(`${interruptedBackup}.manifest.json`), true);
+  verifyBackupManifest({ backup: interruptedBackup, manifestPath: `${interruptedBackup}.manifest.json`, expectedIdentity: f.identity });
   store.close();
+  const restored = restoreWorkflowStateStore({ repositoryRoot: f.root, databasePath: f.databasePath, backup: interruptedBackup, manifestPath: `${interruptedBackup}.manifest.json`, expectedIdentity: f.identity, stateTransferVerifier });
+  assert.ok(restored.quarantine);
+  const reopened = openWorkflowStateStore({ repositoryRoot: f.root, databasePath: f.databasePath, expectedIdentity: f.identity, clock: () => "2029-01-01T00:00:00.000Z" });
+  assert.equal(reopened.getIntent("legacy-effect").state, "MANUAL_RECOVERY_REQUIRED");
+  reopened.close();
 });
