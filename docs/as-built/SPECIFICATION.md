@@ -4856,3 +4856,8 @@ continues to execute only the immutable fixture runtime and never invokes the
 provider descriptor. Each positive launcher case first requires the fixed real
 containment executables and returns the same named prerequisite skip when
 either is absent.
+
+Provider-discovery tests construct the same package-relative CLI/native layout
+and pass the CLI path through the explicit executable locator. The resolver
+pins the native bytes before the injected runner and independent fixture
+authorities supply or reject observation without executing those bytes.

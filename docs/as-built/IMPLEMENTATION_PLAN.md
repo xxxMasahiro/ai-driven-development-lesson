@@ -6172,3 +6172,6 @@ TESTS: tools/check_next_workflow.sh,tools/test_next_workflow.sh,tools/check_as_b
     Codex package-layout descriptor, so CI can construct and verify signed owner
     acceptance without weakening Production executable resolution. Run those
     positive cases only when the same real containment prerequisites exist.
+12. Give provider-discovery fixtures the native package binary required by
+    descriptor pinning while retaining injected runners and independent test
+    authorities, so fixture bytes are never executed.

@@ -54,6 +54,8 @@ Installed-launcher integrity fixtures that reuse the private provider
 descriptor are covered by the same complete synchronization obligation; reuse
 does not change its non-authorizing status, and missing real containment
 requires the same explicit positive-case skip.
+Provider-discovery tests that add a native fixture to satisfy descriptor
+pinning are included in this obligation and remain non-authorizing.
 
 Multiple matching rules add requirements; a weaker rule cannot remove a
 security or verification requirement. The existing

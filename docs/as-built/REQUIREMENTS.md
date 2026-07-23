@@ -4071,6 +4071,9 @@ Installed-launcher integrity tests may reuse the private non-executed provider
 descriptor to construct their signed acceptance fixture on runners without
 Codex. They must still prerequisite-skip without real containment. This remains
 test setup only and cannot attest provider execution.
+Provider-discovery tests must model both CLI and native package executables so
+descriptor pinning is exercised before injected observation and rejection.
+Fixture bytes must not be invoked or accepted as Production certification.
 
 The installed wrapper must remain as the launcher's live parent rather than
 replace itself. Protected trust must pin its shell interpreter, and the

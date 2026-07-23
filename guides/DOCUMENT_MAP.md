@@ -158,6 +158,8 @@ as prerequisite-skipped and still verifies the separate safe-stop guidance.
 The installed-launcher integrity suite also uses that private provider
 descriptor for signed fixture construction only; its wrapper commands never
 launch the descriptor and run only when real containment is present.
+Provider discovery has its own complete CLI/native fixture with an injected
+runner; it proves pinning and rejection without becoming an installed provider.
 
 ## Memory Documents
 

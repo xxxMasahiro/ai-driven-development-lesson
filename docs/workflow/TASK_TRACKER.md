@@ -3716,5 +3716,8 @@ TESTS: tools/check_next_workflow.sh,tools/test_next_workflow.sh,tools/check_as_b
   Codex installation by reusing the suite-private, non-executed descriptor
   while retaining exact wrapper and executable-pinning checks on hosts with
   real containment and explicit prerequisite skips elsewhere.
+- [x] Bring provider-discovery fixtures in line with native executable pinning
+  by adding deterministic non-executed native bytes while preserving injected
+  observation and pre-probe rejection.
 - [ ] Deliver, merge, pass main CI, synchronize, activate the exact merge, and
   run the bounded Production smoke task.

@@ -10,6 +10,28 @@ import { discoverBuiltinProviderInputs } from "./lib/next_workflow/provider_disc
 const temporaryRoots = [];
 test.after(() => temporaryRoots.forEach((root) => rmSync(root, { recursive: true, force: true })));
 
+function installFixtureCodex(root, nativeBytes) {
+  const binRoot = path.join(root, "bin");
+  const packageRoot = path.join(
+    root,
+    "node_modules",
+    "@openai",
+    `codex-linux-${process.arch}`,
+    "vendor",
+    `${{ x64: "x86_64", arm64: "aarch64" }[process.arch]}-unknown-linux-musl`,
+    "bin",
+  );
+  mkdirSync(binRoot, { recursive: true, mode: 0o700 });
+  mkdirSync(packageRoot, { recursive: true, mode: 0o700 });
+  const cliPath = path.join(binRoot, "codex");
+  const nativePath = path.join(packageRoot, "codex");
+  writeFileSync(cliPath, "#!/bin/sh\nexit 0\n", { mode: 0o500 });
+  writeFileSync(nativePath, nativeBytes, { mode: 0o500 });
+  chmodSync(cliPath, 0o500);
+  chmodSync(nativePath, 0o500);
+  return cliPath;
+}
+
 const identity = { execution_provider_id: "fixture-provider", model_publisher_id: "fixture-publisher", agent_product_id: "fixture-product", adapter_id: "fixture-cli", transport_id: "cli_process", model_id: "fixture-model" };
 const identityKey = providerIdentityKey(identity);
 const codexArgvTemplate = ["exec", "--ephemeral", "--sandbox", "{{sandbox}}", "--model", "{{model_id}}", "-c", "{{reasoning_config}}", "--cd", "{{working_directory}}", "--output-last-message", "{{response_file}}", "{{stdin_marker}}"];
@@ -503,8 +525,7 @@ test("API execution remains fail-closed until a gateway-owned network and secret
 test("Codex discovery creates only direct-observation-bound eligible model entries", () => {
   const root = mkdtempSync(path.join(tmpdir(), "next-provider-discovery-"));
   temporaryRoots.push(root);
-  const executable = path.join(root, "codex");
-  writeFileSync(executable, "fixture-binary", { mode: 0o700 });
+  const executable = installFixtureCodex(root, Buffer.from("fixture-native-binary"));
   const family = { family_id: "codex-openai", execution_provider_id: "openai", model_publisher_id: "openai", agent_product_id: "codex", adapter_id: "codex_cli", transport_id: "cli_process", observed_adapter_version: "1.2.3", certification_state: "CERTIFIED", model_catalog_source: "runtime_discovery", capabilities: ["read"], resource_bounds: { cost: 0 }, estimated_cost: 0, priority: 1 };
   const runner = (_executable, argv) => argv[0] === "--version"
     ? "codex-cli 1.2.3\n"
@@ -570,8 +591,7 @@ test("Codex discovery creates only direct-observation-bound eligible model entri
 test("Production discovery refuses an untrusted executable before invoking it", () => {
   const root = mkdtempSync(path.join(tmpdir(), "next-provider-preflight-"));
   temporaryRoots.push(root);
-  const executable = path.join(root, "codex");
-  writeFileSync(executable, "substituted-binary", { mode: 0o700 });
+  const executable = installFixtureCodex(root, Buffer.from("substituted-native-binary"));
   const family = { family_id: "codex-openai", execution_provider_id: "openai", model_publisher_id: "openai", agent_product_id: "codex", adapter_id: "codex_cli", transport_id: "cli_process", observed_adapter_version: "1.2.3", certification_state: "CERTIFIED", model_catalog_source: "runtime_discovery", capabilities: ["read"], resource_bounds: { cost: 0 }, estimated_cost: 0, priority: 1 };
   let invoked = false;
   const probeAuthority = {

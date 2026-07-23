@@ -3901,3 +3901,6 @@ non-executed Codex descriptor. This removes its remaining GitHub-runner Codex
 dependency while preserving executable pinning and all wrapper integrity
 checks where real containment is present; without it, those positive cases are
 explicitly prerequisite-skipped rather than given fake isolation.
+The two provider-discovery regressions now create the required native package
+fixture as well as the CLI path. Their injected runner and authority behavior
+is unchanged, and Production native resolution remains strict.

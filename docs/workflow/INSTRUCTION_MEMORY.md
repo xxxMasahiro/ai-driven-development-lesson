@@ -74,6 +74,9 @@ Bootstrap and installed-launcher integrity regressions may share a private
 non-executed provider descriptor solely to construct signed test acceptance.
 Installed-launcher positive cases also prerequisite-skip when real containment
 is absent. The descriptor never authorizes or performs provider execution.
+Provider-discovery tests may use the complete descriptor layout only with
+injected observation runners and independent fixture authorities; Production
+discovery has no fixture fallback.
 
 The additive lifecycle uses six purpose-named stages: decide the next value,
 order tasks, review the implementation approach, decide the implementation
