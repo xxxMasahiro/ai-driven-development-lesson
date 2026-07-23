@@ -4037,7 +4037,7 @@ blocked until an authorized lifecycle recovery closes every unresolved run.
 
 SYNC-ID: next_workflow_headless_final_security_closure
 STATUS: implemented
-ARTIFACTS: AGENTS.MD,docs/as-built/IMPLEMENTATION_PLAN.md,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/HANDOFF.md,docs/workflow/TASK_TRACKER.md,tools/lib/next_workflow/agents.mjs,tools/lib/next_workflow/headless_bootstrap.mjs,tools/lib/next_workflow/headless_plan.mjs,tools/lib/next_workflow/headless_service.mjs,tools/lib/next_workflow/release_source_receipts.mjs,tools/lib/next_workflow/release_trust.mjs,tools/lib/next_workflow/run_controller.mjs,tools/lib/next_workflow/runtime_trust.mjs,tools/lib/next_workflow/store.mjs,tools/next-workflow-launcher.cjs,tools/next-workflow.mjs,tools/test_next_workflow_headless_bootstrap.mjs,tools/test_next_workflow_headless_plan.mjs,tools/test_next_workflow_headless_runtime.mjs,tools/test_next_workflow_launcher.mjs
+ARTIFACTS: AGENTS.MD,docs/as-built/IMPLEMENTATION_PLAN.md,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/HANDOFF.md,docs/workflow/TASK_TRACKER.md,docs/workflow/TEST_PLAN_MANIFEST.tsv,tools/lib/next_workflow/agents.mjs,tools/lib/next_workflow/headless_bootstrap.mjs,tools/lib/next_workflow/headless_plan.mjs,tools/lib/next_workflow/headless_service.mjs,tools/lib/next_workflow/provider_discovery.mjs,tools/lib/next_workflow/release_source_receipts.mjs,tools/lib/next_workflow/release_trust.mjs,tools/lib/next_workflow/run_controller.mjs,tools/lib/next_workflow/runtime_trust.mjs,tools/lib/next_workflow/store.mjs,tools/next-workflow-launcher.cjs,tools/next-workflow.mjs,tools/test_next_workflow_headless_bootstrap.mjs,tools/test_next_workflow_headless_plan.mjs,tools/test_next_workflow_headless_runtime.mjs,tools/test_next_workflow_launcher.mjs,tools/test_next_workflow_providers.mjs
 TESTS: tools/check_next_workflow.sh,tools/test_next_workflow.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
 
 Production admission must bind all six repository identity fields, use
@@ -4076,6 +4076,11 @@ descriptor pinning is exercised before injected observation and rejection.
 Fixture bytes must not be invoked or accepted as Production certification.
 Every development-selection test that performs the same discovery must provide
 that complete package-relative fixture on hosts without an installed Codex.
+The live default provider probe must preserve the read-only root bind and place
+its pinned executable only below the private writable `/tmp` mount. A
+prerequisite-complete host must execute this real Bubblewrap probe in the
+provider regression suite; unavailable hosts may skip only that positive case
+and must retain the existing fail-closed prerequisite coverage.
 
 The installed wrapper must remain as the launcher's live parent rather than
 replace itself. Protected trust must pin its shell interpreter, and the
