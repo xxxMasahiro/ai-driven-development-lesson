@@ -394,7 +394,7 @@
     },
     {
       "id": "next-workflow-core",
-      "description": "Next Workflow contracts, persisted authorities, CLI and external launcher, provider/model selection, protected runtime/trust/containment owners, immutable candidate and signed activation/release chain, migrations, and CI-portable non-authorizing fixtures and tests update the complete parent authority, as-built, Security, verification, CI, and workflow-state contract without traversing child repositories.",
+      "description": "Next Workflow contracts, persisted authorities, CLI and external launcher, provider/model selection, protected runtime/trust/containment owners, immutable candidate and signed activation/release chain, migrations, CI-portable non-authorizing provider fixtures, honest containment-prerequisite skips, and guided-refusal tests update the complete parent authority, as-built, Security, verification, CI, and workflow-state contract without traversing child repositories.",
       "trigger": {
         "any_of": [
           "docs/workflow/next-workflow/**",

@@ -4063,6 +4063,10 @@ installed. They may introduce a private executable-descriptor fixture that is
 never run and exists only for the isolated test lifetime. Production
 bootstrap, provider discovery, certification, and launch must reject a missing
 actual native executable and must never accept the fixture as authority.
+If the fixed Linux containment executables are absent, CI must not fabricate
+them or claim positive bootstrap evidence. The positive case must be marked
+prerequisite-skipped while the independent status/guidance case passes and
+Production remains unavailable.
 
 The installed wrapper must remain as the launcher's live parent rather than
 replace itself. Protected trust must pin its shell interpreter, and the

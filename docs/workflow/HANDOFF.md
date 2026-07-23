@@ -3891,3 +3891,8 @@ GitHub runner. The test now supplies a private non-executed descriptor fixture
 when the real native executable is absent. A copied Node runtime with no Codex
 package passes the focused test, while Production resolution and executable
 pinning remain unchanged.
+GitHub runners also omit Bubblewrap. Positive bootstrap now runs only with the
+real fixed containment executables; otherwise it is explicitly
+prerequisite-skipped and the separate `STOP` plus installation-guidance test
+must pass. Local prerequisite-complete execution continues to prove the full
+positive path.

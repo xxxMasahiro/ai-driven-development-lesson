@@ -158,6 +158,9 @@ A generated product template must not include the parent bootstrap-test Codex
 fixture or treat its digest as certification. The fixture exists only inside
 an isolated parent regression test; real product execution remains bound to
 the currently observed and parent-authorized provider executable.
+Templates also must not provide fake Bubblewrap or unshare binaries. Missing
+real containment leaves headless Production unavailable and exposes only the
+parent's installation and recheck guidance.
 
 ## LEARNING_TASK_TRACKER.md
 

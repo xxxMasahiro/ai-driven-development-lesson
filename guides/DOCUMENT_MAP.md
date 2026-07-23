@@ -152,6 +152,9 @@ Bootstrap regression remains runnable on CI hosts without Codex by creating a
 private non-executed executable-layout fixture inside the test directory.
 Operational discovery is unchanged and requires the real installed native
 provider binary; the fixture is never an installation or Activation source.
+Unlike the non-executed provider descriptor, containment executables are never
+simulated. CI without fixed-path Bubblewrap or unshare marks positive bootstrap
+as prerequisite-skipped and still verifies the separate safe-stop guidance.
 
 ## Memory Documents
 

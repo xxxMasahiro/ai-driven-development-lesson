@@ -4842,3 +4842,9 @@ unchanged: if the runner has a real native Codex it is pinned; otherwise the
 test-only package-layout descriptor supplies deterministic bytes. No fixture
 is installed, invoked, persisted into Production trust, or exposed through the
 operator CLI.
+
+Before positive bootstrap setup, the test checks the same fixed containment
+paths used by Production. Missing `/usr/bin/unshare` or `/usr/bin/bwrap`
+returns a named prerequisite skip before trust material is created. The
+separate runtime-status case still runs, asserts `STOP`, and verifies ordered
+non-installing setup guidance.

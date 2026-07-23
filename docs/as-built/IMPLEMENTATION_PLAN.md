@@ -6164,3 +6164,7 @@ TESTS: tools/check_next_workflow.sh,tools/test_next_workflow.sh,tools/check_as_b
    constructing an owner-only, non-executed CLI/native descriptor fixture in
    the test sandbox. Do not add a Production fallback: operational bootstrap
    and launch continue to pin the actual native provider executable.
+10. Execute positive bootstrap construction only where the real fixed
+    `/usr/bin/unshare` and `/usr/bin/bwrap` prerequisites exist. On other CI
+    runners, skip that positive case explicitly and require the separate
+    non-installing guided-refusal/status test to pass.

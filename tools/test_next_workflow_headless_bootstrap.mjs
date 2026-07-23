@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { chmodSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -34,6 +34,10 @@ function installFixtureCodex(root) {
 }
 
 test("headless bootstrap creates an external private owner trust and never overwrites it", (t) => {
+  if (!existsSync("/usr/bin/unshare") || !existsSync("/usr/bin/bwrap")) {
+    t.skip("real Linux containment prerequisites are unavailable; guided refusal is verified separately");
+    return;
+  }
   const repositoryRoot = realpathSync(path.resolve(path.dirname(new URL(import.meta.url).pathname), ".."));
   const root = mkdtempSync(path.join(tmpdir(), "next-workflow-headless-bootstrap-"));
   roots.push(root);

@@ -245,3 +245,7 @@ CI bootstrap tests may provide a private non-executed Codex descriptor fixture
 only to prove trust construction on runners without Codex. Production
 bootstrap, discovery, admission, and launch must still resolve and pin the
 actual native provider executable; fixture evidence never grants authority.
+When real `/usr/bin/unshare` or `/usr/bin/bwrap` is absent, the positive
+bootstrap-construction test must be reported as prerequisite-skipped and the
+separate guided-refusal/status test must pass; a fake isolation executable is
+forbidden.

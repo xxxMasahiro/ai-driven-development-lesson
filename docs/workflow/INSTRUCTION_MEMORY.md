@@ -67,6 +67,9 @@ CI may use a bounded, private, non-executed provider descriptor fixture solely
 inside bootstrap regression tests when Codex is absent from the runner. This
 does not become a provider fallback: Production still stops unless it resolves,
 pins, certifies, and later observes the actual native executable.
+If real fixed-path Linux containment is absent, CI must not replace it with a
+fixture. The positive bootstrap test is prerequisite-skipped, the independent
+guided-refusal/status test remains required, and Production stays unavailable.
 
 The additive lifecycle uses six purpose-named stages: decide the next value,
 order tasks, review the implementation approach, decide the implementation

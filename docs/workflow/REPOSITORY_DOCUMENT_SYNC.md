@@ -46,6 +46,10 @@ Portable test fixtures are included in that obligation when they model a
 protected executable. Such a fixture may satisfy isolated test setup only; it
 cannot satisfy Production provider discovery, certification, launch evidence,
 or Activation.
+Containment is stricter: absent fixed-path Bubblewrap or unshare is never
+fixture-substituted. The positive bootstrap case is then an explicit
+prerequisite skip and synchronized verification must retain a passing
+guided-refusal/status case.
 
 Multiple matching rules add requirements; a weaker rule cannot remove a
 security or verification requirement. The existing
