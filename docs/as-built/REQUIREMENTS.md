@@ -4058,6 +4058,12 @@ for that exact range. Passing an earlier push, changing only a partial
 authority subset later, or relying on Control Center documents must not satisfy
 the release gate.
 
+Bootstrap regression tests must pass on a clean CI runner where Codex is not
+installed. They may introduce a private executable-descriptor fixture that is
+never run and exists only for the isolated test lifetime. Production
+bootstrap, provider discovery, certification, and launch must reject a missing
+actual native executable and must never accept the fixture as authority.
+
 The installed wrapper must remain as the launcher's live parent rather than
 replace itself. Protected trust must pin its shell interpreter, and the
 launcher must match the parent executable, canonical wrapper path, and complete

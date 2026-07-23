@@ -63,6 +63,10 @@ The immutable candidate is eligible only when the exact PR and each
 incremental push range also pass the complete parent document-synchronization
 gate; an authority changed only in an earlier range does not satisfy a later
 runtime-bearing push.
+CI may use a bounded, private, non-executed provider descriptor fixture solely
+inside bootstrap regression tests when Codex is absent from the runner. This
+does not become a provider fallback: Production still stops unless it resolves,
+pins, certifies, and later observes the actual native executable.
 
 The additive lifecycle uses six purpose-named stages: decide the next value,
 order tasks, review the implementation approach, decide the implementation

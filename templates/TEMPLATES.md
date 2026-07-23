@@ -154,6 +154,10 @@ entry is created externally only after exact repository identity,
 immutable-candidate release evidence, signed activation transitions, and
 recovery closure pass. Control Center availability is not an authorization
 signal.
+A generated product template must not include the parent bootstrap-test Codex
+fixture or treat its digest as certification. The fixture exists only inside
+an isolated parent regression test; real product execution remains bound to
+the currently observed and parent-authorized provider executable.
 
 ## LEARNING_TASK_TRACKER.md
 

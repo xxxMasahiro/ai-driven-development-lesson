@@ -3884,3 +3884,10 @@ did not include every required parent authority. The complete 17-document
 authority set is now synchronized with the headless Production boundary, and
 both PR merge-base and incremental push ranges are treated as independent
 fail-closed release inputs rather than bypassed or weakened.
+
+The next PR failure was CI portability, not a Production relaxation:
+`test_next_workflow_headless_bootstrap` assumed Codex was installed on the
+GitHub runner. The test now supplies a private non-executed descriptor fixture
+when the real native executable is absent. A copied Node runtime with no Codex
+package passes the focused test, while Production resolution and executable
+pinning remain unchanged.

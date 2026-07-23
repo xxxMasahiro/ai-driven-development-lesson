@@ -3706,5 +3706,8 @@ TESTS: tools/check_next_workflow.sh,tools/test_next_workflow.sh,tools/check_as_b
 - [x] Close the PR-only omission found by CI by synchronizing the complete
   parent authority set, and require both PR and incremental push ranges to pass
   without weakening the document gate.
+- [x] Remove the GitHub-runner dependency on an installed Codex CLI from the
+  bootstrap regression by using a private non-executed descriptor fixture;
+  retain mandatory actual-native resolution for Production.
 - [ ] Deliver, merge, pass main CI, synchronize, activate the exact merge, and
   run the bounded Production smoke task.

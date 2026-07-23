@@ -11,7 +11,29 @@ import { loadProtectedRuntimeTrust } from "./lib/next_workflow/runtime_trust.mjs
 const roots = [];
 test.after(() => roots.forEach((root) => rmSync(root, { recursive: true, force: true })));
 
-test("headless bootstrap creates an external private owner trust and never overwrites it", () => {
+function installFixtureCodex(root) {
+  const binRoot = path.join(root, "bin");
+  const packageRoot = path.join(
+    root,
+    "node_modules",
+    "@openai",
+    `codex-linux-${process.arch}`,
+    "vendor",
+    `${{ x64: "x86_64", arm64: "aarch64" }[process.arch]}-unknown-linux-musl`,
+    "bin",
+  );
+  mkdirSync(binRoot, { recursive: true, mode: 0o700 });
+  mkdirSync(packageRoot, { recursive: true, mode: 0o700 });
+  const cliPath = path.join(binRoot, "codex");
+  const nativePath = path.join(packageRoot, "codex");
+  writeFileSync(cliPath, "#!/bin/sh\nexit 0\n", { mode: 0o500 });
+  writeFileSync(nativePath, Buffer.from([0x7f, 0x45, 0x4c, 0x46]), { mode: 0o500 });
+  chmodSync(cliPath, 0o500);
+  chmodSync(nativePath, 0o500);
+  return { path: `${binRoot}:${process.env.PATH ?? ""}` };
+}
+
+test("headless bootstrap creates an external private owner trust and never overwrites it", (t) => {
   const repositoryRoot = realpathSync(path.resolve(path.dirname(new URL(import.meta.url).pathname), ".."));
   const root = mkdtempSync(path.join(tmpdir(), "next-workflow-headless-bootstrap-"));
   roots.push(root);
@@ -22,6 +44,10 @@ test("headless bootstrap creates an external private owner trust and never overw
   const providerAuthPath = path.join(trustRoot, "auth.json");
   const trustPath = path.join(trustRoot, "owner-trust.json");
   writeFileSync(providerAuthPath, "{\"fixture\":true}\n", { mode: 0o600 });
+  const fixtureCodex = installFixtureCodex(root);
+  const previousPath = process.env.PATH;
+  process.env.PATH = fixtureCodex.path;
+  t.after(() => { process.env.PATH = previousPath; });
   const repositoryIdentity = {
     repository_logical_id: "portable-repository-fixture",
     checkout_instance_id: "headless-bootstrap-test",
@@ -89,6 +115,7 @@ test("headless bootstrap creates an external private owner trust and never overw
     now: "2029-01-01T00:00:01.000Z",
   });
   assert.equal(trust.runtime_authorities[HEADLESS_RUNTIME_AUTHORITIES.containment].profile_id, "linux-user-mount-provider-net-v1");
+  assert.equal(trust.runtime_authorities[HEADLESS_RUNTIME_AUTHORITIES.launchObservation].allowed_executable_paths.length, 1);
   assert.equal(trust.document.repository_logical_id, "portable-repository-fixture");
   assert.equal(trust.runtime_launcher.path, initialized.runtime_launcher_path);
   assert.equal(path.basename(trust.runtime_launcher.script_path), "next-workflow-launcher.cjs");

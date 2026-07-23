@@ -42,6 +42,10 @@ Protected runtime-wiring follow-ups are not exempt: containment, trust,
 lifecycle, task delivery, state migration, provider execution, immutable
 candidate release, source receipts, activation transitions, and their tests
 must carry this complete parent authority set in the same PR or push range.
+Portable test fixtures are included in that obligation when they model a
+protected executable. Such a fixture may satisfy isolated test setup only; it
+cannot satisfy Production provider discovery, certification, launch evidence,
+or Activation.
 
 Multiple matching rules add requirements; a weaker rule cannot remove a
 security or verification requirement. The existing

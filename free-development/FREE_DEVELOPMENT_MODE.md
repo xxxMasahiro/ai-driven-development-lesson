@@ -105,6 +105,9 @@ bounded read-only inputs. It does not receive the parent database, owner trust,
 credentials, Git authority, or a writable child checkout. Missing Bubblewrap
 or namespace support stops with copyable installation and recheck guidance;
 there is no lightweight-but-unisolated fallback.
+Likewise, a provider descriptor created by the parent test suite is isolated
+test data only. A product or Free Development run cannot inherit, copy, or use
+that fixture as provider certification or Production launch authority.
 
 - `none`: product workspace, canonical documents, scaffold authority, product security, and required local checks are still required; Git, remote sync, and CI are not applicable.
 - `local`: local Git worktree and local Git safety checks are required; remote sync and CI are not applicable.

@@ -241,3 +241,7 @@ Changes to that launcher, protected runtime, model-selection policy, signed
 release chain, or Activation boundary must satisfy the complete parent
 document-sync authority set in the same PR and in every incremental push range;
 neither a prior branch commit nor paused Control Center work is a substitute.
+CI bootstrap tests may provide a private non-executed Codex descriptor fixture
+only to prove trust construction on runners without Codex. Production
+bootstrap, discovery, admission, and launch must still resolve and pin the
+actual native provider executable; fixture evidence never grants authority.

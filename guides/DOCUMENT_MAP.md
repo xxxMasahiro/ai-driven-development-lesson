@@ -148,6 +148,10 @@ fixtures, while environments without it must pass the explicit guided-refusal
 path. After the exact signed Activation completes, the installed external
 launcher can run L1 as one Orchestrator or L2-L5 as the admitted
 Orchestrator/Lead/Task Agent hierarchy without waiting for the Control Center.
+Bootstrap regression remains runnable on CI hosts without Codex by creating a
+private non-executed executable-layout fixture inside the test directory.
+Operational discovery is unchanged and requires the real installed native
+provider binary; the fixture is never an installation or Activation source.
 
 ## Memory Documents
 

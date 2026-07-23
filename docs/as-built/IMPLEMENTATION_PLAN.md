@@ -6160,3 +6160,7 @@ TESTS: tools/check_next_workflow.sh,tools/test_next_workflow.sh,tools/check_as_b
    synchronization units; keep the complete parent as-built, instruction,
    verification, Security, CI/hook, workflow-pair, scaffold, and free-
    development authority set current without weakening the range gate.
+9. Make bootstrap verification portable to CI runners without Codex by
+   constructing an owner-only, non-executed CLI/native descriptor fixture in
+   the test sandbox. Do not add a Production fallback: operational bootstrap
+   and launch continue to pin the actual native provider executable.

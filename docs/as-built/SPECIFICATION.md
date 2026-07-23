@@ -4834,3 +4834,11 @@ before-to-after push independently. A headless-core range therefore includes
 the complete additive parent authority groups in that same range; deleted
 documents, earlier-only changes, temporary memory, generated evidence, and
 paused Control Center artifacts cannot satisfy the set.
+
+The bootstrap test creates a mode-0500 CLI shim and non-shebang native
+descriptor under its private temporary root, prepends only that root to the
+test process `PATH`, and restores `PATH` after the test. Resolver logic remains
+unchanged: if the runner has a real native Codex it is pinned; otherwise the
+test-only package-layout descriptor supplies deterministic bytes. No fixture
+is installed, invoked, persisted into Production trust, or exposed through the
+operator CLI.
