@@ -6175,3 +6175,6 @@ TESTS: tools/check_next_workflow.sh,tools/test_next_workflow.sh,tools/check_as_b
 12. Give provider-discovery fixtures the native package binary required by
     descriptor pinning while retaining injected runners and independent test
     authorities, so fixture bytes are never executed.
+13. Apply the complete CLI/native fixture layout to development-selection
+    discovery tests so the GitHub runner needs no installed Codex and the
+    Production resolver remains unchanged.

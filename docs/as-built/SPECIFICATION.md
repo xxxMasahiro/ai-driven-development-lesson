@@ -4861,3 +4861,5 @@ Provider-discovery tests construct the same package-relative CLI/native layout
 and pass the CLI path through the explicit executable locator. The resolver
 pins the native bytes before the injected runner and independent fixture
 authorities supply or reject observation without executing those bytes.
+The development-selection suite uses that identical layout before testing
+model and effort decisions, so a CI host installation cannot affect its result.

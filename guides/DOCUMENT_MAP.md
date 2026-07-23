@@ -160,6 +160,8 @@ descriptor for signed fixture construction only; its wrapper commands never
 launch the descriptor and run only when real containment is present.
 Provider discovery has its own complete CLI/native fixture with an injected
 runner; it proves pinning and rejection without becoming an installed provider.
+Development-selection discovery reuses that fixture shape for portable
+model/effort assertions, never as an operational provider.
 
 ## Memory Documents
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
-import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -31,9 +31,23 @@ function family() {
 function fixtureCatalogSet() {
   const root = mkdtempSync(path.join(tmpdir(), "next-workflow-development-selection-"));
   roots.push(root);
-  const executable = path.join(root, "codex");
+  const executable = path.join(root, "bin", "codex");
+  const nativeExecutable = path.join(
+    root,
+    "node_modules",
+    "@openai",
+    `codex-linux-${process.arch}`,
+    "vendor",
+    process.arch === "arm64" ? "aarch64-unknown-linux-musl" : "x86_64-unknown-linux-musl",
+    "bin",
+    "codex",
+  );
+  mkdirSync(path.dirname(executable), { recursive: true });
+  mkdirSync(path.dirname(nativeExecutable), { recursive: true });
   writeFileSync(executable, "#!/usr/bin/env bash\nexit 0\n", { mode: 0o755 });
+  writeFileSync(nativeExecutable, "fixture-native-codex\n", { mode: 0o755 });
   chmodSync(executable, 0o755);
+  chmodSync(nativeExecutable, 0o755);
   const models = [
     ["gpt-5.6-sol", 1],
     ["gpt-5.6-terra", 2],

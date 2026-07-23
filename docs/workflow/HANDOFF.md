@@ -3904,3 +3904,6 @@ explicitly prerequisite-skipped rather than given fake isolation.
 The two provider-discovery regressions now create the required native package
 fixture as well as the CLI path. Their injected runner and authority behavior
 is unchanged, and Production native resolution remains strict.
+The development-selection regression now supplies the same complete package
+layout. Its model/effort assertions therefore run identically on GitHub hosts
+without Codex, while the Production resolver remains unchanged.

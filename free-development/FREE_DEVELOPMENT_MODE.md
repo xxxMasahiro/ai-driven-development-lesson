@@ -116,6 +116,7 @@ tests does not make it available to a product or Free Development run; those
 parent positive cases still skip when real containment is absent.
 The equivalent provider-discovery fixture is also parent-test-only and cannot
 be inherited as a local provider.
+The same restriction covers the development-selection discovery fixture.
 
 - `none`: product workspace, canonical documents, scaffold authority, product security, and required local checks are still required; Git, remote sync, and CI are not applicable.
 - `local`: local Git worktree and local Git safety checks are required; remote sync and CI are not applicable.

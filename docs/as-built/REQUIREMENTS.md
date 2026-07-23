@@ -4074,6 +4074,8 @@ test setup only and cannot attest provider execution.
 Provider-discovery tests must model both CLI and native package executables so
 descriptor pinning is exercised before injected observation and rejection.
 Fixture bytes must not be invoked or accepted as Production certification.
+Every development-selection test that performs the same discovery must provide
+that complete package-relative fixture on hosts without an installed Codex.
 
 The installed wrapper must remain as the launcher's live parent rather than
 replace itself. Protected trust must pin its shell interpreter, and the

@@ -77,6 +77,8 @@ is absent. The descriptor never authorizes or performs provider execution.
 Provider-discovery tests may use the complete descriptor layout only with
 injected observation runners and independent fixture authorities; Production
 discovery has no fixture fallback.
+Development-selection tests that observe that catalog use the same complete
+layout and remain subject to the identical non-authority boundary.
 
 The additive lifecycle uses six purpose-named stages: decide the next value,
 order tasks, review the implementation approach, decide the implementation

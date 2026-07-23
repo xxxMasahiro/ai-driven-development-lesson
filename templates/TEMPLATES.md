@@ -166,6 +166,7 @@ descriptor only where real containment exists, but generated templates must
 not copy or inherit that fixture.
 Provider-discovery CLI/native fixtures are equally parent-test-only and must
 not be emitted by templates.
+Development-selection discovery fixtures have the same prohibition.
 
 ## LEARNING_TASK_TRACKER.md
 

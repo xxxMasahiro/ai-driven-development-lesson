@@ -254,5 +254,6 @@ integrity fixtures on CI, but only for owner-acceptance construction and
 verification. Those positive launcher cases also require real containment and
 are prerequisite-skipped when it is absent. The fixture must not execute a
 provider or become Production evidence.
-Provider-discovery regressions may use the same complete CLI/native layout only
-with injected observation runners and independent test authorities.
+Provider-discovery and development-selection regressions may use the same
+complete CLI/native layout only with injected observation runners and
+independent test authorities.

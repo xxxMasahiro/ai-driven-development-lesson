@@ -3719,5 +3719,7 @@ TESTS: tools/check_next_workflow.sh,tools/test_next_workflow.sh,tools/check_as_b
 - [x] Bring provider-discovery fixtures in line with native executable pinning
   by adding deterministic non-executed native bytes while preserving injected
   observation and pre-probe rejection.
+- [x] Make development-selection discovery equally CI-portable with a complete
+  private CLI/native fixture and no Production fallback.
 - [ ] Deliver, merge, pass main CI, synchronize, activate the exact merge, and
   run the bounded Production smoke task.

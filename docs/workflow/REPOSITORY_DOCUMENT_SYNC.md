@@ -56,6 +56,8 @@ does not change its non-authorizing status, and missing real containment
 requires the same explicit positive-case skip.
 Provider-discovery tests that add a native fixture to satisfy descriptor
 pinning are included in this obligation and remain non-authorizing.
+This includes development-selection tests that consume the discovered catalog;
+they must not rely on a host Codex installation.
 
 Multiple matching rules add requirements; a weaker rule cannot remove a
 security or verification requirement. The existing
