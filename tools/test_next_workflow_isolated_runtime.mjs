@@ -7,19 +7,20 @@ import test from "node:test";
 import { createDelegationGrant, persistDelegationGrant } from "./lib/next_workflow/agents.mjs";
 import { buildCliLaunchPlan, createRunLifecycleCliExecutor, providerDigest, providerIdentityKey } from "./lib/next_workflow/providers.mjs";
 import { createRunLifecyclePort, runLifecycleDigest } from "./lib/next_workflow/run_lifecycle.mjs";
-import { createLinuxIsolatedContainment } from "./lib/next_workflow/runtime_containment.mjs";
+import { createLinuxIsolatedContainment, diagnoseLinuxIsolationPrerequisites } from "./lib/next_workflow/runtime_containment.mjs";
 import { createIsolatedVerificationRuntime } from "./lib/next_workflow/runtime.mjs";
 import { createProtectedAgentAuthorityVerifier, createProtectedApprovalAuthority, createProtectedFinalizationFenceVerifier, createProtectedIsolatedAuthorityVerifier, createProtectedLaunchObservationVerifier, createProtectedReceiptAuthority, loadProtectedRuntimeTrust } from "./lib/next_workflow/runtime_trust.mjs";
 import { openWorkflowStateStore } from "./lib/next_workflow/store.mjs";
 
 const roots = [];
+const isolatedRuntimeTest = diagnoseLinuxIsolationPrerequisites().available ? test : test.skip;
 test.after(() => roots.forEach((root) => rmSync(root, { recursive: true, force: true })));
 
 function fileDigest(candidate) {
   return providerDigest(readFileSync(candidate));
 }
 
-test("an isolated local CLI runs through the common gateway with explicit observed model and effort", async () => {
+isolatedRuntimeTest("an isolated local CLI runs through the common gateway with explicit observed model and effort", async () => {
   const root = mkdtempSync(path.join(tmpdir(), "next-workflow-isolated-runtime-"));
   const repositoryRoot = mkdtempSync(path.join(tmpdir(), "next-workflow-isolated-repository-"));
   const trustRoot = mkdtempSync(path.join(tmpdir(), "next-workflow-isolated-trust-"));

@@ -3558,6 +3558,10 @@ TESTS: tools/check_next_workflow.sh,tools/test_next_workflow.sh,tools/check_secu
   17-suite Next Workflow aggregate passes 217 tests and all seven contracts.
 - [x] Pass the final aggregate in a clean candidate checkout with the canonical
   repository name, origin identity, and dependency layout.
+- [x] Make containment verification environment-honest: always verify the
+  prerequisite diagnostic, run real Bubblewrap/namespace cases when available,
+  and explicitly skip only those cases on unsupported hosts without creating an
+  unisolated runtime fallback.
 - [ ] Deliver the unchanged candidate through PR and main CI, and finish
   synchronization with non-UI wiring implemented, production unavailable,
   Activation `planned`, and Control Center reconstruction still pending.

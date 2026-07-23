@@ -8,3 +8,4 @@ E	5	next_proposal	proposal	next_cycle	plan_only	none	automatic	none	unclear_next
 F	6	next_roadmap	implementation_plan	next_cycle	plan_only	none	same_scope_only	none	unapproved_scope_expansion|existing_feature_tradeoff
 # next_workflow_compatibility	The A-F overlay remains the enforced procedural fallback while the additive Next Workflow activation record is planned; it must not be represented as active before its Control Center prerequisite and candidate-bound release evidence pass.
 # next_workflow_rigor	The additive Next Workflow selects L1-L5 rigor independently of these compatibility rows; L1-L4 stay within the original task authority, while L5 has one explicit post-plan implementation approval boundary.
+# next_workflow_runtime	Protected non-UI CLI execution is limited to the isolated verification profile, exact owner authority, current provider bounds, and review-gated result closure; unavailable isolation stops with guidance and never enables production launch.

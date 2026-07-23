@@ -82,6 +82,34 @@ the time of use. The unfinished Control Center and TraceCue/browser acceptance
 remain a recorded prerequisite for later resumption and cannot be counted as
 activation evidence now.
 
+### Protected non-UI runtime delivery
+
+The additive core now includes a non-production protected runtime slice. It
+uses repository-local SQLite migration 003, single-use runtime Approval,
+idempotent effect/receipt reconciliation, store-bound lifecycle authority,
+restart recovery, authority-owned task delivery, provider-neutral lifecycle
+ports, and independent Lead/Orchestrator/Validator review closure. A Task Agent
+response is untrusted candidate data until the exact frozen launch request,
+durable launch and admission lineage, completed runtime observation, and all
+review authority records match.
+
+Local CLI execution requires real Linux user, mount, network, and PID isolation
+with Bubblewrap, pinned executables, a read-only private input root, one private
+writable output root, explicit runtime/resource/cost limits, and verified child
+process termination. If packages or namespace policy are unavailable, the
+runtime reports non-installing setup and recheck guidance and stops. It never
+runs without containment. CI runners that lack these prerequisites must test
+that guided refusal and may not represent a skipped real-containment fixture as
+production or Activation evidence.
+
+Model and effort selection remains provider-neutral and policy constrained.
+Only certified, currently observed, permitted models are eligible; user deny
+lists, publisher restrictions, billing mode, endpoint policy, cost ceilings,
+and owner/task limits narrow the result. The selected values are passed
+explicitly and must match the observed launch values. Paid API transport and
+production Agent launch remain unavailable until their separate gateway-owned
+network, secret, idempotency, containment, and Activation owners exist.
+
 ## A. Pre-Implementation Proposal
 
 Read the applicable `AGENTS.MD`, resolved instruction source, workflow skill,

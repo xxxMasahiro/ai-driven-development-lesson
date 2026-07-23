@@ -228,3 +228,9 @@ skills/worklog-doc-sync/SKILL.md
 The Next Workflow commands validate the additive fail-closed core only. Until
 its tracked activation record is enforced, they must not replace the current
 repository procedure or treat paused Control Center work as activation proof.
+The protected non-UI runtime may execute only under its explicit isolated
+verification profile: real prerequisite checks, private store-bound lifecycle
+authority, immutable launch/admission provenance, and independent review are
+mandatory. Missing Bubblewrap or namespace support must produce installation
+or operating-system guidance and a safe stop, never an unisolated fallback.
+Production Agent launch remains unavailable and Activation remains `planned`.

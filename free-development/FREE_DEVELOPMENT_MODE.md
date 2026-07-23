@@ -96,6 +96,13 @@ ordinary parent-CI child traversal is permitted. Until the paused Control
 Center prerequisite and immutable-candidate activation proofs pass, the
 existing Free Development procedure remains authoritative.
 
+When the parent protected runtime is used for an isolated verification task,
+the child receives only the resolved local-first instruction envelope and
+bounded read-only inputs. It does not receive the parent database, owner trust,
+credentials, Git authority, or a writable child checkout. Missing Bubblewrap
+or namespace support stops with copyable installation and recheck guidance;
+there is no lightweight-but-unisolated fallback.
+
 - `none`: product workspace, canonical documents, scaffold authority, product security, and required local checks are still required; Git, remote sync, and CI are not applicable.
 - `local`: local Git worktree and local Git safety checks are required; remote sync and CI are not applicable.
 - `remote_sync`: local Git and remote sync are required; CI is not applicable.

@@ -4571,3 +4571,11 @@ budget enforcement, and idempotent retry accounting. Provider selection may
 rank certified models and exact efforts automatically while applying
 owner-configured allow/deny model IDs, publishers, prefixes, roles, correctness,
 safety, efficiency, and estimated cost.
+
+Containment tests use the same read-only prerequisite diagnostic as the runtime.
+The diagnostic test always runs. Real namespace and Bubblewrap cases run only
+when the diagnostic returns `available`; otherwise those individual cases emit
+explicit test-runner skips while the diagnostic verifies the exact refusal
+classification, non-installing guidance, and recheck command. This distinction
+keeps CI portable without weakening the runtime: missing prerequisites never
+authorize an uncontained provider process.

@@ -3735,3 +3735,8 @@ TESTS: tools/check_developer_memory_requirements.sh,tools/check_document_organiz
   handles the observed nested-sandbox status-zero/post-exec-`EPERM` condition
   without accepting nonzero or ambiguous output, and its final-gate regression
   passed five consecutive runs.
+- Follow-up verification is environment-honest: the isolation diagnostic always
+  runs, real containment cases run on capable hosts, and incapable hosts report
+  those cases as explicit skips after verifying installation or OS-policy
+  guidance. This is a test portability correction only; runtime containment
+  still fails closed and no unisolated fallback exists.

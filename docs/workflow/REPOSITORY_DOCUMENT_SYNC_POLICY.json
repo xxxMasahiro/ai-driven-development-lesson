@@ -394,7 +394,7 @@
     },
     {
       "id": "next-workflow-core",
-      "description": "Next Workflow contracts, persisted authorities, CLI, and runtime owners update the complete parent authority, as-built, Security, verification, CI, and workflow-state contract without traversing child repositories.",
+      "description": "Next Workflow contracts, persisted authorities, CLI, protected runtime/trust/containment owners, migrations, and tests update the complete parent authority, as-built, Security, verification, CI, and workflow-state contract without traversing child repositories.",
       "trigger": {
         "any_of": [
           "docs/workflow/next-workflow/**",

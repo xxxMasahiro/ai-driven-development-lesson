@@ -5994,3 +5994,11 @@ explicit developer action. It must also distinguish subscription CLI, metered
 API, and local-model providers and expose model/publisher deny lists and cost
 ceilings. This is a deferred UI requirement only; no paused Control Center file
 is changed by this implementation.
+
+The verification slice is environment-honest. Real containment tests run when
+the isolation diagnostic proves that Bubblewrap and the required namespaces are
+usable. On a CI host that lacks those prerequisites, the diagnostic assertion
+must pass and each real-containment case must be reported as an explicit skip;
+the suite must not simulate containment, silently run without it, or fail only
+because the optional host package is absent. Production execution remains
+fail-closed in either case.

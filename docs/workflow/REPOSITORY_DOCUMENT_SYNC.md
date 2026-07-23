@@ -37,6 +37,9 @@ and workflow-state pair. This classification remains parent-only and never
 opens or tests a registered child repository. The Dashboard data schema is
 updated separately when its producer contract changes; paused Control Center
 source and browser work are not required merely because the non-UI core changes.
+Protected runtime-wiring follow-ups are not exempt: containment, trust,
+lifecycle, task-delivery, state migration, provider execution, and their tests
+must carry this complete parent authority set in the same PR or push range.
 
 Multiple matching rules add requirements; a weaker rule cannot remove a
 security or verification requirement. The existing

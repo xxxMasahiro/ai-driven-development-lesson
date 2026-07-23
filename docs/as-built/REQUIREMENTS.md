@@ -3829,6 +3829,12 @@ separate production-Activation boundary:
     require an owner-trust-branded agent authority bound to the same protected
     trust source; caller-created `trusted` or `independent` objects are not
     authority.
+29. Containment verification must reflect the host truth. When the prerequisite
+    diagnostic reports usable Bubblewrap and namespaces, all real containment
+    cases run. When it reports `installation_required` or a supported OS-policy
+    refusal, the diagnostic still passes and only the cases that require actual
+    containment are explicitly skipped. Tests must never substitute an
+    unisolated execution path, and the operational runtime remains unavailable.
 
 Current local conformance evidence is 217 passing tests across 17 standalone
 suites, all seven frozen contracts, and the clean-candidate canonical

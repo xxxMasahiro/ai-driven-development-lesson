@@ -12,6 +12,8 @@ import { createProtectedLaunchObservationVerifier, loadProtectedRuntimeTrust } f
 import { openWorkflowStateStore } from "./lib/next_workflow/store.mjs";
 
 const roots = [];
+const isolationPrerequisites = diagnoseLinuxIsolationPrerequisites();
+const isolationTest = isolationPrerequisites.available ? test : test.skip;
 test.after(() => roots.forEach((root) => rmSync(root, { recursive: true, force: true })));
 
 function fileDigest(candidate) {
@@ -130,7 +132,7 @@ function plan(f, { runId = "run-1", selectedEffort = "high", actualEffort = sele
   };
 }
 
-test("RunLifecyclePort persists a detached run and confirms selected versus actual model and effort", async () => {
+isolationTest("RunLifecyclePort persists a detached run and confirms selected versus actual model and effort", async () => {
   const f = fixture();
   const launchPlan = plan(f);
   const started = await f.port.start(launchPlan);
@@ -146,7 +148,7 @@ test("RunLifecyclePort persists a detached run and confirms selected versus actu
   f.store.close();
 });
 
-test("response IO remains bound to the pinned private output directory across pathname replacement", async () => {
+isolationTest("response IO remains bound to the pinned private output directory across pathname replacement", async () => {
   const f = fixture();
   const displacedOutput = `${f.outputRoot}-displaced`;
   const port = createRunLifecyclePort({
@@ -164,7 +166,7 @@ test("response IO remains bound to the pinned private output directory across pa
   f.store.close();
 });
 
-test("response output requires an owner-controlled exact 0700 directory", async () => {
+isolationTest("response output requires an owner-controlled exact 0700 directory", async () => {
   const f = fixture();
   chmodSync(f.outputRoot, 0o750);
   await assert.rejects(() => f.port.start(plan(f)), /RUN_LIFECYCLE_RESPONSE_DIRECTORY_INVALID/);
@@ -172,7 +174,7 @@ test("response output requires an owner-controlled exact 0700 directory", async 
   f.store.close();
 });
 
-test("RunLifecyclePort ignores task self-reporting and rejects launch-argument substitution", async () => {
+isolationTest("RunLifecyclePort ignores task self-reporting and rejects launch-argument substitution", async () => {
   const f = fixture();
   await f.port.start(plan(f, { selectedEffort: "high", actualEffort: "medium" }));
   const collected = await f.port.collect_result("run-1");
@@ -191,7 +193,7 @@ test("RunLifecyclePort ignores task self-reporting and rejects launch-argument s
   implicit.store.close();
 });
 
-test("RunLifecyclePort durably binds process identity before releasing provider execution", async () => {
+isolationTest("RunLifecyclePort durably binds process identity before releasing provider execution", async () => {
   const f = fixture();
   let snapshot;
   const port = createRunLifecyclePort({
@@ -206,7 +208,7 @@ test("RunLifecyclePort durably binds process identity before releasing provider 
   f.store.close();
 });
 
-test("the two-stage barrier never turns controller EOF into provider execution", async () => {
+isolationTest("the two-stage barrier never turns controller EOF into provider execution", async () => {
   const executionRoot = mkdtempSync(path.join(tmpdir(), "next-workflow-barrier-crash-"));
   roots.push(executionRoot);
   chmodSync(executionRoot, 0o700);
@@ -243,7 +245,7 @@ test("the two-stage barrier never turns controller EOF into provider execution",
   await new Promise((resolvePromise) => controllerChild.once("close", resolvePromise));
 });
 
-test("RunLifecyclePort containment denies host repository, owner trust, Git, input writes, and network", async () => {
+isolationTest("RunLifecyclePort containment denies host repository, owner trust, Git, input writes, and network", async () => {
   const f = fixture();
   await f.port.start(plan(f, { mode: "probe" }));
   const collected = await f.port.collect_result("run-1");
@@ -254,7 +256,7 @@ test("RunLifecyclePort containment denies host repository, owner trust, Git, inp
   f.store.close();
 });
 
-test("RunLifecyclePort rejects unknown authority-like result fields", async () => {
+isolationTest("RunLifecyclePort rejects unknown authority-like result fields", async () => {
   const f = fixture();
   await f.port.start(plan(f, { mode: "unsafe" }));
   await assert.rejects(() => f.port.collect_result("run-1"), /AGENT_RESULT_UNKNOWN_FIELD:authority/);
@@ -262,7 +264,7 @@ test("RunLifecyclePort rejects unknown authority-like result fields", async () =
   f.store.close();
 });
 
-test("RunLifecyclePort bounds finding codes to identifiers", async () => {
+isolationTest("RunLifecyclePort bounds finding codes to identifiers", async () => {
   const f = fixture();
   await f.port.start(plan(f, { mode: "invalid-finding-code" }));
   await assert.rejects(() => f.port.collect_result("run-1"), /AGENT_RESULT_FINDING_CODE_INVALID/);
@@ -270,7 +272,7 @@ test("RunLifecyclePort bounds finding codes to identifiers", async () => {
   f.store.close();
 });
 
-test("containment refuses repository and protected-control root overlap", () => {
+isolationTest("containment refuses repository and protected-control root overlap", () => {
   const f = fixture();
   assert.throws(() => createLinuxIsolatedContainment({ runtimeTrust: f.runtimeTrust, authorityId: "fixture-linux-containment", inputRoot: f.repositoryRoot, outputRoot: f.outputRoot }), /LINUX_CONTAINMENT_CONTROL_ROOT_OVERLAP_FORBIDDEN/);
   const nestedControl = path.join(f.inputRoot, "nested", ".git");
@@ -287,7 +289,7 @@ test("containment refuses repository and protected-control root overlap", () => 
   f.store.close();
 });
 
-test("RunLifecyclePort terminates the detached process group and verifies absence", async () => {
+isolationTest("RunLifecyclePort terminates the detached process group and verifies absence", async () => {
   const f = fixture();
   await f.port.start(plan(f, { mode: "sleep" }));
   const terminated = await f.port.terminate("run-1");
@@ -299,7 +301,7 @@ test("RunLifecyclePort terminates the detached process group and verifies absenc
   f.store.close();
 });
 
-test("RunLifecyclePort times out, escalates termination, and returns no result", async () => {
+isolationTest("RunLifecyclePort times out, escalates termination, and returns no result", async () => {
   const f = fixture();
   await f.port.start(plan(f, { mode: "sleep", timeoutMs: 50 }));
   const collected = await f.port.collect_result("run-1");
@@ -309,7 +311,7 @@ test("RunLifecyclePort times out, escalates termination, and returns no result",
   f.store.close();
 });
 
-test("RunLifecyclePort restart recovery reacquires the persisted process identity and terminates fail-closed", async () => {
+isolationTest("RunLifecyclePort restart recovery reacquires the persisted process identity and terminates fail-closed", async () => {
   const f = fixture();
   await f.port.start(plan(f, { mode: "sleep" }));
   const containedIdentity = f.store.getRuntimeRun({ runId: "run-1" }).observation.contained_process_identity;
@@ -329,13 +331,22 @@ test("RunLifecyclePort restart recovery reacquires the persisted process identit
 });
 
 test("isolation prerequisite diagnostics are non-installing and give actionable fail-closed guidance", () => {
-  const available = diagnoseLinuxIsolationPrerequisites();
-  assert.equal(available.status, "available");
-  assert.equal(available.available, true);
-  assert.equal(available.automatic_install, false);
-  assert.deepEqual(available.install_commands, []);
-  const blocked = diagnoseLinuxIsolationPrerequisites({ runner: () => ({ status: 1, stderr: "namespace disabled" }) });
-  assert.equal(blocked.status, "operating_system_policy_blocked");
-  assert.equal(blocked.available, false);
-  assert.ok(blocked.namespace_checks.length > 0);
+  assert.equal(isolationPrerequisites.automatic_install, false);
+  assert.equal(isolationPrerequisites.verification_command, "node tools/next-workflow.mjs runtime isolation-check");
+  if (isolationPrerequisites.available) {
+    assert.equal(isolationPrerequisites.status, "available");
+    assert.deepEqual(isolationPrerequisites.install_commands, []);
+  } else if (isolationPrerequisites.status === "installation_required") {
+    assert.ok(isolationPrerequisites.missing.length > 0);
+    assert.ok(isolationPrerequisites.install_commands.length > 0);
+  } else {
+    assert.equal(isolationPrerequisites.status, "operating_system_policy_blocked");
+    assert.ok(isolationPrerequisites.namespace_checks.length > 0);
+  }
+  if (isolationPrerequisites.missing.length === 0) {
+    const blocked = diagnoseLinuxIsolationPrerequisites({ runner: () => ({ status: 1, stderr: "namespace disabled" }) });
+    assert.equal(blocked.status, "operating_system_policy_blocked");
+    assert.equal(blocked.available, false);
+    assert.ok(blocked.namespace_checks.length > 0);
+  }
 });
