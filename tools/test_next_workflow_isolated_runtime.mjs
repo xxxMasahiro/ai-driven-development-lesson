@@ -40,7 +40,10 @@ isolatedRuntimeTest("an isolated local CLI runs through the common gateway with 
   const identityKey = providerIdentityKey(identity);
   writeFileSync(script, `
 import { readFileSync, writeFileSync, writeSync } from "node:fs";
-const [response, runId, provider, model, effort] = process.argv.slice(2);
+const [modelFlag, model, configFlag, effortConfig, response, runId, provider] = process.argv.slice(2);
+const effortMatch = /^model_reasoning_effort="([^"]+)"$/.exec(effortConfig);
+if (modelFlag !== "--model" || configFlag !== "-c" || !effortMatch) throw new Error("FIXTURE_LAUNCH_CONFIGURATION_INVALID");
+const effort = effortMatch[1];
 const taskEnvelope = readFileSync(0, "utf8");
 if (!taskEnvelope.includes("schema_version")) throw new Error("task envelope missing from stdin");
 writeSync(2, JSON.stringify({ type: "launch_observation", provider, model, effort }) + "\\n");
@@ -64,8 +67,8 @@ writeFileSync(response, JSON.stringify({ schema_version: "1.0.0", run_id: runId,
     priority: 1,
     estimated_cost: 1,
     transport_descriptor: {
-      argv_template: [script, "{{response_file}}", fixedEffectId, identityKey, "{{model_id}}", "{{native_reasoning}}"],
-      argv_schema: ["response_file", "model_id", "native_reasoning"],
+      argv_template: [script, "--model", "{{model_id}}", "-c", "{{reasoning_config}}", "{{response_file}}", fixedEffectId, identityKey],
+      argv_schema: ["model_id", "reasoning_config", "response_file"],
       environment_allowlist: [],
       private_response_file: true,
       executable: { canonical_path: executable, digest: executableDigest },

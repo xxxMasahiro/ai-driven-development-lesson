@@ -4337,9 +4337,9 @@ provider, and Agent adapters before any candidate can be frozen.
 
 The historical pre-runtime-wiring closure contained 192 passing assertions
 across 14 standalone suites; it is retained only as earlier evidence. The
-current non-Control-Center aggregate contains 217 passing assertions across 17
-standalone suites, and the clean-candidate canonical repository aggregate
-passes. Phase 18 Control Center implementation,
+current non-Control-Center aggregate passes all 24 registered standalone
+suites, and the clean-candidate canonical repository aggregate passes. Phase
+18 Control Center implementation,
 TraceCue/browser review, and developer acceptance remain explicitly unfinished
 for later resumption. The current non-Control-Center implementation may proceed
 through scoped PR/main CI delivery and synchronization, but that delivery is not
@@ -4579,3 +4579,287 @@ explicit test-runner skips while the diagnostic verifies the exact refusal
 classification, non-installing guidance, and recheck command. This distinction
 keeps CI portable without weakening the runtime: missing prerequisites never
 authorize an uncontained provider process.
+
+## Development-session automatic Agent selection specification
+
+SYNC-ID: next_workflow_development_agent_auto_selection
+STATUS: implemented
+ARTIFACTS: docs/as-built/IMPLEMENTATION_PLAN.md,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/HANDOFF.md,docs/workflow/INSTRUCTION_MEMORY.md,docs/workflow/TASK_TRACKER.md,docs/workflow/TEST_PLAN_MANIFEST.tsv,learning/NEXT_WORKFLOW_AGENT_SELECTION_SETTINGS.json,skills/repository-development-workflow/SKILL.md,skills/repository-development-workflow/references/repository-development.md,tools/lib/next_workflow/provider_discovery.mjs,tools/lib/next_workflow/providers.mjs,tools/lib/next_workflow/settings.mjs,tools/next-workflow.mjs,tools/test_next_workflow.sh,tools/test_next_workflow_development_selection.mjs,tools/test_next_workflow_development_selection.sh
+TESTS: tools/check_next_workflow.sh,tools/test_next_workflow.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+`tools/next-workflow agent-selection plan` is the planned read-only entry. It
+accepts an Agent/role, rigor, risk, complexity, required capabilities, budget,
+and optional objective. It resolves the saved policy using the existing fixed
+Agent-to-global inheritance order, observes a provider-neutral catalog through
+a bounded built-in adapter, and calls the shared automatic effort and ranking
+owners in advisory mode.
+
+An adapter may expose an authoritative provider recommendation rank. The
+development selector forms a current recommended cohort from the leading
+contiguous ranks rather than hard-coding model names or generations.
+Correctness-first selects the leading candidate, balanced selects the cohort
+median, and efficiency-first selects the last member of that current cohort.
+Automatic objective selection maps low-risk L1-L2 work to efficiency, ordinary
+L3 work to balance, and L4-L5, high-risk, or high-complexity work to
+correctness. The existing effort floor raises the exact native effort for
+rigor, risk, and complexity and stops when no exact mapping is available.
+
+The emitted plan is `development_advisory`, `production_eligible=false`, and
+`selection_grants_launch_authority=false`. It includes only bounded identifiers,
+digests, ranking reasons, selected values, and structured CLI configuration
+slots. It never emits a shell command, credentials, prompts, environment dumps,
+or raw catalog payloads. `agent-selection verify-config` compares a saved plan
+with the exact model and effort prepared for launch; this proves configuration
+binding, not provider-backend execution or model identity.
+
+The initial repository-level saved allowlist is GPT-5.6 Sol, Terra, and Luna.
+GPT-5.5 requires a later explicit saved-policy change; GPT-5.4 is not part of
+the initial supported configuration. Saved allowlists still intersect with the
+fresh observed provider catalog and never synthesize unavailable models.
+
+## Headless Production team enablement specification
+
+SYNC-ID: next_workflow_headless_production_enablement
+STATUS: implemented
+ARTIFACTS: docs/as-built/IMPLEMENTATION_PLAN.md,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/DEVELOPMENT_INSTRUCTION_POLICY.tsv,docs/workflow/FINAL_GATE_GAP_COMMANDS.tsv,docs/workflow/HANDOFF.md,docs/workflow/INSTRUCTION_MEMORY.md,docs/workflow/TASK_TRACKER.md,docs/workflow/TEST_PLAN_MANIFEST.tsv,learning/NEXT_WORKFLOW_RELEASE_PREREQUISITES.json,tools/lib/next_workflow/agents.mjs,tools/lib/next_workflow/headless_bootstrap.mjs,tools/lib/next_workflow/headless_plan.mjs,tools/lib/next_workflow/headless_runtime.mjs,tools/lib/next_workflow/headless_service.mjs,tools/lib/next_workflow/provider_discovery.mjs,tools/lib/next_workflow/release_signing.mjs,tools/lib/next_workflow/release_source_receipts.mjs,tools/lib/next_workflow/run_controller.mjs,tools/lib/next_workflow/run_lifecycle.mjs,tools/lib/next_workflow/runtime_barrier.cjs,tools/lib/next_workflow/runtime_containment.mjs,tools/lib/next_workflow/runtime_trust.mjs,tools/next-workflow.mjs,tools/test_next_workflow.sh,tools/test_next_workflow_agents.mjs,tools/test_next_workflow_headless_bootstrap.mjs,tools/test_next_workflow_headless_bootstrap.sh,tools/test_next_workflow_headless_plan.mjs,tools/test_next_workflow_headless_plan.sh,tools/test_next_workflow_headless_runtime.mjs,tools/test_next_workflow_headless_runtime.sh,tools/test_next_workflow_release_signing.mjs,tools/test_next_workflow_release_signing.sh,tools/test_next_workflow_run_controller.mjs,tools/test_next_workflow_run_controller.sh
+TESTS: tools/check_next_workflow.sh,tools/test_next_workflow.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+`tools/next-workflow runtime acceptance-create --confirm` first generates a
+signed external Owner acceptance receipt bound to repository identity and the
+complete prerequisite-document fingerprint. `runtime bootstrap
+--owner-acceptance PATH --confirm` verifies that receipt, generates distinct
+Ed25519 source-evidence and final-release key pairs, writes public trust and
+private-key path metadata to the runtime composition, pins the native Codex
+executable, provider credential file, namespace tools, barrier interpreter,
+and barrier script, and writes trust/key files with owner-only permissions
+outside the repository. Existing valid trust is loaded but never overwritten.
+
+The built-in Codex family is discovered from bounded `--version` and bundled
+model-catalog calls only after protected digest authorization and inside a
+non-networked Linux namespace plus Bubblewrap probe. Certification signs a
+canonical proof binding that excludes
+only its self-referential proof and authority fields. The final normalized
+certificate, observation, executable digest, adapter version, model, capability
+set, effort mapping, expiry, and drift fingerprint must all verify before the
+entry is eligible.
+
+`createHeadlessProductionService` composes the protected store, activation and
+candidate verifiers, provider registry, current saved selection policy, Linux
+containment, task delivery, AgentLauncher, RunLifecyclePort, and RunController.
+The topology selector chooses model and native effort per actual role. The
+launch plan uses structured argv only, disables Codex tool and nested-Agent
+features, clears inherited environment, exposes only the pinned credential
+descriptor, mounts only a private read-only input and private writable output,
+and denies task network access. Completion preserves containment provenance,
+and the reported provider/model/effort must equal the launch selection.
+
+The topology policy has three user-facing preferences: `auto`,
+`single_agent`, and `team`. The default is `auto`. `single_agent` is represented
+by effective L1 and creates no Lead or Task Agent; the Orchestrator owns the
+condensed workflow. It is rejected or raised when any hard-L5 condition is
+present. `team` may increase the instantiated topology but never reduce the
+automatically assessed rigor. The future Control Center persists this
+preference; the current paused UI is not modified by this slice.
+
+The RunController reconciles persisted effects and runtime runs before launch.
+It persists bounded grants and reservations, launches each instantiated Agent,
+keeps results unaccepted until review/disposition records close them, and
+returns selected model and effort per accepted outcome. Lead, Orchestrator, and
+Validator dispositions come from three actual, separately granted and reserved
+CLI reviewer runs whose process/result provenance is distinct from the subject
+and from each other. A launch exception is reconciled and returned with both
+the original failure code and retry-policy decision. No retry is legal without
+verified material progress; zero estimated subscription cost does not by
+itself exhaust a zero cost ceiling.
+
+The complete Git tree object is the immutable release boundary; the artifact
+list is diagnostic traceability only. `release sign-bundle` and `release
+sign-transition` accept only fresh, candidate-bound source receipts signed by
+the separate source-evidence key, verify and embed them, and then sign with the
+distinct final-release key. Shape-correct raw evidence cannot reach either
+final signer. Each public key must match exactly one active protected verifier
+in its own trust class.
+`release transition` persists the ordered shadow-through-ready chain, and
+`release activate` independently re-verifies the complete signed transition
+and release lineage before `enforced`. Runtime and release status use only the
+protected Production trust/store for authority. Protected state failure,
+unavailable isolation, stale/non-enforced Activation, deployment drift, or
+unavailable providers returns a structured STOP; tracked state is presentation
+data and never an authority fallback.
+
+The lifecycle verifier parses the exact one `--model` value and exact one
+`-c model_reasoning_effort=...` value from the contained process before
+execution release. Persisted
+`observation_scope=pinned_cli_launch_configuration` and
+`backend_attestation_available=false` make explicit that this verifies launch
+configuration, not remote-backend routing. Certification issue/expiry,
+revocation, and observation freshness are checked before every Agent and
+reviewer launch.
+
+This specification supersedes earlier availability text that tied headless
+Activation to Control Center acceptance or kept the protected AgentLauncher
+unavailable after this delivery. The isolated profile remains non-production,
+and separately deferred API/local/child-adapter plans remain unavailable.
+
+## Headless Production trust-boundary hardening specification
+
+SYNC-ID: next_workflow_headless_production_hardening
+STATUS: implemented
+ARTIFACTS: docs/as-built/IMPLEMENTATION_PLAN.md,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/HANDOFF.md,docs/workflow/TASK_TRACKER.md,tools/lib/next_workflow/agents.mjs,tools/lib/next_workflow/headless_bootstrap.mjs,tools/lib/next_workflow/headless_plan.mjs,tools/lib/next_workflow/headless_service.mjs,tools/lib/next_workflow/release.mjs,tools/lib/next_workflow/run_controller.mjs,tools/lib/next_workflow/runtime_trust.mjs,tools/lib/next_workflow/store.mjs,tools/next-workflow-launcher.cjs,tools/next-workflow.mjs,tools/test_next_workflow.sh,tools/test_next_workflow_agents.mjs,tools/test_next_workflow_headless_bootstrap.mjs,tools/test_next_workflow_headless_plan.mjs,tools/test_next_workflow_headless_runtime.mjs,tools/test_next_workflow_run_controller.mjs,tools/test_next_workflow_store.mjs
+TESTS: tools/check_next_workflow.sh,tools/test_next_workflow.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+The initialization sequence is isolation check, external Owner identity
+enrollment, signed acceptance creation, and trust bootstrap. Acceptance embeds
+the enrolled anchor fingerprint and observed native Codex path/digest.
+Bootstrap verifies those values, creates one externally anchored Production
+state generation, and installs `next-workflow-launcher.cjs` outside the
+repository with owner-only execute permission and an exact hash in Owner trust.
+
+The installed launcher uses only Node built-ins before candidate admission. It
+opens the canonical generation-bound database read-only, reads the latest
+Activation, validates the candidate fingerprint, and uses root-owned Git with a
+cleared environment to compare clean HEAD, tree, and artifact blobs. Only then
+does it start `tools/next-workflow.mjs`. `team run` and mutating reconciliation
+verify the launcher binding and otherwise fail closed.
+
+Task normalization derives the six canonical rigor scores, detects hard-L5
+signals, applies developer rigor only as a floor, and projects
+`auto|single_agent|team` to an effective execution mode. Canonical Lead IDs now
+match the saved settings organization. The Orchestrator review is a distinct
+depth-1 review role, while final synthesis is labeled as deterministic
+controller integration rather than a fabricated Agent result.
+
+`AgentRunStopDisposition`, `AgentRunStopClosure`, and
+`AgentReviewerRunClosure` are protected lifecycle kinds with exact run,
+candidate, policy, authority, relation, and event validation. Unresolved Agent
+Runs participate in startup/status/reconcile checks. Candidate-backed runs may
+be closed only after the protected recovery authorizer approves the exact
+request; runs without sufficient evidence remain manual-required.
+
+The service re-reads saved settings at every selection and immediately before
+launch; finalization also reads the live revision. Git candidate inspection
+uses an absolute root-owned binary with replacement objects, hooks, global and
+system configuration, prompts, and inherited Git variables disabled.
+Aggregate runtime is measured by the controller monotonic clock. Token usage is
+reported as unavailable when the provider exposes no independently observable
+counter, and candidate metrics never satisfy a budget gate.
+
+## Headless launcher audit-closure specification
+
+SYNC-ID: next_workflow_headless_launcher_closure
+STATUS: implemented
+ARTIFACTS: docs/as-built/IMPLEMENTATION_PLAN.md,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/HANDOFF.md,docs/workflow/INSTRUCTION_MEMORY.md,docs/workflow/TASK_TRACKER.md,docs/workflow/TEST_PLAN_MANIFEST.tsv,tools/lib/next_workflow/headless_bootstrap.mjs,tools/lib/next_workflow/headless_plan.mjs,tools/lib/next_workflow/runtime_trust.mjs,tools/lib/next_workflow/store.mjs,tools/next-workflow-launcher.cjs,tools/test_next_workflow.sh,tools/test_next_workflow_headless_bootstrap.mjs,tools/test_next_workflow_headless_plan.mjs,tools/test_next_workflow_launcher.mjs,tools/test_next_workflow_launcher.sh,tools/test_next_workflow_store.mjs
+TESTS: tools/check_next_workflow.sh,tools/test_next_workflow.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+Bootstrap writes a mode `0500` POSIX wrapper and a separate mode `0400`
+CommonJS verifier outside the repository. The wrapper invokes the
+digest-pinned absolute Node interpreter through `/usr/bin/env -i`, supplies
+only bounded locale, identity, path, trust-path, and sanitized-entry values,
+and therefore removes pre-Node injection variables. Protected trust stores and
+revalidates distinct fingerprints and canonical paths for the wrapper, script,
+and interpreter.
+
+The standalone verifier uses only Node built-ins before candidate admission.
+It validates the external trust lifetime and key separation, exact protected
+state identity/generation/authority epoch, all eight signed release proofs,
+their signed source receipts and lineage, all six signed transition proofs and
+receipts, and the final Activation summary. It then uses a root-owned Git
+binary with hooks, replacement objects, inherited configuration, and prompts
+disabled. The deployed HEAD is the signed main-CI merge SHA; the deployed tree
+and artifact content must match the frozen candidate.
+
+Task normalization builds its classification text from the root and all child
+tasks before `assessRigor` runs. Child data can only raise rigor and cannot
+become trusted instructions. Child scope paths use the same repository-relative
+validation as the root.
+
+Startup recovery queries `AgentRun` records lacking any terminal lifecycle
+closure. Their presence contributes to `recovery_state.required`. During that
+mode, only schema-valid stop or reviewer closure commits can proceed, and the
+recovery state is recomputed atomically after each such commit.
+
+## Headless Production final security-closure specification
+
+SYNC-ID: next_workflow_headless_final_security_closure
+STATUS: implemented
+ARTIFACTS: AGENTS.MD,docs/as-built/IMPLEMENTATION_PLAN.md,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/HANDOFF.md,docs/workflow/TASK_TRACKER.md,tools/lib/next_workflow/agents.mjs,tools/lib/next_workflow/headless_bootstrap.mjs,tools/lib/next_workflow/headless_plan.mjs,tools/lib/next_workflow/headless_service.mjs,tools/lib/next_workflow/release_source_receipts.mjs,tools/lib/next_workflow/release_trust.mjs,tools/lib/next_workflow/run_controller.mjs,tools/lib/next_workflow/runtime_trust.mjs,tools/lib/next_workflow/store.mjs,tools/next-workflow-launcher.cjs,tools/next-workflow.mjs,tools/test_next_workflow_headless_bootstrap.mjs,tools/test_next_workflow_headless_plan.mjs,tools/test_next_workflow_headless_runtime.mjs,tools/test_next_workflow_launcher.mjs
+TESTS: tools/check_next_workflow.sh,tools/test_next_workflow.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+Protected trust stores the complete attested repository identity as one nested
+value and retains its top-level routing fields. The launcher independently
+rederives origin, checkout anchor, managed-config, logical, checkout, and
+attestation values and exact-compares them. Release and source trust reject
+duplicate SPKI key material both within and across trust classes.
+
+The launcher reads each signed artifact from the deployed Git commit, compares
+the worktree bytes, then writes the verified Git bytes into a private temporary
+snapshot whose files and directories are read-only during execution. It runs
+only the snapshot entry and passes the original repository root separately.
+The runtime verifies parent-process provenance and both roots before a
+protected store is opened.
+
+The mode-0500 wrapper invokes, rather than `exec`-replaces itself with, the
+clean-environment Node launcher. Owner trust pins the wrapper's shell
+interpreter. Before state access, the launcher verifies `/proc` parent
+executable, exact canonical wrapper argument, and the entire forwarded argument
+tail. The public sanitized-environment digest is therefore necessary but not
+sufficient.
+
+The L1 topology contains one depth-zero Orchestrator grant issued by the
+Runtime Adapter. Its result uses the same protected lifecycle but
+`single_agent_internal` review; it creates no reviewer assignment. Safety
+classification accepts at most 64 KiB in total, bounds individual fragments,
+and validates canonical POSIX-relative scopes before scoring. RunController
+recomputes the topology fingerprint and rejects any L1 topology other than the
+one canonical Orchestrator. For L2-L5, that Orchestrator is an actual first
+subject run; accepted parent evidence then flows to Lead and Task descendants.
+The launch budget counts every subject plus its independent review runs.
+Task collection size and the allowlisted unique explicit safety-signal set are
+validated before safety-text traversal.
+
+Headless service retains a private clone of the admitted topology and freezes a
+separate public plan projection. It passes the independently normalized task
+rigor as `expectedRigor`; RunController exact-compares it before recovery or
+launch. Rehashing an L5 public plan as L1 therefore cannot select the direct
+single-Agent branch.
+
+The protected store recreates each recovery request, invokes the enrolled
+synchronous recovery authorizer, and exact-compares request and authorization.
+Only accepted, stopped, or reviewer closures are terminal. Positive launcher
+tests create complete signed source, release, transition, repository, and store
+lineage and prove execution from the immutable snapshot.
+
+The repository range checker evaluates PR merge-base-to-head and every
+before-to-after push independently. A headless-core range therefore includes
+the complete additive parent authority groups in that same range; deleted
+documents, earlier-only changes, temporary memory, generated evidence, and
+paused Control Center artifacts cannot satisfy the set.
+
+The bootstrap test creates a mode-0500 CLI shim and non-shebang native
+descriptor under its private temporary root, prepends only that root to the
+test process `PATH`, and restores `PATH` after the test. Resolver logic remains
+unchanged: if the runner has a real native Codex it is pinned; otherwise the
+test-only package-layout descriptor supplies deterministic bytes. No fixture
+is installed, invoked, persisted into Production trust, or exposed through the
+operator CLI.
+
+Before positive bootstrap setup, the test checks the same fixed containment
+paths used by Production. Missing `/usr/bin/unshare` or `/usr/bin/bwrap`
+returns a named prerequisite skip before trust material is created. The
+separate runtime-status case still runs, asserts `STOP`, and verifies ordered
+non-installing setup guidance.
+
+Launcher regression installs one suite-private Codex CLI/native package layout
+before constructing its isolated repositories. Owner-acceptance verification
+pins those deterministic descriptor bytes, while every tested launcher command
+continues to execute only the immutable fixture runtime and never invokes the
+provider descriptor. Each positive launcher case first requires the fixed real
+containment executables and returns the same named prerequisite skip when
+either is absent.
+
+Provider-discovery tests construct the same package-relative CLI/native layout
+and pass the CLI path through the explicit executable locator. The resolver
+pins the native bytes before the injected runner and independent fixture
+authorities supply or reject observation without executing those bytes.
+The development-selection suite uses that identical layout before testing
+model and effort decisions, so a CI host installation cannot affect its result.

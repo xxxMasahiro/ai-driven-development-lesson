@@ -1,12 +1,19 @@
 {
   "schema_version": "1.0.0",
   "prerequisite_id": "next-development-workflow-release-prerequisites",
-  "revision": 1,
+  "revision": 2,
+  "headless_runtime": {
+    "state": "accepted",
+    "developer_accepted": true,
+    "evidence_fingerprint": "ba97741469f970763b40faa948afc779e88cc3a9a8b28ee4ef940b08da09181e",
+    "accepted_at": "2026-07-23T00:00:00.000Z"
+  },
   "control_center": {
     "state": "paused",
     "developer_accepted": false,
     "evidence_fingerprint": null,
     "accepted_at": null,
-    "resume_required": true
+    "resume_required": true,
+    "blocks_headless_activation": false
   }
 }

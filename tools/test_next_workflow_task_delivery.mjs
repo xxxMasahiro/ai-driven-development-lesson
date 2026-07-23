@@ -66,10 +66,12 @@ test("authority-owned delivery reads AGENTS and the resolved instruction, serial
   const directory = mkdtempSync(path.join(tmpdir(), "next-workflow-task-delivery-"));
   roots.push(directory);
   const promptFile = path.join(directory, "task-envelope.json");
-  const delivery = prepareAgentTaskDelivery({ grant: grant(), authorityRoot: repositoryRoot, repositoryRoot, resolverInput: { targetKind: "parent" }, stage: "C", scopeId: "runtime-wiring-test", data: [{ source: "developer_task", value: "bounded fixture" }], promptFile });
+  const delivery = prepareAgentTaskDelivery({ grant: grant(), authorityRoot: repositoryRoot, repositoryRoot, resolverInput: { targetKind: "parent" }, stage: "C", scopeId: "runtime-wiring-test", data: [{ source: "developer_task", value: "bounded fixture" }], resultContract: { schema_version: "1.0.0", run_id: "effect-runtime-wiring-test" }, promptFile });
   assert.match(delivery.invariant_fingerprint, /^[a-f0-9]{64}$/);
   assert.match(delivery.instruction_fingerprint, /^[a-f0-9]{64}$/);
   assert.equal(delivery.envelope.control.authority_owner, "Orchestrator Agent");
+  assert.equal(delivery.envelope.control.result_contract.run_id, "effect-runtime-wiring-test");
+  assert.equal(delivery.envelope.control.result_contract.output_format, "json_only");
   assert.equal(delivery.envelope.data[0].interpretation, "data");
   assert.equal(delivery.verify().delivery_fingerprint, delivery.delivery_fingerprint);
   const original = readFileSync(promptFile);

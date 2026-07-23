@@ -32,7 +32,7 @@ function plain(value, code) {
   return value;
 }
 
-export function buildTrustedAgentTaskEnvelope({ grant, invariant, instruction, data = [] } = {}) {
+export function buildTrustedAgentTaskEnvelope({ grant, invariant, instruction, resultContract = null, data = [] } = {}) {
   if (!/^[a-f0-9]{64}$/.test(grant?.fingerprint ?? "")) throw new Error("TASK_GRANT_REQUIRED");
   for (const [value, prefix] of [[invariant, "TASK_INVARIANT"], [instruction, "TASK_INSTRUCTION"]]) {
     plain(value, `${prefix}_REQUIRED`);
@@ -51,10 +51,43 @@ export function buildTrustedAgentTaskEnvelope({ grant, invariant, instruction, d
     authority_owner: "Orchestrator Agent",
     invariant: { source: invariant.source, fingerprint: invariant.fingerprint, content: invariant.content },
     procedural_instruction: { source: instruction.source, source_profile: instruction.source_profile, source_version: instruction.source_version, precedence: instruction.precedence, fallback_trigger: instruction.fallback_trigger, fingerprint: instruction.fingerprint, content: instruction.content },
+    ...(resultContract ? { result_contract: normalizeResultContract(resultContract) } : {}),
   };
   const envelope = { schema_version: "2.0.0", grant_fingerprint: grant.fingerprint, control, data: normalizedData };
   assertNoSecretMaterial(envelope, "TASK_ENVELOPE_SECRET_FORBIDDEN");
   return Object.freeze({ ...envelope, fingerprint: digest(envelope) });
+}
+
+function normalizeResultContract(value) {
+  plain(value, "TASK_RESULT_CONTRACT_INVALID");
+  if (value.schema_version !== "1.0.0" || typeof value.run_id !== "string" || value.run_id.length === 0) throw new Error("TASK_RESULT_CONTRACT_INVALID");
+  const reviewSubjectFingerprint = value.review_subject_fingerprint;
+  if (reviewSubjectFingerprint !== undefined && !/^[a-f0-9]{64}$/.test(reviewSubjectFingerprint)) throw new Error("TASK_RESULT_CONTRACT_REVIEW_SUBJECT_INVALID");
+  const contract = {
+    schema_version: "1.0.0",
+    run_id: value.run_id,
+    output_format: "json_only",
+    required_top_level_fields: ["schema_version", "run_id", "status", "summary", "findings", "artifacts", "metrics"],
+    status_values: ["succeeded", "failed", "blocked"],
+    finding_severity_values: ["info", "warning", "error"],
+    summary_format: "single_line_plain_text_without_paths_commands_or_secrets",
+    authority_fields_forbidden: true,
+    markdown_fences_forbidden: true,
+    ...(reviewSubjectFingerprint ? {
+      review_disposition: {
+        subject_fingerprint: reviewSubjectFingerprint,
+        required_artifact: {
+          kind: "review_disposition",
+          fingerprint: reviewSubjectFingerprint,
+          media_type: "application/vnd.next-workflow.review-disposition+json",
+          size_bytes: 0,
+        },
+        pass_requires_status: "succeeded",
+        revise_or_stop_requires_status: ["failed", "blocked"],
+      },
+    } : {}),
+  };
+  return Object.freeze(contract);
 }
 
 function verifyPrivateDirectory(directory) {
@@ -103,6 +136,7 @@ export function prepareAgentTaskDelivery({
   stage,
   scopeId,
   data = [],
+  resultContract = null,
   promptFile,
   maximumInstructionBytes = 4 * 1024 * 1024,
   maximumDeliveryBytes = 4 * 1024 * 1024,
@@ -122,6 +156,7 @@ export function prepareAgentTaskDelivery({
     grant,
     invariant: { source: resolution.invariant_authority.path, fingerprint: invariantRead.digest, content: invariantRead.text },
     instruction: { source: resolution.source_path, source_profile: resolution.source_profile, source_version: resolution.source_version, precedence: resolution.instruction_authority.precedence, fallback_trigger: resolution.instruction_authority.fallback_trigger, fingerprint: instructionRead.digest, content: instructionRead.text },
+    resultContract,
     data,
   });
   const bytes = Buffer.from(`${canonicalJson(envelope)}\n`);

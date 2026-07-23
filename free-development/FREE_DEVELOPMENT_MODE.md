@@ -92,16 +92,31 @@ settings; safety and rigor remain maximum floors; required verification and
 documentation duties are additive. Missing, stale, ambiguous, expired, or
 revoked parent authority blocks the affected action. Each repository retains
 its own bounded state store and evidence; no parent/child shared database or
-ordinary parent-CI child traversal is permitted. Until the paused Control
-Center prerequisite and immutable-candidate activation proofs pass, the
-existing Free Development procedure remains authoritative.
+ordinary parent-CI child traversal is permitted. The existing Free Development
+procedure remains authoritative unless this exact repository is admitted
+through the externally installed parent launcher with immutable-candidate,
+signed-release, recovery, and activation-transition proofs. The paused Control
+Center is presentation only and cannot substitute for or block that authority.
 
-When the parent protected runtime is used for an isolated verification task,
+When the parent protected runtime is used for an isolated verification or
+activated headless task,
 the child receives only the resolved local-first instruction envelope and
 bounded read-only inputs. It does not receive the parent database, owner trust,
 credentials, Git authority, or a writable child checkout. Missing Bubblewrap
 or namespace support stops with copyable installation and recheck guidance;
 there is no lightweight-but-unisolated fallback.
+Likewise, a provider descriptor created by the parent test suite is isolated
+test data only. A product or Free Development run cannot inherit, copy, or use
+that fixture as provider certification or Production launch authority.
+Bubblewrap and unshare cannot be fixture-substituted at all. If either real
+fixed-path prerequisite is absent, positive parent bootstrap is unavailable
+and only the non-installing diagnosis/guidance path may pass.
+Reuse of the non-executed provider descriptor by parent launcher-integrity
+tests does not make it available to a product or Free Development run; those
+parent positive cases still skip when real containment is absent.
+The equivalent provider-discovery fixture is also parent-test-only and cannot
+be inherited as a local provider.
+The same restriction covers the development-selection discovery fixture.
 
 - `none`: product workspace, canonical documents, scaffold authority, product security, and required local checks are still required; Git, remote sync, and CI are not applicable.
 - `local`: local Git worktree and local Git safety checks are required; remote sync and CI are not applicable.

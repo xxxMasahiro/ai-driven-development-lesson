@@ -85,7 +85,7 @@ export function buildSettingsSubjectCatalog(agents) {
   return choices;
 }
 
-function resolveAgentSelectionPolicy(settings, agent) {
+export function resolveAgentSelectionPolicy(settings, agent) {
   const trace = [];
   for (const scope of SCOPES) {
     const subjectId = subjectForScope(agent, scope);

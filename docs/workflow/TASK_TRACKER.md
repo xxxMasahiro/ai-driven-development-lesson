@@ -3488,10 +3488,10 @@ TESTS: tools/check_developer_memory_requirements.sh,tools/check_document_organiz
 - [ ] Deliver the currently verified non-Control-Center scope through a scoped
   commit, PR CI, merge, main CI, and local/remote synchronization. This delivery
   is allowed while Phase 18 remains paused and is not activation evidence.
-- [ ] After the later reconstructed Control Center acceptance, collect a new
-  immutable-candidate
-  local/no-cache, PR CI, main CI, synchronization, recovery, rollback, archive,
-  and outbox evidence set; activation remains `planned` until then.
+- [x] Superseded: Control Center acceptance is no longer a prerequisite for
+  headless Activation. The later
+  `next_workflow_headless_production_enablement` block owns the immutable
+  local/PR/main/synchronization/recovery/rollback/archive/outbox evidence set.
 
 ### Non-UI runtime wiring before Control Center reconstruction (2026-07-23)
 
@@ -3555,7 +3555,7 @@ TESTS: tools/check_next_workflow.sh,tools/test_next_workflow.sh,tools/check_secu
   brand; launch rechecks current manifest bounds, estimated
   cost, and explicit timeout against the persisted reservation; completed
   replay preserves its result fingerprint. The
-  17-suite Next Workflow aggregate passes 217 tests and all seven contracts.
+  24-suite Next Workflow aggregate and all seven contracts pass.
 - [x] Pass the final aggregate in a clean candidate checkout with the canonical
   repository name, origin identity, and dependency layout.
 - [x] Make containment verification environment-honest: always verify the
@@ -3569,11 +3569,157 @@ TESTS: tools/check_next_workflow.sh,tools/test_next_workflow.sh,tools/check_secu
   status, installation and recheck guidance, subscription/API/local billing
   mode, model/publisher restrictions, and API cost ceilings. Do not modify the
   paused Control Center in this delivery.
-- [ ] When a production AgentLauncher composition is intentionally enabled,
-  add one protected happy-path integration fixture that covers launch through
-  accepted review closure. This coverage follow-up grants no Activation or
-  production authority in the current planned state.
+- [x] Add one protected happy-path integration fixture that covers production
+  AgentLauncher execution through accepted review closure. The later headless
+  enablement block separately owns exact-candidate Activation authority.
 
 This block supersedes only the earlier dependency ordering that placed runtime
 wiring after Phase 18. It does not reopen, rewrite, or authorize any paused
 Control Center code, schema, design, test, package, Vite, or MCP surface.
+
+### Development-session automatic Agent selection
+
+SYNC-ID: next_workflow_development_agent_auto_selection
+STATUS: implemented
+ARTIFACTS: docs/as-built/IMPLEMENTATION_PLAN.md,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/HANDOFF.md,docs/workflow/INSTRUCTION_MEMORY.md,docs/workflow/TASK_TRACKER.md,docs/workflow/TEST_PLAN_MANIFEST.tsv,learning/NEXT_WORKFLOW_AGENT_SELECTION_SETTINGS.json,skills/repository-development-workflow/SKILL.md,skills/repository-development-workflow/references/repository-development.md,tools/lib/next_workflow/provider_discovery.mjs,tools/lib/next_workflow/providers.mjs,tools/lib/next_workflow/settings.mjs,tools/next-workflow.mjs,tools/test_next_workflow.sh,tools/test_next_workflow_development_selection.mjs,tools/test_next_workflow_development_selection.sh
+TESTS: tools/check_next_workflow.sh,tools/test_next_workflow.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+- [x] Add bounded provider-neutral development catalog observation.
+- [x] Add automatic Lead/Task Agent advisory model and effort planning.
+- [x] Add exact prepared-configuration verification without backend claims.
+- [x] Connect the repository-development procedure for use from the next task.
+- [x] Limit the initial saved allowlist to GPT-5.6 Sol, Terra, and Luna; keep
+  GPT-5.5 opt-in and GPT-5.4 outside the initial configuration.
+- [x] Pass focused, aggregate, and document gates.
+- [ ] Pass PR CI, main CI, and synchronization gates.
+- [x] Keep Production Activation, protected runtime launch, API spending, Git
+  authority, and paused Control Center work unchanged.
+
+### Headless Production team enablement
+
+SYNC-ID: next_workflow_headless_production_enablement
+STATUS: implemented
+ARTIFACTS: docs/as-built/IMPLEMENTATION_PLAN.md,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/DEVELOPMENT_INSTRUCTION_POLICY.tsv,docs/workflow/FINAL_GATE_GAP_COMMANDS.tsv,docs/workflow/HANDOFF.md,docs/workflow/INSTRUCTION_MEMORY.md,docs/workflow/TASK_TRACKER.md,docs/workflow/TEST_PLAN_MANIFEST.tsv,learning/NEXT_WORKFLOW_RELEASE_PREREQUISITES.json,tools/lib/next_workflow/agents.mjs,tools/lib/next_workflow/headless_bootstrap.mjs,tools/lib/next_workflow/headless_plan.mjs,tools/lib/next_workflow/headless_runtime.mjs,tools/lib/next_workflow/headless_service.mjs,tools/lib/next_workflow/provider_discovery.mjs,tools/lib/next_workflow/release_signing.mjs,tools/lib/next_workflow/release_source_receipts.mjs,tools/lib/next_workflow/run_controller.mjs,tools/lib/next_workflow/run_lifecycle.mjs,tools/lib/next_workflow/runtime_barrier.cjs,tools/lib/next_workflow/runtime_containment.mjs,tools/lib/next_workflow/runtime_trust.mjs,tools/next-workflow.mjs,tools/test_next_workflow.sh,tools/test_next_workflow_agents.mjs,tools/test_next_workflow_headless_bootstrap.mjs,tools/test_next_workflow_headless_bootstrap.sh,tools/test_next_workflow_headless_plan.mjs,tools/test_next_workflow_headless_plan.sh,tools/test_next_workflow_headless_runtime.mjs,tools/test_next_workflow_headless_runtime.sh,tools/test_next_workflow_release_signing.mjs,tools/test_next_workflow_release_signing.sh,tools/test_next_workflow_run_controller.mjs,tools/test_next_workflow_run_controller.sh
+TESTS: tools/check_next_workflow.sh,tools/test_next_workflow.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+- [x] Make accepted headless runtime operation independent of paused Control
+  Center reconstruction.
+- [x] Add protected external bootstrap and exact executable/credential/isolation
+  pinning without overwrite or unsafe fallback.
+- [x] Require a signed external Owner acceptance receipt before bootstrap and
+  bind it to repository identity plus the complete prerequisite fingerprint.
+- [x] Add rigor-aware headless topology and production model/effort
+  auto-selection for each instantiated Lead and Task Agent.
+- [x] Synchronize `auto|single_agent|team` execution preference: L1 remains the
+  Orchestrator-only path, single-Agent preference cannot override hard L5, and
+  the future Control Center setting remains deferred.
+- [x] Add the protected headless runtime composition and a real isolated Codex
+  CLI success path with exact observed provider/model/effort.
+- [x] Add recovery-first stop handling, no blind retry, and candidate result
+  review/disposition closure.
+- [x] Replace candidate self-review with separate Lead, Orchestrator, and
+  Validator CLI reviewer runs and distinct persisted process provenance.
+- [x] Recheck provider certification and observation freshness before every
+  Agent/reviewer launch and describe model/effort evidence as pinned launch
+  configuration rather than backend attestation.
+- [x] Authorize and isolate provider discovery before any executable probe;
+  fail closed without invoking an untrusted replacement.
+- [x] Bind release candidates to the complete Git tree and require
+  source-evidence receipts signed by a key distinct from final release and
+  activation-transition signing.
+- [x] Make runtime and Activation status fail closed without a legacy authority
+  fallback.
+- [x] Add focused and aggregate coverage and synchronize the permanent English
+  documents without changing paused Control Center code.
+- [ ] Complete commit, PR CI, merge, main CI, local/remote synchronization,
+  main-checkout bootstrap, signed evidence transitions, Activation, and the
+  first bounded operational smoke task.
+- [ ] Resume Control Center reconstruction only when the developer later
+  chooses its timing.
+
+This latest block supersedes every earlier statement that made Control Center
+acceptance a prerequisite for headless Activation or required Production to
+remain unavailable after this delivery. It does not enable the separately
+deferred API, local-runtime, child-adapter, Local Agent Bus, or long-term-memory
+plans.
+
+SYNC-ID: next_workflow_headless_production_hardening
+STATUS: implemented
+ARTIFACTS: docs/as-built/IMPLEMENTATION_PLAN.md,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/HANDOFF.md,docs/workflow/TASK_TRACKER.md,tools/lib/next_workflow/agents.mjs,tools/lib/next_workflow/headless_bootstrap.mjs,tools/lib/next_workflow/headless_plan.mjs,tools/lib/next_workflow/headless_service.mjs,tools/lib/next_workflow/release.mjs,tools/lib/next_workflow/run_controller.mjs,tools/lib/next_workflow/runtime_trust.mjs,tools/lib/next_workflow/store.mjs,tools/next-workflow-launcher.cjs,tools/next-workflow.mjs,tools/test_next_workflow.sh,tools/test_next_workflow_agents.mjs,tools/test_next_workflow_headless_bootstrap.mjs,tools/test_next_workflow_headless_plan.mjs,tools/test_next_workflow_headless_runtime.mjs,tools/test_next_workflow_run_controller.mjs,tools/test_next_workflow_store.mjs
+TESTS: tools/check_next_workflow.sh,tools/test_next_workflow.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+- [x] Separate external Owner enrollment from signed acceptance and pin the
+  accepted native provider path/digest.
+- [x] Bind Production state to one external-trust path and generation.
+- [x] Install and require the immutable pre-import candidate verifier.
+- [x] Connect automatic rigor to single/team preference without weakening L5.
+- [x] Protect terminal Agent records and reconcile candidate-backed open runs.
+- [x] Re-read settings, sanitize Git, and report only trusted runtime metrics.
+- [x] Pass the focused and aggregate local test suites.
+- [ ] Pass final independent CLI re-audit and permanent document gates.
+- [ ] Complete PR CI, merge, main CI, local/remote sync, Activation, and smoke.
+- [ ] Resume Control Center reconstruction only when the developer chooses.
+
+## Headless launcher audit closure
+
+SYNC-ID: next_workflow_headless_launcher_closure
+STATUS: implemented
+ARTIFACTS: docs/as-built/IMPLEMENTATION_PLAN.md,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/HANDOFF.md,docs/workflow/INSTRUCTION_MEMORY.md,docs/workflow/TASK_TRACKER.md,docs/workflow/TEST_PLAN_MANIFEST.tsv,tools/lib/next_workflow/headless_bootstrap.mjs,tools/lib/next_workflow/headless_plan.mjs,tools/lib/next_workflow/runtime_trust.mjs,tools/lib/next_workflow/store.mjs,tools/next-workflow-launcher.cjs,tools/test_next_workflow.sh,tools/test_next_workflow_headless_bootstrap.mjs,tools/test_next_workflow_headless_plan.mjs,tools/test_next_workflow_launcher.mjs,tools/test_next_workflow_launcher.sh,tools/test_next_workflow_store.mjs
+TESTS: tools/check_next_workflow.sh,tools/test_next_workflow.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+- [x] Replace the directly executable JavaScript entry with an external
+  clean-environment wrapper and separately pinned verifier/interpreter.
+- [x] Verify signed release, source, transition, prerequisite, authority, and
+  deployed Git lineage before importing candidate code.
+- [x] Remove the compiled repository name and bind external trust to protected
+  store identity and generation.
+- [x] Detect hard-L5 signals inside child tasks and reject unsafe child paths.
+- [x] Make unresolved persisted Agent Runs a recovery-only startup condition.
+- [x] Add focused regressions and register the launcher suite in the aggregate
+  and test-plan manifest.
+- [x] Correct permanent operator instructions to use `runtime_launcher_path`.
+- [ ] Repeat independent CLI security, architecture, and operations audits,
+  then complete Git/GitHub delivery and exact merged-candidate Activation.
+
+## Headless Production final security closure
+
+SYNC-ID: next_workflow_headless_final_security_closure
+STATUS: implemented
+ARTIFACTS: AGENTS.MD,docs/as-built/IMPLEMENTATION_PLAN.md,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/HANDOFF.md,docs/workflow/TASK_TRACKER.md,tools/lib/next_workflow/agents.mjs,tools/lib/next_workflow/headless_bootstrap.mjs,tools/lib/next_workflow/headless_plan.mjs,tools/lib/next_workflow/headless_service.mjs,tools/lib/next_workflow/release_source_receipts.mjs,tools/lib/next_workflow/release_trust.mjs,tools/lib/next_workflow/run_controller.mjs,tools/lib/next_workflow/runtime_trust.mjs,tools/lib/next_workflow/store.mjs,tools/next-workflow-launcher.cjs,tools/next-workflow.mjs,tools/test_next_workflow_headless_bootstrap.mjs,tools/test_next_workflow_headless_plan.mjs,tools/test_next_workflow_headless_runtime.mjs,tools/test_next_workflow_launcher.mjs
+TESTS: tools/check_next_workflow.sh,tools/test_next_workflow.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+- [x] Bind complete repository identity and separate verifier key material.
+- [x] Execute only a private read-only snapshot of signed Git artifact bytes.
+- [x] Verify the pinned live wrapper parent, shell interpreter, and argument
+  vector before protected-state use; a public marker alone is insufficient.
+- [x] Run L1 as exactly one bounded Orchestrator without reviewer launches.
+- [x] Revalidate exact topology at execution and run the root Orchestrator
+  before every L2-L5 Lead/Task hierarchy.
+- [x] Freeze a separate public plan projection and reject any topology whose
+  rigor differs from the captured authority-derived value.
+- [x] Stop on classification overflow and noncanonical scope paths.
+- [x] Bound task and explicit safety-signal collections before traversal.
+- [x] Enforce exact recovery authorization and terminal closure in the store.
+- [x] Pass aggregate local tests and a positive complete signed-launch test.
+- [x] Obtain PASS from the final independent CLI security, architecture, and
+  operations audits with explicit observed model and effort.
+- [x] Close the PR-only omission found by CI by synchronizing the complete
+  parent authority set, and require both PR and incremental push ranges to pass
+  without weakening the document gate.
+- [x] Remove the GitHub-runner dependency on an installed Codex CLI from the
+  bootstrap regression by using a private non-executed descriptor fixture;
+  retain mandatory actual-native resolution for Production.
+- [x] Treat missing real Bubblewrap/unshare on GitHub runners honestly:
+  prerequisite-skip positive bootstrap construction, keep Production blocked,
+  and require the separate guided-refusal/status test to pass.
+- [x] Remove the remaining installed-launcher regression dependency on a host
+  Codex installation by reusing the suite-private, non-executed descriptor
+  while retaining exact wrapper and executable-pinning checks on hosts with
+  real containment and explicit prerequisite skips elsewhere.
+- [x] Bring provider-discovery fixtures in line with native executable pinning
+  by adding deterministic non-executed native bytes while preserving injected
+  observation and pre-probe rejection.
+- [x] Make development-selection discovery equally CI-portable with a complete
+  private CLI/native fixture and no Production fallback.
+- [ ] Deliver, merge, pass main CI, synchronize, activate the exact merge, and
+  run the bounded Production smoke task.

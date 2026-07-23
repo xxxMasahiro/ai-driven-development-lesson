@@ -148,7 +148,25 @@ A product template must not copy parent runtime trust, SQLite state, provider
 credentials, executable certifications, or Git authority. If a future product
 adapter requests a parent Task Agent, it receives a bounded local-first
 instruction envelope and candidate-only result contract; the parent retains
-containment, admission, review, cost, and release authority.
+containment, admission, review, cost, and release authority. A template must
+not install or emulate the parent Production launcher: headless Production
+entry is created externally only after exact repository identity,
+immutable-candidate release evidence, signed activation transitions, and
+recovery closure pass. Control Center availability is not an authorization
+signal.
+A generated product template must not include the parent bootstrap-test Codex
+fixture or treat its digest as certification. The fixture exists only inside
+an isolated parent regression test; real product execution remains bound to
+the currently observed and parent-authorized provider executable.
+Templates also must not provide fake Bubblewrap or unshare binaries. Missing
+real containment leaves headless Production unavailable and exposes only the
+parent's installation and recheck guidance.
+The parent launcher-integrity suite may reuse its private non-executed provider
+descriptor only where real containment exists, but generated templates must
+not copy or inherit that fixture.
+Provider-discovery CLI/native fixtures are equally parent-test-only and must
+not be emitted by templates.
+Development-selection discovery fixtures have the same prohibition.
 
 ## LEARNING_TASK_TRACKER.md
 

@@ -3530,29 +3530,12 @@ Restart context after local implementation:
   incorporated into this permanent contract. Their temporary raw reports are
   not permanent authorities.
 
-Next safe action:
-
-- Preserve the locally verified non-Control-Center safety foundation without
-  changing Control Center code, then complete and deliver the protected non-UI
-  runtime-wiring slice through PR CI, merge, main CI, and synchronization. This
-  delivery is not the final activation candidate.
-- The isolated non-production profile now configures and tests protected
-  runtime, Approval, Receipt, finalization, observation, containment, and CLI
-  lifecycle owners through the common gateway. Keep externally reachable
-  production adapters unavailable and Activation `planned`; isolated evidence
-  is not production authority.
-- When the developer later resumes the paused scope, rebaseline and reconstruct
-  its design-system-owned Control Center work, rerun required browser and
-  TraceCue review, and obtain developer acceptance. Only then complete the
-  activation release against one immutable candidate: final local aggregate and
-  no-cache evidence, PR CI, merge, main CI, and local/remote synchronization,
-  plus recovery, fenced rollback, archive/decommission, and outbox-disposition
-  proofs. If they all bind the same candidate and correctness remains green,
-  use the signed, confirmation-bound release-transition commands to persist the
-  operational activation lifecycle in the repository-local store; do not
-  manually edit the planned baseline included in the scoped delivery. Run the activation checks and
-  repeat the configured delivery proof for the final activation-only change.
-  Any material drift returns to shadow under a new candidate.
+Historical next action: the non-UI baseline originally kept Production
+unavailable until later Control Center acceptance. That sequencing is
+superseded by the later headless Production enablement block. The isolated
+profile remains non-production, but the separately protected headless profile
+may activate from exact local/PR/main/synchronization and recovery evidence
+without changing Control Center code.
 
 ## Non-UI Runtime Wiring Handoff
 
@@ -3619,7 +3602,7 @@ Next Step:
   candidate data only. Activation trust and owner acceptance must be supplied
   by a protected owner-managed source outside the candidate and remain absent
   for this delivery.
-- The 17-suite Next Workflow aggregate currently passes 217 tests, and the
+- The 24-suite Next Workflow aggregate currently passes, and the
   clean-candidate canonical repository aggregate passes. The final delivery
   gate still requires PR CI, merge, main CI, and local/remote synchronization.
   The resulting state is non-UI wiring implemented, production unavailable,
@@ -3740,3 +3723,187 @@ TESTS: tools/check_developer_memory_requirements.sh,tools/check_document_organiz
   those cases as explicit skips after verifying installation or OS-policy
   guidance. This is a test portability correction only; runtime containment
   still fails closed and no unisolated fallback exists.
+
+Development-session automatic selection is an implemented precursor to the
+headless Production slice below.
+
+SYNC-ID: next_workflow_development_agent_auto_selection
+STATUS: implemented
+ARTIFACTS: docs/as-built/IMPLEMENTATION_PLAN.md,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/HANDOFF.md,docs/workflow/INSTRUCTION_MEMORY.md,docs/workflow/TASK_TRACKER.md,docs/workflow/TEST_PLAN_MANIFEST.tsv,learning/NEXT_WORKFLOW_AGENT_SELECTION_SETTINGS.json,skills/repository-development-workflow/SKILL.md,skills/repository-development-workflow/references/repository-development.md,tools/lib/next_workflow/provider_discovery.mjs,tools/lib/next_workflow/providers.mjs,tools/lib/next_workflow/settings.mjs,tools/next-workflow.mjs,tools/test_next_workflow.sh,tools/test_next_workflow_development_selection.mjs,tools/test_next_workflow_development_selection.sh
+TESTS: tools/check_next_workflow.sh,tools/test_next_workflow.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+Implement the read-only development advisory selector before the next Lead or
+Task Agent CLI launch. It must use the installed provider's official bounded
+catalog, saved nearest-scope model policy, role, rigor, risk, and complexity;
+emit exact model/effort configuration and a deterministic fingerprint; and
+verify the prepared launch values. It must not issue provider certification,
+claim backend attestation, activate production, grant Git/network/API authority,
+or touch the paused Control Center.
+
+The initial saved allowlist is GPT-5.6 Sol, Terra, and Luna only. GPT-5.5 is
+available only after an explicit later policy change; GPT-5.4 is not included.
+
+Headless Production enablement is implemented and is the active delivery.
+
+SYNC-ID: next_workflow_headless_production_enablement
+STATUS: implemented
+ARTIFACTS: docs/as-built/IMPLEMENTATION_PLAN.md,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/DEVELOPMENT_INSTRUCTION_POLICY.tsv,docs/workflow/FINAL_GATE_GAP_COMMANDS.tsv,docs/workflow/HANDOFF.md,docs/workflow/INSTRUCTION_MEMORY.md,docs/workflow/TASK_TRACKER.md,docs/workflow/TEST_PLAN_MANIFEST.tsv,learning/NEXT_WORKFLOW_RELEASE_PREREQUISITES.json,tools/lib/next_workflow/agents.mjs,tools/lib/next_workflow/headless_bootstrap.mjs,tools/lib/next_workflow/headless_plan.mjs,tools/lib/next_workflow/headless_runtime.mjs,tools/lib/next_workflow/headless_service.mjs,tools/lib/next_workflow/provider_discovery.mjs,tools/lib/next_workflow/release_signing.mjs,tools/lib/next_workflow/release_source_receipts.mjs,tools/lib/next_workflow/run_controller.mjs,tools/lib/next_workflow/run_lifecycle.mjs,tools/lib/next_workflow/runtime_barrier.cjs,tools/lib/next_workflow/runtime_containment.mjs,tools/lib/next_workflow/runtime_trust.mjs,tools/next-workflow.mjs,tools/test_next_workflow.sh,tools/test_next_workflow_agents.mjs,tools/test_next_workflow_headless_bootstrap.mjs,tools/test_next_workflow_headless_bootstrap.sh,tools/test_next_workflow_headless_plan.mjs,tools/test_next_workflow_headless_plan.sh,tools/test_next_workflow_headless_runtime.mjs,tools/test_next_workflow_headless_runtime.sh,tools/test_next_workflow_release_signing.mjs,tools/test_next_workflow_release_signing.sh,tools/test_next_workflow_run_controller.mjs,tools/test_next_workflow_run_controller.sh
+TESTS: tools/check_next_workflow.sh,tools/test_next_workflow.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+The reusable headless service now resolves the saved model policy, discovers and
+certifies the pinned Codex CLI, selects model and native effort per actual
+Agent role, and launches only through the protected gateway and real Linux
+containment. Startup reconciles prior unknown outcomes. Results remain
+candidates until three separately launched Lead, Orchestrator, and Validator
+CLI reviewer runs close them. Their grants, reservations, result provenance,
+and process identities remain distinct from the reviewed subject and each
+other. Accepted outcomes report the pinned contained-CLI launch model and
+effort; they do not claim remote-backend attestation.
+
+The default execution preference remains automatic. An explicit
+`single_agent` preference maps only to effective L1 and uses the Orchestrator
+without Lead or Task Agent launches; hard-L5 conditions override it. A `team`
+preference may raise but never lower rigor. Persisting this choice in the
+Control Center remains part of the deferred UI reconstruction and does not
+block the current CLI path.
+
+The protected runtime remains fail closed until the main checkout has an
+external signed Owner acceptance, protected trust, and an enforced
+exact-candidate Activation record. Provider discovery is digest-authorized
+before execution and runs inside non-networked isolation; certification and
+observation freshness are rechecked before every launch. After the listed
+delivery gates, freeze the complete Git tree, create fresh source-evidence
+receipts, sign the eight proof kinds and six ordered transitions with the
+distinct final-release key, activate the candidate, and run one bounded smoke
+task. Runtime/status failures remain structured STOP results and never fall
+back to legacy authority. Do not enable API/local transports, touch the paused
+Control Center, or implement the separately deferred plans during this handoff.
+
+This latest block supersedes every earlier handoff statement that required
+Control Center acceptance before headless Activation or that kept the protected
+headless AgentLauncher unavailable after this delivery. The isolated profile
+and the separately deferred API/local/child-adapter plans remain unchanged.
+
+SYNC-ID: next_workflow_headless_production_hardening
+STATUS: implemented
+ARTIFACTS: docs/as-built/IMPLEMENTATION_PLAN.md,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/HANDOFF.md,docs/workflow/TASK_TRACKER.md,tools/lib/next_workflow/agents.mjs,tools/lib/next_workflow/headless_bootstrap.mjs,tools/lib/next_workflow/headless_plan.mjs,tools/lib/next_workflow/headless_service.mjs,tools/lib/next_workflow/release.mjs,tools/lib/next_workflow/run_controller.mjs,tools/lib/next_workflow/runtime_trust.mjs,tools/lib/next_workflow/store.mjs,tools/next-workflow-launcher.cjs,tools/next-workflow.mjs,tools/test_next_workflow.sh,tools/test_next_workflow_agents.mjs,tools/test_next_workflow_headless_bootstrap.mjs,tools/test_next_workflow_headless_plan.mjs,tools/test_next_workflow_headless_runtime.mjs,tools/test_next_workflow_run_controller.mjs,tools/test_next_workflow_store.mjs
+TESTS: tools/check_next_workflow.sh,tools/test_next_workflow.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+The current candidate includes the post-audit trust-boundary hardening. Local
+aggregate tests pass. Production commands must be invoked through the external
+launcher installed by the four-step isolation/enrollment/acceptance/bootstrap
+procedure; direct team execution and mutating recovery stop. External trust
+binds the Owner anchor, provider executable, database generation, and launcher
+wrapper, script, and interpreter digests. Use
+`<runtime_launcher_path> <absolute-repository-path> team run --task
+<repository-relative-json>` where `runtime_launcher_path` is the absolute value
+returned by bootstrap. The wrapper starts from a clean environment before Node
+loads; the launcher independently verifies the complete signed release and
+transition lineage, externally enrolled repository identity and state
+generation, and exact clean deployed Git content before candidate imports.
+
+Automatic execution preference is operational: `auto` derives L1-L5,
+`single_agent` is limited to effective L1, and `team` may raise L1 to L2.
+Hard-L5 signals always win. The team surface honestly stops on L1 until a
+direct Orchestrator executor exists. Open Agent Runs block later work and
+candidate-backed runs can be authorization-closed to STOP during recovery.
+
+Next, run the final independent CLI security, architecture/recovery, and
+operations/document audits. Resolve every blocking finding, pass permanent
+document and repository workflow gates, then perform commit/PR/CI/merge/main-CI
+sync. Bootstrap and activate only the exact merged candidate, and run one
+bounded smoke task through the installed launcher. Do not modify Control Center
+source; its reconstruction remains developer-timed.
+
+## Headless launcher audit-closure handoff
+
+SYNC-ID: next_workflow_headless_launcher_closure
+STATUS: implemented
+ARTIFACTS: docs/as-built/IMPLEMENTATION_PLAN.md,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/HANDOFF.md,docs/workflow/INSTRUCTION_MEMORY.md,docs/workflow/TASK_TRACKER.md,docs/workflow/TEST_PLAN_MANIFEST.tsv,tools/lib/next_workflow/headless_bootstrap.mjs,tools/lib/next_workflow/headless_plan.mjs,tools/lib/next_workflow/runtime_trust.mjs,tools/lib/next_workflow/store.mjs,tools/next-workflow-launcher.cjs,tools/test_next_workflow.sh,tools/test_next_workflow_headless_bootstrap.mjs,tools/test_next_workflow_headless_plan.mjs,tools/test_next_workflow_launcher.mjs,tools/test_next_workflow_launcher.sh,tools/test_next_workflow_store.mjs
+TESTS: tools/check_next_workflow.sh,tools/test_next_workflow.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+The final audit closure removes the remaining pre-candidate trust gaps. The
+bootstrap-returned `runtime_launcher_path` is now a POSIX wrapper that starts a
+pinned interpreter from a clean environment and a separate read-only verifier.
+The verifier accepts no compiled repository name and independently checks the
+protected identity/generation, signed Activation lineage, signed deployed merge
+SHA, Git tree, and artifact content before importing repository code.
+
+Root and child task content now feed safety-only rigor classification, so a
+benign root cannot hide a hard-L5 child. Unresolved Agent Runs now place the
+store in recovery-only mode after restart. Direct repository `team run` and
+mutating reconcile remain forbidden; use the absolute installed launcher
+command documented in `INSTRUCTION_MEMORY.md`.
+
+Focused audit-closure tests pass. The remaining handoff is to rerun the complete
+aggregate and permanent document gates, obtain PASS from the three independent
+CLI audits, deliver through PR/main CI, bootstrap and activate only the exact
+merged candidate, and execute a bounded installed-launcher smoke task. The
+paused Control Center and separately deferred plans remain untouched.
+
+## Headless Production final security-closure handoff
+
+SYNC-ID: next_workflow_headless_final_security_closure
+STATUS: implemented
+ARTIFACTS: AGENTS.MD,docs/as-built/IMPLEMENTATION_PLAN.md,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/HANDOFF.md,docs/workflow/TASK_TRACKER.md,tools/lib/next_workflow/agents.mjs,tools/lib/next_workflow/headless_bootstrap.mjs,tools/lib/next_workflow/headless_plan.mjs,tools/lib/next_workflow/headless_service.mjs,tools/lib/next_workflow/release_source_receipts.mjs,tools/lib/next_workflow/release_trust.mjs,tools/lib/next_workflow/run_controller.mjs,tools/lib/next_workflow/runtime_trust.mjs,tools/lib/next_workflow/store.mjs,tools/next-workflow-launcher.cjs,tools/next-workflow.mjs,tools/test_next_workflow_headless_bootstrap.mjs,tools/test_next_workflow_headless_plan.mjs,tools/test_next_workflow_headless_runtime.mjs,tools/test_next_workflow_launcher.mjs
+TESTS: tools/check_next_workflow.sh,tools/test_next_workflow.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+The remaining audit blockers are implemented. External trust and the launcher
+now bind the complete repository identity and distinct source/release keys.
+The launcher compares deployed files with Git blobs and executes only a
+private read-only snapshot of those verified bytes. The candidate runtime
+checks its installed parent launcher and snapshot before protected-state
+access. The wrapper stays alive as the launcher's parent, and protected trust
+pins the parent shell, canonical wrapper path, and forwarded arguments so a
+replayed public marker cannot replace the installed entry point.
+
+L1 now performs one bounded Orchestrator launch with internal verification and
+revalidates its exact topology at the execution boundary. L2-L5 launch the real
+root Orchestrator before accepted evidence flows to Lead and Task descendants,
+and the budget counts every subject and reviewer process. Classification
+overflow or noncanonical paths stop, and recovery authorization is regenerated
+and exact-compared in the store. Task and explicit safety-signal collection
+bounds are enforced before classification traversal. A complete positive
+fixture proves signed
+source receipts, release proofs, ordered transitions, enforced Activation,
+repository deployment, and snapshot execution. The aggregate local suite
+passes.
+
+The public plan is a frozen projection separate from the privately captured
+admitted topology. RunController also requires the independently normalized
+expected rigor, preventing a self-rehashed strict-to-L1 replacement.
+
+Independent CLI security (`gpt-5.6-sol` / `max`), architecture/recovery
+(`gpt-5.6-terra` / `xhigh`), and operations/document (`gpt-5.6-luna` / `high`)
+re-audits pass. The remaining work is immutable GitHub delivery, exact
+merged-candidate Activation, and one bounded installed-launcher smoke task.
+Control Center and the separately deferred plans remain unchanged.
+
+The PR-only document gate correctly exposed that the first delivery candidate
+did not include every required parent authority. The complete 17-document
+authority set is now synchronized with the headless Production boundary, and
+both PR merge-base and incremental push ranges are treated as independent
+fail-closed release inputs rather than bypassed or weakened.
+
+The next PR failure was CI portability, not a Production relaxation:
+`test_next_workflow_headless_bootstrap` assumed Codex was installed on the
+GitHub runner. The test now supplies a private non-executed descriptor fixture
+when the real native executable is absent. A copied Node runtime with no Codex
+package passes the focused test, while Production resolution and executable
+pinning remain unchanged.
+GitHub runners also omit Bubblewrap. Positive bootstrap now runs only with the
+real fixed containment executables; otherwise it is explicitly
+prerequisite-skipped and the separate `STOP` plus installation-guidance test
+must pass. Local prerequisite-complete execution continues to prove the full
+positive path.
+The installed-launcher regression now uses the same suite-private,
+non-executed Codex descriptor. This removes its remaining GitHub-runner Codex
+dependency while preserving executable pinning and all wrapper integrity
+checks where real containment is present; without it, those positive cases are
+explicitly prerequisite-skipped rather than given fake isolation.
+The two provider-discovery regressions now create the required native package
+fixture as well as the CLI path. Their injected runner and authority behavior
+is unchanged, and Production native resolution remains strict.
+The development-selection regression now supplies the same complete package
+layout. Its model/effort assertions therefore run identically on GitHub hosts
+without Codex, while the Production resolver remains unchanged.

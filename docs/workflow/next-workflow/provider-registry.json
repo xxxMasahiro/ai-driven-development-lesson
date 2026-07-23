@@ -16,14 +16,15 @@
     "drift_or_outage_fails_closed": true
   },
   "configuration_states": ["requested", "selected", "effective", "actual_observed"],
-  "attestation": {"immutable_snapshots": true, "fields": ["identity", "reasoning_native", "normalized_effort", "source", "observed_at", "fingerprint", "evidence_strength"], "actual_absent_before_spawn": true, "copied_or_predicted_actual_refused": true},
+  "attestation": {"immutable_snapshots": true, "fields": ["identity", "reasoning_native", "normalized_effort", "source", "observed_at", "fingerprint", "evidence_strength"], "actual_absent_before_spawn": true, "copied_or_predicted_actual_refused": true, "launch_observation_scope": "pinned_cli_launch_configuration", "backend_attestation_available": false, "backend_identity_must_not_be_inferred_from_launch_arguments": true},
   "reasoning": {"native_and_normalized_are_distinct": true, "normalized_mapping_requires_provenance": true, "unsupported_equivalence_must_not_be_claimed": true},
   "automatic_effort_selection": {
     "inputs": ["rigor", "risk", "complexity", "provider_capability", "explicit_user_override"],
     "rigor_floor": {"L1": "minimal", "L2": "low", "L3": "medium", "L4": "high", "L5": "xhigh"},
     "explicit_native_value_passed_to_cli": true,
     "selected_model_and_effort_bound_to_launch": true,
-    "independent_runtime_observation_required": true,
+    "contained_process_argument_observation_required": true,
+    "backend_attestation_not_claimed": true,
     "selected_actual_mismatch": "STOP",
     "implicit_none_observation": "forbidden",
     "per_launch_report_fields": ["provider", "model", "effort", "observation_proof_fingerprint"]

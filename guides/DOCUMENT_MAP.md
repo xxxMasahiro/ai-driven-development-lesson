@@ -120,13 +120,17 @@ owns its procedure; only exact absence can select the parent fallback. The
 resolver does not merge both documents, does not repair a child by writing a
 copy, and does not apply to structured lesson workflow kinds.
 
-The next-workflow runtime remains fail-closed while its activation record is
-planned or shadow-only. `tools/next-workflow` provides read-only projection,
-catalog, health, activation, and release status plus guarded mutation and
-release commands. Read-only commands do not initialize repository identity or
-SQLite state. The remaining Control Center presentation and acceptance work is
+The next-workflow runtime remains fail-closed until the exact repository and
+immutable Git candidate pass the external owner-trust bootstrap, signed source
+and release evidence, ordered activation transitions, recovery closure, PR/main
+CI, and local/remote synchronization. `tools/next-workflow` provides read-only
+projection, catalog, health, activation, and release status plus guarded
+mutation and release commands. Read-only commands do not initialize repository
+identity or SQLite state. Production entry is accepted only through the
+externally installed launcher; direct repository CLI invocation cannot claim
+Production authority. The remaining Control Center presentation work is
 recorded as paused in `TASK_TRACKER.md` and `HANDOFF.md`; partial UI artifacts
-are not activation evidence.
+are neither required nor accepted as activation evidence.
 
 `REPOSITORY_DOCUMENT_SYNC_POLICY.json` also classifies Next Workflow core
 changes explicitly. Their PR or push range must include the complete as-built,
@@ -134,14 +138,30 @@ instruction, verification, Security, CI/hook, and workflow-state authority set.
 This strict synchronization remains local to the parent repository and does
 not inspect TraceCue, FrameCue, or another registered child checkout.
 
-The protected non-UI runtime is implemented by migration
-`tools/lib/next_workflow/migrations/003_runtime_wiring.sql` and the runtime,
-trust, containment, lifecycle, and task-delivery owners under
+The protected non-UI runtime is implemented by the versioned migrations and
+the runtime, trust, containment, lifecycle, task-delivery, model-selection,
+release-signing, source-receipt, and headless-team owners under
 `tools/lib/next_workflow/`. `./tools/next-workflow runtime isolation-check`
 reports prerequisites without installing them. `tools/test_next_workflow.sh`
 is the focused aggregate; environments with real isolation run containment
 fixtures, while environments without it must pass the explicit guided-refusal
-path. Production launch and Control Center Activation remain unavailable.
+path. After the exact signed Activation completes, the installed external
+launcher can run L1 as one Orchestrator or L2-L5 as the admitted
+Orchestrator/Lead/Task Agent hierarchy without waiting for the Control Center.
+Bootstrap regression remains runnable on CI hosts without Codex by creating a
+private non-executed executable-layout fixture inside the test directory.
+Operational discovery is unchanged and requires the real installed native
+provider binary; the fixture is never an installation or Activation source.
+Unlike the non-executed provider descriptor, containment executables are never
+simulated. CI without fixed-path Bubblewrap or unshare marks positive bootstrap
+as prerequisite-skipped and still verifies the separate safe-stop guidance.
+The installed-launcher integrity suite also uses that private provider
+descriptor for signed fixture construction only; its wrapper commands never
+launch the descriptor and run only when real containment is present.
+Provider discovery has its own complete CLI/native fixture with an injected
+runner; it proves pinning and rejection without becoming an installed provider.
+Development-selection discovery reuses that fixture shape for portable
+model/effort assertions, never as an operational provider.
 
 ## Memory Documents
 

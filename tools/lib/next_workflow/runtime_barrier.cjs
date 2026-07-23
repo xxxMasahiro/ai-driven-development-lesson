@@ -39,7 +39,10 @@ else {
     shell: false,
     detached: false,
     windowsHide: true,
-    stdio: [0, 1, 2, 3, 4, 5, 6, 7, 8, "pipe"],
+    // FD 13 carries the owner-pinned provider credential file for the
+    // provider-network profile. Forward it without copying bytes through
+    // JavaScript; Bubblewrap consumes the descriptor as a read-only mount.
+    stdio: [0, 1, 2, 3, 4, 5, 6, 7, 8, "pipe", "ignore", "ignore", "ignore", 13],
   });
   if (!Number.isSafeInteger(child.pid) || child.pid < 1) failClosed("contained_process_spawn_failed", child);
   else {

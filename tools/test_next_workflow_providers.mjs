@@ -10,6 +10,28 @@ import { discoverBuiltinProviderInputs } from "./lib/next_workflow/provider_disc
 const temporaryRoots = [];
 test.after(() => temporaryRoots.forEach((root) => rmSync(root, { recursive: true, force: true })));
 
+function installFixtureCodex(root, nativeBytes) {
+  const binRoot = path.join(root, "bin");
+  const packageRoot = path.join(
+    root,
+    "node_modules",
+    "@openai",
+    `codex-linux-${process.arch}`,
+    "vendor",
+    `${{ x64: "x86_64", arm64: "aarch64" }[process.arch]}-unknown-linux-musl`,
+    "bin",
+  );
+  mkdirSync(binRoot, { recursive: true, mode: 0o700 });
+  mkdirSync(packageRoot, { recursive: true, mode: 0o700 });
+  const cliPath = path.join(binRoot, "codex");
+  const nativePath = path.join(packageRoot, "codex");
+  writeFileSync(cliPath, "#!/bin/sh\nexit 0\n", { mode: 0o500 });
+  writeFileSync(nativePath, nativeBytes, { mode: 0o500 });
+  chmodSync(cliPath, 0o500);
+  chmodSync(nativePath, 0o500);
+  return cliPath;
+}
+
 const identity = { execution_provider_id: "fixture-provider", model_publisher_id: "fixture-publisher", agent_product_id: "fixture-product", adapter_id: "fixture-cli", transport_id: "cli_process", model_id: "fixture-model" };
 const identityKey = providerIdentityKey(identity);
 const codexArgvTemplate = ["exec", "--ephemeral", "--sandbox", "{{sandbox}}", "--model", "{{model_id}}", "-c", "{{reasoning_config}}", "--cd", "{{working_directory}}", "--output-last-message", "{{response_file}}", "{{stdin_marker}}"];
@@ -503,12 +525,15 @@ test("API execution remains fail-closed until a gateway-owned network and secret
 test("Codex discovery creates only direct-observation-bound eligible model entries", () => {
   const root = mkdtempSync(path.join(tmpdir(), "next-provider-discovery-"));
   temporaryRoots.push(root);
-  const executable = path.join(root, "codex");
-  writeFileSync(executable, "fixture-binary", { mode: 0o700 });
+  const executable = installFixtureCodex(root, Buffer.from("fixture-native-binary"));
   const family = { family_id: "codex-openai", execution_provider_id: "openai", model_publisher_id: "openai", agent_product_id: "codex", adapter_id: "codex_cli", transport_id: "cli_process", observed_adapter_version: "1.2.3", certification_state: "CERTIFIED", model_catalog_source: "runtime_discovery", capabilities: ["read"], resource_bounds: { cost: 0 }, estimated_cost: 0, priority: 1 };
   const runner = (_executable, argv) => argv[0] === "--version"
     ? "codex-cli 1.2.3\n"
-    : JSON.stringify({ models: [{ slug: "fixture-model", visibility: "list", default_reasoning_level: "high", supported_reasoning_levels: [{ effort: "low" }, { effort: "high" }] }] });
+    : JSON.stringify({ models: [
+      { slug: "fixture-balanced", priority: 2, visibility: "list", default_reasoning_level: "high", supported_reasoning_levels: [{ effort: "low" }, { effort: "high" }] },
+      { slug: "fixture-efficient", priority: 3, visibility: "list", default_reasoning_level: "high", supported_reasoning_levels: [{ effort: "low" }, { effort: "high" }] },
+      { slug: "fixture-model", priority: 1, visibility: "list", default_reasoning_level: "high", supported_reasoning_levels: [{ effort: "low" }, { effort: "high" }] },
+    ] });
   const probeAuthority = {
     trusted: true,
     independent: true,
@@ -527,13 +552,78 @@ test("Codex discovery creates only direct-observation-bound eligible model entri
   };
   const discovered = discoverBuiltinProviderInputs({ adapterFamilies: [family], probeAuthority, certificationAuthority, executableLocator: () => executable, runner, platform: "linux-x64", clock: () => "2029-01-01T00:00:00.000Z" });
   const runtime = loadProviderRegistry({ ...discovered, platform: "linux-x64", clock: () => "2029-01-01T00:00:00.000Z" });
-  assert.equal(runtime.entries.length, 1);
-  assert.equal(runtime.entries[0].eligible, true);
-  assert.equal(runtime.entries[0].manifest.identity.model_id, "fixture-model");
-  assert.deepEqual(runtime.entries[0].manifest.native_reasoning_values, ["high", "low"]);
+  assert.equal(runtime.entries.length, 3, JSON.stringify(discovered.blockers));
+  assert.equal(runtime.entries.every((entry) => entry.eligible), true);
+  const recommended = selectAgentConfiguration({
+    registry: runtime,
+    policy: { mode: "auto" },
+    requirements: { capabilities: ["read"], normalized_effort: "high", role: "Implementation Lead", rigor: "L3", risk: "normal", complexity: "normal", objective: "correctness" },
+    authority: { decision: "ALLOW", rigor: "L3" },
+    budget: { cost: 0 },
+  });
+  assert.equal(recommended.decision, "PASS");
+  assert.equal(recommended.selected_model, "fixture-model");
+  assert.equal(recommended.manifest.recommendation_rank, 1);
+  assert.deepEqual(recommended.manifest.native_reasoning_values, ["high", "low"]);
+  const balanced = selectAgentConfiguration({
+    registry: runtime,
+    policy: { mode: "auto" },
+    requirements: { capabilities: ["read"], normalized_effort: "high", role: "Implementation Lead", rigor: "L3", risk: "normal", complexity: "normal" },
+    authority: { decision: "ALLOW", rigor: "L3" },
+    budget: { cost: 0 },
+  });
+  assert.equal(balanced.selected_model, "fixture-balanced");
+  assert.equal(balanced.objective, "balanced");
+  const efficient = selectAgentConfiguration({
+    registry: runtime,
+    policy: { mode: "auto" },
+    requirements: { capabilities: ["read"], normalized_effort: "low", role: "Implementation Lead", rigor: "L1", risk: "low", complexity: "low" },
+    authority: { decision: "ALLOW", rigor: "L1" },
+    budget: { cost: 0 },
+  });
+  assert.equal(efficient.selected_model, "fixture-efficient");
+  assert.equal(efficient.objective, "efficiency");
   const blocked = discoverBuiltinProviderInputs({ adapterFamilies: [family], executableLocator: () => executable, runner, platform: "linux-x64", clock: () => "2029-01-01T00:00:00.000Z" });
   assert.equal(blocked.entries?.length ?? blocked.manifests.length, 0);
   assert.equal(blocked.blockers[0].code, "PROVIDER_PROBE_AUTHORITY_REQUIRED");
+});
+
+test("Production discovery refuses an untrusted executable before invoking it", () => {
+  const root = mkdtempSync(path.join(tmpdir(), "next-provider-preflight-"));
+  temporaryRoots.push(root);
+  const executable = installFixtureCodex(root, Buffer.from("substituted-native-binary"));
+  const family = { family_id: "codex-openai", execution_provider_id: "openai", model_publisher_id: "openai", agent_product_id: "codex", adapter_id: "codex_cli", transport_id: "cli_process", observed_adapter_version: "1.2.3", certification_state: "CERTIFIED", model_catalog_source: "runtime_discovery", capabilities: ["read"], resource_bounds: { cost: 0 }, estimated_cost: 0, priority: 1 };
+  let invoked = false;
+  const probeAuthority = {
+    trusted: true,
+    independent: true,
+    authority_id: "fixture-isolated-probe",
+    verify({ fingerprint }) {
+      return { verified: false, authority_id: this.authority_id, fingerprint };
+    },
+  };
+  const certificationAuthority = {
+    trusted: true,
+    independent: true,
+    authority_id: "fixture-certification-authority",
+    issue() { throw new Error("must not issue"); },
+    verify() { return false; },
+  };
+  const discovered = discoverBuiltinProviderInputs({
+    adapterFamilies: [family],
+    probeAuthority,
+    certificationAuthority,
+    executableLocator: () => executable,
+    runner: () => {
+      invoked = true;
+      throw new Error("must not execute");
+    },
+    platform: "linux-x64",
+    clock: () => "2029-01-01T00:00:00.000Z",
+  });
+  assert.equal(invoked, false);
+  assert.equal(discovered.manifests.length, 0);
+  assert.equal(discovered.blockers[0].code, "PROVIDER_EXECUTABLE_NOT_AUTHORIZED_BEFORE_PROBE");
 });
 
 test("selection dry-run is non-authorizing and revision bound", () => {

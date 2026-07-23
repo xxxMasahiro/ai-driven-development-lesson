@@ -6,7 +6,7 @@ import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:f
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { completeActivation, evaluateCorrectness, evaluatePerformance, freezeReleaseCandidate, freezeRepositoryReleaseCandidate, persistActivationTransition, releaseDigest, rollbackActivation, verifyEnforcedActivationRecord, verifyReleaseProofs } from "./lib/next_workflow/release.mjs";
+import { completeActivation, evaluateCorrectness, evaluatePerformance, freezeReleaseCandidate, freezeRepositoryReleaseCandidate, persistActivationTransition, releaseDigest, rollbackActivation, verifyEnforcedActivationRecord, verifyReleaseProofs, verifyRepositoryReleaseDeployment } from "./lib/next_workflow/release.mjs";
 import { createSignedReleaseProofVerifier, createSignedTransitionVerifier, releaseSignaturePayload } from "./lib/next_workflow/release_trust.mjs";
 import { loadProtectedRuntimeTrust } from "./lib/next_workflow/runtime_trust.mjs";
 import { validateActivationRecord } from "./lib/next_workflow/projection.mjs";
@@ -14,9 +14,10 @@ import { openWorkflowStateStore } from "./lib/next_workflow/store.mjs";
 
 const PROOF_KINDS = ["local_release", "pr_ci", "main_ci", "local_remote_sync", "recovery", "fenced_rollback", "archive_decommission", "outbox_disposition"];
 const NOW = "2029-01-01T00:00:00.000Z";
-const ACCEPTED_PREREQUISITES = { schema_version: "1.0.0", prerequisite_id: "next-development-workflow-release-prerequisites", revision: 2, control_center: { state: "accepted", developer_accepted: true, evidence_fingerprint: "c".repeat(64), accepted_at: "2028-12-31T00:00:00.000Z", resume_required: false } };
-const PAUSED_PREREQUISITES = { schema_version: "1.0.0", prerequisite_id: "next-development-workflow-release-prerequisites", revision: 1, control_center: { state: "paused", developer_accepted: false, evidence_fingerprint: null, accepted_at: null, resume_required: true } };
-const candidate = freezeReleaseCandidate({ repositoryHead: "a".repeat(40), artifactFingerprints: ["artifact-b", "artifact-a"], nodeVersion: "24.14.1", contractFingerprint: "contracts", releasePrerequisites: ACCEPTED_PREREQUISITES });
+const CANDIDATE_TREE = "e".repeat(40);
+const ACCEPTED_PREREQUISITES = { schema_version: "1.0.0", prerequisite_id: "next-development-workflow-release-prerequisites", revision: 2, headless_runtime: { state: "accepted", developer_accepted: true, evidence_fingerprint: "c".repeat(64), accepted_at: "2028-12-31T00:00:00.000Z" }, control_center: { state: "paused", developer_accepted: false, evidence_fingerprint: null, accepted_at: null, resume_required: true, blocks_headless_activation: false } };
+const PAUSED_PREREQUISITES = { schema_version: "1.0.0", prerequisite_id: "next-development-workflow-release-prerequisites", revision: 1, headless_runtime: { state: "pending", developer_accepted: false, evidence_fingerprint: null, accepted_at: null }, control_center: { state: "paused", developer_accepted: false, evidence_fingerprint: null, accepted_at: null, resume_required: true, blocks_headless_activation: false } };
+const candidate = freezeReleaseCandidate({ repositoryHead: "a".repeat(40), repositoryTree: CANDIDATE_TREE, artifactFingerprints: ["artifact-b", "artifact-a"], nodeVersion: "24.14.1", contractFingerprint: "contracts", releasePrerequisites: ACCEPTED_PREREQUISITES });
 const roots = [];
 test.after(() => roots.forEach((root) => rmSync(root, { recursive: true, force: true })));
 
@@ -43,14 +44,15 @@ test("protected runtime trust is external, private, closed-schema, current, and 
     issued_at: "2028-12-31T00:00:00.000Z",
     expires_at: "2029-01-02T00:00:00.000Z",
     release_trust: { schema_version: "1.0.0", verifiers: [] },
-    release_prerequisites: PAUSED_PREREQUISITES,
+    release_prerequisites: ACCEPTED_PREREQUISITES,
     runtime_authorities: { source_verifiers: [], receipt_verifiers: [], approval_verifiers: [] },
   };
   writeFileSync(trustPath, `${JSON.stringify(document)}\n`, { mode: 0o600 });
   chmodSync(trustPath, 0o600);
   const loaded = loadProtectedRuntimeTrust({ repositoryRoot, repositoryLogicalId: "repo", checkoutInstanceId: "checkout", trustPath, now: NOW });
   assert.equal(loaded.document.trust_source_id, "owner-source");
-  assert.equal(loaded.release_prerequisites.control_center.state, "paused");
+  assert.equal(loaded.release_prerequisites.headless_runtime.state, "accepted");
+  assert.equal(loaded.release_prerequisites.control_center.blocks_headless_activation, false);
   assert.match(loaded.fingerprint, /^[a-f0-9]{64}$/);
   assert.throws(() => loadProtectedRuntimeTrust({ repositoryRoot, repositoryLogicalId: "other", checkoutInstanceId: "checkout", trustPath, now: NOW }), /OWNER_TRUST_REPOSITORY_BINDING_INVALID/);
   writeFileSync(trustPath, `${JSON.stringify({ ...document, unexpected: true })}\n`, { mode: 0o600 });
@@ -139,14 +141,14 @@ async function prepareReady(store) {
 test("one deterministic candidate fingerprint binds ordered artifacts and repository head", () => {
   assert.match(candidate.candidate_fingerprint, /^[a-f0-9]{64}$/);
   assert.deepEqual(candidate.artifact_paths, []);
-  const repeated = freezeReleaseCandidate({ repositoryHead: "a".repeat(40), artifactFingerprints: ["artifact-a", "artifact-b"], nodeVersion: "24.14.1", contractFingerprint: "contracts", releasePrerequisites: ACCEPTED_PREREQUISITES });
+  const repeated = freezeReleaseCandidate({ repositoryHead: "a".repeat(40), repositoryTree: CANDIDATE_TREE, artifactFingerprints: ["artifact-a", "artifact-b"], nodeVersion: "24.14.1", contractFingerprint: "contracts", releasePrerequisites: ACCEPTED_PREREQUISITES });
   assert.equal(repeated.candidate_fingerprint, candidate.candidate_fingerprint);
 });
 
 test("paused prerequisites and candidate-definition drift block every release transition", async () => {
-  assert.throws(() => freezeReleaseCandidate({ repositoryHead: "a".repeat(40), artifactFingerprints: ["artifact"], nodeVersion: "24.14.1", contractFingerprint: "contracts", releasePrerequisites: PAUSED_PREREQUISITES }), /CONTROL_CENTER_ACCEPTANCE_PREREQUISITE_UNMET/);
+  assert.throws(() => freezeReleaseCandidate({ repositoryHead: "a".repeat(40), repositoryTree: CANDIDATE_TREE, artifactFingerprints: ["artifact"], nodeVersion: "24.14.1", contractFingerprint: "contracts", releasePrerequisites: PAUSED_PREREQUISITES }), /HEADLESS_RUNTIME_ACCEPTANCE_PREREQUISITE_UNMET/);
   const store = fixtureStore();
-  await assert.rejects(() => persistActivationTransition({ store, expectedRevision: 0, candidateFingerprint: candidate.candidate_fingerprint, candidateDefinition: candidate, nextMode: "shadow", evidence: transitionEvidence("shadow"), transitionVerifier, releasePrerequisites: PAUSED_PREREQUISITES, now: NOW }), /CONTROL_CENTER_ACCEPTANCE_PREREQUISITE_UNMET/);
+  await assert.rejects(() => persistActivationTransition({ store, expectedRevision: 0, candidateFingerprint: candidate.candidate_fingerprint, candidateDefinition: candidate, nextMode: "shadow", evidence: transitionEvidence("shadow"), transitionVerifier, releasePrerequisites: PAUSED_PREREQUISITES, now: NOW }), /HEADLESS_RUNTIME_ACCEPTANCE_PREREQUISITE_UNMET/);
   await assert.rejects(() => persistActivationTransition({ store, expectedRevision: 0, candidateFingerprint: candidate.candidate_fingerprint, candidateDefinition: { ...candidate, artifact_paths: ["changed"] }, nextMode: "shadow", evidence: transitionEvidence("shadow"), transitionVerifier, releasePrerequisites: ACCEPTED_PREREQUISITES, now: NOW }), /RELEASE_CANDIDATE_DEFINITION_INVALID/);
   const wrongHead = transitionEvidence("shadow");
   wrongHead.evidence.repository_head = "b".repeat(40);
@@ -163,7 +165,7 @@ test("repository candidate freeze refuses dirt and binds safe repository-relativ
   writeFileSync(path.join(root, "artifact.txt"), "candidate\n");
   const cleanRunner = (_executable, arguments_) => {
     if (arguments_.includes("status")) return "";
-    if (arguments_.includes("rev-parse")) return `${"b".repeat(40)}\n`;
+    if (arguments_.includes("rev-parse")) return `${arguments_.at(-1).endsWith("^{tree}") ? CANDIDATE_TREE : "b".repeat(40)}\n`;
     if (arguments_.includes("ls-tree")) return "artifact.txt\n";
     if (arguments_.includes("show")) return "candidate\n";
     throw new Error(`unexpected git arguments:${arguments_.join(" ")}`);
@@ -178,7 +180,76 @@ test("repository candidate freeze refuses dirt and binds safe repository-relativ
     return cleanRunner(_executable, arguments_);
   };
   assert.throws(() => freezeRepositoryReleaseCandidate({ repositoryRoot: root, artifactPaths: ["artifact.txt"], contractFingerprint: "contracts", releasePrerequisites: ACCEPTED_PREREQUISITES, gitRunner: mutatingRunner }), /RELEASE_CANDIDATE_CHANGED_DURING_FREEZE/);
-  assert.throws(() => freezeRepositoryReleaseCandidate({ repositoryRoot: root, artifactPaths: ["artifact.txt"], contractFingerprint: "contracts", releasePrerequisites: PAUSED_PREREQUISITES, gitRunner: cleanRunner }), /CONTROL_CENTER_ACCEPTANCE_PREREQUISITE_UNMET/);
+  assert.throws(() => freezeRepositoryReleaseCandidate({ repositoryRoot: root, artifactPaths: ["artifact.txt"], contractFingerprint: "contracts", releasePrerequisites: PAUSED_PREREQUISITES, gitRunner: cleanRunner }), /HEADLESS_RUNTIME_ACCEPTANCE_PREREQUISITE_UNMET/);
+});
+
+test("deployed release preserves candidate content while binding the proven main merge", () => {
+  const root = mkdtempSync(path.join(tmpdir(), "next-release-deployment-"));
+  roots.push(root);
+  writeFileSync(path.join(root, "artifact.txt"), "candidate\n");
+  const candidateHead = "b".repeat(40);
+  const mergeHead = "c".repeat(40);
+  const gitRunnerFor = ({ head, tree = CANDIDATE_TREE, content = "candidate\n" }) => (_executable, arguments_) => {
+    if (arguments_.includes("status")) return "";
+    if (arguments_.includes("rev-parse")) return `${arguments_.at(-1).endsWith("^{tree}") ? tree : head}\n`;
+    if (arguments_.includes("ls-tree")) return "artifact.txt\n";
+    if (arguments_.includes("show")) return content;
+    throw new Error(`unexpected git arguments:${arguments_.join(" ")}`);
+  };
+  const candidateDefinition = freezeRepositoryReleaseCandidate({
+    repositoryRoot: root,
+    artifactPaths: ["artifact.txt"],
+    contractFingerprint: "contracts",
+    releasePrerequisites: ACCEPTED_PREREQUISITES,
+    nodeVersion: "24.14.1",
+    gitRunner: gitRunnerFor({ head: candidateHead }),
+  });
+  const signedReleaseProofs = {
+    main_ci: { fingerprint: releaseDigest("main-ci"), evidence: { merge_sha: mergeHead } },
+    local_remote_sync: {
+      fingerprint: releaseDigest("sync"),
+      evidence: { local_head: mergeHead, remote_head: mergeHead, remote_ref: "refs/remotes/origin/main" },
+    },
+  };
+  const deployed = verifyRepositoryReleaseDeployment({
+    repositoryRoot: root,
+    candidateDefinition,
+    signedReleaseProofs,
+    contractFingerprint: "contracts",
+    releasePrerequisites: ACCEPTED_PREREQUISITES,
+    nodeVersion: "24.14.1",
+    gitRunner: gitRunnerFor({ head: mergeHead }),
+  });
+  assert.equal(deployed.candidate_fingerprint, candidateDefinition.candidate_fingerprint);
+  assert.equal(deployed.repository_head, mergeHead);
+  assert.match(deployed.deployment_fingerprint, /^[a-f0-9]{64}$/);
+  assert.throws(() => verifyRepositoryReleaseDeployment({
+    repositoryRoot: root,
+    candidateDefinition,
+    signedReleaseProofs,
+    contractFingerprint: "contracts",
+    releasePrerequisites: ACCEPTED_PREREQUISITES,
+    nodeVersion: "24.14.1",
+    gitRunner: gitRunnerFor({ head: mergeHead, content: "changed\n" }),
+  }), /DEPLOYED_RELEASE_CONTENT_DRIFT/);
+  assert.throws(() => verifyRepositoryReleaseDeployment({
+    repositoryRoot: root,
+    candidateDefinition,
+    signedReleaseProofs,
+    contractFingerprint: "contracts",
+    releasePrerequisites: ACCEPTED_PREREQUISITES,
+    nodeVersion: "24.14.1",
+    gitRunner: gitRunnerFor({ head: mergeHead, tree: "f".repeat(40) }),
+  }), /DEPLOYED_RELEASE_CONTENT_DRIFT/);
+  assert.throws(() => verifyRepositoryReleaseDeployment({
+    repositoryRoot: root,
+    candidateDefinition,
+    signedReleaseProofs,
+    contractFingerprint: "contracts",
+    releasePrerequisites: ACCEPTED_PREREQUISITES,
+    nodeVersion: "24.14.1",
+    gitRunner: gitRunnerFor({ head: "d".repeat(40) }),
+  }), /DEPLOYED_RELEASE_LINEAGE_DRIFT/);
 });
 
 test("release and transition evidence require trusted Ed25519 verifier signatures", async () => {

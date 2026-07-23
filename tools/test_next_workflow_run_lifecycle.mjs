@@ -41,7 +41,10 @@ function fixture() {
 import { spawn } from "node:child_process";
 import { readFileSync, writeFileSync, writeSync } from "node:fs";
 import { createConnection } from "node:net";
-const [response, runId, provider, model, selectedEffort, reportedEffort, mode, childScript] = process.argv.slice(2);
+const [modelFlag, model, configFlag, effortConfig, response, runId, provider, selectedEffort, reportedEffort, mode, childScript] = process.argv.slice(2);
+if (modelFlag !== "--model" || configFlag !== "-c" || effortConfig !== \`model_reasoning_effort="\${selectedEffort}"\`) {
+  throw new Error("FIXTURE_LAUNCH_CONFIGURATION_INVALID");
+}
 writeSync(2, JSON.stringify({ type: "launch_observation", provider, model, effort: reportedEffort }) + "\\n");
 if (mode === "sleep") {
   spawn(process.execPath, [childScript], { stdio: "ignore" });
@@ -95,6 +98,7 @@ if (mode === "sleep") {
     pathPolicy: ({ plan }) => ({ allowed: plan.working_directory === inputRoot && path.dirname(plan.response_file) === outputRoot && plan.stdin_file === prompt }),
     fenceGuard: async ({ plan }) => ({ allowed: true, fence_fingerprint: plan.fence_fingerprint, authority_epoch: plan.authority_epoch }),
     effectFencer: async ({ run_id: runId, reason }) => ({ fenced: true, fingerprint: runLifecycleDigest({ run_id: runId, reason }) }),
+    recoveryAuthorizer: async ({ request, fingerprint }) => ({ decision: "ALLOW", fingerprint, run_id: request.run_id, authority_epoch: request.authority_epoch }),
     launchObservationVerifier,
     containment,
     limits: { maxRuntimeMs: 5000, maxResultBytes: 64 * 1024, maxStderrBytes: 64 * 1024, maxPromptBytes: 1024, maxArgv: 16 },
@@ -117,7 +121,7 @@ function plan(f, { runId = "run-1", selectedEffort = "high", actualEffort = sele
     fence_fingerprint: runLifecycleDigest({ run_id: runId, authority_epoch: 0 }),
     executable_path: node,
     executable_fingerprint: fileDigest(node),
-    argv: [f.script, response, runId, core.selected_provider, core.selected_model, selectedEffort, actualEffort, mode, f.childScript],
+    argv: [f.script, "--model", core.selected_model, "-c", `model_reasoning_effort="${selectedEffort}"`, response, runId, core.selected_provider, selectedEffort, actualEffort, mode, f.childScript],
     working_directory: f.inputRoot,
     stdin_file: f.prompt,
     stdin_fingerprint: fileDigest(f.prompt),
@@ -183,7 +187,7 @@ isolationTest("RunLifecyclePort ignores task self-reporting and rejects launch-a
   f.store.close();
   const substituted = fixture();
   const substitutedPlan = plan(substituted, { selectedEffort: "high", actualEffort: "medium" });
-  substitutedPlan.argv = substitutedPlan.argv.map((argument) => argument === "high" ? "medium" : argument);
+  substitutedPlan.argv = substitutedPlan.argv.map((argument) => argument === 'model_reasoning_effort="high"' ? 'model_reasoning_effort="medium"' : argument);
   await assert.rejects(() => substituted.port.start(substitutedPlan), /RUN_LIFECYCLE_CONTAINMENT_OBSERVATION_FAILED/);
   assert.equal(substituted.store.getRuntimeRun({ runId: "run-1" }).state, "FAILED");
   substituted.store.close();
@@ -205,6 +209,22 @@ isolationTest("RunLifecyclePort durably binds process identity before releasing 
   assert.ok(Number.isSafeInteger(snapshot.pid));
   assert.match(snapshot.observation.process_identity_fingerprint, /^[a-f0-9]{64}$/);
   assert.equal(f.store.getRuntimeRun({ runId: "run-1" }).state, "FAILED");
+  f.store.close();
+});
+
+isolationTest("RunLifecyclePort revalidates the complete fence immediately before execution release", async () => {
+  const f = fixture();
+  const port = createRunLifecyclePort({
+    ...f.portOptions,
+    fenceGuard: async ({ operation, plan: launchPlan }) => ({
+      allowed: operation !== "release",
+      fence_fingerprint: launchPlan.fence_fingerprint,
+      authority_epoch: launchPlan.authority_epoch,
+    }),
+  });
+  await assert.rejects(() => port.start(plan(f)), /RUN_LIFECYCLE_RELEASE_FENCE_DENIED/);
+  assert.equal(f.store.getRuntimeRun({ runId: "run-1" }).state, "FAILED");
+  assert.equal(existsSync(path.join(f.outputRoot, "run-1-result.json")), false);
   f.store.close();
 });
 
@@ -327,6 +347,21 @@ isolationTest("RunLifecyclePort restart recovery reacquires the persisted proces
   assert.equal((await restartedPort.reconcile("run-1")).result, "matched");
   assert.equal(existsSync(`/proc/${containedIdentity.pid}`), false);
   await assert.rejects(() => f.port.collect_result("run-1"));
+  restartedStore.close();
+});
+
+isolationTest("RunLifecyclePort restart recovery performs no mutation or signal without exact authorization", async () => {
+  const f = fixture();
+  await f.port.start(plan(f, { mode: "sleep" }));
+  const processGroupId = f.store.getRuntimeRun({ runId: "run-1" }).process_group_id;
+  f.store.close();
+  const restartedStore = openWorkflowStateStore({ repositoryRoot: f.repositoryRoot, databasePath: f.databasePath, expectedIdentity: f.identity, clock: () => f.now });
+  const deniedPort = createRunLifecyclePort({ ...f.portOptions, store: restartedStore, recoveryAuthorizer: () => ({ decision: "DENY" }) });
+  await assert.rejects(() => deniedPort.recover("run-1"), /RUN_LIFECYCLE_RECOVERY_AUTHORIZATION_REQUIRED/);
+  assert.equal(restartedStore.getRuntimeRun({ runId: "run-1" }).state, "RUNNING");
+  assert.doesNotThrow(() => process.kill(-processGroupId, 0));
+  const authorizedPort = createRunLifecyclePort({ ...f.portOptions, store: restartedStore });
+  await authorizedPort.recover("run-1");
   restartedStore.close();
 });
 

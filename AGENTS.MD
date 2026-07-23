@@ -233,4 +233,27 @@ verification profile: real prerequisite checks, private store-bound lifecycle
 authority, immutable launch/admission provenance, and independent review are
 mandatory. Missing Bubblewrap or namespace support must produce installation
 or operating-system guidance and a safe stop, never an unisolated fallback.
-Production Agent launch remains unavailable and Activation remains `planned`.
+Production Agent launch remains unavailable while Activation is not `enforced`.
+After the complete signed release lineage is enforced, Production Agent launch
+is authorized only through the owner-protected external launcher recorded in
+the protected runtime trust; direct repository entry points remain fail-closed.
+Changes to that launcher, protected runtime, model-selection policy, signed
+release chain, or Activation boundary must satisfy the complete parent
+document-sync authority set in the same PR and in every incremental push range;
+neither a prior branch commit nor paused Control Center work is a substitute.
+CI bootstrap tests may provide a private non-executed Codex descriptor fixture
+only to prove trust construction on runners without Codex. Production
+bootstrap, discovery, admission, and launch must still resolve and pin the
+actual native provider executable; fixture evidence never grants authority.
+When real `/usr/bin/unshare` or `/usr/bin/bwrap` is absent, the positive
+bootstrap-construction test must be reported as prerequisite-skipped and the
+separate guided-refusal/status test must pass; a fake isolation executable is
+forbidden.
+The same private non-executed Codex descriptor may support installed-launcher
+integrity fixtures on CI, but only for owner-acceptance construction and
+verification. Those positive launcher cases also require real containment and
+are prerequisite-skipped when it is absent. The fixture must not execute a
+provider or become Production evidence.
+Provider-discovery and development-selection regressions may use the same
+complete CLI/native layout only with injected observation runners and
+independent test authorities.
