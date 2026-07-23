@@ -30,15 +30,17 @@ authority. Its additive rules distinguish:
   procedural-instruction boundary, and the A-F autonomy overlay.
 
 The fail-closed Next Workflow core has an explicit additive classification.
-Changes to its contracts, persistent settings/activation authorities, CLI, or
-runtime owners must synchronize the canonical as-built set, verification and
-security authorities, development-instruction governance, CI/hook ownership,
-and workflow-state pair. This classification remains parent-only and never
-opens or tests a registered child repository. The Dashboard data schema is
-updated separately when its producer contract changes; paused Control Center
-source and browser work are not required merely because the non-UI core changes.
+Changes to its contracts, persistent settings/activation authorities, CLI,
+external launcher, model selection, signed release chain, or runtime owners
+must synchronize the canonical as-built set, verification and security
+authorities, development-instruction governance, CI/hook ownership, and
+workflow-state pair. This classification remains parent-only and never opens
+or tests a registered child repository. The Dashboard data schema is updated
+separately when its producer contract changes; paused Control Center source and
+browser work are not required merely because the headless core changes.
 Protected runtime-wiring follow-ups are not exempt: containment, trust,
-lifecycle, task-delivery, state migration, provider execution, and their tests
+lifecycle, task delivery, state migration, provider execution, immutable
+candidate release, source receipts, activation transitions, and their tests
 must carry this complete parent authority set in the same PR or push range.
 
 Multiple matching rules add requirements; a weaker rule cannot remove a

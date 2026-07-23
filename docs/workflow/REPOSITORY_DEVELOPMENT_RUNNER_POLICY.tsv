@@ -7,5 +7,5 @@ fast_loop	4	local_checks	recommended|required	true	true	false	no_release_proof	f
 mid_tests	5	local_checks	recommended|required	true	true	false	no_release_proof	false	medium_verification
 release_gate	6	plan_only	none	false	false	false	strict_release_proof	false	owner_release_gate_only
 main_sync_cleanup	7	plan_only	none	false	false	false	strict_main_sync_proof	false	task_scope_sync_and_approval_bound_destructive_cleanup
-# next_workflow_boundary	These seven compatibility phases remain enforced while Next Workflow activation is planned; Next Workflow L1-L5 orchestration may not claim release authority until its paused Control Center prerequisite and candidate-bound activation evidence pass.
+# next_workflow_boundary	These seven compatibility phases remain the fallback unless the exact repository has passed externally trusted, candidate-bound headless Activation; the paused Control Center is not an execution prerequisite and cannot grant release authority.
 # next_workflow_runtime_release	A protected runtime change must prove exact same-range parent document synchronization, environment-aware isolation refusal or real containment, the focused Next Workflow aggregate, and ordinary PR/main CI without treating skipped unavailable-environment execution as production evidence.

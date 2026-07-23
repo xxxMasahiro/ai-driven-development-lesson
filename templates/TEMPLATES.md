@@ -148,7 +148,12 @@ A product template must not copy parent runtime trust, SQLite state, provider
 credentials, executable certifications, or Git authority. If a future product
 adapter requests a parent Task Agent, it receives a bounded local-first
 instruction envelope and candidate-only result contract; the parent retains
-containment, admission, review, cost, and release authority.
+containment, admission, review, cost, and release authority. A template must
+not install or emulate the parent Production launcher: headless Production
+entry is created externally only after exact repository identity,
+immutable-candidate release evidence, signed activation transitions, and
+recovery closure pass. Control Center availability is not an authorization
+signal.
 
 ## LEARNING_TASK_TRACKER.md
 

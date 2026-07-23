@@ -92,11 +92,14 @@ settings; safety and rigor remain maximum floors; required verification and
 documentation duties are additive. Missing, stale, ambiguous, expired, or
 revoked parent authority blocks the affected action. Each repository retains
 its own bounded state store and evidence; no parent/child shared database or
-ordinary parent-CI child traversal is permitted. Until the paused Control
-Center prerequisite and immutable-candidate activation proofs pass, the
-existing Free Development procedure remains authoritative.
+ordinary parent-CI child traversal is permitted. The existing Free Development
+procedure remains authoritative unless this exact repository is admitted
+through the externally installed parent launcher with immutable-candidate,
+signed-release, recovery, and activation-transition proofs. The paused Control
+Center is presentation only and cannot substitute for or block that authority.
 
-When the parent protected runtime is used for an isolated verification task,
+When the parent protected runtime is used for an isolated verification or
+activated headless task,
 the child receives only the resolved local-first instruction envelope and
 bounded read-only inputs. It does not receive the parent database, owner trust,
 credentials, Git authority, or a writable child checkout. Missing Bubblewrap
