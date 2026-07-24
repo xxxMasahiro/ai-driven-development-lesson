@@ -156,7 +156,9 @@ recovery closure pass. Control Center availability is not an authorization
 signal.
 That parent installation obtains its per-worktree instance from the parent's
 ignored checkout-identity owner; generated templates must not embed, copy, or
-infer it from tracked repository configuration.
+infer it from tracked repository configuration. Templates also cannot redirect
+the wrapper-pinned Controller base or provide a replacement identity to later
+Owner actions.
 A generated product template must not include the parent bootstrap-test Codex
 fixture or treat its digest as certification. The fixture exists only inside
 an isolated parent regression test; real product execution remains bound to

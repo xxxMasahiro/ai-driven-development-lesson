@@ -84,11 +84,12 @@ export function defaultOwnerControllerBase() {
 export function loadOwnerControllerRepositoryIdentity({
   repositoryRoot,
   identityLoader = loadRepositoryIdentity,
+  create = true,
 } = {}) {
   if (typeof identityLoader !== "function") throw new Error("OWNER_CONTROLLER_IDENTITY_LOADER_INVALID");
   return identityLoader({
     repositoryRoot,
-    create: true,
+    create,
   });
 }
 

@@ -133,7 +133,8 @@ recorded as paused in `TASK_TRACKER.md` and `HANDOFF.md`; partial UI artifacts
 are neither required nor accepted as activation evidence.
 The launcher's installation manifest gets its local checkout instance from the
 ignored checkout-identity owner, not from the tracked repository identity
-configuration.
+configuration. Bounded Owner actions read that same identity without creating
+it, while the installed wrapper pins the verified Controller base.
 
 `REPOSITORY_DOCUMENT_SYNC_POLICY.json` also classifies Next Workflow core
 changes explicitly. Their PR or push range must include the complete as-built,

@@ -29,7 +29,7 @@ import { createAgentSelectionSettingsManager, resolveAgentSelectionPolicy } from
 import { openWorkflowStateStore } from "./lib/next_workflow/store.mjs";
 import { evaluateDeliveryImpact, selectDeliveryLane, verifyDeliveryLanePlan } from "./lib/next_workflow/delivery_lane.mjs";
 import { observeDeliveryGitSnapshot } from "./lib/next_workflow/git_snapshot.mjs";
-import { verifyOwnerControllerExecution } from "./lib/next_workflow/owner_controller.mjs";
+import { loadOwnerControllerRepositoryIdentity, verifyOwnerControllerExecution } from "./lib/next_workflow/owner_controller.mjs";
 
 const SOURCE_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const SOURCE_ENTRY = fileURLToPath(import.meta.url);
@@ -79,7 +79,10 @@ function print(value) {
 }
 
 function requireOwnerController(action) {
-  const repositoryIdentity = readJson("learning/NEXT_WORKFLOW_REPOSITORY_IDENTITY.json");
+  const repositoryIdentity = loadOwnerControllerRepositoryIdentity({
+    repositoryRoot: ROOT,
+    create: false,
+  });
   return verifyOwnerControllerExecution({
     action,
     repositoryRoot: ROOT,
@@ -87,6 +90,7 @@ function requireOwnerController(action) {
     entryPath: SOURCE_ENTRY,
     repositoryLogicalId: repositoryIdentity.repository_logical_id,
     checkoutInstanceId: repositoryIdentity.checkout_instance_id,
+    controllerBase: process.env.NEXT_WORKFLOW_OWNER_CONTROLLER_BASE,
   });
 }
 

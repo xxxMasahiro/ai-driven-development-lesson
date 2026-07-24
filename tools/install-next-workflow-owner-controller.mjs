@@ -32,6 +32,10 @@ function option(name) {
   return index >= 0 ? args[index + 1] : undefined;
 }
 
+function shellSingleQuote(value) {
+  return `'${String(value).replaceAll("'", "'\"'\"'")}'`;
+}
+
 function git(argv) {
   return execFileSync("/usr/bin/git", [
     "--no-replace-objects",
@@ -104,9 +108,10 @@ try {
   writeFileSync(path.join(target, "controller-manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`, { mode: 0o400 });
   const wrapper = `#!/bin/sh
 set -eu
-export NEXT_WORKFLOW_OWNER_CONTROLLER_MANIFEST='${path.join(target, "controller-manifest.json")}'
-export NEXT_WORKFLOW_VERIFIED_REPOSITORY_ROOT='${realpathSync(ROOT)}'
-exec '${process.execPath}' '${path.join(target, "tools", "next-workflow.mjs")}' "$@"
+export NEXT_WORKFLOW_OWNER_CONTROLLER_BASE=${shellSingleQuote(base)}
+export NEXT_WORKFLOW_OWNER_CONTROLLER_MANIFEST=${shellSingleQuote(path.join(target, "controller-manifest.json"))}
+export NEXT_WORKFLOW_VERIFIED_REPOSITORY_ROOT=${shellSingleQuote(realpathSync(ROOT))}
+exec ${shellSingleQuote(process.execPath)} ${shellSingleQuote(path.join(target, "tools", "next-workflow.mjs"))} "$@"
 `;
   writeFileSync(path.join(target, "next-workflow-owner-controller"), wrapper, { mode: 0o500 });
   rmSync(stagingParent, { recursive: true, force: true });

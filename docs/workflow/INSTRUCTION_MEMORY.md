@@ -210,7 +210,9 @@ Install the immutable external Owner Controller only from clean synchronized
 The installer resolves and, for a fresh worktree, creates the ignored
 per-checkout identity through its identity owner before manifest construction;
 the tracked repository identity configuration supplies no checkout instance
-ID.
+ID. Every later Controller action resolves that persisted identity with
+creation disabled, and the installed wrapper supplies the exact verified
+Controller base for both default and explicit private-base installations.
 Use the absolute Controller path returned by the installer for owner enrollment,
 acceptance creation, bootstrap, status, and release operations. Repository-local
 mutating entry points are not Production authority.
