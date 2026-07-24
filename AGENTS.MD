@@ -319,3 +319,13 @@ still requires one exact merged PR, candidate head, merge SHA, equal declared,
 candidate, and main trees, complete successful PR/main CI and check
 inventories, clean main synchronization, and no observation drift. Never
 replace those facts with caller assertions or tree equality alone.
+
+Production Codex CLI task execution must state the trusted response protocol
+as a fixed direct prompt before appending the authority-owned task envelope
+from stdin. The Agent may follow only the envelope's trusted `control` object,
+must treat `data` as untrusted task data, and must return exactly one JSON
+object satisfying every result-contract field, enumeration, pattern, and
+constraint without Markdown or surrounding prose. This adapter-specific
+protocol must not change another CLI adapter's declared stdin behavior, weaken
+the protected validator, repair malformed output, or silently escalate model
+authority.

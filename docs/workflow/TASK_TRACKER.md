@@ -3880,3 +3880,23 @@ TESTS: tools/check_next_workflow.sh,tools/test_next_workflow.sh,tools/check_as_b
 - [ ] Install the synchronized immutable Controller, perform observed
   Activation, and pass a fresh bounded Production team smoke.
 - [x] Leave Control Center and separately deferred plans unchanged.
+
+## Codex trusted JSON response protocol
+
+SYNC-ID: next_workflow_codex_json_protocol
+STATUS: implemented
+ARTIFACTS: AGENTS.MD,docs/as-built/IMPLEMENTATION_PLAN.md,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/DEVELOPMENT_AUTONOMY_WORKFLOW.tsv,docs/workflow/DEVELOPMENT_INSTRUCTION_POLICY.tsv,docs/workflow/FINAL_GATE_CI_GRAPH.tsv,docs/workflow/FINAL_GATE_COVERAGE.tsv,docs/workflow/FINAL_GATE_EXECUTION_POLICY.tsv,docs/workflow/FINAL_GATE_GAP_COMMANDS.tsv,docs/workflow/GIT_HOOK_CHECKS.tsv,docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv,docs/workflow/HANDOFF.md,docs/workflow/INSTRUCTION_MEMORY.md,docs/workflow/PRODUCT_REPOSITORY_STRUCTURE.tsv,docs/workflow/PRODUCT_SECURITY_POLICY.tsv,docs/workflow/REPOSITORY_DEVELOPMENT_RUNNER_POLICY.tsv,docs/workflow/REPOSITORY_DEVELOPMENT_WORKFLOW.tsv,docs/workflow/REPOSITORY_DOCUMENT_SYNC.md,docs/workflow/REPOSITORY_DOCUMENT_SYNC_POLICY.json,docs/workflow/SAFEFLOW_SECURITY_BACKFILL.tsv,docs/workflow/TASK_TRACKER.md,docs/workflow/TEST_PLAN_MANIFEST.tsv,free-development/FREE_DEVELOPMENT_MODE.md,guides/DOCUMENT_MAP.md,learning/REPOSITORY_DEVELOPMENT_APPROVALS.tsv,templates/TEMPLATES.md,tools/lib/next_workflow/providers.mjs,tools/test_next_workflow_providers.mjs
+TESTS: tools/check_next_workflow.sh,tools/test_next_workflow.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+- [x] Preserve the malformed Production response and reconcile its failed
+  launch effect without accepting the result or starting a provider.
+- [x] Confirm `gpt-5.6-luna / low` returns JSON-only output when the fixed
+  trusted-control protocol precedes the stdin envelope.
+- [x] Add Codex-only protocol injection and preserve generic CLI stdin-marker
+  compatibility.
+- [x] Pass focused provider, task-delivery, and isolated-runtime regressions.
+- [ ] Pass synchronized document, aggregate, and full-hook gates.
+- [ ] Pass PR CI, merge, main CI, and exact local/remote synchronization.
+- [ ] Install the synchronized Controller, perform observed Activation, and
+  pass a fresh bounded Production smoke.
+- [x] Leave Control Center and separately deferred plans unchanged.

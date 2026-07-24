@@ -1,4 +1,5 @@
 # workflow_id	workflow_file	workflow_name	coverage_scope	job_id	role	needs	selector	description
+# next_workflow_codex_json_protocol	The existing test_next_workflow owner verifies Codex-only protocol injection and non-Codex stdin compatibility once; PR and main CI provide independent release evidence.
 # next_workflow_squash_merge_observation	PR and main workflow identities remain exact release evidence for both merge-commit and squash-merge lineage; the observer consumes completed runs rather than rerunning their owners.
 # next_workflow_result_contract_closure	The existing test_next_workflow owner executes delivery-contract and invalid-result regressions once; PR and main CI consume independent repository revisions rather than repeating local test owners.
 # next_workflow_roll_forward	The regression owner covers a complete second-candidate shadow-to-enforced cycle, direct-stage and same-candidate rewind refusal, historical-record retention, and incomplete-cycle rejection before remote release evidence is accepted.

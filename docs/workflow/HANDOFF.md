@@ -4122,3 +4122,27 @@ and exact PR/head/merge/tree/CI/check acceptance. Remaining delivery is
 synchronized local gates, a merge-commit PR and main CI, Controller
 replacement, observed Activation, and a fresh bounded Production smoke.
 Control Center reconstruction and separately deferred plans remain unchanged.
+
+## Codex trusted JSON response protocol handoff
+
+SYNC-ID: next_workflow_codex_json_protocol
+STATUS: implemented
+ARTIFACTS: AGENTS.MD,docs/as-built/IMPLEMENTATION_PLAN.md,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/DEVELOPMENT_AUTONOMY_WORKFLOW.tsv,docs/workflow/DEVELOPMENT_INSTRUCTION_POLICY.tsv,docs/workflow/FINAL_GATE_CI_GRAPH.tsv,docs/workflow/FINAL_GATE_COVERAGE.tsv,docs/workflow/FINAL_GATE_EXECUTION_POLICY.tsv,docs/workflow/FINAL_GATE_GAP_COMMANDS.tsv,docs/workflow/GIT_HOOK_CHECKS.tsv,docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv,docs/workflow/HANDOFF.md,docs/workflow/INSTRUCTION_MEMORY.md,docs/workflow/PRODUCT_REPOSITORY_STRUCTURE.tsv,docs/workflow/PRODUCT_SECURITY_POLICY.tsv,docs/workflow/REPOSITORY_DEVELOPMENT_RUNNER_POLICY.tsv,docs/workflow/REPOSITORY_DEVELOPMENT_WORKFLOW.tsv,docs/workflow/REPOSITORY_DOCUMENT_SYNC.md,docs/workflow/REPOSITORY_DOCUMENT_SYNC_POLICY.json,docs/workflow/SAFEFLOW_SECURITY_BACKFILL.tsv,docs/workflow/TASK_TRACKER.md,docs/workflow/TEST_PLAN_MANIFEST.tsv,free-development/FREE_DEVELOPMENT_MODE.md,guides/DOCUMENT_MAP.md,learning/REPOSITORY_DEVELOPMENT_APPROVALS.tsv,templates/TEMPLATES.md,tools/lib/next_workflow/providers.mjs,tools/test_next_workflow_providers.mjs
+TESTS: tools/check_next_workflow.sh,tools/test_next_workflow.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+Observed Activation for PR #45 reached available Production with no unresolved
+effects or runs. The bounded L1 smoke selected and observed
+`gpt-5.6-luna / low`, but the Agent returned ordinary Japanese prose instead
+of the required JSON. The protected validator rejected it, and the immutable
+Owner Controller reconciled the stopped launch effect without provider restart
+or result acceptance.
+
+A read-only CLI probe with the same model and effort showed that a fixed direct
+trusted-control protocol makes Codex return JSON-only output. The provider plan
+now supplies that protocol only for `codex_cli`, before the authority-owned
+stdin envelope. Generic CLI adapters retain `-`; structured argv, containment,
+pinning, model/effort observation, and strict result validation are unchanged.
+Focused provider, delivery, and isolated-runtime tests pass. Remaining work is
+document and aggregate gates, one full hook, PR/main CI, exact synchronization,
+Controller replacement, observed Activation, and a fresh bounded Production
+smoke. Control Center and separately deferred plans remain unchanged.
