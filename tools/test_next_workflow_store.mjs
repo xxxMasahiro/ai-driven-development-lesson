@@ -7,6 +7,7 @@ import path from "node:path";
 import test from "node:test";
 import { DatabaseSync } from "node:sqlite";
 import { effectReceiptBindingFingerprint } from "./lib/next_workflow/authority.mjs";
+import { releaseDigest } from "./lib/next_workflow/release.mjs";
 import { createFinalizationFenceVerifier } from "./lib/next_workflow/runtime_trust.mjs";
 import { importLegacyRecords, importWorkflowStateStore, openWorkflowStateStore, readLegacyJsonlState, readLegacyTsvState, restoreWorkflowStateStore, verifyBackupManifest } from "./lib/next_workflow/store.mjs";
 
@@ -554,7 +555,27 @@ test("activation lifecycle records cannot be injected through the generic writer
   const f = fixture();
   const store = openWorkflowStateStore({ repositoryRoot: f.root, databasePath: f.databasePath, expectedIdentity: f.identity });
   assert.throws(() => store.commit({ expectedRevision: 0, records: [{ id: "forged-activation", kind: "NextWorkflowActivation", schema_version: "1.0.0", record_revision: 1, authority_scope: "release", lineage_id: "next-development-workflow", lifecycle_state: "enforced", payload: { activation_id: "next-development-workflow", revision: 1, mode: "enforced", candidate_fingerprint: "a".repeat(64) }, source_revision: "forged", policy_fp: "b".repeat(64), input_fp: "a".repeat(64) }] }), /ACTIVATION_LIFECYCLE_WRITER_REQUIRED/);
-  const direct = { id: "forged-shadow", kind: "NextWorkflowActivation", schema_version: "1.0.0", record_revision: 1, authority_scope: "release", lineage_id: "next-development-workflow", lifecycle_state: "shadow", payload: { activation_id: "next-development-workflow", authority_epoch: 0, revision: 1, mode: "shadow", candidate_fingerprint: "a".repeat(64) }, source_revision: "0", policy_fp: "b".repeat(64), input_fp: "a".repeat(64) };
+  const candidateFingerprint = "a".repeat(64);
+  const cycleStart = {
+    schema_version: "1.1.0",
+    activation_id: "next-development-workflow",
+    authority_epoch: 0,
+    revision: 1,
+    mode: "shadow",
+    candidate_fingerprint: candidateFingerprint,
+    cycle_start_revision: 1,
+    cycle_step: 1,
+    previous_record_revision: 0,
+    previous_record_content_fingerprint: null,
+  };
+  cycleStart.cycle_id = releaseDigest({
+    activation_id: cycleStart.activation_id,
+    candidate_fingerprint: candidateFingerprint,
+    cycle_start_revision: cycleStart.cycle_start_revision,
+    predecessor_record_revision: cycleStart.previous_record_revision,
+    predecessor_record_content_fingerprint: cycleStart.previous_record_content_fingerprint,
+  });
+  const direct = { id: "forged-shadow", kind: "NextWorkflowActivation", schema_version: "1.1.0", record_revision: 1, authority_scope: "release", lineage_id: "next-development-workflow", lifecycle_state: "shadow", payload: cycleStart, source_revision: "0", policy_fp: "b".repeat(64), input_fp: candidateFingerprint };
   assert.throws(() => store.persistActivationLifecycle({ expectedRevision: 0, authorityEpoch: 0, activationId: "next-development-workflow", expectedMode: "planned", nextMode: "shadow", candidateFingerprint: "a".repeat(64), record: direct, event: { event_id: "forged-shadow", event_type: "NEXT_WORKFLOW_ACTIVATION_TRANSITIONED" } }), /ACTIVATION_LIFECYCLE_VERIFIER_REQUIRED/);
   const exactEvent = { event_id: "exact-shadow", aggregate_id: direct.id, event_type: "NEXT_WORKFLOW_ACTIVATION_TRANSITIONED", payload: { activation_id: "next-development-workflow", candidate_fingerprint: "a".repeat(64), authority_epoch: 0, from_mode: "planned", requested_mode: "shadow", to_mode: "shadow" } };
   const exactVerifier = { trusted: true, independent: true, verifier_id: "activation-exact", verify: ({ fingerprint }) => ({ verified: true, verifier_id: "activation-exact", fingerprint, proof_fingerprint: direct.policy_fp }) };

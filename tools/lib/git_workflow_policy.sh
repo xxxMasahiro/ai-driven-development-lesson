@@ -898,8 +898,26 @@ git_workflow_check_repository() {
   return "$failed"
 }
 
+git_workflow_require_delivery_plan() {
+  local plan="$1"
+  local action="$2"
+  local repo="${3:-$PWD}"
+  [[ -n "$plan" && -f "$plan" ]] || {
+    printf 'Current delivery plan is required: %s\n' "$plan" >&2
+    return 1
+  }
+  (
+    cd "$LESSON_ROOT"
+    "$LESSON_ROOT/tools/next-workflow" delivery recheck --plan "$plan" --git-action "$action" >/dev/null
+  ) || {
+    printf 'Delivery-plan recheck refused Git action %s for %s.\n' "$action" "$repo" >&2
+    return 1
+  }
+}
+
 git_workflow_allow_policy() {
   local action="$1"
+  local repo="${2:-$PWD}"
 
   git_workflow_current_consistency_allows_runtime || return 1
 
@@ -914,10 +932,10 @@ git_workflow_allow_policy() {
       git_workflow_bool_enabled main_direct_work_allowed
       ;;
     developer_auto_merge|developer-auto-merge)
-      git_workflow_developer_auto_merge_gates_pass "$PWD"
+      git_workflow_developer_auto_merge_gates_pass "$repo"
       ;;
     commit|push|pr|ci|pr_ci|pr-ci|main_ci|main-ci|sync|merge)
-      git_workflow_automation_allows "$action" "$PWD"
+      git_workflow_automation_allows "$action" "$repo"
       ;;
     *)
       printf 'Unknown Git workflow action: %s\n' "$action" >&2

@@ -4,13 +4,16 @@ import {
   acceptDirectOrchestratorResult,
   agentResultEvidenceFingerprint,
   createDelegationGrant,
-  evaluateAgentRetry,
   persistAgentReview,
   persistDelegationGrant,
   persistResourceCostReservation,
   persistReviewerAssignment,
   planTeamTopology,
 } from "./agents.mjs";
+import {
+  HEADLESS_PRODUCTION_CORRECTION_PROFILE,
+  routeCorrectionFailure,
+} from "./correction_policy.mjs";
 
 function canonicalJson(value) {
   if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
@@ -119,7 +122,7 @@ function stoppedResult({ topology, store, outcomes, code = null }) {
   const core = {
     schema_version: "1.0.0",
     decision: "STOP",
-    profile: "headless_production",
+    profile: HEADLESS_PRODUCTION_CORRECTION_PROFILE.profile_id,
     topology_fingerprint: topology.fingerprint,
     outcomes: normalizedOutcomes,
     authority_epoch: store.revocation_epoch,
@@ -374,7 +377,7 @@ export function createHeadlessRunController({
         const core = {
           schema_version: "1.0.0",
           decision: "STOP",
-          profile: "headless_production",
+          profile: HEADLESS_PRODUCTION_CORRECTION_PROFILE.profile_id,
           topology_fingerprint: topology.fingerprint,
           outcomes: [{ agent_id: "orchestrator", decision: "STOP", code: startupDisposition.code, recovery_fingerprint: digest(startupRecovery) }],
           authority_epoch: store.revocation_epoch,
@@ -383,7 +386,7 @@ export function createHeadlessRunController({
       }
       const now = clock();
       const commonBudget = agentBudget(budget);
-      if (commonBudget.max_retries !== 0) return stoppedResult({ topology, store, outcomes: [], code: "HEADLESS_RETRY_POLICY_UNSUPPORTED" });
+      if (commonBudget.max_retries !== HEADLESS_PRODUCTION_CORRECTION_PROFILE.max_retries) return stoppedResult({ topology, store, outcomes: [], code: "HEADLESS_RETRY_POLICY_UNSUPPORTED" });
       const authorityBindings = {
         task_id: requireString(taskId, "HEADLESS_AUTHORITY_TASK_REQUIRED"),
         policy_fingerprint: requireString(policyFingerprint, "HEADLESS_AUTHORITY_POLICY_REQUIRED"),
@@ -501,25 +504,19 @@ export function createHeadlessRunController({
             code: failureCode,
             effect_id: error?.effect_id ?? null,
           });
-          const retry = evaluateAgentRetry({
-            failureFingerprint,
-            previousFailureFingerprint: failureFingerprint,
-            attempt: 0,
-            limit: commonBudget.max_retries,
-            totalLimit: commonBudget.max_retries,
-            unchangedAttempt: 0,
-            materialProgressVerified: false,
-            maxRuntimeMs: commonBudget.max_runtime_ms,
-            maxTokens: commonBudget.max_tokens,
-            maxCost: commonBudget.max_cost,
+          const correction = routeCorrectionFailure({
+            failureType: error?.correction_failure_type,
+            phase: error?.correction_phase,
+            ownerDecisionRequired: error?.owner_decision_required === true,
           });
           outcomes.push({
             agent_id: agent.agent_id,
             decision: "STOP",
-            code: disposition.safe ? `HEADLESS_${retry.reason}` : disposition.code,
+            code: disposition.safe ? "HEADLESS_TOTAL_RETRY_LIMIT" : disposition.code,
             failure_code: failureCode,
             failure_fingerprint: failureFingerprint,
             recovery_fingerprint: digest(recovery),
+            resume_advice: correction.resume_advice,
           });
           break;
         }
@@ -760,7 +757,7 @@ export function createHeadlessRunController({
         });
       }
       const decision = subjectsPassed ? "PASS" : "STOP";
-      const core = { schema_version: "1.0.0", decision, profile: "headless_production", topology_fingerprint: topology.fingerprint, outcomes, aggregate_usage: { launches: ledger.launches, runtime_ms: ledger.runtime_ms, tokens: null, token_accounting: "provider_usage_unavailable_no_claim" }, authority_epoch: store.revocation_epoch };
+      const core = { schema_version: "1.0.0", decision, profile: HEADLESS_PRODUCTION_CORRECTION_PROFILE.profile_id, topology_fingerprint: topology.fingerprint, outcomes, aggregate_usage: { launches: ledger.launches, runtime_ms: ledger.runtime_ms, tokens: null, token_accounting: "provider_usage_unavailable_no_claim" }, authority_epoch: store.revocation_epoch };
       return { ...core, fingerprint: digest(core) };
     },
   });

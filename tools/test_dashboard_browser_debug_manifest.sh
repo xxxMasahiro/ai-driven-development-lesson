@@ -9,12 +9,14 @@ manifest="$TMP_DIR/dashboard-browser-debug-target.json"
 renamed_manifest="$TMP_DIR/dashboard-review-target-renamed.json"
 compat_manifest="$TMP_DIR/dashboard-browser-debug-compat-target.json"
 
-"$ROOT/tools/dashboard-review-manifest" \
+DASHBOARD_REVIEW_TARGET_ID="ai-driven-development-lesson-dashboard-control-center" \
+  "$ROOT/tools/dashboard-review-manifest" \
   --source tests/fixtures/dashboard-control-center.json \
   --base-url http://127.0.0.1:5173/ \
   --output "$manifest"
 
-"$ROOT/tools/dashboard-browser-debug-manifest" \
+DASHBOARD_REVIEW_TARGET_ID="ai-driven-development-lesson-dashboard-control-center" \
+  "$ROOT/tools/dashboard-browser-debug-manifest" \
   --source tests/fixtures/dashboard-control-center.json \
   --base-url http://127.0.0.1:5173/ \
   --output "$compat_manifest"

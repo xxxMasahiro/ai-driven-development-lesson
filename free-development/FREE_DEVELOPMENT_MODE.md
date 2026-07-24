@@ -119,6 +119,10 @@ be inherited as a local provider.
 The parent's live provider-probe tmpfs path is equally private runtime state;
 a child must derive its own contained path and cannot inherit or widen it.
 The same restriction covers the development-selection discovery fixture.
+An in-progress parent candidate replacement also grants no child authority.
+Free Development may use only the newest fully enforced parent release; it
+cannot fall back to an older enforced record, restart a rolled-back chain, or
+skip the parent's fresh shadow-to-enforced verification.
 
 - `none`: product workspace, canonical documents, scaffold authority, product security, and required local checks are still required; Git, remote sync, and CI are not applicable.
 - `local`: local Git worktree and local Git safety checks are required; remote sync and CI are not applicable.

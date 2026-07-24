@@ -170,6 +170,10 @@ The parent live probe's `/tmp/runtime` mount is also implementation-private;
 templates must derive their own contained runtime path and must not copy it as
 an inherited provider or writable-host convention.
 Development-selection discovery fixtures have the same prohibition.
+Templates must not copy an enforced Activation record or synthesize a
+replacement transition. A generated product can consume only a parent-managed
+newest fully enforced release; an in-progress replacement remains unavailable
+until the parent's complete fresh shadow chain passes.
 
 ## LEARNING_TASK_TRACKER.md
 

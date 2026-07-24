@@ -1,11 +1,13 @@
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
-import { lstatSync, realpathSync } from "node:fs";
+import { lstatSync, readFileSync, realpathSync } from "node:fs";
 import path from "node:path";
 import { advanceActivation, advanceRollback, beginRollback } from "./saga.mjs";
 
 const REQUIRED_PROOFS = ["local_release", "pr_ci", "main_ci", "local_remote_sync", "recovery", "fenced_rollback", "archive_decommission", "outbox_disposition"];
 const ACTIVATION_ORDER = ["planned", "shadow", "release_verified", "recovery_verified", "rollback_verified", "archive_decommission_verified", "ready", "enforced"];
+const ACTIVATION_CYCLE = ACTIVATION_ORDER.slice(1);
+const CURRENT_ACTIVATION_SCHEMA_VERSION = "1.1.0";
 const PROOF_EVIDENCE_FIELDS = {
   local_release: { repository_head: "git", checkout_instance_id: "string", command_manifest_fingerprint: "fingerprint", input_manifest_fingerprint: "fingerprint", artifact_manifest_fingerprint: "fingerprint" },
   pr_ci: { repository: "string", pr_number: "integer", head_sha: "git", run_id: "integer", check_names: "strings", artifact_digest: "fingerprint" },
@@ -27,17 +29,124 @@ function digest(value) {
   return createHash("sha256").update(Buffer.isBuffer(value) ? value : canonicalJson(value)).digest("hex");
 }
 
+function activationCycleId({ activationId, candidateFingerprint, cycleStartRevision, previousRecordRevision, previousRecordContentFingerprint }) {
+  return digest({
+    activation_id: activationId,
+    candidate_fingerprint: candidateFingerprint,
+    cycle_start_revision: cycleStartRevision,
+    predecessor_record_revision: previousRecordRevision,
+    predecessor_record_content_fingerprint: previousRecordContentFingerprint,
+  });
+}
+
+function activationRecords(store, activationId = "next-development-workflow") {
+  const records = [];
+  let cursor = 0;
+  do {
+    const page = store.query({ kind: "NextWorkflowActivation", limit: 1000, cursor });
+    records.push(...page.records.filter((record) => record.lineage_id === activationId));
+    cursor = page.next_cursor;
+  } while (cursor !== null);
+  records.sort((left, right) => left.record_revision - right.record_revision || left.id.localeCompare(right.id));
+  const revisions = new Set();
+  for (const record of records) {
+    if (!Number.isSafeInteger(record.record_revision) || record.record_revision < 1 || revisions.has(record.record_revision)) throw new Error("ACTIVATION_REVISION_HISTORY_INVALID");
+    revisions.add(record.record_revision);
+  }
+  return records;
+}
+
+function currentCycleHistory(records, record) {
+  if (record?.schema_version !== CURRENT_ACTIVATION_SCHEMA_VERSION || !Number.isSafeInteger(record?.cycle_start_revision)) return undefined;
+  return records.filter((entry) => entry.record_revision >= record.cycle_start_revision && entry.record_revision <= record.revision);
+}
+
+export function activationCycleHistory(store, record, activationId = "next-development-workflow") {
+  if (!store || typeof store.query !== "function") throw new Error("ACTIVATION_STORE_REQUIRED");
+  return currentCycleHistory(activationRecords(store, activationId), record);
+}
+
+function verifyCurrentActivationCycle(record, cycleHistory) {
+  if (!Array.isArray(cycleHistory) || cycleHistory.length !== ACTIVATION_CYCLE.length) throw new Error("ENFORCED_ACTIVATION_CYCLE_HISTORY_REQUIRED");
+  const normalized = cycleHistory.map((entry) => {
+    const payload = entry?.payload ?? entry;
+    if (!payload || typeof payload !== "object" || Array.isArray(payload)) throw new Error("ENFORCED_ACTIVATION_CYCLE_HISTORY_INVALID");
+    const contentFingerprint = entry?.payload ? entry.content_fp : digest(payload);
+    if (!/^[a-f0-9]{64}$/.test(contentFingerprint ?? "")) throw new Error("ENFORCED_ACTIVATION_CYCLE_HISTORY_INVALID");
+    if (entry?.payload
+      && (entry.kind !== "NextWorkflowActivation"
+        || entry.schema_version !== payload.schema_version
+        || Number(entry.record_revision) !== payload.revision
+        || entry.lineage_id !== payload.activation_id
+        || entry.lifecycle_state !== payload.mode
+        || entry.source_revision !== String(payload.previous_record_revision)
+        || entry.input_fp !== payload.candidate_fingerprint
+        || entry.content_fp !== digest(payload))) {
+      throw new Error("ENFORCED_ACTIVATION_CYCLE_ROW_BINDING_INVALID");
+    }
+    return { payload, content_fingerprint: contentFingerprint };
+  });
+  for (let index = 0; index < normalized.length; index += 1) {
+    const { payload } = normalized[index];
+    const expectedRevision = record.cycle_start_revision + index;
+    if (payload.schema_version !== CURRENT_ACTIVATION_SCHEMA_VERSION
+      || payload.activation_id !== record.activation_id
+      || payload.candidate_fingerprint !== record.candidate_fingerprint
+      || payload.cycle_id !== record.cycle_id
+      || payload.cycle_start_revision !== record.cycle_start_revision
+      || payload.cycle_step !== index + 1
+      || payload.revision !== expectedRevision
+      || payload.mode !== ACTIVATION_CYCLE[index]) {
+      throw new Error("ENFORCED_ACTIVATION_CYCLE_HISTORY_INVALID");
+    }
+    if (index === 0) {
+      if (payload.previous_record_revision !== payload.revision - 1
+        || (payload.previous_record_revision === 0
+          ? payload.previous_record_content_fingerprint !== null
+          : !/^[a-f0-9]{64}$/.test(payload.previous_record_content_fingerprint ?? ""))
+        || payload.cycle_id !== activationCycleId({
+          activationId: payload.activation_id,
+          candidateFingerprint: payload.candidate_fingerprint,
+          cycleStartRevision: payload.cycle_start_revision,
+          previousRecordRevision: payload.previous_record_revision,
+          previousRecordContentFingerprint: payload.previous_record_content_fingerprint,
+        })) {
+        throw new Error("ENFORCED_ACTIVATION_CYCLE_START_INVALID");
+      }
+    } else if (payload.previous_record_revision !== normalized[index - 1].payload.revision
+      || payload.previous_record_content_fingerprint !== normalized[index - 1].content_fingerprint) {
+      throw new Error("ENFORCED_ACTIVATION_CYCLE_PREDECESSOR_INVALID");
+    }
+  }
+  if (canonicalJson(normalized.at(-1).payload) !== canonicalJson(record)) throw new Error("ENFORCED_ACTIVATION_CYCLE_HEAD_INVALID");
+}
+
 function requireString(value, code) {
   if (typeof value !== "string" || value.length === 0) throw new Error(code);
   return value;
 }
 
 export function trustedGitExecutable(candidates = ["/usr/bin/git", "/bin/git"]) {
+  const rootOwnerAppearsAsOverflow = (() => {
+    try {
+      return readFileSync("/proc/self/uid_map", "utf8").split(/\r?\n/u).some((line) => {
+        const [inside, outside, length] = line.trim().split(/\s+/u).map(Number);
+        return inside === process.getuid?.() && outside === 0 && length === 1;
+      });
+    } catch {
+      return false;
+    }
+  })();
   for (const candidate of candidates) {
     try {
       const canonical = realpathSync(candidate);
       const info = lstatSync(canonical);
-      if (info.isFile() && !info.isSymbolicLink() && (info.mode & 0o111) !== 0 && (info.mode & 0o022) === 0 && info.uid === 0) return canonical;
+      if (info.isFile()
+        && !info.isSymbolicLink()
+        && (info.mode & 0o111) !== 0
+        && (info.mode & 0o022) === 0
+        && (info.uid === 0 || (info.uid === 65534 && rootOwnerAppearsAsOverflow))
+        && ["/usr/bin", "/bin"].includes(path.dirname(canonical))) return canonical;
     } catch {}
   }
   throw new Error("TRUSTED_GIT_EXECUTABLE_UNAVAILABLE");
@@ -321,9 +430,32 @@ export function verifyReleaseProofs({ candidateFingerprint, candidateDefinition,
   return { ...summary, fingerprint: digest(summary) };
 }
 
-export function verifyEnforcedActivationRecord({ record, proofVerifier, transitionVerifier, expectedRevocationEpoch, now = new Date().toISOString() } = {}) {
-  const allowedFields = ["activated_at", "activation_id", "authority_epoch", "candidate_definition", "candidate_fingerprint", "correctness", "evidence", "mode", "proof_summary", "release_prerequisite_fingerprint", "revision", "schema_version", "signed_release_proofs", "signed_transition_proofs", "transition_evidence"].sort();
-  if (!record || Object.keys(record).sort().join("\0") !== allowedFields.join("\0") || record.schema_version !== "1.0.0" || record.activation_id !== "next-development-workflow" || record.mode !== "enforced" || record.revision !== ACTIVATION_ORDER.length - 1 || !Number.isSafeInteger(expectedRevocationEpoch) || expectedRevocationEpoch < 0 || record.authority_epoch !== expectedRevocationEpoch || !Number.isFinite(Date.parse(now)) || !Number.isFinite(Date.parse(record.activated_at))) throw new Error("ENFORCED_ACTIVATION_RECORD_INVALID");
+export function verifyEnforcedActivationRecord({ record, cycleHistory, proofVerifier, transitionVerifier, expectedRevocationEpoch, now = new Date().toISOString() } = {}) {
+  const legacyFields = ["activated_at", "activation_id", "authority_epoch", "candidate_definition", "candidate_fingerprint", "correctness", "evidence", "mode", "proof_summary", "release_prerequisite_fingerprint", "revision", "schema_version", "signed_release_proofs", "signed_transition_proofs", "transition_evidence"].sort();
+  const currentFields = [...legacyFields, "cycle_id", "cycle_start_revision", "cycle_step", "previous_record_content_fingerprint", "previous_record_revision"].sort();
+  const legacy = record?.schema_version === "1.0.0";
+  const allowedFields = legacy ? legacyFields : currentFields;
+  if (!record
+    || Object.keys(record).sort().join("\0") !== allowedFields.join("\0")
+    || !new Set(["1.0.0", CURRENT_ACTIVATION_SCHEMA_VERSION]).has(record.schema_version)
+    || record.activation_id !== "next-development-workflow"
+    || record.mode !== "enforced"
+    || !Number.isSafeInteger(record.revision)
+    || (legacy
+      ? record.revision !== ACTIVATION_CYCLE.length
+      : (record.cycle_step !== ACTIVATION_CYCLE.length
+        || record.revision !== record.cycle_start_revision + ACTIVATION_CYCLE.length - 1
+        || record.previous_record_revision !== record.revision - 1
+        || !/^[a-f0-9]{64}$/.test(record.previous_record_content_fingerprint ?? "")
+        || !/^[a-f0-9]{64}$/.test(record.cycle_id ?? "")))
+    || !Number.isSafeInteger(expectedRevocationEpoch)
+    || expectedRevocationEpoch < 0
+    || record.authority_epoch !== expectedRevocationEpoch
+    || !Number.isFinite(Date.parse(now))
+    || !Number.isFinite(Date.parse(record.activated_at))) {
+    throw new Error("ENFORCED_ACTIVATION_RECORD_INVALID");
+  }
+  if (!legacy) verifyCurrentActivationCycle(record, cycleHistory);
   const candidateDefinition = validateCandidateDefinition(record.candidate_definition, { candidateFingerprint: record.candidate_fingerprint, prerequisiteFingerprint: record.release_prerequisite_fingerprint });
   if (canonicalJson(candidateDefinition) !== canonicalJson(record.candidate_definition)) throw new Error("ENFORCED_ACTIVATION_CANDIDATE_BINDING_INVALID");
   const currentSummary = verifyReleaseProofs({ candidateFingerprint: record.candidate_fingerprint, candidateDefinition, proofs: record.signed_release_proofs, proofVerifier, now });
@@ -351,23 +483,49 @@ export async function completeActivation({ candidateFingerprint, proofs, proofVe
   if (typeof transitionVerifier !== "function") throw new Error("ACTIVATION_TRANSITION_VERIFIER_REQUIRED");
   if (!Number.isSafeInteger(expectedRevision) || expectedRevision < 0) throw new Error("ACTIVATION_EXPECTED_REVISION_REQUIRED");
   requireString(activationId, "ACTIVATION_ID_REQUIRED");
-  const existing = store.query({ kind: "NextWorkflowActivation", limit: 1000 }).records.sort((left, right) => right.record_revision - left.record_revision)[0];
-  if (!existing || existing.payload?.mode !== "ready" || existing.payload?.candidate_fingerprint !== candidateFingerprint || existing.payload?.activation_id !== activationId || existing.payload?.release_prerequisite_fingerprint !== prerequisites.fingerprint) throw new Error("ACTIVATION_READY_RECORD_REQUIRED");
+  const records = activationRecords(store, activationId);
+  const existing = records.at(-1);
+  if (!existing
+    || existing.schema_version !== CURRENT_ACTIVATION_SCHEMA_VERSION
+    || existing.payload?.schema_version !== CURRENT_ACTIVATION_SCHEMA_VERSION
+    || existing.payload?.mode !== "ready"
+    || existing.payload?.cycle_step !== ACTIVATION_CYCLE.length - 1
+    || existing.payload?.candidate_fingerprint !== candidateFingerprint
+    || existing.payload?.activation_id !== activationId
+    || existing.payload?.release_prerequisite_fingerprint !== prerequisites.fingerprint) {
+    throw new Error("ACTIVATION_READY_RECORD_REQUIRED");
+  }
   const authorityEpoch = existing.payload.authority_epoch;
   if (!Number.isSafeInteger(authorityEpoch) || authorityEpoch < 0) throw new Error("ACTIVATION_AUTHORITY_EPOCH_INVALID");
   const candidateDefinition = validateCandidateDefinition(existing.payload.candidate_definition, { candidateFingerprint, prerequisiteFingerprint: prerequisites.fingerprint });
   const proofSummary = verifyReleaseProofs({ candidateFingerprint, candidateDefinition, proofs, proofVerifier, now });
   if (proofSummary.status !== "passed" || proofSummary.candidate_fingerprint !== candidateFingerprint) throw new Error("ACTIVATION_RELEASE_PROOF_INVALID");
-  const activation = advanceActivation({ ...existing.payload, evidence: existing.payload.transition_evidence ?? [] }, { nextMode: "enforced", candidateFingerprint, evidenceFingerprint: digest({ nextMode: "enforced", release: proofSummary.fingerprint }) });
+  const activation = advanceActivation(
+    { ...existing.payload, evidence: existing.payload.transition_evidence ?? [] },
+    {
+      nextMode: "enforced",
+      candidateFingerprint,
+      evidenceFingerprint: digest({ nextMode: "enforced", release: proofSummary.fingerprint }),
+      nextRevision: existing.record_revision + 1,
+      previousRecordRevision: existing.record_revision,
+      previousRecordContentFingerprint: existing.content_fp,
+      activationId,
+    },
+  );
   const activatedAt = new Date(Date.parse(now)).toISOString();
   const recordId = `${activationId}-${candidateFingerprint.slice(0, 24)}`;
   const activationRecord = {
-    schema_version: "1.0.0",
+    schema_version: CURRENT_ACTIVATION_SCHEMA_VERSION,
     activation_id: activationId,
     authority_epoch: authorityEpoch,
     revision: existing.payload.revision + 1,
     mode: "enforced",
     candidate_fingerprint: candidateFingerprint,
+    cycle_id: activation.cycle_id,
+    cycle_start_revision: activation.cycle_start_revision,
+    cycle_step: activation.cycle_step,
+    previous_record_revision: activation.previous_record_revision,
+    previous_record_content_fingerprint: activation.previous_record_content_fingerprint,
     evidence: REQUIRED_PROOFS.map((kind) => ({ kind, status: "passed", candidate_fingerprint: candidateFingerprint, fingerprint: proofSummary.verified_proofs[kind].proof_fingerprint })),
     correctness: { status: "passed", fingerprint: proofSummary.fingerprint },
     release_prerequisite_fingerprint: prerequisites.fingerprint,
@@ -378,6 +536,8 @@ export async function completeActivation({ candidateFingerprint, proofs, proofVe
     transition_evidence: activation.evidence,
     proof_summary: proofSummary,
   };
+  const proposedRecord = { id: recordId, kind: "NextWorkflowActivation", schema_version: CURRENT_ACTIVATION_SCHEMA_VERSION, record_revision: activationRecord.revision, authority_scope: "release", lineage_id: activationId, lifecycle_state: "enforced", payload: activationRecord, source_revision: String(existing.record_revision), policy_fp: proofSummary.fingerprint, input_fp: candidateFingerprint, content_fp: digest(activationRecord) };
+  const cycleHistory = [...currentCycleHistory(records, activationRecord), proposedRecord];
   const committed = store.persistActivationLifecycle({
     expectedRevision,
     authorityEpoch,
@@ -385,16 +545,21 @@ export async function completeActivation({ candidateFingerprint, proofs, proofVe
     expectedMode: "ready",
     nextMode: "enforced",
     candidateFingerprint,
-    record: { id: recordId, kind: "NextWorkflowActivation", schema_version: "1.0.0", record_revision: activationRecord.revision, authority_scope: "release", lineage_id: activationId, lifecycle_state: "enforced", payload: activationRecord, source_revision: String(existing.record_revision), policy_fp: proofSummary.fingerprint, input_fp: candidateFingerprint },
+    record: proposedRecord,
     event: { event_id: `activation-${proofSummary.fingerprint.slice(0, 24)}`, aggregate_id: recordId, event_type: "NEXT_WORKFLOW_ACTIVATED", payload: { activation_id: activationId, candidate_fingerprint: candidateFingerprint, authority_epoch: authorityEpoch, proof_summary_fingerprint: proofSummary.fingerprint } },
     verifier: {
       trusted: true,
       independent: true,
       verifier_id: "activation-release-proof-verifier",
       verify({ current_record: lockedCurrent, proposed_record: proposedRecord, fingerprint, now: lockedNow }) {
-        if (lockedCurrent?.payload?.mode !== "ready" || lockedCurrent.payload.candidate_fingerprint !== candidateFingerprint || lockedCurrent.payload.authority_epoch !== authorityEpoch || proposedRecord.payload?.mode !== "enforced" || canonicalJson(proposedRecord.payload?.signed_transition_proofs) !== canonicalJson(lockedCurrent.payload.signed_transition_proofs)) return false;
+        if (lockedCurrent?.payload?.mode !== "ready"
+          || lockedCurrent.payload.candidate_fingerprint !== candidateFingerprint
+          || lockedCurrent.payload.authority_epoch !== authorityEpoch
+          || lockedCurrent.content_fp !== existing.content_fp
+          || proposedRecord.payload?.mode !== "enforced"
+          || canonicalJson(proposedRecord.payload?.signed_transition_proofs) !== canonicalJson(lockedCurrent.payload.signed_transition_proofs)) return false;
         try {
-          const atomicVerification = verifyEnforcedActivationRecord({ record: proposedRecord.payload, proofVerifier, transitionVerifier, expectedRevocationEpoch: authorityEpoch, now: lockedNow });
+          const atomicVerification = verifyEnforcedActivationRecord({ record: proposedRecord.payload, cycleHistory, proofVerifier, transitionVerifier, expectedRevocationEpoch: authorityEpoch, now: lockedNow });
           return atomicVerification.trusted === true && proposedRecord.policy_fp === proposedRecord.payload.proof_summary.fingerprint
             ? { verified: true, verifier_id: "activation-release-proof-verifier", fingerprint, proof_fingerprint: proposedRecord.payload.proof_summary.fingerprint }
             : false;
@@ -413,23 +578,38 @@ export async function persistActivationTransition({ store, expectedRevision, can
   if (!Number.isSafeInteger(expectedRevision) || expectedRevision < 0) throw new Error("ACTIVATION_EXPECTED_REVISION_REQUIRED");
   if (!/^[a-f0-9]{64}$/.test(candidateFingerprint ?? "")) throw new Error("ACTIVATION_CANDIDATE_INVALID");
   if (!Number.isFinite(Date.parse(now))) throw new Error("ACTIVATION_TRANSITION_TIME_INVALID");
-  const currentRecord = store.query({ kind: "NextWorkflowActivation", limit: 1000 }).records.sort((left, right) => right.record_revision - left.record_revision)[0];
+  const records = activationRecords(store, activationId);
+  const currentRecord = records.at(-1);
   const current = currentRecord?.payload ?? { schema_version: "1.0.0", activation_id: activationId, revision: 0, mode: "planned", candidate_fingerprint: null, evidence: [] };
   const authorityEpoch = currentRecord ? current.authority_epoch : store.revocation_epoch;
   if (!Number.isSafeInteger(authorityEpoch) || authorityEpoch < 0) throw new Error("ACTIVATION_AUTHORITY_EPOCH_INVALID");
-  if (current.activation_id !== activationId || current.mode === "enforced" || current.mode === "rolled_back") throw new Error("ACTIVATION_TRANSITION_TARGET_INVALID");
+  if (current.activation_id !== activationId || current.mode === "rolled_back") throw new Error("ACTIVATION_TRANSITION_TARGET_INVALID");
   if (current.revision > 0 && current.release_prerequisite_fingerprint !== prerequisites.fingerprint) throw new Error("ACTIVATION_PREREQUISITE_DRIFT");
   const effectiveCandidateDefinition = validateCandidateDefinition(candidateDefinition ?? current.candidate_definition, { candidateFingerprint, prerequisiteFingerprint: prerequisites.fingerprint });
-  if (current.candidate_definition && canonicalJson(current.candidate_definition) !== canonicalJson(effectiveCandidateDefinition)) throw new Error("ACTIVATION_CANDIDATE_DEFINITION_DRIFT");
+  const candidateRestart = nextMode === "shadow" && current.candidate_fingerprint && current.candidate_fingerprint !== candidateFingerprint;
+  if (current.candidate_definition && canonicalJson(current.candidate_definition) !== canonicalJson(effectiveCandidateDefinition) && !candidateRestart) throw new Error("ACTIVATION_CANDIDATE_DEFINITION_DRIFT");
+  if (currentRecord && !candidateRestart && current.schema_version !== CURRENT_ACTIVATION_SCHEMA_VERSION) throw new Error("ACTIVATION_LEGACY_CYCLE_CONTINUATION_FORBIDDEN");
   const verifiedEvidence = verifyTransitionEvidence({ nextMode, candidateFingerprint, repositoryHead: effectiveCandidateDefinition.repository_head, evidence, transitionVerifier, now });
   if (verifiedEvidence.evidence.acceptance_prerequisite_fingerprint !== prerequisites.fingerprint) throw new Error("ACTIVATION_TRANSITION_PREREQUISITE_MISMATCH");
-  const advanced = advanceActivation({ ...current, evidence: current.transition_evidence ?? [] }, { nextMode, candidateFingerprint, evidenceFingerprint: verifiedEvidence.fingerprint });
-  if (advanced.decision === "STOP") throw new Error(`ACTIVATION_TRANSITION_BLOCKED:${advanced.reason}`);
   const revision = current.revision + 1;
+  const advanced = advanceActivation(
+    { ...current, evidence: current.transition_evidence ?? [] },
+    {
+      nextMode,
+      candidateFingerprint,
+      evidenceFingerprint: verifiedEvidence.fingerprint,
+      nextRevision: revision,
+      previousRecordRevision: currentRecord?.record_revision ?? 0,
+      previousRecordContentFingerprint: currentRecord?.content_fp ?? null,
+      activationId,
+    },
+  );
+  if (advanced.decision === "STOP") throw new Error(`ACTIVATION_TRANSITION_BLOCKED:${advanced.reason}`);
   const effectiveMode = advanced.mode;
   const sameCandidate = current.candidate_fingerprint === candidateFingerprint;
-  const payload = { schema_version: "1.0.0", activation_id: activationId, authority_epoch: authorityEpoch, revision, mode: effectiveMode, candidate_fingerprint: candidateFingerprint, candidate_definition: effectiveCandidateDefinition, release_prerequisite_fingerprint: prerequisites.fingerprint, evidence: sameCandidate ? (current.evidence ?? []) : [], signed_transition_proofs: [...(sameCandidate ? (current.signed_transition_proofs ?? []) : []), structuredClone(evidence)], transition_evidence: advanced.evidence.map((item, index) => index === advanced.evidence.length - 1 ? { ...item, kind: nextMode, owner: verifiedEvidence.owner, verifier: verifiedEvidence.verifier, candidate_fingerprint: candidateFingerprint, fresh_until: verifiedEvidence.fresh_until, correctness_fingerprint: verifiedEvidence.correctness.fingerprint, verification_fingerprint: verifiedEvidence.verification_fingerprint } : item), decision: advanced.decision, ...(advanced.reason ? { reason: advanced.reason } : {}), transitioned_at: new Date(Date.parse(now)).toISOString() };
+  const payload = { schema_version: CURRENT_ACTIVATION_SCHEMA_VERSION, activation_id: activationId, authority_epoch: authorityEpoch, revision, mode: effectiveMode, candidate_fingerprint: candidateFingerprint, candidate_definition: effectiveCandidateDefinition, release_prerequisite_fingerprint: prerequisites.fingerprint, cycle_id: advanced.cycle_id, cycle_start_revision: advanced.cycle_start_revision, cycle_step: advanced.cycle_step, previous_record_revision: advanced.previous_record_revision, previous_record_content_fingerprint: advanced.previous_record_content_fingerprint, evidence: sameCandidate ? (current.evidence ?? []) : [], signed_transition_proofs: [...(sameCandidate ? (current.signed_transition_proofs ?? []) : []), structuredClone(evidence)], transition_evidence: advanced.evidence.map((item, index) => index === advanced.evidence.length - 1 ? { ...item, kind: nextMode, owner: verifiedEvidence.owner, verifier: verifiedEvidence.verifier, candidate_fingerprint: candidateFingerprint, fresh_until: verifiedEvidence.fresh_until, correctness_fingerprint: verifiedEvidence.correctness.fingerprint, verification_fingerprint: verifiedEvidence.verification_fingerprint } : item), decision: advanced.decision, ...(advanced.reason ? { reason: advanced.reason } : {}), transitioned_at: new Date(Date.parse(now)).toISOString() };
   const recordId = `${activationId}-${candidateFingerprint.slice(0, 24)}-${effectiveMode}`;
+  const proposedRecord = { id: recordId, kind: "NextWorkflowActivation", schema_version: CURRENT_ACTIVATION_SCHEMA_VERSION, record_revision: revision, authority_scope: "release", lineage_id: activationId, lifecycle_state: effectiveMode, payload, source_revision: String(currentRecord?.record_revision ?? 0), policy_fp: verifiedEvidence.verification_fingerprint, input_fp: candidateFingerprint, content_fp: digest(payload) };
   const committed = store.persistActivationLifecycle({
     expectedRevision,
     authorityEpoch,
@@ -437,14 +617,17 @@ export async function persistActivationTransition({ store, expectedRevision, can
     expectedMode: current.mode,
     nextMode: effectiveMode,
     candidateFingerprint,
-    record: { id: recordId, kind: "NextWorkflowActivation", schema_version: "1.0.0", record_revision: revision, authority_scope: "release", lineage_id: activationId, lifecycle_state: effectiveMode, payload, source_revision: String(currentRecord?.record_revision ?? 0), policy_fp: verifiedEvidence.verification_fingerprint, input_fp: candidateFingerprint },
+    record: proposedRecord,
     event: { event_id: `activation-transition-${revision}-${candidateFingerprint.slice(0, 16)}`, aggregate_id: recordId, event_type: "NEXT_WORKFLOW_ACTIVATION_TRANSITIONED", payload: { activation_id: activationId, candidate_fingerprint: candidateFingerprint, authority_epoch: authorityEpoch, from_mode: current.mode, requested_mode: nextMode, to_mode: effectiveMode, evidence_fingerprint: verifiedEvidence.fingerprint, verification_fingerprint: verifiedEvidence.verification_fingerprint } },
     verifier: {
       trusted: true,
       independent: true,
       verifier_id: `activation-transition-verifier:${evidence.verifier}`,
       verify({ current_record: lockedCurrent, proposed_record: proposedRecord, fingerprint, now: lockedNow }) {
-        if ((lockedCurrent?.payload?.mode ?? "planned") !== current.mode || proposedRecord.payload?.candidate_fingerprint !== candidateFingerprint || proposedRecord.payload?.mode !== effectiveMode) return false;
+        if ((lockedCurrent?.payload?.mode ?? "planned") !== current.mode
+          || (lockedCurrent?.content_fp ?? null) !== (currentRecord?.content_fp ?? null)
+          || proposedRecord.payload?.candidate_fingerprint !== candidateFingerprint
+          || proposedRecord.payload?.mode !== effectiveMode) return false;
         const atomicEvidence = verifyTransitionEvidence({ nextMode, candidateFingerprint, repositoryHead: effectiveCandidateDefinition.repository_head, evidence, transitionVerifier, now: lockedNow });
         return atomicEvidence.verification_fingerprint === proposedRecord.policy_fp
           ? { verified: true, verifier_id: `activation-transition-verifier:${evidence.verifier}`, fingerprint, proof_fingerprint: atomicEvidence.verification_fingerprint }
@@ -461,8 +644,8 @@ export async function rollbackActivation({ store, expectedRevision, candidateFin
   const timestamp = Date.parse(now);
   if (!Number.isFinite(timestamp)) throw new Error("ACTIVATION_ROLLBACK_TIME_INVALID");
   if (!evidence || typeof evidence !== "object" || !rollbackVerifier || rollbackVerifier.independent !== true || typeof rollbackVerifier.verifier_id !== "string" || typeof rollbackVerifier.verify !== "function" || typeof stateRestorer !== "function" || typeof legacyVerifier !== "function") throw new Error("ACTIVATION_ROLLBACK_COORDINATOR_REQUIRED");
-  const records = store.query({ kind: "NextWorkflowActivation", limit: 1000 }).records.sort((left, right) => right.record_revision - left.record_revision);
-  const current = records[0];
+  const records = activationRecords(store, activationId);
+  const current = records.at(-1);
   if (!current || current.payload?.mode !== "enforced" || current.payload.candidate_fingerprint !== candidateFingerprint || current.payload.activation_id !== activationId) throw new Error("ACTIVATION_ROLLBACK_TARGET_INVALID");
   if (store.revision !== expectedRevision) throw new Error("REVISION_CONFLICT");
   let rollback = beginRollback({ candidateFingerprint, expectedEpoch: store.fence({ reason: `activation-rollback:${candidateFingerprint}` }).revocation_epoch - 1 });
@@ -510,8 +693,33 @@ export async function rollbackActivation({ store, expectedRevision, candidateFin
   rollback = advanceRollback(rollback, { nextState: "ROLLED_BACK", evidenceFingerprint: verification.proof_fingerprint, verified: true });
   const revision = current.payload.revision + 1;
   const rolledBackAt = new Date(timestamp).toISOString();
-  const payload = { ...structuredClone(current.payload), authority_epoch: rollback.authority_epoch, revision, mode: "rolled_back", rolled_back_at: rolledBackAt, rollback_evidence: { request_fingerprint: digest(evidence), authority_epoch: rollback.authority_epoch, steps: verifiedSteps, rollback_fingerprint: digest(rollback) } };
+  const legacyCurrent = current.payload.schema_version === "1.0.0";
+  const cycleStartRevision = legacyCurrent ? 1 : current.payload.cycle_start_revision;
+  const cycleId = legacyCurrent
+    ? activationCycleId({
+      activationId,
+      candidateFingerprint,
+      cycleStartRevision,
+      previousRecordRevision: 0,
+      previousRecordContentFingerprint: null,
+    })
+    : current.payload.cycle_id;
+  const payload = {
+    ...structuredClone(current.payload),
+    schema_version: CURRENT_ACTIVATION_SCHEMA_VERSION,
+    authority_epoch: rollback.authority_epoch,
+    revision,
+    mode: "rolled_back",
+    cycle_id: cycleId,
+    cycle_start_revision: cycleStartRevision,
+    cycle_step: ACTIVATION_CYCLE.length + 1,
+    previous_record_revision: current.record_revision,
+    previous_record_content_fingerprint: current.content_fp,
+    rolled_back_at: rolledBackAt,
+    rollback_evidence: { request_fingerprint: digest(evidence), authority_epoch: rollback.authority_epoch, steps: verifiedSteps, rollback_fingerprint: digest(rollback) },
+  };
   const recordId = `${activationId}-${candidateFingerprint.slice(0, 24)}-rollback-${revision}`;
+  const proposedRecord = { id: recordId, kind: "NextWorkflowActivation", schema_version: CURRENT_ACTIVATION_SCHEMA_VERSION, record_revision: revision, authority_scope: "release", lineage_id: activationId, lifecycle_state: "rolled_back", payload, source_revision: String(current.record_revision), policy_fp: verification.proof_fingerprint, input_fp: candidateFingerprint, content_fp: digest(payload) };
   const committed = store.persistActivationLifecycle({
     expectedRevision: store.revision,
     authorityEpoch: rollback.authority_epoch,
@@ -519,7 +727,7 @@ export async function rollbackActivation({ store, expectedRevision, candidateFin
     expectedMode: "enforced",
     nextMode: "rolled_back",
     candidateFingerprint,
-    record: { id: recordId, kind: "NextWorkflowActivation", schema_version: "1.0.0", record_revision: revision, authority_scope: "release", lineage_id: activationId, lifecycle_state: "rolled_back", payload, source_revision: String(current.record_revision), policy_fp: verification.proof_fingerprint, input_fp: candidateFingerprint },
+    record: proposedRecord,
     event: { event_id: `activation-rollback-${digest({ candidateFingerprint, revision, rollback: payload.rollback_evidence.rollback_fingerprint }).slice(0, 24)}`, aggregate_id: recordId, event_type: "NEXT_WORKFLOW_ROLLED_BACK", payload: { activation_id: activationId, candidate_fingerprint: candidateFingerprint, rollback_evidence_fingerprint: payload.rollback_evidence.rollback_fingerprint, authority_epoch: rollback.authority_epoch } },
     verifier: {
       trusted: true,

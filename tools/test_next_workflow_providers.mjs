@@ -528,13 +528,17 @@ test("Codex discovery creates only direct-observation-bound eligible model entri
   temporaryRoots.push(root);
   const executable = installFixtureCodex(root, Buffer.from("fixture-native-binary"));
   const family = { family_id: "codex-openai", execution_provider_id: "openai", model_publisher_id: "openai", agent_product_id: "codex", adapter_id: "codex_cli", transport_id: "cli_process", observed_adapter_version: "1.2.3", certification_state: "CERTIFIED", model_catalog_source: "runtime_discovery", capabilities: ["read"], resource_bounds: { cost: 0 }, estimated_cost: 0, priority: 1 };
-  const runner = (_executable, argv) => argv[0] === "--version"
-    ? "codex-cli 1.2.3\n"
-    : JSON.stringify({ models: [
+  const observedCommands = [];
+  const runner = (_executable, argv) => {
+    observedCommands.push([...argv]);
+    return argv[0] === "--version"
+      ? "codex-cli 1.2.3\n"
+      : JSON.stringify({ models: [
       { slug: "fixture-balanced", priority: 2, visibility: "list", default_reasoning_level: "high", supported_reasoning_levels: [{ effort: "low" }, { effort: "high" }] },
       { slug: "fixture-efficient", priority: 3, visibility: "list", default_reasoning_level: "high", supported_reasoning_levels: [{ effort: "low" }, { effort: "high" }] },
       { slug: "fixture-model", priority: 1, visibility: "list", default_reasoning_level: "high", supported_reasoning_levels: [{ effort: "low" }, { effort: "high" }] },
     ] });
+  };
   const probeAuthority = {
     trusted: true,
     independent: true,
@@ -552,6 +556,7 @@ test("Codex discovery creates only direct-observation-bound eligible model entri
     verify({ certification: value, fingerprint }) { return { verified: true, authority_id: this.authority_id, fingerprint, certification_id: value.certification_id, identity_key: value.identity_key, authority_fingerprint: value.authority_fingerprint }; }
   };
   const discovered = discoverBuiltinProviderInputs({ adapterFamilies: [family], probeAuthority, certificationAuthority, executableLocator: () => executable, runner, platform: "linux-x64", clock: () => "2029-01-01T00:00:00.000Z" });
+  assert.deepEqual(observedCommands, [["--version"], ["debug", "models", "--bundled"]]);
   const runtime = loadProviderRegistry({ ...discovered, platform: "linux-x64", clock: () => "2029-01-01T00:00:00.000Z" });
   assert.equal(runtime.entries.length, 3, JSON.stringify(discovered.blockers));
   assert.equal(runtime.entries.every((entry) => entry.eligible), true);

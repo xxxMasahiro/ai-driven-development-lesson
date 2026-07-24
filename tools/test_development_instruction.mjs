@@ -16,6 +16,7 @@ import { fileURLToPath } from 'node:url';
 import {
   DevelopmentInstructionError,
   formatDevelopmentInstruction,
+  intersectDeliveryLaneWithGitPlan,
   resolveDevelopmentInstruction,
 } from './lib/development_instruction.mjs';
 
@@ -334,6 +335,17 @@ try {
     const result = resolveProduct(fixture, { stage: 'D', scopeId: 'fixture-scope' });
     for (const action of expectedAutomatic) expect(result.git_plan.automatic.includes(action), mode + ' omitted ' + action);
     for (const action of expectedNotApplicable) expect(result.git_plan.not_applicable.includes(action), mode + ' wrongly applied ' + action);
+  }
+
+  {
+    const fixture = createFixture();
+    const resolved = resolveParent(fixture, { stage: 'D', scopeId: 'fixture-scope' });
+    const local = intersectDeliveryLaneWithGitPlan({ lane: 'local', gitPlan: resolved.git_plan });
+    expect(local.automatic.includes('commit'), 'local delivery omitted automatic commit');
+    expect(local.not_applicable.includes('push'), 'local delivery exposed push');
+    const ci = intersectDeliveryLaneWithGitPlan({ lane: 'ci', gitPlan: resolved.git_plan });
+    expect(ci.automatic.includes('pr_ci_monitoring'), 'ci delivery lost existing pr_ci semantics');
+    expect(ci.automatic.includes('merge'), 'ci delivery lost saved merge permission');
   }
 
   {

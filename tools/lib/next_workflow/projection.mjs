@@ -40,8 +40,25 @@ export function permittedControlsForMode(mode, blockers = []) {
 }
 
 export function validateActivationRecord(record) {
-  if (!record || record.schema_version !== "1.0.0" || record.activation_id !== "next-development-workflow" || !Number.isInteger(record.revision) || record.revision < 1 || !ACTIVATION_MODES.has(record.mode) || !Array.isArray(record.evidence)) throw new Error("NEXT_WORKFLOW_ACTIVATION_INVALID");
+  if (!record || !new Set(["1.0.0", "1.1.0"]).has(record.schema_version) || record.activation_id !== "next-development-workflow" || !Number.isInteger(record.revision) || record.revision < 1 || !ACTIVATION_MODES.has(record.mode) || !Array.isArray(record.evidence)) throw new Error("NEXT_WORKFLOW_ACTIVATION_INVALID");
   if (record.candidate_fingerprint !== null && !/^[a-f0-9]{64}$/.test(record.candidate_fingerprint)) throw new Error("NEXT_WORKFLOW_ACTIVATION_CANDIDATE_INVALID");
+  if (record.schema_version === "1.1.0") {
+    const expectedStep = ENFORCEMENT_TRANSITION_ORDER.indexOf(record.mode) + 1;
+    const rolledBack = record.mode === "rolled_back";
+    if (!/^[a-f0-9]{64}$/.test(record.cycle_id ?? "")
+      || !Number.isSafeInteger(record.cycle_start_revision)
+      || record.cycle_start_revision < 1
+      || !Number.isSafeInteger(record.cycle_step)
+      || record.cycle_step !== (rolledBack ? ENFORCEMENT_TRANSITION_ORDER.length + 1 : expectedStep)
+      || record.revision !== record.cycle_start_revision + record.cycle_step - 1
+      || !Number.isSafeInteger(record.previous_record_revision)
+      || record.previous_record_revision !== record.revision - 1
+      || (record.previous_record_revision === 0
+        ? record.previous_record_content_fingerprint !== null
+        : !/^[a-f0-9]{64}$/.test(record.previous_record_content_fingerprint ?? ""))) {
+      throw new Error("NEXT_WORKFLOW_ACTIVATION_CYCLE_INVALID");
+    }
+  }
   const seen = new Set();
   for (const proof of record.evidence) {
     if (!proof || !REQUIRED_RELEASE_PROOFS.has(proof.kind) || seen.has(proof.kind) || proof.status !== "passed" || proof.candidate_fingerprint !== record.candidate_fingerprint || !/^[a-f0-9]{64}$/.test(proof.fingerprint ?? "")) throw new Error("NEXT_WORKFLOW_ACTIVATION_EVIDENCE_INVALID");
@@ -65,7 +82,11 @@ export function validateActivationRecord(record) {
       || !Array.isArray(record.signed_transition_proofs)
       || record.signed_transition_proofs.length !== ENFORCEMENT_TRANSITION_ORDER.length - 1
       || canonicalJson(transitionModes) !== canonicalJson(ENFORCEMENT_TRANSITION_ORDER)
-      || (record.transition_evidence ?? []).some((entry) => !/^[a-f0-9]{64}$/.test(entry?.fingerprint ?? ""))) throw new Error("NEXT_WORKFLOW_ACTIVATION_PREMATURE");
+      || (record.transition_evidence ?? []).some((entry) => !/^[a-f0-9]{64}$/.test(entry?.fingerprint ?? ""))
+      || (record.schema_version === "1.0.0" && record.revision !== ENFORCEMENT_TRANSITION_ORDER.length)
+      || (record.schema_version === "1.1.0"
+        && (record.cycle_step !== ENFORCEMENT_TRANSITION_ORDER.length
+          || record.revision !== record.cycle_start_revision + ENFORCEMENT_TRANSITION_ORDER.length - 1))) throw new Error("NEXT_WORKFLOW_ACTIVATION_PREMATURE");
   }
   if (record.mode === "rolled_back" && (!record.candidate_fingerprint || typeof record.activated_at !== "string")) throw new Error("NEXT_WORKFLOW_ROLLBACK_INVALID");
   if (record.mode !== "planned" && !record.candidate_fingerprint) throw new Error("NEXT_WORKFLOW_ACTIVATION_CANDIDATE_REQUIRED");

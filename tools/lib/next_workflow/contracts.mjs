@@ -36,7 +36,7 @@ const DECISIONS = Object.freeze(["PASS", "REVISE", "ASK_OWNER", "STOP"]);
 const LIFECYCLE_IDS = Object.freeze(["outcome_discovery", "roadmap_decomposition", "solution_proposal_review", "implementation_planning", "build_and_verify", "release_and_sync"]);
 const EXECUTION_PHASE_IDS = Object.freeze(["context_triage", "proposal", "implementation_plan", "fast_loop", "mid_tests", "release_gate", "main_sync_cleanup"]);
 const RIGOR_SCORE_IDS = Object.freeze(["user_impact", "change_scope", "recoverability", "uncertainty", "verification_difficulty", "permission_boundary_impact"]);
-const HARD_L5_TRIGGERS = Object.freeze(["security", "authentication", "secrets", "permissions", "destructive_operation", "history_rewrite", "ci_or_safety_gate_change", "external_repository_write", "data_migration", "breaking_compatibility", "unknown_impact"]);
+export const RIGOR_HARD_L5_TRIGGERS = Object.freeze(["security", "authentication", "secrets", "permissions", "destructive_operation", "history_rewrite", "ci_or_safety_gate_change", "external_repository_write", "data_migration", "breaking_compatibility", "unknown_impact"]);
 const REPOSITORY_PHASE_MAPPING = Object.freeze({
   context_triage: ["outcome_discovery"],
   proposal: ["outcome_discovery", "roadmap_decomposition", "solution_proposal_review"],
@@ -152,7 +152,7 @@ function validateAuthority(value, issues) {
   requireCondition(issues, canonicalJson(phaseMapping) === canonicalJson(REPOSITORY_PHASE_MAPPING), "PHASE_LIFECYCLE_EDGE_INVALID", "the exact canonical execution-phase to lifecycle-stage edges are required", id);
   requireCondition(issues, sameMembers(Object.keys(value.rigor_levels ?? {}), ["L1", "L2", "L3", "L4", "L5"]), "RIGOR_LEVEL_INVALID", "L1-L5 are required", id);
   requireCondition(issues, JSON.stringify(value.rigor_scores) === JSON.stringify(RIGOR_SCORE_IDS), "RIGOR_SCORE_COMPONENTS_INVALID", "the six canonical 0-2 rigor score components are fixed", id);
-  requireCondition(issues, sameMembers(value.hard_l5_triggers, HARD_L5_TRIGGERS), "RIGOR_HARD_TRIGGER_SET_INVALID", "the canonical hard L5 trigger vocabulary is required", id);
+  requireCondition(issues, sameMembers(value.hard_l5_triggers, RIGOR_HARD_L5_TRIGGERS), "RIGOR_HARD_TRIGGER_SET_INVALID", "the canonical hard L5 trigger vocabulary is required", id);
   requireCondition(issues, value.rigor_levels?.L5?.formal_start_approval === true && ["L1", "L2", "L3", "L4"].every((level) => value.rigor_levels?.[level]?.formal_start_approval === false), "APPROVAL_TIMING_INVALID", "only L5 has normal start approval", id);
   requireCondition(issues, sameMembers(value.decisions, DECISIONS), "DECISION_SET_INVALID", "four finite loop decisions are required", id);
   requireCondition(issues, value.immutable_stop?.terminal_for_same_decision_fingerprint === true && value.immutable_stop?.reentry_requires_material_change === true, "STOP_NOT_IMMUTABLE", "STOP must be immutable for an unchanged decision", id);
@@ -257,7 +257,7 @@ export function assessRigor({ scores, scoreReasons, hardTriggers = [], hardTrigg
   const values = Object.values(normalizedScores);
   if (values.some((score) => !Number.isInteger(score) || score < 0 || score > 2)) throw new Error("RIGOR_SCORE_INVALID");
   if (!isObject(scoreReasons) || RIGOR_SCORE_IDS.some((id) => typeof scoreReasons[id] !== "string" || scoreReasons[id].trim().length === 0) || Object.keys(scoreReasons).some((id) => !RIGOR_SCORE_IDS.includes(id))) throw new Error("RIGOR_SCORE_REASONS_REQUIRED");
-  if (!Array.isArray(hardTriggers) || hardTriggers.some((trigger) => !HARD_L5_TRIGGERS.includes(trigger))) throw new Error("RIGOR_HARD_TRIGGER_INVALID");
+  if (!Array.isArray(hardTriggers) || hardTriggers.some((trigger) => !RIGOR_HARD_L5_TRIGGERS.includes(trigger))) throw new Error("RIGOR_HARD_TRIGGER_INVALID");
   if (!isObject(hardTriggerEvidence) || hardTriggers.some((trigger) => typeof hardTriggerEvidence[trigger] !== "string" || hardTriggerEvidence[trigger].trim().length === 0) || Object.keys(hardTriggerEvidence).some((trigger) => !hardTriggers.includes(trigger))) throw new Error("RIGOR_HARD_TRIGGER_EVIDENCE_REQUIRED");
   if (!order.includes(developerMinimum)) throw new Error("RIGOR_DEVELOPER_MINIMUM_INVALID");
   const total = values.reduce((sum, score) => sum + score, 0);

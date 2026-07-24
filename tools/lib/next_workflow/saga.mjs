@@ -310,16 +310,102 @@ export function advanceRollback(rollback, { nextState, evidenceFingerprint, veri
   return { ...next, decision: nextState === "ROLLED_BACK" ? "PASS" : "REVISE" };
 }
 
-export function advanceActivation(activation, { nextMode, candidateFingerprint, evidenceFingerprint }) {
+function candidateCycleMetadata({ activationId, candidateFingerprint, cycleStartRevision, cycleStep, previousRecordRevision, previousRecordContentFingerprint }) {
+  const cycleId = digest({
+    activation_id: activationId,
+    candidate_fingerprint: candidateFingerprint,
+    cycle_start_revision: cycleStartRevision,
+    predecessor_record_revision: previousRecordRevision,
+    predecessor_record_content_fingerprint: previousRecordContentFingerprint,
+  });
+  return {
+    cycle_id: cycleId,
+    cycle_start_revision: cycleStartRevision,
+    cycle_step: cycleStep,
+    previous_record_revision: previousRecordRevision,
+    previous_record_content_fingerprint: previousRecordContentFingerprint,
+  };
+}
+
+export function advanceActivation(activation, {
+  nextMode,
+  candidateFingerprint,
+  evidenceFingerprint,
+  nextRevision,
+  previousRecordRevision,
+  previousRecordContentFingerprint,
+  activationId = "next-development-workflow",
+}) {
+  if (activation.mode === "rolled_back") throw new Error("ACTIVATION_ROLLBACK_TERMINAL");
+  const cycleInputs = [nextRevision, previousRecordRevision, previousRecordContentFingerprint];
+  const hasCycleInputs = cycleInputs.some((value) => value !== undefined);
+  if (hasCycleInputs
+    && (!Number.isSafeInteger(nextRevision)
+      || nextRevision < 1
+      || !Number.isSafeInteger(previousRecordRevision)
+      || previousRecordRevision !== nextRevision - 1
+      || (previousRecordRevision === 0
+        ? previousRecordContentFingerprint !== null
+        : !/^[a-f0-9]{64}$/.test(previousRecordContentFingerprint ?? "")))) {
+    throw new Error("ACTIVATION_CYCLE_PREDECESSOR_INVALID");
+  }
   if (activation.candidate_fingerprint && activation.candidate_fingerprint !== candidateFingerprint) {
     if (nextMode !== "shadow") throw new Error("CANDIDATE_DRIFT_REQUIRES_SHADOW");
     if (typeof evidenceFingerprint !== "string" || evidenceFingerprint.length === 0) return { ...activation, decision: "STOP", reason: "ACTIVATION_EVIDENCE_REQUIRED" };
-    return { mode: "shadow", candidate_fingerprint: candidateFingerprint, evidence: [{ mode: "shadow", fingerprint: evidenceFingerprint }], decision: "REVISE", reason: "CANDIDATE_DRIFT" };
+    return {
+      mode: "shadow",
+      candidate_fingerprint: candidateFingerprint,
+      evidence: [{ mode: "shadow", fingerprint: evidenceFingerprint }],
+      ...(hasCycleInputs ? candidateCycleMetadata({
+        activationId,
+        candidateFingerprint,
+        cycleStartRevision: nextRevision,
+        cycleStep: 1,
+        previousRecordRevision,
+        previousRecordContentFingerprint,
+      }) : {}),
+      decision: "REVISE",
+      reason: "CANDIDATE_DRIFT",
+    };
   }
   const currentIndex = ACTIVATION_ORDER.indexOf(activation.mode);
   if (nextMode !== ACTIVATION_ORDER[currentIndex + 1]) throw new Error(`ACTIVATION_ORDER_INVALID:${activation.mode}:${nextMode}`);
   if (typeof evidenceFingerprint !== "string" || evidenceFingerprint.length === 0) return { ...activation, decision: "STOP", reason: "ACTIVATION_EVIDENCE_REQUIRED" };
-  return { mode: nextMode, candidate_fingerprint: candidateFingerprint, evidence: [...(activation.evidence ?? []), { mode: nextMode, fingerprint: evidenceFingerprint }], decision: nextMode === "enforced" ? "PASS" : "REVISE" };
+  let cycleMetadata = {};
+  if (hasCycleInputs) {
+    if (activation.candidate_fingerprint === candidateFingerprint) {
+      if (activation.schema_version !== "1.1.0"
+        || !/^[a-f0-9]{64}$/.test(activation.cycle_id ?? "")
+        || !Number.isSafeInteger(activation.cycle_start_revision)
+        || !Number.isSafeInteger(activation.cycle_step)
+        || activation.cycle_step < 1) {
+        throw new Error("ACTIVATION_LEGACY_CYCLE_CONTINUATION_FORBIDDEN");
+      }
+      cycleMetadata = {
+        cycle_id: activation.cycle_id,
+        cycle_start_revision: activation.cycle_start_revision,
+        cycle_step: activation.cycle_step + 1,
+        previous_record_revision: previousRecordRevision,
+        previous_record_content_fingerprint: previousRecordContentFingerprint,
+      };
+    } else {
+      cycleMetadata = candidateCycleMetadata({
+        activationId,
+        candidateFingerprint,
+        cycleStartRevision: nextRevision,
+        cycleStep: 1,
+        previousRecordRevision,
+        previousRecordContentFingerprint,
+      });
+    }
+  }
+  return {
+    mode: nextMode,
+    candidate_fingerprint: candidateFingerprint,
+    evidence: [...(activation.evidence ?? []), { mode: nextMode, fingerprint: evidenceFingerprint }],
+    ...cycleMetadata,
+    decision: nextMode === "enforced" ? "PASS" : "REVISE",
+  };
 }
 
 export function projectChildProgress(input) {

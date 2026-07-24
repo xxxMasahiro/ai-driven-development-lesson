@@ -32,6 +32,7 @@ docs/workflow/GIT_HOOK_CHECKS.tsv	full-no-cache	Check-list changes need full ver
 docs/workflow/FINAL_GATE_COVERAGE.tsv	full-no-cache	Final-gate coverage changes need full verification.
 tools/ci-final-gate	full-no-cache	Final-gate runner changes need full verification.
 tools/lib/ci_evidence.sh	full-no-cache	CI evidence helper changes need full verification.
+tools/lib/next_workflow/	full-no-cache	Next Workflow runtime changes need full verification.
 tools/test_*.sh	full-no-cache	Regression-test changes need full verification.
 EOF
 
@@ -124,10 +125,29 @@ docs/workflow/GIT_HOOK_CHECKS.tsv	full-no-cache	Check-list changes need full ver
 docs/workflow/FINAL_GATE_COVERAGE.tsv	full-no-cache	Final-gate coverage changes need full verification.
 tools/ci-final-gate	full-no-cache	Final-gate runner changes need full verification.
 tools/lib/ci_evidence.sh	full-no-cache	CI evidence helper changes need full verification.
+tools/lib/next_workflow/	full-no-cache	Next Workflow runtime changes need full verification.
 tools/test_*.sh	full-no-cache	Regression-test changes need full verification.
 EOF
 run_git_hooks mode fast >/dev/null
 [[ "$(awk -F '\t' '$1 == "hook_mode" { print $2 }' "$SETTINGS_FILE")" == "fast" ]]
+
+effective_staged_mode() {
+  LESSON_ROOT="$TEST_REPO" \
+  GIT_HOOKS_POLICY_FILE="$POLICY_FILE" \
+  GIT_HOOKS_SETTINGS_FILE="$SETTINGS_FILE" \
+  GIT_HOOKS_CHECKS_FILE="$CHECKS_FILE" \
+  GIT_HOOKS_RECOMMENDATION_PATHS_FILE="$RECOMMENDATION_FILE" \
+  GIT_HOOKS_CACHE_DIR="$CACHE_DIR" \
+  bash -c 'source "$1"; git_hooks_effective_staged_mode' _ "$ROOT/tools/lib/git_hooks_policy.sh"
+}
+
+mkdir -p "$TEST_REPO/tools/lib/next_workflow"
+printf 'changed\n' >"$TEST_REPO/tools/lib/next_workflow/runtime.mjs"
+git -C "$TEST_REPO" add tools/lib/next_workflow/runtime.mjs
+[[ "$(effective_staged_mode)" == $'full\ttrue' ]]
+git -C "$TEST_REPO" reset -q HEAD -- tools/lib/next_workflow/runtime.mjs
+[[ "$(effective_staged_mode)" == $'fast\tfalse' ]]
+rm -rf "$TEST_REPO/tools"
 
 if run_git_hooks mode off >/dev/null 2>&1; then
   printf 'invalid hook mode was accepted\n' >&2
@@ -253,5 +273,20 @@ fi
 run_git_hooks cache clear >/dev/null
 [[ -d "$CACHE_DIR" ]]
 [[ -f "$CACHE_DIR/.git-hooks-cache" ]]
+
+(
+  LESSON_ROOT="$ROOT"
+  # shellcheck source=tools/lib/git_hooks_policy.sh
+  source "$ROOT/tools/lib/git_hooks_policy.sh"
+  export GIT_DIR
+  GIT_DIR="$(git -C "$ROOT" rev-parse --absolute-git-dir)"
+  export GIT_WORK_TREE="$ROOT"
+  export GIT_INDEX_FILE
+  GIT_INDEX_FILE="$(git -C "$ROOT" rev-parse --git-path index)"
+  git_hooks_clear_local_repository_environment
+  [[ -z "${GIT_DIR+x}" ]]
+  [[ -z "${GIT_WORK_TREE+x}" ]]
+  [[ -z "${GIT_INDEX_FILE+x}" ]]
+)
 
 printf 'Git hooks policy tests passed.\n'

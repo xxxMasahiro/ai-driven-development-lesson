@@ -151,7 +151,13 @@ function launcherFixture() {
   return { repositoryRoot, root, trustPath, trust, databasePath, initialized, repositoryIdentity, releasePrerequisites, now };
 }
 
-async function enforceFixtureActivation(fixture) {
+let reusableCleanFixture;
+function cleanLauncherFixture() {
+  reusableCleanFixture ??= launcherFixture();
+  return reusableCleanFixture;
+}
+
+async function enforceFixtureActivation(fixture, { afterTransition, stopAfterTransition } = {}) {
   const candidateDefinition = freezeRepositoryReleaseCandidate({
     repositoryRoot: fixture.repositoryRoot,
     artifactPaths: ["tools/next-workflow.mjs"],
@@ -282,6 +288,8 @@ async function enforceFixtureActivation(fixture) {
         releasePrerequisites: fixture.releasePrerequisites,
         now: fixture.now,
       });
+      await afterTransition?.({ nextMode, candidateDefinition });
+      if (nextMode === stopAfterTransition) return candidateDefinition;
     }
     await completeActivation({
       store,
@@ -350,7 +358,7 @@ test("the installed wrapper removes pre-Node injection variables and rejects a f
 
 test("a copied launcher script and forged public marker cannot replace the installed wrapper entry point", (t) => {
   if (!requireRealContainment(t)) return;
-  const fixture = launcherFixture();
+  const fixture = cleanLauncherFixture();
   const result = spawnSync(process.execPath, [fixture.trust.runtime_launcher.script_path, fixture.repositoryRoot, "runtime", "status"], {
     cwd: fixture.repositoryRoot,
     encoding: "utf8",
@@ -369,10 +377,45 @@ test("a copied launcher script and forged public marker cannot replace the insta
   assert.match(result.stderr, /VERIFIED_LAUNCH_WRAPPER_PARENT_REQUIRED/);
 });
 
-test("the installed wrapper runs only the immutable signed runtime snapshot after complete activation", async (t) => {
+test("the installed wrapper accepts a complete cycle after an abandoned candidate and runs only the newest immutable snapshot", async (t) => {
   if (!requireRealContainment(t)) return;
-  const fixture = launcherFixture();
-  await enforceFixtureActivation(fixture);
+  const fixture = cleanLauncherFixture();
+  const initialCandidate = await enforceFixtureActivation(fixture);
+  writeFileSync(path.join(fixture.repositoryRoot, "abandoned-release-marker.txt"), "abandoned\n");
+  for (const args of [["add", "abandoned-release-marker.txt"], ["commit", "-qm", "abandoned candidate"]]) {
+    const result = spawnSync("/usr/bin/git", args, { cwd: fixture.repositoryRoot, encoding: "utf8" });
+    assert.equal(result.status, 0, result.stderr);
+  }
+  const abandonedCandidate = await enforceFixtureActivation(fixture, { stopAfterTransition: "release_verified" });
+  writeFileSync(path.join(fixture.repositoryRoot, "replacement-release-marker.txt"), "replacement\n");
+  for (const args of [["add", "replacement-release-marker.txt"], ["commit", "-qm", "replacement candidate"]]) {
+    const result = spawnSync("/usr/bin/git", args, { cwd: fixture.repositoryRoot, encoding: "utf8" });
+    assert.equal(result.status, 0, result.stderr);
+  }
+  const replacementCandidate = await enforceFixtureActivation(fixture, {
+    afterTransition({ nextMode }) {
+      if (nextMode !== "shadow") return;
+      const blocked = spawnSync(fixture.initialized.runtime_launcher_path, [fixture.repositoryRoot, "runtime", "status", ""], {
+        cwd: fixture.repositoryRoot,
+        encoding: "utf8",
+        env: process.env,
+      });
+      assert.equal(blocked.status, 1);
+      assert.match(blocked.stderr, /VERIFIED_LAUNCH_ACTIVATION_INVALID/);
+    },
+  });
+  assert.notEqual(abandonedCandidate.candidate_fingerprint, initialCandidate.candidate_fingerprint);
+  assert.notEqual(replacementCandidate.candidate_fingerprint, initialCandidate.candidate_fingerprint);
+  assert.notEqual(replacementCandidate.candidate_fingerprint, abandonedCandidate.candidate_fingerprint);
+  const database = new DatabaseSync(fixture.databasePath, { readOnly: true });
+  const latest = JSON.parse(database.prepare("SELECT payload_json FROM records WHERE kind='NextWorkflowActivation' ORDER BY record_revision DESC LIMIT 1").get().payload_json);
+  const activationCount = database.prepare("SELECT COUNT(*) AS count FROM records WHERE kind='NextWorkflowActivation'").get().count;
+  database.close();
+  assert.equal(latest.mode, "enforced");
+  assert.equal(latest.revision, 16);
+  assert.equal(latest.cycle_start_revision, 10);
+  assert.equal(latest.cycle_step, 7);
+  assert.equal(activationCount, 16);
   const result = spawnSync(fixture.initialized.runtime_launcher_path, [fixture.repositoryRoot, "runtime", "status", ""], {
     cwd: fixture.repositoryRoot,
     encoding: "utf8",
@@ -381,4 +424,16 @@ test("the installed wrapper runs only the immutable signed runtime snapshot afte
   assert.equal(result.status, 0, result.stderr);
   assert.deepEqual(JSON.parse(result.stdout), { decision: "PASS", verified_runtime: true });
   assert.equal(existsSync(path.join(path.dirname(fixture.trustPath), "verified-runtime-tools")), false);
+  const corruptingDatabase = new DatabaseSync(fixture.databasePath);
+  const enforcedRow = corruptingDatabase.prepare("SELECT id,payload_json FROM records WHERE kind='NextWorkflowActivation' ORDER BY record_revision DESC LIMIT 1").get();
+  const incomplete = { ...JSON.parse(enforcedRow.payload_json), revision: 13 };
+  corruptingDatabase.prepare("UPDATE records SET payload_json=? WHERE id=?").run(JSON.stringify(incomplete), enforcedRow.id);
+  corruptingDatabase.close();
+  const incompleteResult = spawnSync(fixture.initialized.runtime_launcher_path, [fixture.repositoryRoot, "runtime", "status", ""], {
+    cwd: fixture.repositoryRoot,
+    encoding: "utf8",
+    env: process.env,
+  });
+  assert.equal(incompleteResult.status, 1);
+  assert.match(incompleteResult.stderr, /VERIFIED_LAUNCH_ACTIVATION_INVALID/);
 });

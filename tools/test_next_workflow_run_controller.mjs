@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
 import test from "node:test";
+import { HEADLESS_PRODUCTION_CORRECTION_PROFILE, routeCorrectionFailure } from "./lib/next_workflow/correction_policy.mjs";
 import { createHeadlessRunController, headlessRunControllerDigest } from "./lib/next_workflow/run_controller.mjs";
 
 function storeFixture() {
@@ -112,6 +113,7 @@ test("the headless RunController closes an Orchestrator-Lead-Task team only afte
     expiresAt: "2029-01-01T01:00:00.000Z",
   });
   assert.equal(result.decision, "PASS");
+  assert.equal(result.profile, "headless_production_stop_only_v1");
   assert.equal(result.outcomes.length, topology.agents.length + 1);
   assert.ok(result.outcomes.slice(0, -1).every((outcome) => outcome.state === "CLOSED"));
   assert.equal(result.outcomes.at(-1).state, "DETERMINISTIC_SYNTHESIS");
@@ -330,7 +332,7 @@ test("startup recovery blocks every launch while an effect outcome is unresolved
   assert.equal(launched, false);
 });
 
-test("a reconciled launch failure still requires verified material progress before retry", async () => {
+test("Production launch failure stops automatic retry and returns only non-authorizing resume advice", async () => {
   const { store } = storeFixture();
   let recoveryCalls = 0;
   const runtime = {
@@ -339,7 +341,10 @@ test("a reconciled launch failure still requires verified material progress befo
       return { attempted: 0, remaining: 0, results: [], runtime_attempted: 0, runtime_remaining: 0, runtime_results: [] };
     },
     async launchAgent() {
-      throw new Error("TRANSIENT_PROVIDER_FAILURE");
+      const error = new Error("TRANSIENT_PROVIDER_FAILURE");
+      error.correction_failure_type = "material_change";
+      error.correction_phase = "fast_loop";
+      throw error;
     },
   };
   const controller = createHeadlessRunController({
@@ -365,9 +370,50 @@ test("a reconciled launch failure still requires verified material progress befo
     expiresAt: "2029-01-01T01:00:00.000Z",
   });
   assert.equal(result.decision, "STOP");
+  assert.equal(result.profile, "headless_production_stop_only_v1");
   assert.equal(result.outcomes[0].code, "HEADLESS_TOTAL_RETRY_LIMIT");
   assert.equal(result.outcomes[0].failure_code, "TRANSIENT_PROVIDER_FAILURE");
+  assert.deepEqual(result.outcomes[0].resume_advice, {
+    schema_version: "1.0.0",
+    advisory_type: "non_authorizing_resume_advice",
+    route: "fast_loop",
+    authorizes_resume: false,
+    authorizes_retry: false,
+    requires_owner_decision: false,
+    requires_material_change: true,
+  });
+  assert.equal(JSON.stringify(result).includes("ASK_OWNER"), false);
   assert.equal(recoveryCalls, 2);
+});
+
+test("the Production correction profile is stop-only and routes typed advice without granting resume authority", () => {
+  assert.equal(HEADLESS_PRODUCTION_CORRECTION_PROFILE.profile_id, "headless_production_stop_only_v1");
+  assert.equal(HEADLESS_PRODUCTION_CORRECTION_PROFILE.max_retries, 0);
+  assert.deepEqual(HEADLESS_PRODUCTION_CORRECTION_PROFILE.allowed_decisions, ["PASS", "STOP"]);
+
+  for (const phase of ["fast_loop", "mid_tests", "implementation_plan", "release_gate", "main_sync_cleanup"]) {
+    const routed = routeCorrectionFailure({ failureType: "material_change", phase });
+    assert.equal(routed.decision, "STOP");
+    assert.equal(routed.resume_advice.route, phase);
+    assert.equal(routed.resume_advice.authorizes_resume, false);
+    assert.equal(routed.resume_advice.authorizes_retry, false);
+    assert.equal(routed.resume_advice.requires_material_change, true);
+    assert.equal(JSON.stringify(routed).includes("ASK_OWNER"), false);
+  }
+
+  const ownerDecision = routeCorrectionFailure({ failureType: "owner_decision", phase: "implementation_plan" });
+  assert.equal(ownerDecision.decision, "STOP");
+  assert.equal(ownerDecision.resume_advice.route, "implementation_plan");
+  assert.equal(ownerDecision.resume_advice.requires_owner_decision, true);
+  assert.equal(ownerDecision.resume_advice.authorizes_resume, false);
+
+  for (const failureType of ["authority", "safety", "unknown", "untyped"]) {
+    const stopped = routeCorrectionFailure({ failureType, phase: "fast_loop", ownerDecisionRequired: true });
+    assert.equal(stopped.decision, "STOP");
+    assert.equal(stopped.resume_advice.route, "STOP");
+    assert.equal(stopped.resume_advice.requires_owner_decision, false);
+    assert.equal(stopped.resume_advice.requires_material_change, false);
+  }
 });
 
 test("a rejected independent review stops the remaining team", async () => {

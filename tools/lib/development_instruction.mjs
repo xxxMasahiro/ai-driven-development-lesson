@@ -664,6 +664,39 @@ function buildGitPlan({ parentRoot, policy, targetKind, contextId, stage, taskSc
   };
 }
 
+export function intersectDeliveryLaneWithGitPlan({ lane, gitPlan } = {}) {
+  const laneActions = {
+    none: [],
+    local: ['commit'],
+    remote_sync: ['commit', 'push', 'sync_monitoring'],
+    ci: ['commit', 'push', 'pr_creation', 'pr_ci_monitoring', 'merge', 'main_ci_monitoring', 'sync_monitoring'],
+  };
+  if (!Object.hasOwn(laneActions, lane)
+    || !gitPlan
+    || !Object.hasOwn(laneActions, gitPlan.mode)
+    || !Array.isArray(gitPlan.automatic)
+    || !Array.isArray(gitPlan.manual)
+    || !Array.isArray(gitPlan.not_applicable)) fail('DELIVERY_GIT_PLAN', 'Delivery lane and Git plan cannot be intersected.');
+  const allowed = new Set(laneActions[lane]);
+  const automatic = new Set(gitPlan.automatic);
+  const manual = new Set(gitPlan.manual);
+  const notApplicable = new Set(gitPlan.not_applicable);
+  const result = { automatic: [], manual: [], not_applicable: [] };
+  for (const action of laneActions.ci) {
+    if (!allowed.has(action) || notApplicable.has(action)) result.not_applicable.push(action);
+    else if (automatic.has(action)) result.automatic.push(action);
+    else if (manual.has(action)) result.manual.push(action);
+    else result.manual.push(action);
+  }
+  return {
+    mode: gitPlan.mode,
+    ceiling: gitPlan.mode,
+    decision_authority: gitPlan.decision_authority ?? 'not_applicable',
+    task_scope: gitPlan.task_scope,
+    ...result,
+  };
+}
+
 export function loadDevelopmentInstructionAuthorities({ root, policyPath } = {}) {
   const parentRoot = realpathSync(path.resolve(root));
   const policy = parsePolicy(parentRoot, policyPath);

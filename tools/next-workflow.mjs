@@ -1,7 +1,10 @@
 #!/usr/bin/env node
-import { existsSync, lstatSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
+import { closeSync, constants as fsConstants, existsSync, fstatSync, lstatSync, openSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
+import { userInfo } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { execFileSync } from "node:child_process";
+import { intersectDeliveryLaneWithGitPlan, resolveDevelopmentInstruction } from "./lib/development_instruction.mjs";
 import { loadContracts, validateContractSet } from "./lib/next_workflow/contracts.mjs";
 import { compatibilityDigest, resolveRuntimeAuthorityInputs } from "./lib/next_workflow/compatibility.mjs";
 import { composeAuthorityDecision } from "./lib/next_workflow/authority.mjs";
@@ -14,17 +17,22 @@ import { bootstrapHeadlessRuntimeTrust, createHeadlessOwnerAcceptance, createHea
 import { createHeadlessProductionService } from "./lib/next_workflow/headless_service.mjs";
 import { createHeadlessRecoveryLifecycle } from "./lib/next_workflow/headless_runtime.mjs";
 import { recoverUnresolvedAgentRun } from "./lib/next_workflow/run_controller.mjs";
-import { completeActivation, freezeRepositoryReleaseCandidate, persistActivationTransition, verifyEnforcedActivationRecord, verifyReleaseProofs, verifyRepositoryReleaseDeployment } from "./lib/next_workflow/release.mjs";
+import { activationCycleHistory, completeActivation, freezeRepositoryReleaseCandidate, persistActivationTransition, verifyEnforcedActivationRecord, verifyReleaseProofs, verifyRepositoryReleaseDeployment } from "./lib/next_workflow/release.mjs";
 import { createSignedReleaseBundle, createSignedTransitionEvidence } from "./lib/next_workflow/release_signing.mjs";
 import { createSignedReleaseSourceReceipt, createSignedTransitionSourceReceipt } from "./lib/next_workflow/release_source_receipts.mjs";
 import { createSignedReleaseProofVerifier, createSignedTransitionVerifier } from "./lib/next_workflow/release_trust.mjs";
+import { activateObservedRelease } from "./lib/next_workflow/release_observation.mjs";
 import { createNextWorkflowRuntime } from "./lib/next_workflow/runtime.mjs";
 import { createLinuxIsolatedContainment, diagnoseLinuxIsolationPrerequisites } from "./lib/next_workflow/runtime_containment.mjs";
 import { createProtectedFinalizationFenceVerifier, createProtectedLaunchObservationVerifier, createProtectedProviderCertificationAuthority, createProtectedProviderProbeAuthority, createProtectedReceiptAuthority, createProtectedRuntimeRecoveryAuthorizer, defaultOwnerTrustPath, loadProtectedRuntimeTrust } from "./lib/next_workflow/runtime_trust.mjs";
 import { createAgentSelectionSettingsManager, resolveAgentSelectionPolicy } from "./lib/next_workflow/settings.mjs";
 import { openWorkflowStateStore } from "./lib/next_workflow/store.mjs";
+import { evaluateDeliveryImpact, selectDeliveryLane, verifyDeliveryLanePlan } from "./lib/next_workflow/delivery_lane.mjs";
+import { observeDeliveryGitSnapshot } from "./lib/next_workflow/git_snapshot.mjs";
+import { verifyOwnerControllerExecution } from "./lib/next_workflow/owner_controller.mjs";
 
 const SOURCE_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const SOURCE_ENTRY = fileURLToPath(import.meta.url);
 const ROOT = process.env.NEXT_WORKFLOW_VERIFIED_REPOSITORY_ROOT
   ? realpathSync(process.env.NEXT_WORKFLOW_VERIFIED_REPOSITORY_ROOT)
   : SOURCE_ROOT;
@@ -43,6 +51,18 @@ function readRepositoryBoundJson(configuredPath, fallbackRelativePath) {
   return JSON.parse(readFileSync(resolved, "utf8"));
 }
 
+function readUntrustedEvidenceJson(configuredPath) {
+  const candidate = path.resolve(configuredPath);
+  const descriptor = openSync(candidate, fsConstants.O_RDONLY | fsConstants.O_NOFOLLOW);
+  try {
+    const stat = fstatSync(descriptor);
+    if (!stat.isFile() || stat.size <= 0 || stat.size > 2 * 1024 * 1024) throw new Error("NEXT_WORKFLOW_EVIDENCE_FILE_INVALID");
+    return JSON.parse(readFileSync(descriptor, "utf8"));
+  } finally {
+    closeSync(descriptor);
+  }
+}
+
 function option(name, fallback = undefined) {
   const index = args.indexOf(name);
   return index >= 0 ? args[index + 1] : fallback;
@@ -56,6 +76,85 @@ function options(name) {
 
 function print(value) {
   writeFileSync(process.stdout.fd, `${JSON.stringify(value, null, 2)}\n`);
+}
+
+function requireOwnerController(action) {
+  const repositoryIdentity = readJson("learning/NEXT_WORKFLOW_REPOSITORY_IDENTITY.json");
+  return verifyOwnerControllerExecution({
+    action,
+    repositoryRoot: ROOT,
+    sourceRoot: SOURCE_ROOT,
+    entryPath: SOURCE_ENTRY,
+    repositoryLogicalId: repositoryIdentity.repository_logical_id,
+    checkoutInstanceId: repositoryIdentity.checkout_instance_id,
+  });
+}
+
+function deliveryEvaluation(parameters = {}) {
+  let targetRoot = ROOT;
+  const targetKind = parameters.target_kind ?? "parent";
+  const repositorySelector = parameters.repository_selector ?? undefined;
+  if (!["parent", "product"].includes(targetKind) || (targetKind === "product" && !repositorySelector)) throw new Error("DELIVERY_TARGET_INVALID");
+  const instruction = resolveDevelopmentInstruction({
+    root: ROOT,
+    contextId: parameters.context_id ?? undefined,
+    targetKind,
+    repo: repositorySelector,
+    stage: "D",
+    scopeId: parameters.scope_id ?? "next-workflow-delivery",
+    ...(targetKind === "product" ? {
+      gitTopLevelResolver(candidate) {
+        targetRoot = realpathSync(candidate);
+        return candidate;
+      },
+    } : {}),
+  });
+  if (instruction.status !== "ready" || !targetRoot) throw new Error("DELIVERY_INSTRUCTION_NOT_READY");
+  const parentIdentity = readJson("learning/NEXT_WORKFLOW_REPOSITORY_IDENTITY.json");
+  const snapshot = observeDeliveryGitSnapshot({
+    repositoryRoot: targetRoot,
+    authorityRoot: ROOT,
+    repositoryLogicalId: targetKind === "parent" ? parentIdentity.repository_logical_id : repositorySelector,
+    checkoutInstanceId: targetKind === "parent"
+      ? parentIdentity.checkout_instance_id
+      : compatibilityDigest({ repository_selector: repositorySelector, git_directory: execFileSync("git", ["-C", targetRoot, "rev-parse", "--git-common-dir"], { encoding: "utf8" }).trim() }),
+  });
+  const impact = evaluateDeliveryImpact({ snapshot });
+  const preferences = readRepositoryBoundJson(process.env.NEXT_WORKFLOW_DELIVERY_SETTINGS_FILE, "learning/NEXT_WORKFLOW_DELIVERY_SETTINGS.json");
+  const selectionInput = {
+    snapshot,
+    impact,
+    preferences,
+    outcome: parameters.outcome ?? "working_change",
+    explicitLane: parameters.explicit_lane ?? undefined,
+    effectiveCeiling: instruction.git_plan.mode,
+  };
+  const preliminary = selectDeliveryLane(selectionInput);
+  const candidates = preliminary.decision === "PASS"
+    ? intersectDeliveryLaneWithGitPlan({ lane: preliminary.selected_lane, gitPlan: instruction.git_plan })
+    : { automatic: [], manual: [], not_applicable: [] };
+  const plan = selectDeliveryLane({ ...selectionInput, gitPolicyCandidates: candidates });
+  const context = {
+    target_kind: targetKind,
+    repository_selector: repositorySelector ?? null,
+    context_id: parameters.context_id ?? null,
+    scope_id: parameters.scope_id ?? "next-workflow-delivery",
+    outcome: parameters.outcome ?? "working_change",
+    explicit_lane: parameters.explicit_lane ?? null,
+    instruction_source: instruction.source,
+    instruction_digest: instruction.source_digest,
+  };
+  const core = {
+    schema_version: "1.0.0",
+    kind: "next-workflow-delivery-plan-envelope",
+    context,
+    plan,
+    git_snapshot: snapshot,
+    impact,
+    grants_git_authority: false,
+  };
+  const serializable = JSON.parse(JSON.stringify(core));
+  return { ...serializable, fingerprint: compatibilityDigest(serializable) };
 }
 
 function developmentSelectionStop(code, details = {}) {
@@ -439,7 +538,7 @@ function persistedActivation(store) {
   return structuredClone(records.sort((left, right) => right.record_revision - left.record_revision)[0].payload);
 }
 
-function currentActivationStatus() {
+async function currentActivationStatus() {
   try {
     const { store, runtimeTrust } = protectedProductionStore({ createIdentity: false, mode: "readonly" });
     try {
@@ -458,10 +557,22 @@ function currentActivationStatus() {
       const now = new Date().toISOString();
       const verified = verifyEnforcedActivationRecord({
         record: activation,
+        cycleHistory: activationCycleHistory(store, activation),
         proofVerifier: createSignedReleaseProofVerifier({ trustDocument: runtimeTrust.release_trust, now: () => now }),
         transitionVerifier: createSignedTransitionVerifier({ trustDocument: runtimeTrust.release_trust, now: () => now }),
         expectedRevocationEpoch: store.revocation_epoch,
         now,
+      });
+      const contracts = await loadContracts({ repositoryRoot: ROOT });
+      const validation = validateContractSet(contracts);
+      if (!validation.ok) throw new Error("ACTIVE_CANDIDATE_CONTRACT_INVALID");
+      const deployment = verifyRepositoryReleaseDeployment({
+        repositoryRoot: ROOT,
+        candidateDefinition: activation.candidate_definition,
+        signedReleaseProofs: activation.signed_release_proofs,
+        contractFingerprint: compatibilityDigest(validation.fingerprints),
+        releasePrerequisites: runtimeTrust.release_prerequisites,
+        nodeVersion: process.versions.node,
       });
       return {
         schema_version: "1.0.0",
@@ -471,6 +582,7 @@ function currentActivationStatus() {
         candidate_fingerprint: activation.candidate_fingerprint,
         protected_state_verified: true,
         verification_fingerprint: verified.proof_fingerprint,
+        deployment_fingerprint: deployment.deployment_fingerprint,
       };
     } finally {
       store.close();
@@ -525,14 +637,15 @@ function requireVerifiedProductionLaunch() {
   }
 }
 
-function productionActivationVerifier(clock = () => new Date().toISOString(), revocationEpochProvider) {
+function productionActivationVerifier(clock = () => new Date().toISOString(), revocationEpochProvider, cycleHistoryProvider) {
   return async ({ record, record_fingerprint: recordFingerprint }) => {
     if (record.mode !== "enforced") return { trusted: true, record_fingerprint: recordFingerprint, proof_fingerprint: compatibilityDigest({ source: "non-enforced-fail-closed", record_fingerprint: recordFingerprint }) };
     try {
       if (typeof revocationEpochProvider !== "function") throw new Error("ACTIVATION_LIVE_EPOCH_PROVIDER_REQUIRED");
       const expectedRevocationEpoch = revocationEpochProvider();
       const trustDocument = releaseTrustDocument();
-      const verification = verifyEnforcedActivationRecord({ record, proofVerifier: createSignedReleaseProofVerifier({ trustDocument, now: clock }), transitionVerifier: createSignedTransitionVerifier({ trustDocument, now: clock }), expectedRevocationEpoch, now: clock() });
+      if (typeof cycleHistoryProvider !== "function") throw new Error("ACTIVATION_CYCLE_HISTORY_PROVIDER_REQUIRED");
+      const verification = verifyEnforcedActivationRecord({ record, cycleHistory: cycleHistoryProvider(record), proofVerifier: createSignedReleaseProofVerifier({ trustDocument, now: clock }), transitionVerifier: createSignedTransitionVerifier({ trustDocument, now: clock }), expectedRevocationEpoch, now: clock() });
       return verification.trusted === true && verification.record_fingerprint === recordFingerprint
         ? verification
         : { trusted: false, record_fingerprint: recordFingerprint, proof_fingerprint: compatibilityDigest({ reason: "ACTIVATION_RECORD_BINDING_INVALID", record_fingerprint: recordFingerprint }) };
@@ -545,7 +658,7 @@ function productionActivationVerifier(clock = () => new Date().toISOString(), re
 function productionRuntime(store) {
   const clock = () => new Date().toISOString();
   const activationProvider = () => persistedActivation(store) ?? readJson("learning/NEXT_WORKFLOW_ACTIVATION.json");
-  const activationVerifier = productionActivationVerifier(clock, () => store.revocation_epoch);
+  const activationVerifier = productionActivationVerifier(clock, () => store.revocation_epoch, (record) => activationCycleHistory(store, record));
   const currentCandidateProvider = async ({ activation }) => {
     const definition = activation.candidate_definition;
     if (!definition || !/^[a-f0-9]{40,64}$/.test(definition.repository_tree ?? "")) throw new Error("ACTIVE_CANDIDATE_DEFINITION_REQUIRED");
@@ -627,6 +740,7 @@ const DEFAULT_RELEASE_ARTIFACTS = [
   "docs/workflow/next-workflow/team-agent-security.json",
   "learning/NEXT_WORKFLOW_ACTIVATION.json",
   "learning/NEXT_WORKFLOW_AGENT_SELECTION_SETTINGS.json",
+  "learning/NEXT_WORKFLOW_DELIVERY_SETTINGS.json",
   "learning/NEXT_WORKFLOW_PROVIDER_REGISTRY.json",
   "learning/NEXT_WORKFLOW_RELEASE_PREREQUISITES.json",
   "learning/NEXT_WORKFLOW_RELEASE_TRUST.json",
@@ -638,15 +752,21 @@ const DEFAULT_RELEASE_ARTIFACTS = [
   "tools/lib/next_workflow/authority.mjs",
   "tools/lib/next_workflow/compatibility.mjs",
   "tools/lib/next_workflow/contracts.mjs",
+  "tools/lib/next_workflow/correction_policy.mjs",
+  "tools/lib/next_workflow/delivery_lane.mjs",
+  "tools/lib/next_workflow/git_snapshot.mjs",
   "tools/lib/next_workflow/headless_bootstrap.mjs",
   "tools/lib/next_workflow/headless_plan.mjs",
   "tools/lib/next_workflow/headless_runtime.mjs",
   "tools/lib/next_workflow/headless_service.mjs",
   "tools/lib/next_workflow/identity.mjs",
+  "tools/lib/next_workflow/owner_controller.mjs",
   "tools/lib/next_workflow/provider_discovery.mjs",
+  "tools/lib/next_workflow/provider_runtime_closure.mjs",
   "tools/lib/next_workflow/providers.mjs",
   "tools/lib/next_workflow/projection.mjs",
   "tools/lib/next_workflow/release.mjs",
+  "tools/lib/next_workflow/release_observation.mjs",
   "tools/lib/next_workflow/release_signing.mjs",
   "tools/lib/next_workflow/release_source_receipts.mjs",
   "tools/lib/next_workflow/release_trust.mjs",
@@ -656,6 +776,7 @@ const DEFAULT_RELEASE_ARTIFACTS = [
   "tools/lib/next_workflow/runtime_barrier.cjs",
   "tools/lib/next_workflow/runtime_containment.mjs",
   "tools/lib/next_workflow/runtime_trust.mjs",
+  "tools/lib/next_workflow/rigor_classification.mjs",
   "tools/lib/next_workflow/saga.mjs",
   "tools/lib/next_workflow/secret_policy.mjs",
   "tools/next-workflow-launcher.cjs",
@@ -669,18 +790,28 @@ const DEFAULT_RELEASE_ARTIFACTS = [
   "tools/test_next_workflow_agents.mjs",
   "tools/test_next_workflow_development_selection.mjs",
   "tools/test_next_workflow_development_selection.sh",
+  "tools/test_next_workflow_delivery.mjs",
+  "tools/test_next_workflow_delivery.sh",
   "tools/test_next_workflow_headless_bootstrap.mjs",
   "tools/test_next_workflow_headless_bootstrap.sh",
   "tools/test_next_workflow_headless_plan.mjs",
   "tools/test_next_workflow_headless_plan.sh",
   "tools/test_next_workflow_headless_runtime.mjs",
   "tools/test_next_workflow_headless_runtime.sh",
+  "tools/test_next_workflow_owner_controller.mjs",
+  "tools/test_next_workflow_owner_controller.sh",
+  "tools/test_next_workflow_provider_isolation.mjs",
+  "tools/test_next_workflow_providers.mjs",
+  "tools/test_next_workflow_providers.sh",
   "tools/test_next_workflow_release.mjs",
+  "tools/test_next_workflow_release_observation.mjs",
+  "tools/test_next_workflow_release_observation.sh",
   "tools/test_next_workflow_release_signing.mjs",
   "tools/test_next_workflow_release_signing.sh",
   "tools/test_next_workflow_run_controller.mjs",
   "tools/test_next_workflow_run_controller.sh",
   "tools/test_next_workflow_task_delivery.mjs",
+  "tools/install-next-workflow-owner-controller.mjs",
 ];
 
 const command = args[0] ?? "help";
@@ -688,7 +819,7 @@ if (command === "projection") {
   const state = readOnlyState();
   try {
     const registry = runtimeRegistry();
-    const projection = await loadDefaultNextWorkflowProjection({ repositoryRoot: ROOT, providerRegistry: registry, activationRecord: state.store ? persistedActivation(state.store) ?? undefined : undefined, activationVerifier: productionActivationVerifier(() => new Date().toISOString(), state.store ? () => state.store.revocation_epoch : undefined), selectionCatalog: readOnlySelectionCatalog({ store: state.store, registry }), store: state.store, storeStatus: state.status });
+    const projection = await loadDefaultNextWorkflowProjection({ repositoryRoot: ROOT, providerRegistry: registry, activationRecord: state.store ? persistedActivation(state.store) ?? undefined : undefined, activationVerifier: productionActivationVerifier(() => new Date().toISOString(), state.store ? () => state.store.revocation_epoch : undefined, state.store ? (record) => activationCycleHistory(state.store, record) : undefined), selectionCatalog: readOnlySelectionCatalog({ store: state.store, registry }), store: state.store, storeStatus: state.status });
     print(projection);
   } finally {
     state.store?.close();
@@ -706,16 +837,17 @@ if (command === "projection") {
   }
   else if (action === "reattest") {
     if (!args.includes("--confirm")) throw new Error("IDENTITY_REATTEST_CONFIRMATION_REQUIRED");
+    requireOwnerController("identity_reattest");
     print(runtimeIdentity({ create: true, reattest: true }));
   } else throw new Error(`UNKNOWN_IDENTITY_ACTION:${action}`);
 } else if (command === "activation") {
   const action = args[1] ?? "status";
   if (action !== "status") throw new Error(`UNKNOWN_ACTIVATION_ACTION:${action}`);
-  print(currentActivationStatus());
+  print(await currentActivationStatus());
 } else if (command === "release") {
   const action = args[1] ?? "status";
   if (action === "status") {
-    print(currentActivationStatus());
+    print(await currentActivationStatus());
   } else if (action === "candidate") {
     const contracts = await loadContracts({ repositoryRoot: ROOT });
     const validation = validateContractSet(contracts);
@@ -732,6 +864,7 @@ if (command === "projection") {
       : { status: "failed", candidate_fingerprint: candidateFingerprint, missing: ["candidate_definition"], mismatched: [], stale: [], incorrect: [], invalid: ["release_lineage"], verified_proofs: {}, verified_at: now });
   } else if (action === "source-receipt") {
     if (!args.includes("--confirm")) throw new Error("RELEASE_SOURCE_RECEIPT_CONFIRMATION_REQUIRED");
+    requireOwnerController("release_source_receipt");
     const candidateDefinition = readRepositoryBoundJson(option("--candidate-file"), ".workflow-state/next-workflow-release-candidate.json");
     const evidence = readRepositoryBoundJson(option("--evidence"), ".workflow-state/next-workflow-source-evidence.json");
     const runtimeTrust = protectedTrustBundle();
@@ -748,6 +881,7 @@ if (command === "projection") {
       : createSignedReleaseSourceReceipt({ ...common, kind: option("--kind") }));
   } else if (action === "sign-bundle") {
     if (!args.includes("--confirm")) throw new Error("RELEASE_SIGNING_CONFIRMATION_REQUIRED");
+    requireOwnerController("release_sign_bundle");
     const candidateDefinition = readRepositoryBoundJson(option("--candidate-file"), ".workflow-state/next-workflow-release-candidate.json");
     const sourceReceipts = readRepositoryBoundJson(option("--receipts"), ".workflow-state/next-workflow-release-source-receipts.json");
     const runtimeTrust = protectedTrustBundle();
@@ -761,6 +895,7 @@ if (command === "projection") {
     }));
   } else if (action === "sign-transition") {
     if (!args.includes("--confirm")) throw new Error("TRANSITION_SIGNING_CONFIRMATION_REQUIRED");
+    requireOwnerController("release_sign_transition");
     const candidateDefinition = readRepositoryBoundJson(option("--candidate-file"), ".workflow-state/next-workflow-release-candidate.json");
     const stageReceipt = readRepositoryBoundJson(option("--stage-receipt"), ".workflow-state/next-workflow-transition-source-receipt.json");
     const runtimeTrust = protectedTrustBundle();
@@ -775,16 +910,38 @@ if (command === "projection") {
     }));
   } else if (action === "transition") {
     if (!args.includes("--confirm")) throw new Error("ACTIVATION_TRANSITION_CONFIRMATION_REQUIRED");
+    requireOwnerController("release_transition");
     const bundle = readRepositoryBoundJson(option("--evidence"), "learning/NEXT_WORKFLOW_ACTIVATION_TRANSITION.json");
     const now = new Date().toISOString();
     const { store } = protectedProductionStore({ createIdentity: false });
     try { print(await persistActivationTransition({ store, expectedRevision: Number(option("--expect-revision")), candidateFingerprint: option("--candidate"), candidateDefinition: bundle.candidate_definition ?? bundle.candidate, nextMode: option("--mode"), evidence: bundle.evidence ?? bundle, transitionVerifier: createSignedTransitionVerifier({ trustDocument: releaseTrustDocument(), now: () => now }), releasePrerequisites: releasePrerequisites(), now })); } finally { store.close(); }
   } else if (action === "activate") {
     if (!args.includes("--confirm")) throw new Error("ACTIVATION_CONFIRMATION_REQUIRED");
+    requireOwnerController("release_activate");
     const bundle = readRepositoryBoundJson(option("--bundle"), "learning/NEXT_WORKFLOW_RELEASE_PROOFS.json");
     const now = new Date().toISOString();
     const { store } = protectedProductionStore({ createIdentity: false });
     try { const trustDocument = releaseTrustDocument(); print(await completeActivation({ store, expectedRevision: Number(option("--expect-revision")), candidateFingerprint: option("--candidate"), proofs: bundle.proofs ?? bundle, proofVerifier: createSignedReleaseProofVerifier({ trustDocument, now: () => now }), transitionVerifier: createSignedTransitionVerifier({ trustDocument, now: () => now }), releasePrerequisites: releasePrerequisites(), now })); } finally { store.close(); }
+  } else if (action === "activate-observed") {
+    if (!args.includes("--confirm")) throw new Error("OBSERVED_ACTIVATION_CONFIRMATION_REQUIRED");
+    requireOwnerController("release_activate_observed");
+    const candidatePath = option("--candidate-file");
+    if (typeof candidatePath !== "string" || candidatePath.length === 0) throw new Error("OBSERVED_ACTIVATION_CANDIDATE_REQUIRED");
+    const candidateDefinition = readUntrustedEvidenceJson(candidatePath);
+    const { store, runtimeTrust, identity } = protectedProductionStore({ createIdentity: false });
+    try {
+      print(await activateObservedRelease({
+        repositoryRoot: ROOT,
+        candidateDefinition,
+        repositoryIdentity: identity,
+        runtimeTrust,
+        store,
+        releasePrivateKeyPath: releasePrivateKeyPath(),
+        sourcePrivateKeyPath: releaseSourcePrivateKeyPath(),
+      }));
+    } finally {
+      store.close();
+    }
   } else throw new Error(`UNKNOWN_RELEASE_ACTION:${action}`);
 } else if (command === "runtime") {
   const action = args[1] ?? "status";
@@ -792,6 +949,7 @@ if (command === "projection") {
     print(diagnoseLinuxIsolationPrerequisites());
   } else if (action === "owner-enroll") {
     if (!args.includes("--confirm")) throw new Error("OWNER_IDENTITY_CONFIRMATION_REQUIRED");
+    requireOwnerController("runtime_owner_enroll");
     const trustDirectory = path.dirname(process.env.NEXT_WORKFLOW_OWNER_TRUST_PATH || defaultOwnerTrustPath());
     print(createHeadlessOwnerIdentity({
       repositoryRoot: ROOT,
@@ -800,6 +958,7 @@ if (command === "projection") {
     }));
   } else if (action === "acceptance-create") {
     if (!args.includes("--confirm")) throw new Error("OWNER_ACCEPTANCE_CONFIRMATION_REQUIRED");
+    requireOwnerController("runtime_acceptance_create");
     const identity = runtimeIdentity({ create: true });
     const trustDirectory = path.dirname(process.env.NEXT_WORKFLOW_OWNER_TRUST_PATH || defaultOwnerTrustPath());
     print(createHeadlessOwnerAcceptance({
@@ -812,6 +971,7 @@ if (command === "projection") {
     }));
   } else if (action === "bootstrap") {
     if (!args.includes("--confirm")) throw new Error("HEADLESS_RUNTIME_BOOTSTRAP_CONFIRMATION_REQUIRED");
+    requireOwnerController("runtime_bootstrap");
     const prerequisites = diagnoseLinuxIsolationPrerequisites();
     if (prerequisites.available !== true) {
       print({ decision: "STOP", code: "HEADLESS_RUNTIME_ISOLATION_UNAVAILABLE", prerequisites });
@@ -825,7 +985,7 @@ if (command === "projection") {
         ownerAcceptancePath: path.resolve(option("--owner-acceptance", path.join(path.dirname(process.env.NEXT_WORKFLOW_OWNER_TRUST_PATH || defaultOwnerTrustPath()), "owner-acceptance.json"))),
         ownerAnchorPath: path.resolve(option("--owner-anchor", path.join(path.dirname(process.env.NEXT_WORKFLOW_OWNER_TRUST_PATH || defaultOwnerTrustPath()), "owner-anchor.json"))),
         trustPath: process.env.NEXT_WORKFLOW_OWNER_TRUST_PATH || defaultOwnerTrustPath(),
-        providerAuthPath: process.env.NEXT_WORKFLOW_CODEX_AUTH_PATH,
+        providerAuthPath: process.env.NEXT_WORKFLOW_CODEX_AUTH_PATH || path.join(userInfo().homedir, ".codex", "auth.json"),
         runtimeStateRoot: process.env.NEXT_WORKFLOW_RUNTIME_STATE_ROOT || defaultHeadlessRuntimeStateRoot(),
       }));
     }
@@ -862,25 +1022,42 @@ if (command === "projection") {
           const now = new Date().toISOString();
           const verifiedActivation = verifyEnforcedActivationRecord({
           record: activation,
+          cycleHistory: activationCycleHistory(store, activation),
           proofVerifier: createSignedReleaseProofVerifier({ trustDocument: runtimeTrust.release_trust, now: () => now }),
           transitionVerifier: createSignedTransitionVerifier({ trustDocument: runtimeTrust.release_trust, now: () => now }),
           expectedRevocationEpoch: store.revocation_epoch,
           now,
-        });
+          });
           if (unresolvedEffects !== 0 || unresolvedRuntimeRuns !== 0 || unresolvedAgentRuns !== 0) throw new Error("HEADLESS_RUNTIME_RECOVERY_REQUIRED");
+          const registry = runtimeRegistry({ runtimeTrust, issuedAt: now });
+          const eligibleProviders = registry.entries.filter((entry) => entry.eligible === true);
+          if (eligibleProviders.length === 0) throw new Error(`HEADLESS_PRODUCTION_PROVIDER_UNAVAILABLE:${(registry.discovery_blockers ?? []).map((entry) => entry.code).join(",")}`);
+          const contracts = await loadContracts({ repositoryRoot: ROOT });
+          const contractValidation = validateContractSet(contracts);
+          if (!contractValidation.ok) throw new Error("HEADLESS_ACTIVE_CONTRACT_INVALID");
+          const deployment = verifyRepositoryReleaseDeployment({
+            repositoryRoot: ROOT,
+            candidateDefinition: activation.candidate_definition,
+            signedReleaseProofs: activation.signed_release_proofs,
+            contractFingerprint: compatibilityDigest(contractValidation.fingerprints),
+            releasePrerequisites: runtimeTrust.release_prerequisites,
+            nodeVersion: process.versions.node,
+          });
           print({
-            status: "preflight_required",
-            decision: "STOP",
-            production_available: false,
-            code: "HEADLESS_RUNTIME_OPERATIONAL_PREFLIGHT_REQUIRED",
+            status: "available",
+            decision: "PASS",
+            production_available: true,
             activation,
             activation_verification_fingerprint: verifiedActivation.proof_fingerprint,
             isolation,
             store: health,
             database_path: databasePath,
             trust_fingerprint: runtimeTrust.fingerprint,
-            provider_preflight_required: true,
-            candidate_preflight_required: true,
+            provider_preflight_required: false,
+            provider_registry_fingerprint: registry.fingerprint,
+            eligible_provider_count: eligibleProviders.length,
+            candidate_preflight_required: false,
+            deployment_fingerprint: deployment.deployment_fingerprint,
             unresolved_effects: unresolvedEffects,
             unresolved_runtime_runs: unresolvedRuntimeRuns,
             unresolved_agent_runs: unresolvedAgentRuns,
@@ -932,6 +1109,7 @@ if (command === "projection") {
     try { print(await productionRuntime(state.store).previewEffect(readRepositoryBoundJson(effectPath, effectPath))); } finally { state.store.close(); }
   } else if (action === "reconcile") {
     if (!args.includes("--confirm")) throw new Error("RUNTIME_RECONCILIATION_CONFIRMATION_REQUIRED");
+    requireOwnerController("runtime_reconcile");
     requireVerifiedProductionLaunch();
     const limit = Number(option("--limit", "100"));
     const recovery = await recoverRuntimeProcesses({ limit });
@@ -955,12 +1133,95 @@ if (command === "projection") {
       }
     }
   } else throw new Error(`UNKNOWN_RUNTIME_ACTION:${action}`);
+} else if (command === "delivery") {
+  const action = args[1] ?? "plan";
+  if (action === "plan") {
+    const laneOption = option("--lane");
+    const result = deliveryEvaluation({
+      target_kind: option("--target-kind", "parent"),
+      repository_selector: option("--repo"),
+      context_id: option("--context"),
+      scope_id: option("--scope", "next-workflow-delivery"),
+      outcome: option("--outcome", "working_change"),
+      explicit_lane: laneOption && laneOption !== "auto" ? laneOption : undefined,
+    });
+    print(result);
+    if (result.plan.decision !== "PASS") process.exitCode = 1;
+  } else if (action === "recheck") {
+    const planPath = option("--plan");
+    if (!planPath) throw new Error("DELIVERY_PLAN_FILE_REQUIRED");
+    // A delivery plan is non-authoritative evidence and may live in an external
+    // runtime directory so that saving it cannot change the Git snapshot it
+    // describes. The descriptor is pinned before parsing; authority still
+    // depends on a fresh, exact re-observation below.
+    const planned = readUntrustedEvidenceJson(planPath);
+    if (planned?.kind !== "next-workflow-delivery-plan-envelope" || !/^[a-f0-9]{64}$/u.test(planned.fingerprint ?? "")) throw new Error("DELIVERY_PLAN_ENVELOPE_INVALID");
+    const current = deliveryEvaluation({
+      target_kind: planned.context?.target_kind,
+      repository_selector: planned.context?.repository_selector ?? undefined,
+      context_id: planned.context?.context_id ?? undefined,
+      scope_id: planned.context?.scope_id,
+      outcome: planned.context?.outcome,
+      explicit_lane: planned.context?.explicit_lane ?? undefined,
+    });
+    const verification = verifyDeliveryLanePlan({
+      plan: planned.plan,
+      currentSnapshot: current.git_snapshot,
+      currentImpact: current.impact,
+      preferences: readRepositoryBoundJson(process.env.NEXT_WORKFLOW_DELIVERY_SETTINGS_FILE, "learning/NEXT_WORKFLOW_DELIVERY_SETTINGS.json"),
+      outcome: current.context.outcome,
+      explicitLane: current.context.explicit_lane ?? undefined,
+      effectiveCeiling: current.plan.effective_ceiling,
+      gitPolicyCandidates: current.plan.git_policy_candidates,
+    });
+    const contextMatched = compatibilityDigest(planned.context) === compatibilityDigest(current.context);
+    const envelopeMatched = planned.fingerprint === compatibilityDigest({
+      schema_version: planned.schema_version,
+      kind: planned.kind,
+      context: planned.context,
+      plan: planned.plan,
+      git_snapshot: planned.git_snapshot,
+      impact: planned.impact,
+      grants_git_authority: planned.grants_git_authority,
+    });
+    const requestedGitAction = option("--git-action");
+    const actionMap = {
+      commit: "commit",
+      push: "push",
+      pr: "pr_creation",
+      ci: "pr_ci_monitoring",
+      "pr-ci": "pr_ci_monitoring",
+      pr_ci: "pr_ci_monitoring",
+      merge: "merge",
+      "main-ci": "main_ci_monitoring",
+      main_ci: "main_ci_monitoring",
+      sync: "sync_monitoring",
+    };
+    if (requestedGitAction && !Object.hasOwn(actionMap, requestedGitAction)) throw new Error("DELIVERY_GIT_ACTION_INVALID");
+    const gitActionAllowed = !requestedGitAction || verification.git_policy_candidates.automatic.includes(actionMap[requestedGitAction]);
+    const decision = verification.decision === "PASS" && contextMatched && envelopeMatched && gitActionAllowed ? "PASS" : "STOP";
+    print({
+      schema_version: "1.0.0",
+      decision,
+      code: !envelopeMatched ? "DELIVERY_PLAN_ENVELOPE_TAMPERED" : !contextMatched ? "DELIVERY_PLAN_CONTEXT_DRIFT" : !gitActionAllowed ? "DELIVERY_GIT_ACTION_NOT_AUTOMATIC" : verification.code,
+      context_matched: contextMatched,
+      envelope_matched: envelopeMatched,
+      requested_git_action: requestedGitAction ?? null,
+      git_action_allowed: gitActionAllowed,
+      verification,
+      grants_git_authority: false,
+    });
+    if (decision !== "PASS") process.exitCode = 1;
+  } else throw new Error(`UNKNOWN_DELIVERY_ACTION:${action}`);
 } else if (command === "settings") {
   const action = args[1] ?? "catalog";
   if (action === "catalog") {
     const state = readOnlyState();
     try { const registry = runtimeRegistry(); print(readOnlySelectionCatalog({ store: state.store, registry })); } finally { state.store?.close(); }
   } else {
+    if (action === "apply") {
+      if (!args.includes("--confirm")) throw new Error("SETTINGS_APPLY_CONFIRMATION_REQUIRED");
+    }
     const { store, manager } = settingsManager();
     try {
       if (action === "dry-run") print(manager.dryRun({ scope: option("--scope"), subjectId: option("--subject"), mode: option("--mode"), identityKey: option("--identity", null), expectedRevision: Number(option("--expect-revision")) }));
@@ -1039,5 +1300,5 @@ if (command === "projection") {
     }
   } else throw new Error(`UNKNOWN_TEAM_ACTION:${action}`);
 } else {
-  process.stdout.write("Usage: tools/next-workflow projection|contracts|activation status|identity status|identity reattest --confirm|store-health|release status|release candidate [--artifact PATH ...]|release proofs-verify --candidate FP --bundle PATH|release source-receipt --candidate-file PATH (--kind KIND|--mode MODE) --evidence PATH [--fresh-until ISO] --confirm|release sign-bundle --candidate-file PATH --receipts PATH [--fresh-until ISO] --confirm|release sign-transition --candidate-file PATH --mode MODE --stage-receipt PATH [--fresh-until ISO] --confirm|release transition --candidate FP --mode MODE --evidence PATH --expect-revision N --confirm|release activate --candidate FP --bundle PATH --expect-revision N --confirm|runtime status|runtime isolation-check|runtime owner-enroll [--anchor PATH] [--private-key PATH] --confirm|runtime acceptance-create [--output PATH] [--private-key PATH] --confirm|runtime bootstrap --owner-acceptance PATH --confirm|runtime effect-preview --effect PATH|runtime reconcile [--target ID] [--limit N] --confirm|settings catalog|settings dry-run --scope S --subject ID --mode auto|manual|inherit --expect-revision N [--identity KEY]|settings revert-dry-run --receipt ID --expect-revision N|settings apply --token TOKEN --confirm|agent-selection plan --agent ID [--role ID] [--rigor L1..L5] [--risk low|normal|high|critical] [--complexity low|normal|high|extreme] [--objective auto|correctness|balanced|efficiency] [--capability ID] [--allow-model ID] [--deny-model ID] [--deny-prefix PREFIX] [--max-cost N]|agent-selection verify-config --plan PATH --model ID --effort VALUE|team plan --task PATH|team run --task PATH\n");
+  process.stdout.write("Usage: tools/next-workflow projection|contracts|activation status|identity status|identity reattest --confirm|store-health|delivery plan [--target-kind parent|product] [--repo ID] [--context ID] [--scope ID] [--outcome working_change|local_history|shared_branch|pr_validation|main_release] [--lane auto|none|local|remote_sync|ci]|delivery recheck --plan PATH|release status|release candidate [--artifact PATH ...]|release proofs-verify --candidate FP --bundle PATH|release activate-observed --candidate-file PATH --confirm|runtime status|runtime isolation-check|runtime owner-enroll [--anchor PATH] [--private-key PATH] --confirm|runtime acceptance-create [--output PATH] [--private-key PATH] --confirm|runtime bootstrap --owner-acceptance PATH --confirm|runtime effect-preview --effect PATH|runtime reconcile [--target ID] [--limit N] --confirm|settings catalog|settings dry-run --scope S --subject ID --mode auto|manual|inherit --expect-revision N [--identity KEY]|settings revert-dry-run --receipt ID --expect-revision N|settings apply --token TOKEN --confirm|agent-selection plan --agent ID [--role ID] [--rigor L1..L5] [--risk low|normal|high|critical] [--complexity low|normal|high|extreme] [--objective auto|correctness|balanced|efficiency] [--capability ID] [--allow-model ID] [--deny-model ID] [--deny-prefix PREFIX] [--max-cost N]|agent-selection verify-config --plan PATH --model ID --effort VALUE|team plan --task PATH|team run --task PATH\n");
 }

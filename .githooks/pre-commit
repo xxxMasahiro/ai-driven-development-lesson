@@ -3,4 +3,21 @@ set -euo pipefail
 
 ROOT="$(git rev-parse --show-toplevel)"
 
-"$ROOT/tools/git-hooks" run
+# shellcheck source=tools/lib/lesson_common.sh
+source "$ROOT/tools/lib/lesson_common.sh"
+# shellcheck source=tools/lib/git_hooks_policy.sh
+source "$ROOT/tools/lib/git_hooks_policy.sh"
+
+IFS=$'\t' read -r effective_mode effective_no_cache < <(git_hooks_effective_staged_mode)
+args=(run --mode "$effective_mode")
+if [[ "$effective_no_cache" == "true" ]]; then
+  args+=(--no-cache)
+fi
+
+# Git exports repository-local variables to hooks. They override `git -C` and
+# can redirect fixture repositories back into this worktree. The staged mode
+# has already been resolved above; clear only Git's documented local variables
+# before running tests so every fixture owns its own Git directory and index.
+git_hooks_clear_local_repository_environment
+
+"$ROOT/tools/git-hooks" "${args[@]}"

@@ -3912,3 +3912,85 @@ probe tried to create `/runtime` after binding the host root read-only. The
 probe now creates `/tmp/runtime` inside its existing private writable tmpfs,
 retains the read-only root and network isolation, and has passed a real
 Bubblewrap regression on the prerequisite-complete development host.
+
+## Production Activation candidate roll-forward handoff
+
+SYNC-ID: next_workflow_activation_roll_forward
+STATUS: implemented
+ARTIFACTS: docs/as-built/IMPLEMENTATION_PLAN.md,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/HANDOFF.md,docs/workflow/TASK_TRACKER.md,docs/workflow/TEST_PLAN_MANIFEST.tsv,tools/lib/next_workflow/release.mjs,tools/lib/next_workflow/store.mjs,tools/next-workflow-launcher.cjs,tools/test_next_workflow_launcher.mjs,tools/test_next_workflow_release.mjs
+TESTS: tools/check_next_workflow.sh,tools/test_next_workflow.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+PRs 36 and 37 merged and their required CI passed. The first candidate was
+enforced successfully. The corrected provider-probe candidate then exposed a
+separate lifecycle defect before a second Production launch: the release owner
+and protected store treated `enforced` as permanently terminal, so a different
+immutable candidate could not begin a new signed shadow chain.
+
+The implementation now allows only `enforced -> shadow` for a different
+candidate, preserves every old record, clears candidate-specific proofs, and
+requires the complete ordered chain again. While the replacement is not
+enforced, the newest record makes runtime launch stop; the older enforced
+candidate is not used as an implicit fallback. `rolled_back` remains terminal,
+same-candidate rewind remains invalid, and enforced verification rejects a
+revision that is not the end of a complete seven-stage cycle.
+The independent installed launcher now derives that same cycle boundary rather
+than accepting only revision 7. Its positive test performs two real signed
+candidate cycles, retains all 14 Activation rows, and launches the newest
+immutable snapshot.
+
+The focused release suite passes all 20 cases, and the direct launcher test
+passes all three cases. Remaining work is aggregate and permanent-document
+verification, full hooks, immutable GitHub delivery, replacement-candidate
+Activation, and one bounded installed-launcher smoke task. Control Center and
+every separately deferred plan remain unchanged.
+
+## Automatic delivery-lane efficiency handoff
+
+SYNC-ID: next_workflow_delivery_lane_selection
+STATUS: implemented
+ARTIFACTS: .githooks/pre-commit,.github/workflows/ci.yml,.github/workflows/lesson14-ci.yml,docs/as-built/IMPLEMENTATION_PLAN.md,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/GIT_HOOK_RECOMMENDATION_PATHS.tsv,docs/workflow/HANDOFF.md,docs/workflow/TASK_TRACKER.md,docs/workflow/TEST_PLAN_MANIFEST.tsv,learning/NEXT_WORKFLOW_DELIVERY_SETTINGS.json,tools/check_ci_workflow_structure.sh,tools/git-workflow,tools/lib/development_instruction.mjs,tools/lib/git_hooks_policy.sh,tools/lib/git_workflow_policy.sh,tools/lib/next_workflow/delivery_lane.mjs,tools/lib/next_workflow/git_snapshot.mjs,tools/next-workflow.mjs,tools/test_git_hooks.sh,tools/test_next_workflow_delivery.mjs,tools/test_next_workflow_delivery.sh
+TESTS: tools/check_next_workflow.sh,tools/test_next_workflow.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+Delivery rigor and delivery destination are now independent decisions. The
+planner honors an explicit developer lane first, applies immutable CI floors,
+intersects the result with saved Git authority, binds it to an exact Git
+snapshot, and rechecks immediately before each Git action. `none`, `local`,
+`remote_sync`, and `ci` therefore avoid unnecessary remote cycles without
+weakening required PR or main CI. Branch pushes no longer duplicate the
+pull-request workflow.
+
+## Rigor, lifecycle, and correction handoff
+
+SYNC-ID: next_workflow_rigor_activation_correction_contract
+STATUS: implemented
+ARTIFACTS: docs/as-built/IMPLEMENTATION_PLAN.md,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/HANDOFF.md,docs/workflow/TASK_TRACKER.md,docs/workflow/TEST_PLAN_MANIFEST.tsv,tools/lib/next_workflow/correction_policy.mjs,tools/lib/next_workflow/headless_plan.mjs,tools/lib/next_workflow/headless_service.mjs,tools/lib/next_workflow/release.mjs,tools/lib/next_workflow/rigor_classification.mjs,tools/lib/next_workflow/run_controller.mjs,tools/lib/next_workflow/saga.mjs,tools/lib/next_workflow/store.mjs,tools/next-workflow-launcher.cjs,tools/next-workflow.mjs,tools/test_next_workflow_authority.mjs,tools/test_next_workflow_headless_plan.mjs,tools/test_next_workflow_launcher.mjs,tools/test_next_workflow_release.mjs,tools/test_next_workflow_run_controller.mjs,tools/test_next_workflow_store.mjs
+TESTS: tools/check_next_workflow.sh,tools/test_next_workflow.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+Automatic rigor classification now uses bounded structured inputs and stops on
+unknown or contradictory impact rather than silently selecting a weaker level.
+Production uses the immutable stop-only correction profile: no blind retry is
+permitted, and a failure resumes only through a separately authorized new run.
+A replacement Production release must complete its own contiguous signed
+Activation cycle; prior complete cycles remain immutable history.
+
+## External Owner Controller handoff
+
+SYNC-ID: next_workflow_owner_controller_authority
+STATUS: implemented
+ARTIFACTS: docs/as-built/IMPLEMENTATION_PLAN.md,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/HANDOFF.md,docs/workflow/TASK_TRACKER.md,docs/workflow/TEST_PLAN_MANIFEST.tsv,tools/install-next-workflow-owner-controller.mjs,tools/lib/next_workflow/owner_controller.mjs,tools/lib/next_workflow/release.mjs,tools/lib/next_workflow/release_observation.mjs,tools/next-workflow-launcher.cjs,tools/next-workflow.mjs,tools/test_next_workflow_owner_controller.mjs,tools/test_next_workflow_owner_controller.sh,tools/test_next_workflow_release_observation.mjs,tools/test_next_workflow_release_observation.sh
+TESTS: tools/check_next_workflow.sh,tools/test_next_workflow.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+Production mutations are now exposed only by an immutable external Owner
+Controller snapshot installed from clean synchronized `main`. Its manifest
+pins every artifact byte and permits only bounded high-level actions. Release
+activation uses `release activate-observed`: the Controller independently
+observes local and remote Git lineage, the merged pull request, the complete
+required check-run page, PR CI, main CI, store recovery state, and immutable
+candidate identity before generating any signed evidence or transition.
+Caller-supplied low-level evidence cannot authorize Activation.
+
+The remaining handoff is to pass the complete local gates, deliver and merge
+the immutable candidate, pass main CI, synchronize `main`, install the external
+Controller from that checkout, bootstrap the default protected runtime, run
+observed Activation, and execute one bounded team smoke task. Control Center
+reconstruction and every separately deferred plan remain unchanged.

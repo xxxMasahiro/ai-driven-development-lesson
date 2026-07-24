@@ -64,6 +64,8 @@ const ACTIVATION_TRANSITIONS = new Map([
   ["enforced", new Set(["rolled_back"])],
   ["rolled_back", new Set()]
 ]);
+const ACTIVATION_CYCLE = ["shadow", "release_verified", "recovery_verified", "rollback_verified", "archive_decommission_verified", "ready", "enforced"];
+const CURRENT_ACTIVATION_SCHEMA_VERSION = "1.1.0";
 const RUNTIME_RUN_TRANSITIONS = new Map([
   ["STARTING", new Set(["RUNNING", "TERMINATING", "FAILED", "UNKNOWN"])],
   ["RUNNING", new Set(["CANCELLING", "TERMINATING", "COMPLETED", "FAILED", "TIMED_OUT", "UNKNOWN"])],
@@ -460,6 +462,155 @@ function normalizeRecord(record, identity, now) {
     created_at: record.created_at ?? now,
     superseded_by: record.superseded_by ?? null
   };
+}
+
+function activationCycleId({ activationId, candidateFingerprint, cycleStartRevision, previousRecordRevision, previousRecordContentFingerprint }) {
+  return digest({
+    activation_id: activationId,
+    candidate_fingerprint: candidateFingerprint,
+    cycle_start_revision: cycleStartRevision,
+    predecessor_record_revision: previousRecordRevision,
+    predecessor_record_content_fingerprint: previousRecordContentFingerprint,
+  });
+}
+
+function activationRowPayload(row) {
+  try {
+    return row.payload ?? JSON.parse(row.payload_json);
+  } catch {
+    throw new Error("ACTIVATION_ROW_PAYLOAD_INVALID");
+  }
+}
+
+function assertActivationRowBinding(row, identity) {
+  const payload = activationRowPayload(row);
+  const recordRevision = Number(row.record_revision);
+  if (row.kind !== "NextWorkflowActivation"
+    || row.repository_id !== identity.repository_logical_id
+    || row.checkout_id !== identity.checkout_instance_id
+    || row.authority_scope !== "release"
+    || row.lineage_id !== payload.activation_id
+    || row.schema_version !== payload.schema_version
+    || !new Set(["1.0.0", CURRENT_ACTIVATION_SCHEMA_VERSION]).has(payload.schema_version)
+    || !Number.isSafeInteger(recordRevision)
+    || recordRevision < 1
+    || recordRevision !== payload.revision
+    || row.lifecycle_state !== payload.mode
+    || row.input_fp !== payload.candidate_fingerprint
+    || row.content_fp !== digest(payload)) {
+    throw new Error("ACTIVATION_ROW_BINDING_INVALID");
+  }
+  const predecessorRevision = payload.schema_version === CURRENT_ACTIVATION_SCHEMA_VERSION
+    ? payload.previous_record_revision
+    : recordRevision - 1;
+  if (!Number.isSafeInteger(predecessorRevision)
+    || predecessorRevision !== recordRevision - 1
+    || row.source_revision !== String(predecessorRevision)) {
+    throw new Error("ACTIVATION_ROW_SOURCE_INVALID");
+  }
+  return { row, payload, record_revision: recordRevision };
+}
+
+function assertActivationHistory(rows, identity) {
+  if (rows.length === 0) return { current: null, payload: null };
+  const normalized = rows
+    .map((row) => assertActivationRowBinding(row, identity))
+    .sort((left, right) => left.record_revision - right.record_revision || left.row.id.localeCompare(right.row.id));
+  const revisions = new Set();
+  const ids = new Set();
+  for (const entry of normalized) {
+    if (revisions.has(entry.record_revision) || ids.has(entry.row.id)) throw new Error("ACTIVATION_REVISION_HISTORY_INVALID");
+    revisions.add(entry.record_revision);
+    ids.add(entry.row.id);
+  }
+  const current = normalized.at(-1);
+  if (current.payload.schema_version === "1.0.0") {
+    const legacyLength = current.payload.mode === "rolled_back" ? ACTIVATION_CYCLE.length + 1 : current.record_revision;
+    if (current.record_revision !== legacyLength || legacyLength > ACTIVATION_CYCLE.length + 1) throw new Error("ACTIVATION_LEGACY_HISTORY_INVALID");
+    const legacyRows = normalized.filter((entry) => entry.record_revision >= 1 && entry.record_revision <= Math.min(legacyLength, ACTIVATION_CYCLE.length));
+    if (legacyRows.length !== Math.min(legacyLength, ACTIVATION_CYCLE.length)) throw new Error("ACTIVATION_LEGACY_HISTORY_INVALID");
+    for (let index = 0; index < legacyRows.length; index += 1) {
+      if (legacyRows[index].record_revision !== index + 1
+        || legacyRows[index].payload.mode !== ACTIVATION_CYCLE[index]
+        || legacyRows[index].payload.candidate_fingerprint !== current.payload.candidate_fingerprint) {
+        throw new Error("ACTIVATION_LEGACY_HISTORY_INVALID");
+      }
+    }
+    return { current: current.row, payload: current.payload };
+  }
+  const cycleLength = current.payload.mode === "rolled_back" ? ACTIVATION_CYCLE.length + 1 : current.payload.cycle_step;
+  if (!Number.isSafeInteger(current.payload.cycle_start_revision)
+    || !Number.isSafeInteger(current.payload.cycle_step)
+    || current.payload.cycle_step !== cycleLength
+    || current.record_revision !== current.payload.cycle_start_revision + current.payload.cycle_step - 1
+    || cycleLength < 1
+    || cycleLength > ACTIVATION_CYCLE.length + 1) {
+    throw new Error("ACTIVATION_CYCLE_METADATA_INVALID");
+  }
+  const cycleRows = normalized.filter((entry) => entry.record_revision >= current.payload.cycle_start_revision && entry.record_revision <= current.record_revision);
+  if (cycleRows.length !== cycleLength) throw new Error("ACTIVATION_CYCLE_HISTORY_MISSING");
+  const legacyRollbackUpgrade = current.payload.mode === "rolled_back"
+    && cycleRows.length === ACTIVATION_CYCLE.length + 1
+    && cycleRows.slice(0, ACTIVATION_CYCLE.length).every((entry, index) => entry.payload.schema_version === "1.0.0"
+      && entry.record_revision === index + 1
+      && entry.payload.mode === ACTIVATION_CYCLE[index]
+      && entry.payload.candidate_fingerprint === current.payload.candidate_fingerprint)
+    && cycleRows.at(-1).payload.schema_version === CURRENT_ACTIVATION_SCHEMA_VERSION;
+  if (legacyRollbackUpgrade) {
+    if (current.payload.cycle_start_revision !== 1
+      || current.payload.cycle_step !== ACTIVATION_CYCLE.length + 1
+      || current.payload.previous_record_revision !== ACTIVATION_CYCLE.length
+      || current.payload.previous_record_content_fingerprint !== cycleRows.at(-2).row.content_fp
+      || current.payload.cycle_id !== activationCycleId({
+        activationId: current.payload.activation_id,
+        candidateFingerprint: current.payload.candidate_fingerprint,
+        cycleStartRevision: 1,
+        previousRecordRevision: 0,
+        previousRecordContentFingerprint: null,
+      })) {
+      throw new Error("ACTIVATION_LEGACY_ROLLBACK_UPGRADE_INVALID");
+    }
+    return { current: current.row, payload: current.payload };
+  }
+  for (let index = 0; index < cycleRows.length; index += 1) {
+    const entry = cycleRows[index];
+    const expectedMode = index < ACTIVATION_CYCLE.length ? ACTIVATION_CYCLE[index] : "rolled_back";
+    if (entry.record_revision !== current.payload.cycle_start_revision + index
+      || entry.payload.schema_version !== CURRENT_ACTIVATION_SCHEMA_VERSION
+      || entry.payload.activation_id !== current.payload.activation_id
+      || entry.payload.candidate_fingerprint !== current.payload.candidate_fingerprint
+      || entry.payload.cycle_id !== current.payload.cycle_id
+      || entry.payload.cycle_start_revision !== current.payload.cycle_start_revision
+      || entry.payload.cycle_step !== index + 1
+      || entry.payload.mode !== expectedMode) {
+      throw new Error("ACTIVATION_CYCLE_HISTORY_INVALID");
+    }
+    if (index === 0) {
+      const predecessor = normalized.find((candidate) => candidate.record_revision === entry.payload.previous_record_revision);
+      if (entry.payload.previous_record_revision !== entry.record_revision - 1
+        || (entry.payload.previous_record_revision === 0
+          ? entry.payload.previous_record_content_fingerprint !== null
+          : predecessor?.row.content_fp !== entry.payload.previous_record_content_fingerprint)
+        || entry.payload.cycle_id !== activationCycleId({
+          activationId: entry.payload.activation_id,
+          candidateFingerprint: entry.payload.candidate_fingerprint,
+          cycleStartRevision: entry.payload.cycle_start_revision,
+          previousRecordRevision: entry.payload.previous_record_revision,
+          previousRecordContentFingerprint: entry.payload.previous_record_content_fingerprint,
+        })) {
+        throw new Error("ACTIVATION_CYCLE_START_INVALID");
+      }
+    } else if (entry.payload.previous_record_revision !== cycleRows[index - 1].record_revision
+      || entry.payload.previous_record_content_fingerprint !== cycleRows[index - 1].row.content_fp) {
+      throw new Error("ACTIVATION_CYCLE_PREDECESSOR_INVALID");
+    }
+  }
+  if (current.payload.mode === "enforced"
+    && (current.payload.cycle_step !== ACTIVATION_CYCLE.length
+      || current.record_revision !== current.payload.cycle_start_revision + ACTIVATION_CYCLE.length - 1)) {
+    throw new Error("ACTIVATION_ENFORCEMENT_CYCLE_INCOMPLETE");
+  }
+  return { current: current.row, payload: current.payload };
 }
 
 function normalizeRuntimeObservation(observation = {}) {
@@ -1667,23 +1818,42 @@ export function openWorkflowStateStore({ repositoryRoot, databasePath, expectedI
       try {
         if (Number(getMeta(db, "store_revision") ?? 0) !== expectedRevision) throw new Error("REVISION_CONFLICT");
         if (Number(getMeta(db, "revocation_epoch") ?? 0) !== authorityEpoch) throw new Error("AUTHORITY_EPOCH_STALE");
-        const currentRow = db.prepare("SELECT * FROM records WHERE kind='NextWorkflowActivation' AND lineage_id=? ORDER BY record_revision DESC LIMIT 1").get(activationId);
-        const currentPayload = currentRow ? JSON.parse(currentRow.payload_json) : null;
+        const activationRows = db.prepare("SELECT * FROM records WHERE kind='NextWorkflowActivation' AND lineage_id=? ORDER BY record_revision,id").all(activationId);
+        const currentHistory = assertActivationHistory(activationRows, identity);
+        const currentRow = currentHistory.current;
+        const currentPayload = currentHistory.payload;
         const currentMode = currentPayload?.mode ?? "planned";
         const currentCandidate = currentPayload?.candidate_fingerprint ?? null;
-        if (currentRow && (currentRow.lineage_id !== activationId || currentRow.lifecycle_state !== currentMode || currentPayload?.activation_id !== activationId || currentPayload?.revision !== Number(currentRow.record_revision))) throw new Error("ACTIVATION_CURRENT_RECORD_INVALID");
         if (currentMode !== expectedMode || (currentPayload?.activation_id && currentPayload.activation_id !== activationId)) throw new Error("ACTIVATION_LIFECYCLE_STATE_CONFLICT");
-        const candidateRestart = nextMode === "shadow" && currentCandidate && currentCandidate !== candidateFingerprint && !["enforced", "rolled_back"].includes(currentMode);
+        const candidateRestart = nextMode === "shadow" && currentCandidate && currentCandidate !== candidateFingerprint && currentMode !== "rolled_back";
         if (!candidateRestart && !ACTIVATION_TRANSITIONS.get(currentMode)?.has(nextMode)) throw new Error(`ACTIVATION_LIFECYCLE_TRANSITION_INVALID:${currentMode}:${nextMode}`);
         const previousRevision = Number(currentRow?.record_revision ?? 0);
         const expectedEventType = nextMode === "enforced" ? "NEXT_WORKFLOW_ACTIVATED" : nextMode === "rolled_back" ? "NEXT_WORKFLOW_ROLLED_BACK" : "NEXT_WORKFLOW_ACTIVATION_TRANSITIONED";
-        if (record.lineage_id !== activationId || record.lifecycle_state !== nextMode || record.payload?.activation_id !== activationId || record.payload?.mode !== nextMode || record.payload?.candidate_fingerprint !== candidateFingerprint || record.payload?.authority_epoch !== authorityEpoch || record.record_revision !== previousRevision + 1 || record.payload?.revision !== record.record_revision || record.source_revision !== String(previousRevision) || record.input_fp !== candidateFingerprint || !/^[a-f0-9]{64}$/.test(record.policy_fp ?? "") || event.event_type !== expectedEventType || event.aggregate_id !== record.id || event.payload?.activation_id !== activationId || event.payload?.candidate_fingerprint !== candidateFingerprint || event.payload?.authority_epoch !== authorityEpoch) throw new Error("ACTIVATION_LIFECYCLE_RECORD_INVALID");
+        if (record.schema_version !== CURRENT_ACTIVATION_SCHEMA_VERSION
+          || record.payload?.schema_version !== CURRENT_ACTIVATION_SCHEMA_VERSION
+          || record.lineage_id !== activationId
+          || record.lifecycle_state !== nextMode
+          || record.payload?.activation_id !== activationId
+          || record.payload?.mode !== nextMode
+          || record.payload?.candidate_fingerprint !== candidateFingerprint
+          || record.payload?.authority_epoch !== authorityEpoch
+          || record.record_revision !== previousRevision + 1
+          || record.payload?.revision !== record.record_revision
+          || record.source_revision !== String(previousRevision)
+          || record.input_fp !== candidateFingerprint
+          || !/^[a-f0-9]{64}$/.test(record.policy_fp ?? "")
+          || event.event_type !== expectedEventType
+          || event.aggregate_id !== record.id
+          || event.payload?.activation_id !== activationId
+          || event.payload?.candidate_fingerprint !== candidateFingerprint
+          || event.payload?.authority_epoch !== authorityEpoch) throw new Error("ACTIVATION_LIFECYCLE_RECORD_INVALID");
         if (expectedEventType === "NEXT_WORKFLOW_ACTIVATION_TRANSITIONED" && (event.payload?.from_mode !== currentMode || event.payload?.to_mode !== nextMode || event.payload?.requested_mode !== nextMode)) throw new Error("ACTIVATION_LIFECYCLE_EVENT_INVALID");
+        const normalized = normalizeRecord(record, identity, now);
+        assertActivationHistory([...activationRows, normalized], identity);
         const verificationFingerprint = digest({ current_record_fingerprint: currentRow?.content_fp ?? null, current_mode: currentMode, next_mode: nextMode, candidate_fingerprint: candidateFingerprint, authority_epoch: authorityEpoch, proposed_record: record, event, locked_revision: expectedRevision });
         const verdict = verifier.verify({ current_record: currentRow ? { ...currentRow, payload: currentPayload } : null, proposed_record: structuredClone(record), event: structuredClone(event), fingerprint: verificationFingerprint, locked_revision: expectedRevision, authority_epoch: authorityEpoch, now });
         if (verdict && typeof verdict.then === "function") throw new Error("ACTIVATION_LIFECYCLE_ASYNC_VERIFIER_UNSUPPORTED");
         if (verdict?.verified !== true || verdict.verifier_id !== verifier.verifier_id || verdict.fingerprint !== verificationFingerprint || verdict.proof_fingerprint !== record.policy_fp) throw new Error("ACTIVATION_LIFECYCLE_VERIFICATION_FAILED");
-        const normalized = normalizeRecord(record, identity, now);
         db.prepare(`INSERT INTO records(id,kind,schema_version,record_revision,repository_id,checkout_id,authority_scope,lineage_id,lifecycle_state,payload_json,source_revision,policy_fp,input_fp,content_fp,sensitivity,fresh_until,created_at,superseded_by) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(...Object.values(normalized));
         db.prepare("INSERT INTO events(event_id,aggregate_id,event_type,payload_json,authority_decision_id,created_at) VALUES(?,?,?,?,?,?)").run(event.event_id, normalized.id, event.event_type, canonicalJson(event.payload ?? {}), event.authority_decision_id ?? null, event.created_at ?? now);
         setMeta(db, "store_revision", expectedRevision + 1);

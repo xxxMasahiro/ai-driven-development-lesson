@@ -62,6 +62,11 @@ Changes to the live default provider probe must also synchronize the full
 parent authority set. The supported probe retains the read-only host-root bind,
 creates its runtime directory below the private writable `/tmp` tmpfs, and is
 executed only when the real containment diagnostic passes.
+Changes to multi-candidate Activation or lifecycle persistence have the same
+obligation. The synchronized contract must describe fresh-shadow restart,
+complete-cycle verification, newest-record fail-closed runtime behavior,
+historical retention, and same-candidate or rolled-back refusal in the same PR
+and every incremental push range.
 
 Multiple matching rules add requirements; a weaker rule cannot remove a
 security or verification requirement. The existing
