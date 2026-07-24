@@ -4,6 +4,7 @@ import {
   chmodSync,
   mkdirSync,
   mkdtempSync,
+  readFileSync,
   rmSync,
   writeFileSync,
 } from "node:fs";
@@ -45,6 +46,17 @@ test("installer and runtime identity resolution use the checkout identity owner 
   assert.equal(identity.repository_logical_id, "repository");
   assert.equal(identity.checkout_instance_id, "7a20ee52-3ee3-41c1-9fb9-9f9733ebfcef");
   assert.deepEqual(runtimeIdentity, identity);
+});
+
+test("runtime reconciliation uses the immutable Owner Controller without an impossible launcher conjunction", () => {
+  const source = readFileSync(new URL("./next-workflow.mjs", import.meta.url), "utf8");
+  const start = source.indexOf('} else if (action === "reconcile") {');
+  const end = source.indexOf("} else throw new Error(`UNKNOWN_RUNTIME_ACTION:${action}`);", start);
+  assert.notEqual(start, -1);
+  assert.notEqual(end, -1);
+  const reconcileBranch = source.slice(start, end);
+  assert.match(reconcileBranch, /requireOwnerController\("runtime_reconcile"\)/u);
+  assert.doesNotMatch(reconcileBranch, /requireVerifiedProductionLaunch/u);
 });
 
 function fixture() {

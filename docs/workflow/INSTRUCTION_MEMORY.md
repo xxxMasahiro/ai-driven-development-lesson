@@ -306,3 +306,12 @@ through its existing bounded grace period while the process identity
 observation is `unknown`. A matched or reused identity is handled immediately.
 Identity that remains unknown after the grace period fails closed and cannot
 be accepted as a successful Agent result.
+
+## Owner Runtime Reconciliation
+
+`runtime reconcile` is a confirmation-bound recovery action executed only by
+the exact immutable external Owner Controller whose manifest allowlists it.
+The Production launcher continues to sanitize Owner Controller authority from
+Agent execution and is not a simultaneous prerequisite for this Owner action.
+Direct repository execution, unconfirmed mutation, provider launch, and result
+acceptance remain unauthorized.

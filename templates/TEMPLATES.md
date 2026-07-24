@@ -283,3 +283,8 @@ Next Workflow template consumers must preserve the parent runtime's bounded
 post-exit process identity settlement. Templates cannot extend the grace
 period, reinterpret matched or reused identity, or accept an identity that
 remains unknown.
+
+Templates also cannot grant runtime reconciliation authority. That action
+remains confirmation-bound to the exact immutable external Owner Controller;
+the sanitized Production launcher and child templates carry no Owner
+authority.

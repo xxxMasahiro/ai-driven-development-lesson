@@ -60,3 +60,4 @@ relationship	test_dashboard_control_center	test_dashboard_i18n	The same-run Cont
 relationship	test_dashboard_control_center	test_dashboard_settings	The same-run Control Center owner executes the existing settings regression in its isolated static phase.
 # next_workflow_owner_controller_identity	The existing test_next_workflow owner executes checkout-identity installer/runtime and custom-base wrapper regressions once; final-gate jobs consume that same-run result instead of repeating it.
 # next_workflow_post_exit_identity_settlement	The existing test_next_workflow owner executes bounded post-exit identity settlement once; final-gate jobs consume that result and do not repeat the grace-period probes.
+# next_workflow_owner_reconciliation_authority	The existing test_next_workflow owner proves the reachable Controller-only reconciliation gate once; final-gate jobs consume that result and do not mutate Production recovery state.

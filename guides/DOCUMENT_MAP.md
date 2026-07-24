@@ -302,3 +302,8 @@ post-exit identity settlement sections in the as-built trio and
 `docs/workflow/INSTRUCTION_MEMORY.md`. They define the bounded transient wait,
 immediate reuse handling, and persistent-unknown stop shared by the parent
 authority documents.
+
+For recovery authority, use the Owner reconciliation sections in the same
+as-built and workflow documents. They distinguish the immutable external
+Controller action from the Production launcher, which deliberately strips
+Owner authority before Agent execution.

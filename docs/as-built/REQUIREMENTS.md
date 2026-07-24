@@ -4225,3 +4225,23 @@ bounded interval must continue to fail closed without accepting the result.
 Release refusal tests must bind their intentionally missing Owner trust to a
 suite-private path so an already initialized Production workstation cannot
 turn the negative test into a different command outcome.
+
+## Owner reconciliation authority requirements
+
+SYNC-ID: next_workflow_owner_reconciliation_authority
+STATUS: implemented
+ARTIFACTS: AGENTS.MD,docs/as-built/IMPLEMENTATION_PLAN.md,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/DEVELOPMENT_AUTONOMY_WORKFLOW.tsv,docs/workflow/DEVELOPMENT_INSTRUCTION_POLICY.tsv,docs/workflow/FINAL_GATE_CI_GRAPH.tsv,docs/workflow/FINAL_GATE_COVERAGE.tsv,docs/workflow/FINAL_GATE_EXECUTION_POLICY.tsv,docs/workflow/FINAL_GATE_GAP_COMMANDS.tsv,docs/workflow/GIT_HOOK_CHECKS.tsv,docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv,docs/workflow/HANDOFF.md,docs/workflow/INSTRUCTION_MEMORY.md,docs/workflow/PRODUCT_REPOSITORY_STRUCTURE.tsv,docs/workflow/PRODUCT_SECURITY_POLICY.tsv,docs/workflow/REPOSITORY_DEVELOPMENT_RUNNER_POLICY.tsv,docs/workflow/REPOSITORY_DEVELOPMENT_WORKFLOW.tsv,docs/workflow/REPOSITORY_DOCUMENT_SYNC.md,docs/workflow/REPOSITORY_DOCUMENT_SYNC_POLICY.json,docs/workflow/SAFEFLOW_SECURITY_BACKFILL.tsv,docs/workflow/TASK_TRACKER.md,docs/workflow/TEST_PLAN_MANIFEST.tsv,free-development/FREE_DEVELOPMENT_MODE.md,guides/DOCUMENT_MAP.md,learning/REPOSITORY_DEVELOPMENT_APPROVALS.tsv,templates/TEMPLATES.md,tools/lib/next_workflow/owner_controller.mjs,tools/next-workflow.mjs,tools/test_next_workflow_owner_controller.mjs,tools/test_next_workflow_owner_controller.sh
+TESTS: tools/check_next_workflow.sh,tools/test_next_workflow.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+Recovery of a previously authorized but unresolved runtime effect must have
+one usable authority path before replacement Activation requires a quiescent
+store. That path must be the exact immutable external Owner Controller whose
+manifest already allowlists `runtime_reconcile`; it must never be a direct
+repository command or an unverified launcher.
+
+The Production launcher must continue to sanitize Owner Controller authority
+from Agent execution. Runtime reconciliation therefore must not require both
+the Owner Controller and that intentionally sanitized launcher. Reconciliation
+must retain confirmation, protected checkout identity, Controller snapshot,
+store, recovery authorization, process identity, and no-provider-start
+requirements.

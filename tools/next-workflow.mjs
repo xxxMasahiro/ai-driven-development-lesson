@@ -1113,8 +1113,11 @@ if (command === "projection") {
     try { print(await productionRuntime(state.store).previewEffect(readRepositoryBoundJson(effectPath, effectPath))); } finally { state.store.close(); }
   } else if (action === "reconcile") {
     if (!args.includes("--confirm")) throw new Error("RUNTIME_RECONCILIATION_CONFIRMATION_REQUIRED");
+    // Recovery is an Owner action executed from the immutable external
+    // Controller snapshot. Requiring the Production launcher here as well
+    // would create an impossible conjunction because that launcher
+    // intentionally sanitizes all Controller authority from its child.
     requireOwnerController("runtime_reconcile");
-    requireVerifiedProductionLaunch();
     const limit = Number(option("--limit", "100"));
     const recovery = await recoverRuntimeProcesses({ limit });
     if (recovery.runtime_remaining !== 0 || recovery.agent_remaining !== 0) {

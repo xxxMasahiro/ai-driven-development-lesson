@@ -158,3 +158,9 @@ settlement. Every synchronized authority must preserve the bounded wait only
 for transient `unknown` status, immediate handling of matched or reused
 identity, and fail-closed refusal when identity remains unknown after the
 existing grace period.
+
+Owner runtime reconciliation is also synchronized as a distinct authority
+boundary. The exact immutable external Controller and explicit confirmation
+authorize that bounded recovery action. The Production launcher continues to
+strip Controller variables from Agent execution and is not a simultaneous
+reconcile prerequisite; direct repository execution remains unauthorized.

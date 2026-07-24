@@ -19,3 +19,4 @@ git_workflow_status	["./tools/git-workflow","status"]	discard	Confirm Git workfl
 git_workflow_cleanup_plan	["./tools/git-workflow","cleanup-plan"]	discard	Confirm Git workflow cleanup planning remains available.
 # next_workflow_owner_controller_identity	No final-gap command installs or invokes a Controller; the aggregate regression owns identity and wrapper-base wiring, while real installation and Owner actions occur only after synchronized main.
 # next_workflow_post_exit_identity_settlement	No final-gap command repeats process identity settlement; the aggregate regression owns transient unknown settlement, immediate reuse refusal, and persistent-unknown fail-closed coverage.
+# next_workflow_owner_reconciliation_authority	No final-gap command performs runtime reconciliation; the aggregate verifies Controller-only authority, while real reconcile remains a confirmed external Owner action.
