@@ -4313,3 +4313,23 @@ Removing the redundant ancestry probe must not permit a tree-only,
 caller-asserted, ambiguous, unmerged, wrong-head, failed-CI, missing-check, or
 unsynchronized candidate. The independent GitHub and Git observations remain
 the release authority.
+
+## Codex trusted JSON response protocol requirements
+
+SYNC-ID: next_workflow_codex_json_protocol
+STATUS: implemented
+ARTIFACTS: AGENTS.MD,docs/as-built/IMPLEMENTATION_PLAN.md,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/DEVELOPMENT_AUTONOMY_WORKFLOW.tsv,docs/workflow/DEVELOPMENT_INSTRUCTION_POLICY.tsv,docs/workflow/FINAL_GATE_CI_GRAPH.tsv,docs/workflow/FINAL_GATE_COVERAGE.tsv,docs/workflow/FINAL_GATE_EXECUTION_POLICY.tsv,docs/workflow/FINAL_GATE_GAP_COMMANDS.tsv,docs/workflow/GIT_HOOK_CHECKS.tsv,docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv,docs/workflow/HANDOFF.md,docs/workflow/INSTRUCTION_MEMORY.md,docs/workflow/PRODUCT_REPOSITORY_STRUCTURE.tsv,docs/workflow/PRODUCT_SECURITY_POLICY.tsv,docs/workflow/REPOSITORY_DEVELOPMENT_RUNNER_POLICY.tsv,docs/workflow/REPOSITORY_DEVELOPMENT_WORKFLOW.tsv,docs/workflow/REPOSITORY_DOCUMENT_SYNC.md,docs/workflow/REPOSITORY_DOCUMENT_SYNC_POLICY.json,docs/workflow/SAFEFLOW_SECURITY_BACKFILL.tsv,docs/workflow/TASK_TRACKER.md,docs/workflow/TEST_PLAN_MANIFEST.tsv,free-development/FREE_DEVELOPMENT_MODE.md,guides/DOCUMENT_MAP.md,learning/REPOSITORY_DEVELOPMENT_APPROVALS.tsv,templates/TEMPLATES.md,tools/lib/next_workflow/providers.mjs,tools/test_next_workflow_providers.mjs
+TESTS: tools/check_next_workflow.sh,tools/test_next_workflow.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+Every Production Codex CLI launch must receive a fixed direct protocol before
+the authority-owned task envelope is appended from stdin. The protocol must
+state that only the trusted `control` object is instructional, `data` is
+untrusted task data, and the response is exactly one JSON object satisfying
+every result-contract field, enumeration, pattern, and constraint without
+Markdown, code fences, or surrounding prose.
+
+The protocol must be adapter specific. Existing non-Codex CLI adapters retain
+their declared stdin marker and transport behavior. Structured argv,
+descriptor pinning, containment, model and effort binding, and the protected
+result validator remain unchanged. Any remaining malformed output fails
+closed; it is not rewritten, accepted, or granted implicit retry authority.

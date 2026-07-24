@@ -303,3 +303,9 @@ Templates cannot impose a false candidate-ancestry requirement on GitHub
 squash merge or weaken the exact alternative. Production Activation always
 retains one merged PR, exact head and merge SHA, equal trees, successful
 required PR/main CI and checks, synchronization, and no observation drift.
+
+Templates cannot remove or reinterpret the fixed Production Codex response
+protocol. Codex receives the trusted-control directive before the protected
+stdin envelope, template content remains untrusted task data, and the response
+must satisfy the complete JSON contract without Markdown or surrounding prose.
+Templates also cannot replace another CLI adapter's declared stdin behavior.

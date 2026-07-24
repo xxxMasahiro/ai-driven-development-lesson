@@ -1,4 +1,5 @@
 # check_id	modes	command	description
+# next_workflow_codex_json_protocol	The existing test_next_workflow hook verifies fixed Codex protocol injection and unchanged generic CLI stdin behavior without adding a duplicate hook owner.
 # next_workflow_squash_merge_observation	The existing test_next_workflow hook proves exact squash lineage without adding a duplicate hook owner or invoking GitHub.
 # next_workflow_result_contract_closure	The existing test_next_workflow hook checks the authority-owned finding grammar and preserves strict invalid-result refusal without adding a duplicate hook command.
 # next_workflow_roll_forward	The existing test_next_workflow hook includes the complete two-candidate activation regression so a locally reproducible lifecycle defect is rejected before Push and PR CI.

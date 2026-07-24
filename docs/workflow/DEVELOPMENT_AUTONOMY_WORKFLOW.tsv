@@ -1,4 +1,5 @@
 # stage_id	order	stage_name	repository_phases	cycle_scope	write_scope	approval_mode	continuation_mode	git_policy	stop_conditions
+# next_workflow_codex_json_protocol	Codex CLI launches receive a fixed trusted-control protocol before the authority-owned stdin envelope; malformed output still stops at validation and is never repaired or accepted automatically.
 # next_workflow_squash_merge_observation	Phase 6 may use GitHub merge or squash merge when the protected observer proves the exact PR/head/merge/tree/PR-main-CI/check/synchronization lineage; missing or ambiguous evidence stops without history rewriting.
 # next_workflow_result_contract_closure	A trusted Agent task envelope publishes the exact result grammar before autonomous execution; invalid returned identifiers stop at validation and do not become an approval prompt, sanitized result, or automatic retry.
 # next_workflow_roll_forward	A replacement Production candidate returns only to shadow, repeats the complete signed activation chain, and blocks runtime use until the newest candidate is enforced without deleting the prior lineage.

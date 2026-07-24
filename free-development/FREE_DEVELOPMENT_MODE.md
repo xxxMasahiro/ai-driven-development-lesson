@@ -158,3 +158,10 @@ Development follows the same exact merge-method evidence as the parent
 workflow. Squash merge does not imply candidate ancestry, but it never permits
 tree-only activation or bypass of the merged PR, PR/main CI, checks, and
 synchronization evidence.
+
+When Free Development uses a Production Codex Agent, the runtime sends the
+fixed trusted JSON response protocol before the authority-owned stdin
+envelope. Repository task text remains untrusted data, the protected result
+contract remains exact, and malformed output returns to the correction loop
+without rewriting or silent model escalation. Non-Codex CLI adapters retain
+their configured stdin behavior.

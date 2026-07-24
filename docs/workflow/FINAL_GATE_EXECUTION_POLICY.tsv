@@ -1,4 +1,5 @@
 # row_type	key	value	description
+# next_workflow_codex_json_protocol	Run focused provider and lifecycle tests during correction, then execute the existing aggregate/full-hook owner once before PR CI and one bounded smoke after observed Activation.
 # next_workflow_squash_merge_observation	Local tests prove merge-method semantics once; observed Activation later consumes exact completed PR/main evidence and must not trigger duplicate test owners.
 # next_workflow_result_contract_closure	Run focused delivery tests during correction, then let the existing aggregate/full-hook owner execute the complete local suite once before PR CI; do not repeat already passing full local evidence after remote synchronization.
 # next_workflow_roll_forward	activation_cycle	complete_only	The local release gate must prove replacement-candidate restart, full cycle verification, historical retention, and invalid-cycle refusal before PR CI; remote CI remains independent release evidence rather than a duplicate local suite.

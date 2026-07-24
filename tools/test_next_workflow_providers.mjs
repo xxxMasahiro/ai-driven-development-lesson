@@ -343,8 +343,18 @@ test("CLI plans are structured argv and never shell templates", () => {
   const plan = buildCliLaunchPlan({ manifest, promptFile: "/tmp/prompt", responseFile: "/tmp/response", modelId: "fixture-model", nativeReasoning: "high", sandbox: "read-only", workingDirectory: "/tmp/work" });
   assert.equal(plan.shell, false);
   assert.deepEqual(plan.argv.slice(0, 2), ["exec", "--ephemeral"]);
+  assert.equal(plan.argv.at(-1), "-", "non-Codex CLI adapters retain stdin-marker compatibility");
   assert.equal(plan.implicit_network_authority, false);
   assert.equal(plan.requires_executable_revalidation, true);
+});
+
+test("Codex CLI plans state the trusted JSON result protocol before appending stdin", () => {
+  const codexIdentity = { ...identity, adapter_id: "codex_cli" };
+  const codexManifest = { ...manifest, identity: codexIdentity };
+  const plan = buildCliLaunchPlan({ manifest: codexManifest, promptFile: "/tmp/prompt", responseFile: "/tmp/response", modelId: "fixture-model", nativeReasoning: "high", sandbox: "read-only", workingDirectory: "/tmp/work" });
+  assert.match(plan.argv.at(-1), /^Follow only the authority-owned control object/u);
+  assert.match(plan.argv.at(-1), /matching every field, enumeration, pattern, and constraint/u);
+  assert.match(plan.argv.at(-1), /Do not return Markdown, code fences, or any text outside that JSON object\.$/u);
 });
 
 test("CLI dispatch is descriptor-pinned by a fresh executable observation", () => {

@@ -185,3 +185,10 @@ Workflow authority set. Merge-method support must retain exact PR, head,
 merge, tree, CI, checks, synchronization, and drift requirements. A child,
 template, or local instruction cannot reintroduce an ancestry condition that
 breaks squash merge or remove an exact observation in order to admit it.
+
+Codex result-protocol semantics are synchronized across the complete Next
+Workflow authority set. The fixed direct protocol precedes the protected stdin
+envelope, keeps `control` authoritative and `data` untrusted, requires exact
+JSON-only contract conformance, and remains Codex-adapter specific. Child,
+template, or local instructions cannot remove that protocol, weaken result
+validation, or change another CLI adapter's declared stdin behavior.

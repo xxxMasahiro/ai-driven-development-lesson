@@ -344,3 +344,11 @@ the candidate commit as an ancestor. It is eligible only when the protected
 observer independently proves one exact merged PR, its candidate head and
 main merge SHA, equal trees, successful required PR/main workflows and checks,
 clean synchronization, and stable Git state throughout observation.
+
+Codex Production launches place a fixed trusted response protocol before the
+authority-owned stdin envelope. The protocol directs Codex to follow only the
+trusted `control` object, keep task `data` untrusted, and emit exactly one JSON
+object that satisfies the complete result contract without Markdown or
+surrounding prose. Other CLI adapters retain their declared stdin marker.
+Malformed output still fails closed and receives no normalization, automatic
+acceptance, or implicit retry authority.

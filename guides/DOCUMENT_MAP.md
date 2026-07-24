@@ -325,3 +325,10 @@ the release security and CI policies. The protected implementation and its
 real Git topology regression are
 `tools/lib/next_workflow/release_observation.mjs` and
 `tools/test_next_workflow_release_observation.mjs`.
+
+For the Production Codex JSON response protocol, read the corresponding
+sections in the as-built authorities, Task Tracker, and Handoff, followed by
+the provider, security, and verification policies. The adapter-specific
+implementation and compatibility regression are
+`tools/lib/next_workflow/providers.mjs` and
+`tools/test_next_workflow_providers.mjs`.
