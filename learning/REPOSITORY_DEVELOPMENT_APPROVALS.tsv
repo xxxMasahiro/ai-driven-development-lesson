@@ -1,4 +1,5 @@
 # phase_id	approval_scope	required	default_state	description
+# next_workflow_squash_merge_observation	Exact merge-method observation is normal verification under saved Git authority and needs no extra approval; history rewriting, ambiguous lineage, or evidence weakening remains blocked.
 # next_workflow_result_contract_closure	Publishing and enforcing the trusted result grammar is normal in-scope verification and needs no extra approval; weakening validation, accepting malformed output, or expanding retry authority remains prohibited.
 # instruction_boundary	Approval defaults operate below AGENTS.MD invariants and only after local-first, exact-absence instruction resolution succeeds.
 context_triage	read_repository_context	false	not_required	Read-only context gathering does not require a separate approval beyond the developer request.

@@ -337,3 +337,10 @@ representation. The protected validator remains unchanged and rejects rather
 than repairs malformed Agent output. This parent runtime contract is inherited
 by child repositories even when a valid child-local instruction memory
 supplies repository-specific development guidance.
+
+Observed Activation treats GitHub merge methods according to their real
+semantics. Squash merge may produce the exact candidate tree without retaining
+the candidate commit as an ancestor. It is eligible only when the protected
+observer independently proves one exact merged PR, its candidate head and
+main merge SHA, equal trees, successful required PR/main workflows and checks,
+clean synchronization, and stable Git state throughout observation.

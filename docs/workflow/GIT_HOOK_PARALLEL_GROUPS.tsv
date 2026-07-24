@@ -1,4 +1,5 @@
 # check_id	parallel_group	execution_kind	description
+# next_workflow_squash_merge_observation	The real temporary Git topology test stays inside the existing test_next_workflow owner; live observed Activation remains outside hook parallel groups.
 # next_workflow_result_contract_closure	The delivery-contract assertions stay inside the existing test_next_workflow regression owner; Production smoke is post-Activation evidence and never runs in a Git-hook parallel group.
 # next_workflow_roll_forward	The isolated release fixture may run inside the regression group, but it owns one complete multi-candidate lifecycle and must not be split into reusable evidence across runs.
 # test_ci_full_pipeline_acceleration_plan: lesson CLI fixture checks are classified here so full Git hooks can parallelize only mechanically independent work.

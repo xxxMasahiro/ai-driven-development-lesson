@@ -1,5 +1,6 @@
 # sync_id	product_security_workflow_gate
 # check_id	context	severity	gate_effect	approval_required	description
+next_workflow_squash_merge_observation	all	block	block	false	Squash merge is eligible only through one exact merged PR, bound candidate head and main merge SHA, equal trees, complete successful PR/main workflows and checks, clean synchronization, and drift-free observation.
 next_workflow_result_contract_closure	all	block	block	false	Trusted delivery must publish the exact protected finding and evidence-reference grammar; malformed Agent output is rejected without rewriting, validator weakening, result acceptance, or retry authority.
 repository_boundary	all	block	block	false	Product security checks must inspect only the configured product repository and must not scan unrelated directories.
 secret_exposure	all	block	block	false	Secret-like values, private keys, credentials, tokens, or private messages must not be committed, printed, or logged.

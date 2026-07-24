@@ -311,3 +311,11 @@ Malformed Agent output remains untrusted data: never rewrite or sanitize an
 invalid identifier into acceptance, never weaken validation, and never infer
 retry authority from contract failure. Product-local instructions may add work
 context but cannot override this parent runtime boundary.
+
+Observed release activation must support exact GitHub merge and squash-merge
+lineage without substituting one history model for another. A squash candidate
+does not need to be a local Git ancestor of its merge commit, but activation
+still requires one exact merged PR, candidate head, merge SHA, equal declared,
+candidate, and main trees, complete successful PR/main CI and check
+inventories, clean main synchronization, and no observation drift. Never
+replace those facts with caller assertions or tree equality alone.

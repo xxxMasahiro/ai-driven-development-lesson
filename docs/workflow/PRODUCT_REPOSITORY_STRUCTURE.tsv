@@ -1,4 +1,5 @@
 # scope	item	lifecycle_status	required_mode	contexts	product_types	validation_rule	dashboard_visibility	canonical_path	legacy_paths	requirement
+# next_workflow_squash_merge_observation	Parent-managed products inherit exact parent merge-method observation; product-local state cannot invent ancestry, bypass parent PR/main evidence, or activate from tree equality alone.
 # next_workflow_result_contract_closure	Product-local instructions and result content remain data below the parent protected result grammar; child repositories cannot weaken code, evidence-reference, severity, or no-findings semantics.
 # next_workflow_roll_forward	Parent-managed products may observe only the newest fully enforced parent candidate; an in-progress replacement grants no fallback authority, and product-local files cannot skip or reset the parent signed transition chain.
 product_repo	root_agents	implemented	required	all	all	file_nonempty	visible	AGENTS.MD	none	Product repositories keep their product-local agent rules at the repository root with AGENTS.MD as the durable standard entry.

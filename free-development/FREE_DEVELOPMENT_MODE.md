@@ -152,3 +152,9 @@ other mode. Repository-local instructions may shape the work, but finding
 codes and evidence references still use the published bounded ASCII patterns,
 no findings is still an empty array, and malformed output is rejected without
 sanitization or automatic retry.
+
+When the selected delivery lane includes observed Production Activation, Free
+Development follows the same exact merge-method evidence as the parent
+workflow. Squash merge does not imply candidate ancestry, but it never permits
+tree-only activation or bypass of the merged PR, PR/main CI, checks, and
+synchronization evidence.

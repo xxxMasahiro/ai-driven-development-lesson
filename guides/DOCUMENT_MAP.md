@@ -318,3 +318,10 @@ in the three as-built authorities, then the matching Task Tracker and Handoff
 blocks. The security, test-plan, Git/CI, instruction, child-inheritance,
 template, and Free Development documents mirror that contract; the runtime
 implementation remains in `tools/lib/next_workflow/task_delivery.mjs`.
+
+For exact merge and squash-merge Activation, read the squash-observation
+sections in the as-built authorities, Task Tracker, and Handoff, followed by
+the release security and CI policies. The protected implementation and its
+real Git topology regression are
+`tools/lib/next_workflow/release_observation.mjs` and
+`tools/test_next_workflow_release_observation.mjs`.
