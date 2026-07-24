@@ -1,4 +1,5 @@
 # phase_id	order	execution_mode	executable_check_sets	record_required	reuse_allowed	approval_required	release_policy	destructive_execution	stop_policy
+# next_workflow_result_contract_closure	Phase 5 uses the trusted delivery grammar and returns invalid Agent results to the nearest correction loop without sanitization or retry; Phase 6 begins only after the local aggregate owner passes.
 # next_workflow_roll_forward	A protected release update runs the complete second-candidate lifecycle regression locally before the remote release gate; the Runner cannot reuse an older enforced record or treat PR/main CI as a substitute for that preflight.
 # instruction_boundary	Runner phases consume resolved procedural guidance but cannot weaken AGENTS.MD invariants or reinterpret an invalid local instruction as absent.
 context_triage	1	plan_only	none	false	false	false	no_release_proof	false	plan_first

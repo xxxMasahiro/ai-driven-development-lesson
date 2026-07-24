@@ -5048,3 +5048,26 @@ authorization into the finalization fence. If the stored decision has expired,
 the store independently reconstructs that request, invokes its injected
 runtime-recovery authorizer, and requires byte-equivalent canonical evidence
 before atomically delivering the outbox and marking the intent reconciled.
+
+## Machine-valid Agent result contract specification
+
+SYNC-ID: next_workflow_result_contract_closure
+STATUS: implemented
+ARTIFACTS: AGENTS.MD,docs/as-built/IMPLEMENTATION_PLAN.md,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/DEVELOPMENT_AUTONOMY_WORKFLOW.tsv,docs/workflow/DEVELOPMENT_INSTRUCTION_POLICY.tsv,docs/workflow/FINAL_GATE_CI_GRAPH.tsv,docs/workflow/FINAL_GATE_COVERAGE.tsv,docs/workflow/FINAL_GATE_EXECUTION_POLICY.tsv,docs/workflow/FINAL_GATE_GAP_COMMANDS.tsv,docs/workflow/GIT_HOOK_CHECKS.tsv,docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv,docs/workflow/HANDOFF.md,docs/workflow/INSTRUCTION_MEMORY.md,docs/workflow/PRODUCT_REPOSITORY_STRUCTURE.tsv,docs/workflow/PRODUCT_SECURITY_POLICY.tsv,docs/workflow/REPOSITORY_DEVELOPMENT_RUNNER_POLICY.tsv,docs/workflow/REPOSITORY_DEVELOPMENT_WORKFLOW.tsv,docs/workflow/REPOSITORY_DOCUMENT_SYNC.md,docs/workflow/REPOSITORY_DOCUMENT_SYNC_POLICY.json,docs/workflow/SAFEFLOW_SECURITY_BACKFILL.tsv,docs/workflow/TASK_TRACKER.md,docs/workflow/TEST_PLAN_MANIFEST.tsv,free-development/FREE_DEVELOPMENT_MODE.md,guides/DOCUMENT_MAP.md,learning/REPOSITORY_DEVELOPMENT_APPROVALS.tsv,templates/TEMPLATES.md,tools/lib/next_workflow/task_delivery.mjs,tools/test_next_workflow_task_delivery.mjs
+TESTS: tools/check_next_workflow.sh,tools/test_next_workflow.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+`normalizeResultContract` emits a trusted `finding_contract` with:
+
+- `required_fields`: `code`, `severity`, `message`, and `evidence_refs`;
+- `code_pattern`: `^[A-Za-z0-9][A-Za-z0-9_.:-]{0,63}$`;
+- an ASCII machine-identifier instruction and valid examples;
+- a single-line plain-text message instruction that excludes paths, commands,
+  and secrets;
+- `evidence_ref_pattern`:
+  `^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$`; and
+- `no_findings_representation`: an empty array.
+
+The existing result validator keeps the same closed severity vocabulary and
+regular expressions. The trusted contract is delivered in the control plane;
+the Agent response remains untrusted data and receives no normalization that
+could conceal an invalid result.

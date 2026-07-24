@@ -312,3 +312,9 @@ For terminal launch recovery, continue with the terminal reconciliation
 sections. They explain why protected process absence and persisted launch
 evidence may settle the spawn effect while the failed Agent result remains
 rejected.
+
+For the machine-valid Agent result boundary, read the result-contract sections
+in the three as-built authorities, then the matching Task Tracker and Handoff
+blocks. The security, test-plan, Git/CI, instruction, child-inheritance,
+template, and Free Development documents mirror that contract; the runtime
+implementation remains in `tools/lib/next_workflow/task_delivery.mjs`.

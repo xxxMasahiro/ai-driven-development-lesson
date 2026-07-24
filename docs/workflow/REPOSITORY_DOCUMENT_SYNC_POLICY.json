@@ -394,7 +394,7 @@
     },
     {
       "id": "next-workflow-core",
-      "description": "Next Workflow contracts, state, CLI, checkout-bound external Controller and launcher, Controller-only reconciliation, structured L5 terminal-launch recovery with protected process-absence and persisted launch verification but no result acceptance or retry, provider selection, protected runtime/trust/containment, bounded post-exit identity settlement, immutable candidate and signed multi-candidate activation history, migrations, isolated provider probe, portable non-authorizing fixtures, launcher integrity, discovery, and refusal tests update the complete parent authority, as-built, Security, verification, CI, and workflow-state contract without traversing child repositories.",
+      "description": "Next Workflow contracts, including the machine-valid Agent result grammar, state, CLI, checkout-bound external Controller and launcher, Controller-only reconciliation, structured L5 terminal-launch recovery with protected process-absence and persisted launch verification but no result acceptance or retry, provider selection, protected runtime/trust/containment, bounded post-exit identity settlement, immutable candidate and signed multi-candidate activation history, migrations, isolated provider probe, portable non-authorizing fixtures, launcher integrity, discovery, and refusal tests update the complete parent authority, as-built, Security, verification, CI, and workflow-state contract without traversing child repositories.",
       "trigger": {
         "any_of": [
           "docs/workflow/next-workflow/**",

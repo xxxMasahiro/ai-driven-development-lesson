@@ -329,3 +329,11 @@ process is absent, and the protected launch observer must re-verify the
 persisted model, effort, process identity, containment, observation scope,
 disabled task network, and disabled task tools. This does not accept an Agent
 result, create an AgentRun, or authorize a retry.
+
+The trusted task-delivery envelope publishes the exact required finding
+fields, closed severity values, bounded ASCII code and evidence-reference
+patterns, single-line message rule, and empty-array no-findings
+representation. The protected validator remains unchanged and rejects rather
+than repairs malformed Agent output. This parent runtime contract is inherited
+by child repositories even when a valid child-local instruction memory
+supplies repository-specific development guidance.

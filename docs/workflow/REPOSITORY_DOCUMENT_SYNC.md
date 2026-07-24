@@ -171,3 +171,11 @@ protected process-absence proof, protected persisted-launch verification, and
 the distinction between settling the spawn effect and accepting an Agent
 result. Child, template, or Free Development documents cannot weaken those
 conditions or introduce retry authority.
+
+The Agent result grammar is part of the complete synchronized parent
+authority set. Changes to task delivery or result validation must keep the
+as-built requirements, specification, implementation plan, workflow state,
+security policies, test manifest, Git/CI ownership, instruction inheritance,
+templates, and Free Development guidance aligned. A child repository may add
+local task context, but it cannot weaken the parent machine-valid result
+contract or convert malformed output into an accepted result.

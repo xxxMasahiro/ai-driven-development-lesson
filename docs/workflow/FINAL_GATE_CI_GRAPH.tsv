@@ -1,4 +1,5 @@
 # workflow_id	workflow_file	workflow_name	coverage_scope	job_id	role	needs	selector	description
+# next_workflow_result_contract_closure	The existing test_next_workflow owner executes delivery-contract and invalid-result regressions once; PR and main CI consume independent repository revisions rather than repeating local test owners.
 # next_workflow_roll_forward	The regression owner covers a complete second-candidate shadow-to-enforced cycle, direct-stage and same-candidate rewind refusal, historical-record retention, and incomplete-cycle rejection before remote release evidence is accepted.
 main	.github/workflows/ci.yml	CI	full	syntax-checks	auxiliary	none	{}	Preserve the required syntax context without owning compatibility executions.
 main	.github/workflows/ci.yml	CI	full	repository-document-sync	owner	syntax-checks	{"include":["check_repository_document_sync","test_repository_document_sync"]}	Own parent-only document-sync policy and rejection checks before provider range validation.

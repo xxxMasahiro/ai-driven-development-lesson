@@ -1,4 +1,5 @@
 # stage_id	order	stage_name	repository_phases	cycle_scope	write_scope	approval_mode	continuation_mode	git_policy	stop_conditions
+# next_workflow_result_contract_closure	A trusted Agent task envelope publishes the exact result grammar before autonomous execution; invalid returned identifiers stop at validation and do not become an approval prompt, sanitized result, or automatic retry.
 # next_workflow_roll_forward	A replacement Production candidate returns only to shadow, repeats the complete signed activation chain, and blocks runtime use until the newest candidate is enforced without deleting the prior lineage.
 # authority_layer	A-F is procedural only; the applicable AGENTS.MD remains the invariant authority and exact local absence is the sole parent-fallback trigger.
 A	1	pre_implementation_proposal	context_triage|proposal	current_task	plan_only	none	automatic	none	unclear_requirement|repository_mismatch|existing_feature_tradeoff|security_conflict

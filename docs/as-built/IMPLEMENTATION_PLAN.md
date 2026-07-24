@@ -6321,3 +6321,26 @@ TESTS: tools/check_next_workflow.sh,tools/test_next_workflow.sh,tools/check_as_b
 7. Pass all local and remote gates, install the synchronized Controller,
    reconcile the preserved effect, activate the replacement, and run a fresh
    bounded Production team smoke.
+
+## Machine-valid Agent result contract implementation plan
+
+SYNC-ID: next_workflow_result_contract_closure
+STATUS: implemented
+ARTIFACTS: AGENTS.MD,docs/as-built/IMPLEMENTATION_PLAN.md,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/DEVELOPMENT_AUTONOMY_WORKFLOW.tsv,docs/workflow/DEVELOPMENT_INSTRUCTION_POLICY.tsv,docs/workflow/FINAL_GATE_CI_GRAPH.tsv,docs/workflow/FINAL_GATE_COVERAGE.tsv,docs/workflow/FINAL_GATE_EXECUTION_POLICY.tsv,docs/workflow/FINAL_GATE_GAP_COMMANDS.tsv,docs/workflow/GIT_HOOK_CHECKS.tsv,docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv,docs/workflow/HANDOFF.md,docs/workflow/INSTRUCTION_MEMORY.md,docs/workflow/PRODUCT_REPOSITORY_STRUCTURE.tsv,docs/workflow/PRODUCT_SECURITY_POLICY.tsv,docs/workflow/REPOSITORY_DEVELOPMENT_RUNNER_POLICY.tsv,docs/workflow/REPOSITORY_DEVELOPMENT_WORKFLOW.tsv,docs/workflow/REPOSITORY_DOCUMENT_SYNC.md,docs/workflow/REPOSITORY_DOCUMENT_SYNC_POLICY.json,docs/workflow/SAFEFLOW_SECURITY_BACKFILL.tsv,docs/workflow/TASK_TRACKER.md,docs/workflow/TEST_PLAN_MANIFEST.tsv,free-development/FREE_DEVELOPMENT_MODE.md,guides/DOCUMENT_MAP.md,learning/REPOSITORY_DEVELOPMENT_APPROVALS.tsv,templates/TEMPLATES.md,tools/lib/next_workflow/task_delivery.mjs,tools/test_next_workflow_task_delivery.mjs
+TESTS: tools/check_next_workflow.sh,tools/test_next_workflow.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+1. Preserve and reconcile the refused Production smoke effect without
+   accepting its malformed Agent result or authorizing a retry.
+2. Compare the trusted delivery contract with the unchanged protected result
+   validator and identify the missing identifier grammar.
+3. Add the exact finding and evidence-reference grammar, valid examples, and
+   empty-array no-findings representation to the authority-owned contract.
+4. Add focused regressions that inspect the delivered control envelope while
+   retaining the existing invalid-result refusal cases.
+5. Pass document synchronization, focused and aggregate Next Workflow tests,
+   and the single local full-hook gate before remote delivery.
+6. Deliver through PR CI, merge, main CI, and exact local/remote
+   synchronization; install the merged immutable Owner Controller, perform
+   observed Activation, and repeat one bounded Production team smoke.
+7. Keep Control Center reconstruction and every separately deferred plan
+   unchanged.

@@ -1,4 +1,5 @@
 # phase_id	approval_scope	required	default_state	description
+# next_workflow_result_contract_closure	Publishing and enforcing the trusted result grammar is normal in-scope verification and needs no extra approval; weakening validation, accepting malformed output, or expanding retry authority remains prohibited.
 # instruction_boundary	Approval defaults operate below AGENTS.MD invariants and only after local-first, exact-absence instruction resolution succeeds.
 context_triage	read_repository_context	false	not_required	Read-only context gathering does not require a separate approval beyond the developer request.
 proposal	present_structured_proposal	false	not_required	Proposal writing is read-only and may continue inside the current task scope when no stop condition applies.
