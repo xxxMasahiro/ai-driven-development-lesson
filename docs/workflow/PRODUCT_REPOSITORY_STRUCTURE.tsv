@@ -53,3 +53,4 @@ product_ci	github_workflows	implemented	contextual	product-improvement|external-
 product_hooks	git_hooks	implemented	optional	all	all	path_exists	reference	.githooks/	none	Product-local Git hooks may exist when the product chooses them and are declared by ops manifests.
 product_tests	test_tree	implemented	contextual	all	all	path_exists	visible	tests/	spec/,e2e/	Product tests live in stack-appropriate test directories and are declared by TEST_PLAN_MANIFEST.tsv.
 # next_workflow_owner_controller_identity	Parent Controller installation and runtime actions consume the same parent checkout identity only; product scaffolds do not copy, invent, inherit, or redirect that per-worktree state or Controller base.
+# next_workflow_post_exit_identity_settlement	Parent runtime post-exit identity settlement is bounded and fail-closed; child or product state cannot extend the grace period, reinterpret reuse, or accept persistent unknown status.

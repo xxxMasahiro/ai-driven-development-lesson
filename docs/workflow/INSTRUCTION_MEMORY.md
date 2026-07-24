@@ -298,3 +298,11 @@ roadmap items. F is plan-only. A same-scope continuation may return to A/B
 without an artificial stop, but automatic entry into a new C implementation is
 allowed only when the current developer request already authorizes that exact
 scope; otherwise stop for direction.
+
+## Protected Post-Exit Identity
+
+After a provider exits successfully, the protected runtime may wait only
+through its existing bounded grace period while the process identity
+observation is `unknown`. A matched or reused identity is handled immediately.
+Identity that remains unknown after the grace period fails closed and cannot
+be accepted as a successful Agent result.

@@ -282,3 +282,7 @@ checkout-identity owner; the tracked repository identity configuration is not
 a substitute for local checkout identity. Every Controller action resolves the
 same persisted identity read-only, and the installed wrapper pins its verified
 Controller base even when a non-default private base was selected.
+After a provider exits successfully, protected process identity may wait only
+through the existing bounded grace period while observation remains `unknown`.
+Matched or reused identity is handled immediately, and unresolved identity
+after that grace period remains a fail-closed stop.

@@ -152,3 +152,9 @@ state that the installer uses the checkout-identity owner and never derives a
 per-worktree instance ID from tracked repository configuration. They must also
 state that bounded Owner actions read the same persisted identity without
 creation and that the installed wrapper pins the verified Controller base.
+
+The same Next Workflow authority set owns post-exit process identity
+settlement. Every synchronized authority must preserve the bounded wait only
+for transient `unknown` status, immediate handling of matched or reused
+identity, and fail-closed refusal when identity remains unknown after the
+existing grace period.

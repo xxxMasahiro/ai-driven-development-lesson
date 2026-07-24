@@ -278,3 +278,8 @@ completed: 通過済みで復習できる項目
 
 ## 注意点
 ```
+
+Next Workflow template consumers must preserve the parent runtime's bounded
+post-exit process identity settlement. Templates cannot extend the grace
+period, reinterpret matched or reused identity, or accept an identity that
+remains unknown.

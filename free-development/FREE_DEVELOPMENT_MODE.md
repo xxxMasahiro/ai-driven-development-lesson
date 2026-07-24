@@ -128,6 +128,10 @@ An in-progress parent candidate replacement also grants no child authority.
 Free Development may use only the newest fully enforced parent release; it
 cannot fall back to an older enforced record, restart a rolled-back chain, or
 skip the parent's fresh shadow-to-enforced verification.
+Parent runtime result authority also requires bounded post-exit process
+identity settlement. Free Development cannot lengthen that grace period,
+reinterpret matched or reused identity, or accept an identity that remains
+unknown.
 
 - `none`: product workspace, canonical documents, scaffold authority, product security, and required local checks are still required; Git, remote sync, and CI are not applicable.
 - `local`: local Git worktree and local Git safety checks are required; remote sync and CI are not applicable.
