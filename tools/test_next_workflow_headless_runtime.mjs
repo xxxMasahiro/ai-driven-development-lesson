@@ -6,7 +6,7 @@ import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import test from "node:test";
 import { createHeadlessRunController, recoverUnresolvedAgentRun } from "./lib/next_workflow/run_controller.mjs";
-import { createHeadlessAuthoritySourceProvider, createHeadlessProductionRuntime, headlessRuntimeDigest } from "./lib/next_workflow/headless_runtime.mjs";
+import { createHeadlessAuthoritySourceProvider, createHeadlessProductionRuntime, createRuntimeProviderObserver, headlessRuntimeDigest } from "./lib/next_workflow/headless_runtime.mjs";
 import { buildCliLaunchPlan, providerDigest, providerIdentityKey } from "./lib/next_workflow/providers.mjs";
 import { createLinuxIsolatedContainment, diagnoseLinuxIsolationPrerequisites } from "./lib/next_workflow/runtime_containment.mjs";
 import {
@@ -26,6 +26,75 @@ const databasePaths = [];
 const runtimeTest = diagnoseLinuxIsolationPrerequisites().available ? test : test.skip;
 test.after(() => roots.forEach((root) => rmSync(root, { recursive: true, force: true })));
 test.after(() => databasePaths.flatMap((candidate) => [candidate, `${candidate}-wal`, `${candidate}-shm`]).forEach((candidate) => rmSync(candidate, { force: true })));
+
+test("terminal isolated launches reconcile the spawn effect only after process absence and persisted launch verification", async () => {
+  const effectId = "effect-terminal-launch";
+  const intent = {
+    effect_id: effectId,
+    effect_key: "a".repeat(64),
+    request_fp: "b".repeat(64),
+    authority_fp: "c".repeat(64),
+    target_id: "headless-task:terminal-launch",
+    operation: "agent_launch:spawn",
+    expected_selector: {},
+  };
+  const run = {
+    run_id: effectId,
+    state: "FAILED",
+    exit_code: 0,
+    signal: null,
+    result_fp: null,
+    observation: {
+      selected_provider: "provider",
+      selected_model: "model",
+      selected_effort: "high",
+      actual_provider: "provider",
+      actual_model: "model",
+      actual_effort: "high",
+      observation_scope: "pinned_cli_launch_configuration",
+      backend_attestation: null,
+      backend_attestation_available: false,
+      launch_observation_verifier_id: "launch-observer",
+      launch_observation_proof_fingerprint: "d".repeat(64),
+      process_identity_fingerprint: "e".repeat(64),
+      containment_evidence_fingerprint: "f".repeat(64),
+      containment_profile_id: "linux-user-mount-provider-net-v1",
+      task_network_access: false,
+      task_tools_enabled: false,
+    },
+  };
+  const store = {
+    getIntent: () => intent,
+    getRuntimeRun: () => structuredClone(run),
+  };
+  const verifier = {
+    verifier_id: "launch-observer",
+    verifyPersisted({ fingerprint }) {
+      return {
+        verified: true,
+        verifier_id: "launch-observer",
+        fingerprint,
+        proof_fingerprint: "1".repeat(64),
+      };
+    },
+  };
+  const matched = createRuntimeProviderObserver({
+    store,
+    runtimeRunReconciler: async () => ({ result: "matched" }),
+    launchObservationVerifier: verifier,
+  });
+  const result = await matched.reconcile(intent);
+  assert.equal(result.state, "matched");
+  assert.equal(result.status, "succeeded");
+  assert.match(result.observation_fingerprint, /^[a-f0-9]{64}$/u);
+
+  const unknown = createRuntimeProviderObserver({
+    store,
+    runtimeRunReconciler: async () => ({ result: "unknown" }),
+    launchObservationVerifier: verifier,
+  });
+  assert.deepEqual(await unknown.reconcile(intent), { state: "unknown" });
+});
 
 function fileDigest(candidate) {
   return providerDigest(readFileSync(candidate));

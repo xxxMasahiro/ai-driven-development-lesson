@@ -44,6 +44,7 @@ export function createNextWorkflowRuntime({
   containment,
   taskDeliveryPreparer,
   runLifecyclePort,
+  runtimeProfile = "production",
   clock = () => new Date().toISOString(),
   idFactory,
 } = {}) {
@@ -67,7 +68,7 @@ export function createNextWorkflowRuntime({
     if (adapters[variant] !== undefined) throw new Error(`PROVIDER_GATEWAY_ADAPTER_OVERRIDE_FORBIDDEN:${variant}`);
     adapters[variant] = providerAdapter;
   }
-  const gateway = createSideEffectGateway({ store, sourceProvider, activationProvider, activationVerifier, currentCandidateProvider, reconciliationAuthorizer, adapters, receiptVerifier, approvalVerifier, clock, ...(idFactory ? { idFactory } : {}) });
+  const gateway = createSideEffectGateway({ store, sourceProvider, activationProvider, activationVerifier, currentCandidateProvider, reconciliationAuthorizer, adapters, receiptVerifier, approvalVerifier, runtimeProfile, clock, ...(idFactory ? { idFactory } : {}) });
   let protectedOperationalAuthority = false;
   try {
     assertProtectedRuntimeVerifier(receiptVerifier, "receipt_issuer");

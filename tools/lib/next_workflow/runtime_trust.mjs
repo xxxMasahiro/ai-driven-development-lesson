@@ -238,6 +238,54 @@ export function createProtectedLaunchObservationVerifier({ runtimeTrust, authori
       const proofFingerprint = digest({ authority_id: authorityId, authority_revision: authority.revision, observed, process_evidence_fingerprint: processEvidence.fingerprint, plan_fingerprint: plan.plan_fingerprint, fingerprint });
       return { verified: true, verifier_id: authorityId, fingerprint, proof_fingerprint: proofFingerprint, actual_provider: observed.provider, actual_model: observed.model, actual_effort: observed.effort, observation_scope: "pinned_cli_launch_configuration", backend_attestation: null, backend_attestation_available: false };
     },
+    verifyPersisted({ run, fingerprint }) {
+      const observation = run?.observation;
+      const terminal = ["FAILED", "CANCELLED", "TIMED_OUT"].includes(run?.state);
+      const selectedConfiguration = [
+        observation?.selected_provider,
+        observation?.selected_model,
+        observation?.selected_effort,
+      ];
+      const actualConfiguration = [
+        observation?.actual_provider,
+        observation?.actual_model,
+        observation?.actual_effort,
+      ];
+      const verified = terminal
+        && typeof run?.run_id === "string"
+        && run.run_id.length > 0
+        && selectedConfiguration.every((value) => typeof value === "string" && value.length > 0)
+        && canonicalJson(selectedConfiguration) === canonicalJson(actualConfiguration)
+        && observation.observation_scope === "pinned_cli_launch_configuration"
+        && observation.backend_attestation === null
+        && observation.backend_attestation_available === false
+        && observation.launch_observation_verifier_id === authorityId
+        && /^[a-f0-9]{64}$/u.test(observation.launch_observation_proof_fingerprint ?? "")
+        && /^[a-f0-9]{64}$/u.test(observation.process_identity_fingerprint ?? "")
+        && /^[a-f0-9]{64}$/u.test(observation.containment_evidence_fingerprint ?? "")
+        && typeof observation.containment_profile_id === "string"
+        && observation.containment_profile_id.length > 0
+        && observation.task_network_access === false
+        && observation.task_tools_enabled === false
+        && /^[a-f0-9]{64}$/u.test(fingerprint ?? "");
+      return {
+        verified,
+        verifier_id: authorityId,
+        fingerprint,
+        proof_fingerprint: verified
+          ? digest({
+            authority_id: authorityId,
+            authority_revision: authority.revision,
+            run_id: run.run_id,
+            state: run.state,
+            launch_observation_proof_fingerprint: observation.launch_observation_proof_fingerprint,
+            process_identity_fingerprint: observation.process_identity_fingerprint,
+            containment_evidence_fingerprint: observation.containment_evidence_fingerprint,
+            fingerprint,
+          })
+          : null,
+      };
+    },
   });
   return brandRuntimeVerifier(verifier, "launch_observation", runtimeTrust, authority);
 }

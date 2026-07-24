@@ -326,17 +326,18 @@ function protectedProductionStore({ createIdentity = false, mode = "readwrite" }
 
 function defaultProductionTask() {
   return {
-    schema_version: "1.0.0",
+    schema_version: "1.1.0",
     task_id: "runtime-recovery",
     summary: "Reconcile pending headless runtime effects without expanding task authority",
-    scope_paths: ["tools"],
-    rigor: "L1",
+    scope_paths: ["tools/next-workflow.mjs"],
+    operations: ["security_control"],
+    rigor: "L5",
     risk: "high",
     complexity: "low",
   };
 }
 
-function productionService({ task = defaultProductionTask() } = {}) {
+function productionService({ task = defaultProductionTask(), recoveryOnly = false } = {}) {
   const identity = runtimeIdentity({ create: false });
   const runtimeTrust = loadProtectedRuntimeTrust({
     repositoryRoot: ROOT,
@@ -344,8 +345,16 @@ function productionService({ task = defaultProductionTask() } = {}) {
     checkoutInstanceId: identity.checkout_instance_id,
     trustPath: process.env.NEXT_WORKFLOW_OWNER_TRUST_PATH || defaultOwnerTrustPath(),
   });
-  const registry = runtimeRegistry({ runtimeTrust });
-  if (registry.entries.filter((entry) => entry.eligible === true).length === 0) throw new Error(`HEADLESS_PRODUCTION_PROVIDER_UNAVAILABLE:${(registry.discovery_blockers ?? []).map((entry) => entry.code).join(",")}`);
+  const registry = recoveryOnly
+    ? Object.freeze({
+      schema_version: "1.0.0",
+      profile: "recovery_only_no_provider_discovery",
+      entries: [],
+      discovery_blockers: [],
+      fingerprint: compatibilityDigest("recovery_only_no_provider_discovery"),
+    })
+    : runtimeRegistry({ runtimeTrust });
+  if (!recoveryOnly && registry.entries.filter((entry) => entry.eligible === true).length === 0) throw new Error(`HEADLESS_PRODUCTION_PROVIDER_UNAVAILABLE:${(registry.discovery_blockers ?? []).map((entry) => entry.code).join(",")}`);
   const selectionState = readOnlyState();
   let selectionSettings;
   try {
@@ -371,6 +380,7 @@ function productionService({ task = defaultProductionTask() } = {}) {
     releasePrerequisites: runtimeTrust.release_prerequisites,
     releaseArtifactPaths: DEFAULT_RELEASE_ARTIFACTS,
     task,
+    recoveryOnly,
     databasePath: path.join(ROOT, runtimeTrust.production_state.database_relative_path),
     runtimeStateRoot: process.env.NEXT_WORKFLOW_RUNTIME_STATE_ROOT || defaultHeadlessRuntimeStateRoot(),
   });
@@ -1128,7 +1138,7 @@ if (command === "projection") {
     } else {
       let service;
       try {
-        service = productionService();
+        service = productionService({ recoveryOnly: true });
         const reconciliation = await service.runtime.reconcilePending({ targetId: option("--target"), limit: Math.max(1, limit - recovery.attempted) });
         print({ decision: reconciliation.remaining === 0 && reconciliation.runtime_remaining === 0 ? "PASS" : "STOP", recovery, reconciliation });
         if (reconciliation.remaining !== 0 || reconciliation.runtime_remaining !== 0) process.exitCode = 1;

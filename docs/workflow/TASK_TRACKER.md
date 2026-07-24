@@ -3823,3 +3823,23 @@ TESTS: tools/check_next_workflow.sh,tools/test_next_workflow.sh,tools/check_as_b
 - [ ] Pass aggregate, full-hook, PR CI, main CI, synchronized installation,
   old-effect reconciliation, replacement Activation, and Production smoke.
 - [x] Leave Control Center and separately deferred plans unchanged.
+
+## Terminal launch reconciliation
+
+SYNC-ID: next_workflow_terminal_launch_reconciliation
+STATUS: implemented
+ARTIFACTS: AGENTS.MD,docs/as-built/IMPLEMENTATION_PLAN.md,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/DEVELOPMENT_AUTONOMY_WORKFLOW.tsv,docs/workflow/DEVELOPMENT_INSTRUCTION_POLICY.tsv,docs/workflow/FINAL_GATE_CI_GRAPH.tsv,docs/workflow/FINAL_GATE_COVERAGE.tsv,docs/workflow/FINAL_GATE_EXECUTION_POLICY.tsv,docs/workflow/FINAL_GATE_GAP_COMMANDS.tsv,docs/workflow/GIT_HOOK_CHECKS.tsv,docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv,docs/workflow/HANDOFF.md,docs/workflow/INSTRUCTION_MEMORY.md,docs/workflow/PRODUCT_REPOSITORY_STRUCTURE.tsv,docs/workflow/PRODUCT_SECURITY_POLICY.tsv,docs/workflow/REPOSITORY_DEVELOPMENT_RUNNER_POLICY.tsv,docs/workflow/REPOSITORY_DEVELOPMENT_WORKFLOW.tsv,docs/workflow/REPOSITORY_DOCUMENT_SYNC.md,docs/workflow/REPOSITORY_DOCUMENT_SYNC_POLICY.json,docs/workflow/SAFEFLOW_SECURITY_BACKFILL.tsv,docs/workflow/TASK_TRACKER.md,docs/workflow/TEST_PLAN_MANIFEST.tsv,free-development/FREE_DEVELOPMENT_MODE.md,guides/DOCUMENT_MAP.md,learning/REPOSITORY_DEVELOPMENT_APPROVALS.tsv,templates/TEMPLATES.md,tools/lib/next_workflow/authority.mjs,tools/lib/next_workflow/headless_runtime.mjs,tools/lib/next_workflow/headless_service.mjs,tools/lib/next_workflow/runtime.mjs,tools/lib/next_workflow/runtime_trust.mjs,tools/lib/next_workflow/store.mjs,tools/next-workflow.mjs,tools/test_next_workflow_headless_runtime.mjs,tools/test_next_workflow_owner_controller.mjs,tools/test_next_workflow_store.mjs
+TESTS: tools/check_next_workflow.sh,tools/test_next_workflow.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+- [x] Reproduce the structured-impact and terminal-launch blockers.
+- [x] Make the recovery task explicit, structured, and L5.
+- [x] Make Owner reconciliation recovery-only without provider discovery,
+  model selection, Agent planning, or Agent launch.
+- [x] Require protected process absence and persisted launch verification.
+- [x] Bind settlement to the original signed Activation snapshot and require
+  exact protected reauthorization after the original decision expires.
+- [x] Keep Agent result acceptance and retry authority unchanged.
+- [x] Pass the aggregate Next Workflow suite.
+- [ ] Pass full hooks, PR CI, main CI, synchronization, preserved-effect
+  reconciliation, replacement Activation, and a fresh Production smoke.
+- [x] Leave Control Center and separately deferred plans unchanged.

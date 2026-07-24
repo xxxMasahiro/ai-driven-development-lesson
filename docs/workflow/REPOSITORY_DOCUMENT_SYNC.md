@@ -164,3 +164,10 @@ boundary. The exact immutable external Controller and explicit confirmation
 authorize that bounded recovery action. The Production launcher continues to
 strip Controller variables from Agent execution and is not a simultaneous
 reconcile prerequisite; direct repository execution remains unauthorized.
+
+Terminal launch reconciliation belongs to the same synchronized parent
+authority set. Every authority must preserve structured L5 recovery planning,
+protected process-absence proof, protected persisted-launch verification, and
+the distinction between settling the spawn effect and accepting an Agent
+result. Child, template, or Free Development documents cannot weaken those
+conditions or introduce retry authority.
