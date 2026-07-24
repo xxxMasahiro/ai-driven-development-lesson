@@ -55,12 +55,13 @@ function repositoryHead(repositoryRoot) {
   }).trim();
 }
 
-function activationSnapshotFingerprint({ store, fallbackActivation, repositoryRoot }) {
+function activationSnapshotFingerprint({ store, fallbackActivation, repositoryRoot, recoveryOnly = false }) {
   const activation = persistedActivation(store, fallbackActivation);
+  const historicalHead = activation.signed_release_proofs?.main_ci?.evidence?.merge_sha;
   return digest({
     mode: activation.mode,
     candidate_fingerprint: activation.candidate_fingerprint,
-    repository_head: repositoryHead(repositoryRoot),
+    repository_head: recoveryOnly ? historicalHead : repositoryHead(repositoryRoot),
     revision: activation.revision,
   });
 }
@@ -112,13 +113,14 @@ export function createHeadlessProductionService({
   releasePrerequisites,
   releaseArtifactPaths,
   task,
+  recoveryOnly = false,
   databasePath,
   runtimeStateRoot = defaultHeadlessRuntimeStateRoot(),
   clock = () => new Date().toISOString(),
 } = {}) {
   const repository = realpathSync(repositoryRoot);
   const normalizedTask = normalizeHeadlessTask(task);
-  if (!repositoryIdentity || !runtimeTrust || !registry || !selectionSettings || typeof selectionSettingsProvider !== "function" || !fallbackActivation || !releasePrerequisites || !Array.isArray(releaseArtifactPaths) || releaseArtifactPaths.length === 0) throw new Error("HEADLESS_SERVICE_CONFIGURATION_INVALID");
+  if (!repositoryIdentity || !runtimeTrust || !registry || !selectionSettings || typeof selectionSettingsProvider !== "function" || !fallbackActivation || !releasePrerequisites || !Array.isArray(releaseArtifactPaths) || releaseArtifactPaths.length === 0 || typeof recoveryOnly !== "boolean") throw new Error("HEADLESS_SERVICE_CONFIGURATION_INVALID");
   mkdirSync(runtimeStateRoot, { recursive: true, mode: 0o700 });
   const runtimeRoot = mkdtempSync(path.join(realpathSync(runtimeStateRoot), "run-"));
   const inputRoot = path.join(runtimeRoot, "input");
@@ -164,9 +166,9 @@ export function createHeadlessProductionService({
   const finalizationFenceVerifier = createProtectedFinalizationFenceVerifier({
     runtimeTrust,
     authorityId: HEADLESS_RUNTIME_AUTHORITIES.finalization,
-    activationFingerprintProvider: () => activationSnapshotFingerprint({ store, fallbackActivation, repositoryRoot: repository }),
-    policyRevisionProvider: () => policyFingerprint,
-    settingsRevisionProvider: () => String(selectionSettingsProvider()?.revision),
+    activationFingerprintProvider: () => activationSnapshotFingerprint({ store, fallbackActivation, repositoryRoot: repository, recoveryOnly }),
+    policyRevisionProvider: ({ intent }) => recoveryOnly ? intent.policy_revision : policyFingerprint,
+    settingsRevisionProvider: ({ intent }) => recoveryOnly ? intent.settings_revision : String(selectionSettingsProvider()?.revision),
     authorityEpochProvider: () => store.revocation_epoch,
   });
   store = openWorkflowStateStore({
@@ -232,6 +234,47 @@ export function createHeadlessProductionService({
     rigorProvider: () => normalizedTask.rigor,
     clock,
   });
+  const recoveryIssuedAt = clock();
+  const recoveryFreshUntil = new Date(Date.parse(recoveryIssuedAt) + 5 * 60 * 1000).toISOString();
+  const reconciliationAuthorizer = ({ intent, now }) => {
+    if (!recoveryOnly
+      || !Number.isFinite(Date.parse(now))
+      || Date.parse(now) > Date.parse(recoveryFreshUntil)
+      || Number(intent?.authority_epoch) !== store.revocation_epoch) return { decision: "DENY" };
+    const recoveryRequest = {
+      run_id: intent.effect_id,
+      authority_epoch: Number(intent.authority_epoch),
+      requested_action: "record_manual_recovery",
+      effect_id: intent.effect_id,
+      target_id: intent.target_id,
+      operation: intent.operation,
+      original_authority_fingerprint: intent.authority_fp,
+    };
+    const recoveryFingerprint = digest(recoveryRequest);
+    const recoveryAuthorization = runtimeRecoveryAuthorizer({
+      request: structuredClone(recoveryRequest),
+      fingerprint: recoveryFingerprint,
+    });
+    if (recoveryAuthorization?.decision !== "ALLOW") return { decision: "DENY" };
+    return {
+      decision: "ALLOW",
+      original_authority_fingerprint: intent.authority_fp,
+      target_id: intent.target_id,
+      operation: intent.operation,
+      current_revocation_epoch: store.revocation_epoch,
+      issued_at: recoveryIssuedAt,
+      fresh_until: recoveryFreshUntil,
+      recovery_request: recoveryRequest,
+      recovery_authorization: recoveryAuthorization,
+      proof_fingerprint: digest({
+        profile: "headless_production_recovery_only",
+        recovery_request: recoveryRequest,
+        recovery_authorization: recoveryAuthorization,
+        issued_at: recoveryIssuedAt,
+        fresh_until: recoveryFreshUntil,
+      }),
+    };
+  };
   const composition = createHeadlessProductionRuntime({
     store,
     registryProvider: () => registry,
@@ -247,13 +290,31 @@ export function createHeadlessProductionService({
     activationVerifier,
     currentCandidateProvider,
     sourceProvider,
+    reconciliationAuthorizer,
     runtimeRecoveryAuthorizer,
+    runtimeProfile: recoveryOnly ? "production_recovery" : "production",
     authorityRoot: repository,
     repositoryRoot: repository,
     inputRoot,
     outputRoot,
     clock,
   });
+  const closeService = ({ cleanup = true } = {}) => {
+    const unresolvedAgentRuns = store.listUnresolvedAgentRuns().length;
+    const unresolved = store.listUnresolvedEffects().length + store.listUnresolvedRuntimeRuns().length + unresolvedAgentRuns;
+    store.close();
+    if (cleanup && unresolved === 0) rmSync(runtimeRoot, { recursive: true, force: true });
+    return { unresolved, runtime_root_retained: unresolved > 0 || cleanup !== true };
+  };
+  if (recoveryOnly) {
+    return Object.freeze({
+      profile: "headless_production_recovery_only",
+      production_execution_available: false,
+      runtime_root: runtimeRoot,
+      runtime: composition.runtime,
+      close: closeService,
+    });
+  }
 
   const selections = new Map();
   const selectionFor = (agent, explicitRoleId = roleId(agent)) => {
@@ -413,13 +474,7 @@ export function createHeadlessProductionService({
         || !HEADLESS_PRODUCTION_CORRECTION_PROFILE.allowed_decisions.includes(result.decision)) throw new Error("HEADLESS_PRODUCTION_CORRECTION_PROFILE_VIOLATION");
       return result;
     },
-    close({ cleanup = true } = {}) {
-      const unresolvedAgentRuns = store.listUnresolvedAgentRuns().length;
-      const unresolved = store.listUnresolvedEffects().length + store.listUnresolvedRuntimeRuns().length + unresolvedAgentRuns;
-      store.close();
-      if (cleanup && unresolved === 0) rmSync(runtimeRoot, { recursive: true, force: true });
-      return { unresolved, runtime_root_retained: unresolved > 0 || cleanup !== true };
-    },
+    close: closeService,
   });
   } catch (error) {
     try { store?.close(); } catch {}

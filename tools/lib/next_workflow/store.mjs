@@ -1896,7 +1896,32 @@ export function openWorkflowStateStore({ repositoryRoot, databasePath, expectedI
         {
           if (!finalizationFence || finalizationFence.activation_fingerprint !== lockedIntent.activation_fp || finalizationFence.policy_revision !== lockedIntent.policy_revision || finalizationFence.settings_revision !== lockedIntent.settings_revision || finalizationFence.authority_epoch !== Number(lockedIntent.authority_epoch) || finalizationFence.decision_expires_at !== lockedIntent.decision_expires_at) throw new Error("EFFECT_FINALIZATION_FENCE_BINDING_INVALID");
           if (Number(getMeta(db, "revocation_epoch") ?? 0) !== Number(lockedIntent.authority_epoch)) throw new Error("EFFECT_FINALIZATION_AUTHORITY_EPOCH_STALE");
-          if (!Number.isFinite(Date.parse(lockedIntent.decision_expires_at)) || Date.parse(lockedIntent.decision_expires_at) < Date.parse(now)) throw new Error("EFFECT_FINALIZATION_DECISION_EXPIRED");
+          const decisionExpired = !Number.isFinite(Date.parse(lockedIntent.decision_expires_at)) || Date.parse(lockedIntent.decision_expires_at) < Date.parse(now);
+          if (decisionExpired) {
+            if (!recovery || typeof runtimeRecoveryAuthorizer !== "function") throw new Error("EFFECT_FINALIZATION_DECISION_EXPIRED");
+            const recoveryRequest = {
+              run_id: effectId,
+              authority_epoch: Number(lockedIntent.authority_epoch),
+              requested_action: "record_manual_recovery",
+              effect_id: effectId,
+              target_id: lockedIntent.target_id,
+              operation: lockedIntent.operation,
+              original_authority_fingerprint: lockedIntent.authority_fp,
+            };
+            const recoveryFingerprint = digest(recoveryRequest);
+            const recoveryAuthorization = runtimeRecoveryAuthorizer({
+              request: structuredClone(recoveryRequest),
+              fingerprint: recoveryFingerprint,
+            });
+            if (recoveryAuthorization && typeof recoveryAuthorization.then === "function") throw new Error("EFFECT_RECOVERY_ASYNC_AUTHORIZER_UNSUPPORTED");
+            if (canonicalJson(finalizationFence.recovery_request) !== canonicalJson(recoveryRequest)
+              || canonicalJson(finalizationFence.recovery_authorization) !== canonicalJson(recoveryAuthorization)
+              || recoveryAuthorization?.decision !== "ALLOW"
+              || recoveryAuthorization.fingerprint !== recoveryFingerprint
+              || recoveryAuthorization.run_id !== effectId
+              || recoveryAuthorization.authority_epoch !== Number(lockedIntent.authority_epoch)
+              || !/^[a-f0-9]{64}$/u.test(recoveryAuthorization.proof_fingerprint ?? "")) throw new Error("EFFECT_RECOVERY_AUTHORIZATION_INVALID");
+          }
           const approvalIds = JSON.parse(lockedIntent.approval_ids_json);
           for (const approvalId of approvalIds) {
             const approval = db.prepare("SELECT state,consumed_by,expires_at,authority_epoch,policy_revision,settings_revision FROM runtime_approvals WHERE approval_id=?").get(approvalId);

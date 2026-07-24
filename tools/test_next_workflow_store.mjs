@@ -72,6 +72,16 @@ function finalizationFenceFor(value = effect()) {
   return { activation_fingerprint: value.activation_fp, policy_revision: value.policy_revision, settings_revision: value.settings_revision, authority_epoch: value.authority_epoch, decision_expires_at: value.decision_expires_at };
 }
 
+function canonicalJson(value) {
+  if (value === null || typeof value !== "object") return JSON.stringify(value);
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
+  return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${canonicalJson(value[key])}`).join(",")}}`;
+}
+
+function digest(value) {
+  return createHash("sha256").update(canonicalJson(value)).digest("hex");
+}
+
 function updateBackupManifestDigest(backup) {
   const manifest = JSON.parse(readFileSync(backup.manifest_path, "utf8"));
   manifest.database_digest = createHash("sha256").update(readFileSync(backup.destination)).digest("hex");
@@ -341,6 +351,68 @@ test("outbox delivery and RECONCILED are one transaction and cannot be bypassed"
   assert.equal(store.getOutbox({ intentId: "effect-1" }).state, "delivered");
   assert.equal(store.getIntent("effect-1").state, "RECONCILED");
   competitor.close();
+  store.close();
+});
+
+test("an expired effect can be finalized only by an exact protected recovery authorization", () => {
+  const f = fixture();
+  const runtimeRecoveryAuthorizer = ({ request, fingerprint }) => ({
+    decision: "ALLOW",
+    fingerprint,
+    run_id: request.run_id,
+    authority_epoch: request.authority_epoch,
+    proof_fingerprint: digest({ purpose: "expired-effect-recovery", request, fingerprint }),
+  });
+  const store = openWorkflowStateStore({
+    repositoryRoot: f.root,
+    databasePath: f.databasePath,
+    expectedIdentity: f.identity,
+    receiptProofVerifier,
+    finalizationFenceVerifier: defaultFinalizationFenceVerifier,
+    runtimeRecoveryAuthorizer,
+    clock: () => "2031-01-01T00:00:00.000Z",
+  });
+  store.commit({ expectedRevision: 0, authorityEpoch: 0, effectIntent: effect(), outboxItem: { outbox_id: "outbox-1", intent_id: "effect-1", message_fp: "message-1", sequence: 1 } });
+  store.transitionIntent({ effectId: "effect-1", expectedState: "PREPARED", nextState: "DISPATCHING", recovery: true });
+  store.transitionOutbox({ outboxId: "outbox-1", expectedState: "pending", nextState: "sending", recovery: true });
+  store.transitionIntent({ effectId: "effect-1", expectedState: "DISPATCHING", nextState: "OBSERVED", recovery: true });
+
+  const recoveryRequest = {
+    run_id: "effect-1",
+    authority_epoch: 0,
+    requested_action: "record_manual_recovery",
+    effect_id: "effect-1",
+    target_id: "target-1",
+    operation: "push",
+    original_authority_fingerprint: "authority-effect-1",
+  };
+  const recoveryAuthorization = runtimeRecoveryAuthorizer({ request: recoveryRequest, fingerprint: digest(recoveryRequest) });
+  const receipt = { receipt_id: "receipt-expired-recovery", intent_id: "effect-1", object_identity: "object", observation_fp: "observation", proof_record_id: "proof-expired-recovery", result: "reconstructed" };
+  const records = [receiptProof("proof-expired-recovery", "effect-1", "observation", "reconcile")];
+  const exactFence = { ...finalizationFenceFor(), recovery_request: recoveryRequest, recovery_authorization: recoveryAuthorization };
+
+  assert.throws(() => store.finalizeReconciliation({
+    expectedRevision: store.revision,
+    effectId: "effect-1",
+    recovery: true,
+    records,
+    receipt,
+    finalizationFence: { ...exactFence, recovery_authorization: { ...recoveryAuthorization, proof_fingerprint: "f".repeat(64) } },
+  }), /EFFECT_RECOVERY_AUTHORIZATION_INVALID/);
+  assert.equal(store.getIntent("effect-1").state, "OBSERVED");
+  assert.equal(store.getOutbox({ intentId: "effect-1" }).state, "sending");
+
+  store.finalizeReconciliation({
+    expectedRevision: store.revision,
+    effectId: "effect-1",
+    recovery: true,
+    records,
+    receipt,
+    finalizationFence: exactFence,
+  });
+  assert.equal(store.getIntent("effect-1").state, "RECONCILED");
+  assert.equal(store.getOutbox({ intentId: "effect-1" }).state, "delivered");
+  assert.equal(store.recovery_only, false);
   store.close();
 });
 

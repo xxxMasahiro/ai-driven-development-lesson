@@ -57,6 +57,13 @@ test("runtime reconciliation uses the immutable Owner Controller without an impo
   const reconcileBranch = source.slice(start, end);
   assert.match(reconcileBranch, /requireOwnerController\("runtime_reconcile"\)/u);
   assert.doesNotMatch(reconcileBranch, /requireVerifiedProductionLaunch/u);
+  const defaultTaskStart = source.indexOf("function defaultProductionTask()");
+  const defaultTaskEnd = source.indexOf("\n}\n\nfunction productionService", defaultTaskStart);
+  const defaultTask = source.slice(defaultTaskStart, defaultTaskEnd);
+  assert.match(defaultTask, /schema_version:\s*"1\.1\.0"/u);
+  assert.match(defaultTask, /operations:\s*\["security_control"\]/u);
+  assert.match(defaultTask, /rigor:\s*"L5"/u);
+  assert.match(reconcileBranch, /productionService\(\{\s*recoveryOnly:\s*true\s*\}\)/u);
 });
 
 function fixture() {

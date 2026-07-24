@@ -291,3 +291,15 @@ from the exact immutable external Owner Controller whose manifest allowlists
 that action. Do not require the Production launcher at the same time: the
 launcher must continue stripping Owner authority from Agent execution, and
 that intentional sanitization cannot make recovery unreachable.
+Recovery planning must use the structured headless task schema and an explicit
+security-control operation; an ambiguous legacy recovery task must never block
+the only authorized recovery path. A terminal failed, cancelled, or timed-out
+Agent process may settle only the already-issued `agent_launch:spawn` effect,
+and only after the protected lifecycle proves process absence and the
+protected launch observer re-verifies the persisted model, effort, process,
+containment, no-task-network, and no-task-tool evidence. This disposition does
+not accept an Agent result or authorize a retry. Owner reconciliation uses a
+recovery-only service with no provider discovery, model selection, Agent plan,
+or Agent launch. It remains bound to the original signed Activation snapshot;
+an expired decision additionally requires exact protected runtime-recovery
+reauthorization before atomic finalization.

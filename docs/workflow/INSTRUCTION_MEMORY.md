@@ -315,3 +315,17 @@ The Production launcher continues to sanitize Owner Controller authority from
 Agent execution and is not a simultaneous prerequisite for this Owner action.
 Direct repository execution, unconfirmed mutation, provider launch, and result
 acceptance remain unauthorized.
+
+## Terminal Agent Launch Reconciliation
+
+The Owner recovery task uses the structured headless task schema, declares an
+explicit security-control operation, and keeps L5 as its minimum rigor.
+Legacy free-text inference cannot make the only authorized recovery action
+unreachable.
+
+A failed, cancelled, or timed-out runtime run may settle only its existing
+`agent_launch:spawn` effect. The protected lifecycle must prove that the bound
+process is absent, and the protected launch observer must re-verify the
+persisted model, effort, process identity, containment, observation scope,
+disabled task network, and disabled task tools. This does not accept an Agent
+result, create an AgentRun, or authorize a retry.

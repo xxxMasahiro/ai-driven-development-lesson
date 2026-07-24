@@ -129,8 +129,13 @@ export function createPersistedAgentAdmissionAdapter({ store, clock = () => new 
   });
 }
 
-export function createRuntimeProviderObserver({ store } = {}) {
-  if (!store || typeof store.getIntent !== "function" || typeof store.getRuntimeRun !== "function") throw new Error("HEADLESS_PROVIDER_OBSERVER_STORE_REQUIRED");
+export function createRuntimeProviderObserver({ store, runtimeRunReconciler, launchObservationVerifier } = {}) {
+  if (!store
+    || typeof store.getIntent !== "function"
+    || typeof store.getRuntimeRun !== "function"
+    || typeof runtimeRunReconciler !== "function"
+    || !launchObservationVerifier
+    || typeof launchObservationVerifier.verifyPersisted !== "function") throw new Error("HEADLESS_PROVIDER_OBSERVER_STORE_REQUIRED");
   let lastDispatch = null;
   const completedObservation = (effectId, effectKey, resultFingerprint) => {
     const intent = store.getIntent(effectId);
@@ -162,8 +167,35 @@ export function createRuntimeProviderObserver({ store } = {}) {
     },
     async reconcile(intent) {
       const run = store.getRuntimeRun({ runId: intent.effect_id });
-      if (run?.state !== "COMPLETED" || !/^[a-f0-9]{64}$/.test(run.result_fp ?? "")) return { state: run ? "conflict" : "unknown" };
-      const actual = completedObservation(intent.effect_id, intent.effect_key, run.result_fp);
+      let resultFingerprint = run?.result_fp;
+      if (run?.state !== "COMPLETED" || !/^[a-f0-9]{64}$/.test(resultFingerprint ?? "")) {
+        if (!run || intent.operation !== "agent_launch:spawn" || !["FAILED", "CANCELLED", "TIMED_OUT"].includes(run.state)) return { state: run ? "conflict" : "unknown" };
+        const processReconciliation = await runtimeRunReconciler(run.run_id);
+        if (processReconciliation?.result !== "matched") return { state: processReconciliation?.result === "conflict" ? "conflict" : "unknown" };
+        const persistedFingerprint = digest({
+          run_id: run.run_id,
+          state: run.state,
+          exit_code: run.exit_code,
+          signal: run.signal,
+          observation: run.observation,
+        });
+        const verification = launchObservationVerifier.verifyPersisted({
+          run: structuredClone(run),
+          fingerprint: persistedFingerprint,
+        });
+        if (verification?.verified !== true
+          || verification.verifier_id !== launchObservationVerifier.verifier_id
+          || verification.fingerprint !== persistedFingerprint
+          || !/^[a-f0-9]{64}$/u.test(verification.proof_fingerprint ?? "")) return { state: "conflict" };
+        resultFingerprint = digest({
+          disposition: "terminal_launch_observed",
+          run_id: run.run_id,
+          state: run.state,
+          persisted_fingerprint: persistedFingerprint,
+          verification_proof_fingerprint: verification.proof_fingerprint,
+        });
+      }
+      const actual = completedObservation(intent.effect_id, intent.effect_key, resultFingerprint);
       return {
         state: "matched",
         status: "succeeded",
@@ -228,6 +260,7 @@ export function createHeadlessProductionRuntime({
   sourceProvider,
   reconciliationAuthorizer = () => ({ decision: "DENY" }),
   runtimeRecoveryAuthorizer = () => ({ decision: "DENY" }),
+  runtimeProfile = "production",
   authorityRoot,
   repositoryRoot,
   inputRoot,
@@ -237,9 +270,8 @@ export function createHeadlessProductionRuntime({
   clock = () => new Date().toISOString(),
   idFactory,
 } = {}) {
-  if (!store || typeof registryProvider !== "function" || !runtimeTrust || !receiptAuthority || !agentObservationAuthority || !agentAuthorityVerifier || !launchObservationVerifier || !containment || typeof activationProvider !== "function" || typeof activationVerifier !== "function" || typeof currentCandidateProvider !== "function" || typeof sourceProvider !== "function") throw new Error("HEADLESS_PRODUCTION_RUNTIME_CONFIGURATION_INVALID");
+  if (!store || typeof registryProvider !== "function" || !runtimeTrust || !receiptAuthority || !agentObservationAuthority || !agentAuthorityVerifier || !launchObservationVerifier || !containment || typeof activationProvider !== "function" || typeof activationVerifier !== "function" || typeof currentCandidateProvider !== "function" || typeof sourceProvider !== "function" || !new Set(["production", "production_recovery"]).has(runtimeProfile)) throw new Error("HEADLESS_PRODUCTION_RUNTIME_CONFIGURATION_INVALID");
   if (![authorityRoot, repositoryRoot, inputRoot, outputRoot].every((candidate) => typeof candidate === "string" && path.isAbsolute(candidate))) throw new Error("HEADLESS_PRODUCTION_RUNTIME_PATH_REQUIRED");
-  const providerObserver = createRuntimeProviderObserver({ store });
   let runtime;
   const fenceRuntimeRun = ({ runId, authorityEpoch, reason }) => {
     const fenceId = `runtime-run-fence-${runId}`;
@@ -295,6 +327,11 @@ export function createHeadlessProductionRuntime({
     recoveryAuthorizer: runtimeRecoveryAuthorizer,
     clock,
   });
+  const providerObserver = createRuntimeProviderObserver({
+    store,
+    runtimeRunReconciler: (runId) => lifecyclePort.reconcile(runId),
+    launchObservationVerifier,
+  });
   const lifecycleExecutor = createRunLifecycleCliExecutor({
     lifecyclePort,
     observationBuilder: createAgentObservationBuilder({ store, observationAuthority: agentObservationAuthority, containmentProfileId: containment.profile_id }),
@@ -342,6 +379,7 @@ export function createHeadlessProductionRuntime({
     containment: processContainment,
     taskDeliveryPreparer,
     runLifecyclePort: lifecyclePort,
+    runtimeProfile,
     clock,
     ...(idFactory ? { idFactory } : {}),
   });

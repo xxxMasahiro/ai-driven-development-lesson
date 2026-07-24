@@ -307,3 +307,8 @@ For recovery authority, use the Owner reconciliation sections in the same
 as-built and workflow documents. They distinguish the immutable external
 Controller action from the Production launcher, which deliberately strips
 Owner authority before Agent execution.
+
+For terminal launch recovery, continue with the terminal reconciliation
+sections. They explain why protected process absence and persisted launch
+evidence may settle the spawn effect while the failed Agent result remains
+rejected.

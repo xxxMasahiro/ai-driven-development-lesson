@@ -340,7 +340,7 @@ export function createSideEffectGateway({ composer = composeAuthorityDecision, s
   if (typeof reconciliationAuthorizer !== "function") throw new Error("GATEWAY_RECONCILIATION_AUTHORIZER_REQUIRED");
   if (!adapters || typeof adapters !== "object") throw new Error("GATEWAY_ADAPTERS_REQUIRED");
   if (typeof receiptVerifier !== "function") throw new Error("GATEWAY_INDEPENDENT_RECEIPT_VERIFIER_REQUIRED");
-  if (!new Set(["production", "isolated_verification"]).has(runtimeProfile)) throw new Error("GATEWAY_RUNTIME_PROFILE_INVALID");
+  if (!new Set(["production", "production_recovery", "isolated_verification"]).has(runtimeProfile)) throw new Error("GATEWAY_RUNTIME_PROFILE_INVALID");
   if (runtimeProfile === "isolated_verification" && (typeof isolatedVerificationAuthorityProvider !== "function" || !isolatedVerificationVerifier || isolatedVerificationVerifier.trusted !== true || isolatedVerificationVerifier.independent !== true || typeof isolatedVerificationVerifier.verifier_id !== "string" || typeof isolatedVerificationVerifier.verify !== "function" || typeof isolatedEffectGuard !== "function")) throw new Error("GATEWAY_ISOLATED_AUTHORITY_REQUIRED");
   let protectedOperationalAuthority = false;
   try {
@@ -377,6 +377,14 @@ export function createSideEffectGateway({ composer = composeAuthorityDecision, s
     if (activation.mode !== "enforced") {
       return { allowed: false, decision: deny("NEXT_WORKFLOW_NOT_ENFORCED", [activation?.mode ?? "missing"], { phase, activation_mode: activation?.mode ?? "missing" }) };
     }
+    if (runtimeProfile === "production_recovery") {
+      const historicalHead = activation.signed_release_proofs?.main_ci?.evidence?.merge_sha;
+      if (!/^[a-f0-9]{40,64}$/u.test(historicalHead ?? "")) {
+        return { allowed: false, decision: deny("NEXT_WORKFLOW_RECOVERY_LINEAGE_INVALID", [activation.candidate_fingerprint], { phase, activation_mode: activation.mode }) };
+      }
+      const snapshot = { mode: activation.mode, candidate_fingerprint: activation.candidate_fingerprint, repository_head: historicalHead, revision: activation.revision ?? null };
+      return { allowed: true, fingerprint: fingerprint(snapshot), snapshot };
+    }
     const currentCandidate = await currentCandidateProvider({ activation: structuredClone(activation), effect: structuredClone(effect), phase });
     if (!currentCandidate || !/^[a-f0-9]{64}$/.test(currentCandidate.candidate_fingerprint ?? "") || !/^[a-f0-9]{40,64}$/.test(currentCandidate.repository_head ?? "") || currentCandidate.candidate_fingerprint !== activation.candidate_fingerprint) {
       return { allowed: false, decision: deny("NEXT_WORKFLOW_CANDIDATE_DRIFT", [activation.candidate_fingerprint, currentCandidate?.candidate_fingerprint ?? "missing"], { phase, activation_mode: activation.mode }) };
@@ -398,6 +406,9 @@ export function createSideEffectGateway({ composer = composeAuthorityDecision, s
   }
 
   async function preview(effect) {
+    if (runtimeProfile === "production_recovery") {
+      return { decision: deny("RECOVERY_PROFILE_RECONCILE_ONLY", ["preview"], { runtime_profile: runtimeProfile }), observation: null, bindings_fingerprint: fingerprint(effect?.bindings ?? {}), activation_fingerprint: null, effect: structuredClone(effect) };
+    }
     const canonicalEffect = canonicalizeGatewayEffect(effect);
     const adapter = adapters[canonicalEffect.variant];
     if (!adapter) throw new Error("ADAPTER_NOT_CONFIGURED");
@@ -447,6 +458,7 @@ export function createSideEffectGateway({ composer = composeAuthorityDecision, s
 
   async function execute(effect, { beforeFinalize } = {}) {
     requireProtectedOperationalAuthority();
+    if (runtimeProfile === "production_recovery") throw new Error("RECOVERY_PROFILE_RECONCILE_ONLY");
     if (beforeFinalize !== undefined && typeof beforeFinalize !== "function") throw new Error("SIDE_EFFECT_BEFORE_FINALIZE_HOOK_INVALID");
     const canonicalInput = canonicalizeGatewayEffect(effect);
     const operation = `${canonicalInput.variant}:${canonicalInput.action}`;
@@ -588,17 +600,19 @@ export function createSideEffectGateway({ composer = composeAuthorityDecision, s
     const reconcileEffect = { variant, action, target: { target_id: intent.target_id }, request: { effect_id: effectId }, expected_selector: intent.expected_selector, bindings: { target_id: intent.target_id } };
     const activation = await activationSnapshot({ effect: reconcileEffect, phase: "reconcile" });
     if (!activation.allowed) throw new Error(`RECONCILIATION_ACTIVATION_BLOCKED:${activation.decision.code}`);
+    if (runtimeProfile === "production_recovery" && activation.fingerprint !== intent.activation_fp) throw new Error("RECONCILIATION_ACTIVATION_BINDING_CHANGED");
     async function currentAuthorization(phase) {
       const authorization = await reconciliationAuthorizer({ intent: structuredClone(intent), phase, now: clock() });
       if (!authorization || authorization.decision !== "ALLOW" || authorization.original_authority_fingerprint !== intent.authority_fp || authorization.target_id !== intent.target_id || authorization.operation !== intent.operation || !Number.isSafeInteger(authorization.current_revocation_epoch) || authorization.current_revocation_epoch < 0 || !Number.isFinite(Date.parse(authorization.fresh_until)) || Date.parse(authorization.fresh_until) < Date.parse(clock()) || typeof authorization.proof_fingerprint !== "string") throw new Error("RECONCILIATION_AUTHORITY_DENIED");
-      return fingerprint(authorization);
+      return { fingerprint: fingerprint(authorization), authorization };
     }
     const firstAuthorization = await currentAuthorization("before_observation");
     const result = await adapter.reconcile(intent);
     if (result.state === "matched") {
       const secondActivation = await activationSnapshot({ effect: reconcileEffect, phase: "reconcile_finalize" });
       if (!secondActivation.allowed || secondActivation.fingerprint !== activation.fingerprint) throw new Error("RECONCILIATION_ACTIVATION_CHANGED");
-      if (await currentAuthorization("before_finalize") !== firstAuthorization) throw new Error("RECONCILIATION_AUTHORITY_CHANGED");
+      const secondAuthorization = await currentAuthorization("before_finalize");
+      if (secondAuthorization.fingerprint !== firstAuthorization.fingerprint) throw new Error("RECONCILIATION_AUTHORITY_CHANGED");
       const reconciliation = canonicalReconciliationVerdict(intent, result);
       if (reconciliation.decision !== "PASS") {
         const expectedState = intent.state;
@@ -611,7 +625,7 @@ export function createSideEffectGateway({ composer = composeAuthorityDecision, s
       if (intent.state === "PREPARED") store.transitionIntent({ effectId, expectedState: "PREPARED", nextState: "UNKNOWN", recovery: true });
       const observedFrom = intent.state === "PREPARED" ? "UNKNOWN" : intent.state;
       if (["UNKNOWN", "CONFLICT", "DISPATCHING", "MANUAL_RECOVERY_REQUIRED"].includes(observedFrom)) store.transitionIntent({ effectId, expectedState: observedFrom, nextState: "OBSERVED", recovery: true });
-      store.finalizeReconciliation({ expectedRevision: store.revision, effectId, recovery: true, records: [verified.record], receipt: { receipt_id: `receipt-${effectId}`, intent_id: effectId, object_identity: result.object_identity, observation_fp: result.observation_fingerprint, proof_record_id: verified.proof_record_id, result: "reconstructed" }, finalizationFence: { activation_fingerprint: secondActivation.fingerprint, policy_revision: intent.policy_revision, settings_revision: intent.settings_revision, authority_epoch: Number(intent.authority_epoch), decision_expires_at: intent.decision_expires_at } });
+      store.finalizeReconciliation({ expectedRevision: store.revision, effectId, recovery: true, records: [verified.record], receipt: { receipt_id: `receipt-${effectId}`, intent_id: effectId, object_identity: result.object_identity, observation_fp: result.observation_fingerprint, proof_record_id: verified.proof_record_id, result: "reconstructed" }, finalizationFence: { activation_fingerprint: secondActivation.fingerprint, policy_revision: intent.policy_revision, settings_revision: intent.settings_revision, authority_epoch: Number(intent.authority_epoch), decision_expires_at: intent.decision_expires_at, recovery_request: secondAuthorization.authorization.recovery_request, recovery_authorization: secondAuthorization.authorization.recovery_authorization } });
       return { effect_id: effectId, state: "RECONCILED", reconstructed: true, proof_record_id: verified.proof_record_id };
     }
     const next = result.state === "conflict" ? "CONFLICT" : "MANUAL_RECOVERY_REQUIRED";

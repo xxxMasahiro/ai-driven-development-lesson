@@ -288,3 +288,8 @@ Templates also cannot grant runtime reconciliation authority. That action
 remains confirmation-bound to the exact immutable external Owner Controller;
 the sanitized Production launcher and child templates carry no Owner
 authority.
+
+Templates cannot weaken terminal launch reconciliation either. Protected
+process absence and persisted launch evidence are mandatory, settling a spawn
+effect never accepts a failed Agent result, and no retry authority is
+inherited.
