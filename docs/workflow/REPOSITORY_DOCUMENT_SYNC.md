@@ -179,3 +179,9 @@ security policies, test manifest, Git/CI ownership, instruction inheritance,
 templates, and Free Development guidance aligned. A child repository may add
 local task context, but it cannot weaken the parent machine-valid result
 contract or convert malformed output into an accepted result.
+
+Release-observation semantics are synchronized across the complete Next
+Workflow authority set. Merge-method support must retain exact PR, head,
+merge, tree, CI, checks, synchronization, and drift requirements. A child,
+template, or local instruction cannot reintroduce an ancestry condition that
+breaks squash merge or remove an exact observation in order to admit it.

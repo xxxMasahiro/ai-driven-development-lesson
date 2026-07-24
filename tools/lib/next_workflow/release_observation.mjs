@@ -260,7 +260,6 @@ export function observeReleaseLineage({
   const mainTree = gitRun(["rev-parse", `${mainHead}^{tree}`]);
   const candidateTree = gitRun(["rev-parse", `${candidateDefinition.repository_head}^{tree}`]);
   if (mainHead !== remoteHead) throw new Error("OWNER_RELEASE_MAIN_NOT_SYNCHRONIZED");
-  gitRun(["merge-base", "--is-ancestor", candidateDefinition.repository_head, mainHead]);
   const repository = repositorySlug(gitRun(["remote", "get-url", "origin"]));
   const ghEnvironment = Object.fromEntries(Object.entries({
     PATH: "/usr/bin:/bin",

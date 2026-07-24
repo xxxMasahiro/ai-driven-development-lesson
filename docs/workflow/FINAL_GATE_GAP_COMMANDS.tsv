@@ -1,4 +1,5 @@
 # command_id	argv	output	description
+# next_workflow_squash_merge_observation	No final-gap command fabricates merge ancestry or activates a release; the aggregate owns topology proof and the immutable Owner Controller owns live observation.
 # next_workflow_result_contract_closure	No final-gap command launches an Agent or mutates Production; focused and aggregate tests own contract proof, while one post-Activation bounded smoke supplies real runtime evidence.
 # next_workflow_roll_forward_status	none	discard	Runtime status must follow the newest Activation record and report STOP for an in-progress replacement instead of using the prior enforced candidate.
 menu_status	["./tools/menu"]	discard	Confirm the menu command still renders.

@@ -298,3 +298,8 @@ Templates inherit the exact parent Agent result grammar. They may add
 repository-specific context but must not redefine finding codes, evidence
 references, severity values, or the empty-array no-findings representation,
 and must not sanitize malformed output into acceptance.
+
+Templates cannot impose a false candidate-ancestry requirement on GitHub
+squash merge or weaken the exact alternative. Production Activation always
+retains one merged PR, exact head and merge SHA, equal trees, successful
+required PR/main CI and checks, synchronization, and no observation drift.
