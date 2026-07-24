@@ -277,3 +277,6 @@ Install the immutable external Owner Controller only from clean synchronized
 store recovery, and candidate identity are independently observed; caller
 evidence and repository-local low-level release actions never authorize
 Activation.
+That installation resolves the per-worktree checkout instance through the
+checkout-identity owner; the tracked repository identity configuration is not
+a substitute for local checkout identity.

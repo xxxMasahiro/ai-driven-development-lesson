@@ -145,3 +145,8 @@ wiring. The strict standalone checks and local full/no-cache path remain
 available independently of the CI distribution graph.
 No product-repository mutation, credential action, provider call, external
 transfer, or browser execution is required.
+
+The Next Workflow authority set also treats external Owner Controller
+installation wiring as identity-sensitive. Its synchronized documents must
+state that the installer uses the checkout-identity owner and never derives a
+per-worktree instance ID from tracked repository configuration.

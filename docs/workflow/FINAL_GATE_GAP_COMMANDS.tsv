@@ -17,3 +17,4 @@ external_integration_status	["./tools/external-integration","status"]	discard	Co
 product_repository_cleanup_status	["./tools/product-repository-cleanup","status"]	discard	Confirm product repository cleanup status remains available.
 git_workflow_status	["./tools/git-workflow","status"]	discard	Confirm Git workflow status remains available.
 git_workflow_cleanup_plan	["./tools/git-workflow","cleanup-plan"]	discard	Confirm Git workflow cleanup planning remains available.
+# next_workflow_owner_controller_identity	No final-gap command installs a Controller; the aggregate regression owns identity wiring and real installation occurs only after synchronized main.

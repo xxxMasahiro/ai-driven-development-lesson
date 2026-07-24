@@ -12,11 +12,32 @@ import path from "node:path";
 import test from "node:test";
 import {
   createOwnerControllerManifest,
+  loadOwnerControllerRepositoryIdentity,
   verifyOwnerControllerExecution,
 } from "./lib/next_workflow/owner_controller.mjs";
 
 const roots = [];
 test.after(() => roots.forEach((root) => rmSync(root, { recursive: true, force: true })));
+
+test("installer identity resolution uses the checkout identity owner instead of the tracked repository config", () => {
+  const calls = [];
+  const identity = loadOwnerControllerRepositoryIdentity({
+    repositoryRoot: "/bounded/repository",
+    identityLoader: (options) => {
+      calls.push(options);
+      return {
+        repository_logical_id: "repository",
+        checkout_instance_id: "7a20ee52-3ee3-41c1-9fb9-9f9733ebfcef",
+      };
+    },
+  });
+  assert.deepEqual(calls, [{
+    repositoryRoot: "/bounded/repository",
+    create: true,
+  }]);
+  assert.equal(identity.repository_logical_id, "repository");
+  assert.equal(identity.checkout_instance_id, "7a20ee52-3ee3-41c1-9fb9-9f9733ebfcef");
+});
 
 function fixture() {
   const root = mkdtempSync(path.join(tmpdir(), "next-workflow-owner-controller-"));

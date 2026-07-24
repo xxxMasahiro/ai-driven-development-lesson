@@ -20,6 +20,7 @@ import { fileURLToPath } from "node:url";
 import {
   createOwnerControllerManifest,
   defaultOwnerControllerBase,
+  loadOwnerControllerRepositoryIdentity,
   ownerControllerDigest,
 } from "./lib/next_workflow/owner_controller.mjs";
 
@@ -78,7 +79,7 @@ const head = git(["rev-parse", "HEAD"]);
 const remoteHead = git(["rev-parse", "refs/remotes/origin/main"]);
 if (head !== remoteHead) throw new Error("OWNER_CONTROLLER_INSTALL_REQUIRES_SYNCHRONIZED_MAIN");
 const tree = git(["rev-parse", "HEAD^{tree}"]);
-const identity = JSON.parse(readFileSync(path.join(ROOT, "learning", "NEXT_WORKFLOW_REPOSITORY_IDENTITY.json"), "utf8"));
+const identity = loadOwnerControllerRepositoryIdentity({ repositoryRoot: ROOT });
 const base = path.resolve(option("--base") ?? defaultOwnerControllerBase());
 mkdirSync(base, { recursive: true, mode: 0o700 });
 chmodSync(base, 0o700);

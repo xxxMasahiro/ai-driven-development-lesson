@@ -3989,6 +3989,12 @@ required check-run page, PR CI, main CI, store recovery state, and immutable
 candidate identity before generating any signed evidence or transition.
 Caller-supplied low-level evidence cannot authorize Activation.
 
+Installer identity resolution now uses the checkout-identity owner so a fresh
+synchronized-main worktree receives its persistent checkout instance ID before
+the external manifest is created. The tracked repository identity
+configuration remains only the logical repository and origin attestation
+source.
+
 The remaining handoff is to pass the complete local gates, deliver and merge
 the immutable candidate, pass main CI, synchronize `main`, install the external
 Controller from that checkout, bootstrap the default protected runtime, run
