@@ -132,6 +132,9 @@ Parent runtime result authority also requires bounded post-exit process
 identity settlement. Free Development cannot lengthen that grace period,
 reinterpret matched or reused identity, or accept an identity that remains
 unknown.
+Parent runtime reconciliation remains a confirmed immutable Owner Controller
+action. Free Development cannot invoke or inherit that authority, and the
+Production launcher cannot convey it to an Agent.
 
 - `none`: product workspace, canonical documents, scaffold authority, product security, and required local checks are still required; Git, remote sync, and CI are not applicable.
 - `local`: local Git worktree and local Git safety checks are required; remote sync and CI are not applicable.

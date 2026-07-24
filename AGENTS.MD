@@ -286,3 +286,8 @@ After a provider exits successfully, protected process identity may wait only
 through the existing bounded grace period while observation remains `unknown`.
 Matched or reused identity is handled immediately, and unresolved identity
 after that grace period remains a fail-closed stop.
+`runtime reconcile` is a confirmation-bound Owner action. It must run only
+from the exact immutable external Owner Controller whose manifest allowlists
+that action. Do not require the Production launcher at the same time: the
+launcher must continue stripping Owner authority from Agent execution, and
+that intentional sanitization cannot make recovery unreachable.

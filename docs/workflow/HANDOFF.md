@@ -4031,3 +4031,24 @@ The aggregate run also exposed a test-only assumption that the workstation had
 never been initialized. The missing-trust release regression now uses an exact
 suite-private nonexistent trust path, so the complete test suite remains
 repeatable before and after Production Activation.
+
+## Owner reconciliation authority handoff
+
+SYNC-ID: next_workflow_owner_reconciliation_authority
+STATUS: implemented
+ARTIFACTS: AGENTS.MD,docs/as-built/IMPLEMENTATION_PLAN.md,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/DEVELOPMENT_AUTONOMY_WORKFLOW.tsv,docs/workflow/DEVELOPMENT_INSTRUCTION_POLICY.tsv,docs/workflow/FINAL_GATE_CI_GRAPH.tsv,docs/workflow/FINAL_GATE_COVERAGE.tsv,docs/workflow/FINAL_GATE_EXECUTION_POLICY.tsv,docs/workflow/FINAL_GATE_GAP_COMMANDS.tsv,docs/workflow/GIT_HOOK_CHECKS.tsv,docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv,docs/workflow/HANDOFF.md,docs/workflow/INSTRUCTION_MEMORY.md,docs/workflow/PRODUCT_REPOSITORY_STRUCTURE.tsv,docs/workflow/PRODUCT_SECURITY_POLICY.tsv,docs/workflow/REPOSITORY_DEVELOPMENT_RUNNER_POLICY.tsv,docs/workflow/REPOSITORY_DEVELOPMENT_WORKFLOW.tsv,docs/workflow/REPOSITORY_DOCUMENT_SYNC.md,docs/workflow/REPOSITORY_DOCUMENT_SYNC_POLICY.json,docs/workflow/SAFEFLOW_SECURITY_BACKFILL.tsv,docs/workflow/TASK_TRACKER.md,docs/workflow/TEST_PLAN_MANIFEST.tsv,free-development/FREE_DEVELOPMENT_MODE.md,guides/DOCUMENT_MAP.md,learning/REPOSITORY_DEVELOPMENT_APPROVALS.tsv,templates/TEMPLATES.md,tools/lib/next_workflow/owner_controller.mjs,tools/next-workflow.mjs,tools/test_next_workflow_owner_controller.mjs,tools/test_next_workflow_owner_controller.sh
+TESTS: tools/check_next_workflow.sh,tools/test_next_workflow.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+Observed replacement Activation correctly stopped because the first smoke run
+left one terminal failed runtime effect unresolved. The installed Production
+launcher also correctly stripped Owner Controller variables, while the
+`runtime reconcile` CLI branch required both authorities. This made the
+documented recovery action unreachable without weakening the launcher.
+
+The branch now treats reconciliation as the bounded Owner action it already
+was in the external Controller allowlist. The immutable Controller verification
+remains mandatory; only the contradictory Production-launcher check is absent.
+No Agent execution, provider launch, result acceptance, direct repository
+entry, or unconfirmed mutation gains authority. Remaining work is aggregate
+and remote proof, synchronized Controller replacement, old-effect reconcile,
+observed Activation, and the bounded Production team smoke.
