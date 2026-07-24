@@ -8,6 +8,7 @@ import {
 } from "node:fs";
 import { userInfo } from "node:os";
 import path from "node:path";
+import { loadRepositoryIdentity } from "./identity.mjs";
 
 const FINGERPRINT = /^[a-f0-9]{64}$/u;
 const GIT_OBJECT = /^[a-f0-9]{40,64}$/u;
@@ -78,6 +79,17 @@ function snapshotFiles(root) {
 
 export function defaultOwnerControllerBase() {
   return path.join(userInfo().homedir, ".local", "state", "ai-driven-development-lesson", "next-workflow", "owner-controller");
+}
+
+export function loadOwnerControllerRepositoryIdentity({
+  repositoryRoot,
+  identityLoader = loadRepositoryIdentity,
+} = {}) {
+  if (typeof identityLoader !== "function") throw new Error("OWNER_CONTROLLER_IDENTITY_LOADER_INVALID");
+  return identityLoader({
+    repositoryRoot,
+    create: true,
+  });
 }
 
 export function createOwnerControllerManifest({

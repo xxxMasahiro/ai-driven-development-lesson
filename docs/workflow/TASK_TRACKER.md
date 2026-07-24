@@ -3780,6 +3780,8 @@ ARTIFACTS: docs/as-built/IMPLEMENTATION_PLAN.md,docs/as-built/REQUIREMENTS.md,do
 TESTS: tools/check_next_workflow.sh,tools/test_next_workflow.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
 
 - [x] Implement the exact immutable external snapshot manifest and installer.
+- [x] Bind installation to the checkout-identity owner instead of expecting a
+  checkout instance ID in tracked repository configuration.
 - [x] Remove caller-evidence release actions from the Owner allowlist.
 - [x] Implement independent Git/GitHub observed activation.
 - [x] Make runtime availability depend on all live preflights.

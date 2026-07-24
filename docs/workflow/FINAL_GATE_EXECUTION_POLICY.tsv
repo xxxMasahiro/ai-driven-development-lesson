@@ -58,3 +58,4 @@ relationship	test_dashboard_control_center	check_dashboard_bundle_contract	The s
 relationship	test_dashboard_control_center	check_dashboard_design_system	The same-run Control Center owner executes the existing design-system drift check in its static phase.
 relationship	test_dashboard_control_center	test_dashboard_i18n	The same-run Control Center owner executes the existing locale regression in its static phase.
 relationship	test_dashboard_control_center	test_dashboard_settings	The same-run Control Center owner executes the existing settings regression in its isolated static phase.
+# next_workflow_owner_controller_identity	The existing test_next_workflow owner executes the checkout-identity installer regression once; final-gate jobs consume that same-run result instead of repeating it.

@@ -4189,6 +4189,11 @@ Repository code and copied launchers cannot satisfy that snapshot manifest.
 Low-level source-receipt, signing, transition, and activation commands are not
 Owner actions.
 
+The installer must resolve the repository logical ID and checkout instance ID
+through the checkout-identity owner. The tracked repository identity
+configuration does not contain, and must never be treated as containing, the
+per-checkout instance ID.
+
 The only release activation action is observed activation. It must
 independently obtain the merged PR, candidate SHA and tree, main merge SHA and
 tree, successful required PR/main workflow runs, successful check inventory,

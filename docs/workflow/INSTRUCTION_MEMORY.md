@@ -207,6 +207,10 @@ purpose or scope actually changes.
 
 Install the immutable external Owner Controller only from clean synchronized
 `main` with `node tools/install-next-workflow-owner-controller.mjs --confirm`.
+The installer resolves and, for a fresh worktree, creates the ignored
+per-checkout identity through its identity owner before manifest construction;
+the tracked repository identity configuration supplies no checkout instance
+ID.
 Use the absolute Controller path returned by the installer for owner enrollment,
 acceptance creation, bootstrap, status, and release operations. Repository-local
 mutating entry points are not Production authority.

@@ -154,6 +154,9 @@ entry is created externally only after exact repository identity,
 immutable-candidate release evidence, signed activation transitions, and
 recovery closure pass. Control Center availability is not an authorization
 signal.
+That parent installation obtains its per-worktree instance from the parent's
+ignored checkout-identity owner; generated templates must not embed, copy, or
+infer it from tracked repository configuration.
 A generated product template must not include the parent bootstrap-test Codex
 fixture or treat its digest as certification. The fixture exists only inside
 an isolated parent regression test; real product execution remains bound to

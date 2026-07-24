@@ -4954,7 +4954,11 @@ entry, development-instruction owner, and complete Next Workflow library to a
 versioned external private directory, normalizes directories to `0700` and
 source files to `0400`, and records every relative path, size, digest, source
 HEAD, source tree, repository identity, and allowed action in a closed
-manifest. The wrapper supplies that manifest and the verified repository root.
+manifest. Before creating that manifest, it obtains the repository logical ID
+and the per-worktree checkout instance ID from the checkout-identity owner; it
+does not read a nonexistent checkout ID from the tracked repository identity
+configuration. The wrapper supplies that manifest and the verified repository
+root.
 
 `release activate-observed` is the sole allowed release mutation. The external
 snapshot re-observes Git ancestry, exact candidate/main trees, merged PR

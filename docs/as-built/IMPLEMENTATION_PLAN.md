@@ -6243,7 +6243,9 @@ STATUS: implemented
 ARTIFACTS: docs/as-built/IMPLEMENTATION_PLAN.md,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/HANDOFF.md,docs/workflow/TASK_TRACKER.md,docs/workflow/TEST_PLAN_MANIFEST.tsv,tools/install-next-workflow-owner-controller.mjs,tools/lib/next_workflow/owner_controller.mjs,tools/lib/next_workflow/release.mjs,tools/lib/next_workflow/release_observation.mjs,tools/next-workflow-launcher.cjs,tools/next-workflow.mjs,tools/test_next_workflow_owner_controller.mjs,tools/test_next_workflow_owner_controller.sh,tools/test_next_workflow_release_observation.mjs,tools/test_next_workflow_release_observation.sh
 TESTS: tools/check_next_workflow.sh,tools/test_next_workflow.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
 
-1. Install an immutable owner-private snapshot only from synchronized main.
+1. Resolve the persistent checkout identity, then install an immutable
+   owner-private snapshot only from synchronized main; never substitute the
+   tracked repository identity configuration for the per-checkout identity.
 2. Exact-verify its manifest, repository identity, source HEAD/tree, complete
    file inventory, permissions, and action allowlist on every mutation.
 3. Remove low-level release mutation actions from that allowlist.
