@@ -6257,3 +6257,25 @@ TESTS: tools/check_next_workflow.sh,tools/test_next_workflow.sh,tools/check_as_b
 6. Deliver through PR/main CI, install the merged controller, bootstrap default
    headless state, activate the observed candidate, and run a bounded smoke
    task; keep Control Center reconstruction deferred.
+
+## Post-exit process identity settlement implementation plan
+
+SYNC-ID: next_workflow_post_exit_identity_settlement
+STATUS: implemented
+ARTIFACTS: docs/as-built/IMPLEMENTATION_PLAN.md,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/HANDOFF.md,docs/workflow/TASK_TRACKER.md,docs/workflow/TEST_PLAN_MANIFEST.tsv,tools/lib/next_workflow/run_lifecycle.mjs,tools/test_next_workflow_release.mjs,tools/test_next_workflow_run_lifecycle.mjs
+TESTS: tools/check_next_workflow.sh,tools/test_next_workflow.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+1. Reproduce the Production smoke refusal and confirm that the detached leader
+   exited successfully while its already bound namespace process tree was
+   still completing teardown.
+2. Add a bounded helper that waits through `unknown` only and returns every
+   definitive process-identity state immediately.
+3. Re-read durable run state after settlement and retain every existing
+   descendant, PID-reuse, response, launch, and provenance gate.
+4. Prove transient settlement, immediate reuse refusal, timeout refusal, and
+   the complete real Linux containment lifecycle.
+5. Make missing-trust release tests independent of any real initialized Owner
+   trust on the workstation.
+6. Deliver through full local gates, PR CI, main CI, synchronized-main
+   Controller installation, replacement Activation, and a bounded Production
+   team smoke task.

@@ -23,7 +23,10 @@ test.after(() => roots.forEach((root) => rmSync(root, { recursive: true, force: 
 
 test("release proofs-verify CLI refuses missing protected identity or trust before signed verification", () => {
   const repositoryRoot = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
+  const missingTrustRoot = mkdtempSync(path.join(tmpdir(), "next-workflow-missing-owner-trust-"));
+  roots.push(missingTrustRoot);
   const { NODE_TEST_CONTEXT: ignoredNodeTestContext, ...childEnvironment } = process.env;
+  childEnvironment.NEXT_WORKFLOW_OWNER_TRUST_PATH = path.join(missingTrustRoot, "owner-trust.json");
   const result = spawnSync(process.execPath, [path.join(repositoryRoot, "tools/next-workflow.mjs"), "release", "proofs-verify", "--candidate", "a".repeat(64), "--bundle", "learning/NEXT_WORKFLOW_RELEASE_PREREQUISITES.json"], { cwd: repositoryRoot, encoding: "utf8", env: childEnvironment });
   assert.notEqual(result.status, 0, result.stdout);
   assert.doesNotMatch(result.stderr, /ReferenceError|verifyReleaseProofs is not defined/);

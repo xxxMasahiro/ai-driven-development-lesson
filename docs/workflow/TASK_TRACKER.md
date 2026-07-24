@@ -3790,3 +3790,21 @@ TESTS: tools/check_next_workflow.sh,tools/test_next_workflow.sh,tools/check_as_b
 - [ ] Complete full hooks, PR CI, merge, main CI, synchronized-main install,
   default bootstrap, observed Activation, and bounded Production smoke.
 - [x] Leave Control Center and separately deferred plans unchanged.
+
+## Post-exit process identity settlement
+
+SYNC-ID: next_workflow_post_exit_identity_settlement
+STATUS: implemented
+ARTIFACTS: docs/as-built/IMPLEMENTATION_PLAN.md,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/HANDOFF.md,docs/workflow/TASK_TRACKER.md,docs/workflow/TEST_PLAN_MANIFEST.tsv,tools/lib/next_workflow/run_lifecycle.mjs,tools/test_next_workflow_release.mjs,tools/test_next_workflow_run_lifecycle.mjs
+TESTS: tools/check_next_workflow.sh,tools/test_next_workflow.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+- [x] Reproduce the real Production smoke failure without accepting its result.
+- [x] Confirm successful provider exit and transient namespace teardown.
+- [x] Wait only through a bounded `unknown` post-exit status.
+- [x] Preserve immediate matched/reused handling and fail-closed timeout.
+- [x] Add and pass focused settlement and complete containment regressions.
+- [x] Isolate the missing-trust release regression from initialized Production
+  workstation state.
+- [ ] Pass aggregate, full-hook, PR CI, main CI, exact synchronization,
+  replacement Activation, and the bounded Production team smoke.
+- [x] Leave Control Center and separately deferred plans unchanged.

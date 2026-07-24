@@ -6,7 +6,7 @@ import { chmodSync, closeSync, constants as fsConstants, existsSync, mkdirSync, 
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { createRunLifecyclePort, runLifecycleDigest } from "./lib/next_workflow/run_lifecycle.mjs";
+import { createRunLifecyclePort, runLifecycleDigest, waitForPostExitProcessStatus } from "./lib/next_workflow/run_lifecycle.mjs";
 import { createLinuxIsolatedContainment, diagnoseLinuxIsolationPrerequisites } from "./lib/next_workflow/runtime_containment.mjs";
 import { createProtectedLaunchObservationVerifier, loadProtectedRuntimeTrust } from "./lib/next_workflow/runtime_trust.mjs";
 import { openWorkflowStateStore } from "./lib/next_workflow/store.mjs";
@@ -15,6 +15,40 @@ const roots = [];
 const isolationPrerequisites = diagnoseLinuxIsolationPrerequisites();
 const isolationTest = isolationPrerequisites.available ? test : test.skip;
 test.after(() => roots.forEach((root) => rmSync(root, { recursive: true, force: true })));
+
+test("post-exit process verification tolerates only a bounded unknown teardown interval", async () => {
+  const statuses = ["unknown", "unknown", "absent"];
+  let probes = 0;
+  const settled = await waitForPostExitProcessStatus({
+    probe: () => {
+      probes += 1;
+      return statuses.shift() ?? "absent";
+    },
+    timeoutMs: 100,
+    pollMs: 1,
+  });
+  assert.equal(settled, "absent");
+  assert.equal(probes, 3);
+
+  let reusedProbes = 0;
+  const reused = await waitForPostExitProcessStatus({
+    probe: () => {
+      reusedProbes += 1;
+      return "reused";
+    },
+    timeoutMs: 100,
+    pollMs: 1,
+  });
+  assert.equal(reused, "reused");
+  assert.equal(reusedProbes, 1);
+
+  const unresolved = await waitForPostExitProcessStatus({
+    probe: () => "unknown",
+    timeoutMs: 2,
+    pollMs: 1,
+  });
+  assert.equal(unresolved, "unknown");
+});
 
 function fileDigest(candidate) {
   return createHash("sha256").update(readFileSync(candidate)).digest("hex");

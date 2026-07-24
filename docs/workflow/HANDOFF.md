@@ -4002,3 +4002,32 @@ the immutable candidate, pass main CI, synchronize `main`, install the external
 Controller from that checkout, bootstrap the default protected runtime, run
 observed Activation, and execute one bounded team smoke task. Control Center
 reconstruction and every separately deferred plan remain unchanged.
+
+## Post-exit process identity settlement handoff
+
+SYNC-ID: next_workflow_post_exit_identity_settlement
+STATUS: implemented
+ARTIFACTS: docs/as-built/IMPLEMENTATION_PLAN.md,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/HANDOFF.md,docs/workflow/TASK_TRACKER.md,docs/workflow/TEST_PLAN_MANIFEST.tsv,tools/lib/next_workflow/run_lifecycle.mjs,tools/test_next_workflow_release.mjs,tools/test_next_workflow_run_lifecycle.mjs
+TESTS: tools/check_next_workflow.sh,tools/test_next_workflow.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+The first installed Production team smoke correctly refused to accept an Agent
+result because the reaped namespace leader was absent while its already bound
+process group was still finishing teardown. The provider exited with code
+zero, and both the leader and contained process were absent immediately after
+the refusal, identifying a short post-exit observation race rather than an
+escaped process.
+
+Result collection now waits through only the `unknown` status for the existing
+bounded termination grace period. It never waits through a matched or reused
+identity, never changes the stored process evidence, and still rejects an
+unresolved status. The focused lifecycle suite passes all 17 cases, including
+the new transient, reuse, and timeout checks. Remaining delivery is the
+aggregate and full-hook gates, immutable PR/main CI, synchronized-main
+Controller replacement, observed replacement Activation, and the same bounded
+team smoke. Control Center reconstruction and separately deferred plans remain
+unchanged.
+
+The aggregate run also exposed a test-only assumption that the workstation had
+never been initialized. The missing-trust release regression now uses an exact
+suite-private nonexistent trust path, so the complete test suite remains
+repeatable before and after Production Activation.

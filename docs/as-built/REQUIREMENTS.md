@@ -4203,3 +4203,25 @@ and exact local/origin main synchronization through trusted Git and GitHub
 executables. It then signs, advances, and enforces one exact candidate. Status
 may report Production available only after Activation, deployment, store,
 isolation, and a fresh eligible Provider all pass.
+
+## Post-exit process identity settlement requirements
+
+SYNC-ID: next_workflow_post_exit_identity_settlement
+STATUS: implemented
+ARTIFACTS: docs/as-built/IMPLEMENTATION_PLAN.md,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/HANDOFF.md,docs/workflow/TASK_TRACKER.md,docs/workflow/TEST_PLAN_MANIFEST.tsv,tools/lib/next_workflow/run_lifecycle.mjs,tools/test_next_workflow_release.mjs,tools/test_next_workflow_run_lifecycle.mjs
+TESTS: tools/check_next_workflow.sh,tools/test_next_workflow.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+Successful provider exit may briefly leave namespace teardown helpers in the
+already bound process group after its reaped leader disappears. Result
+collection must allow only this transitional `unknown` identity status to
+settle within the existing termination grace period. It must not weaken the
+persisted boot ID, start-time, process-group, contained-process, executable,
+or authority bindings.
+
+An `absent` status may continue to result validation. A `matched` or `reused`
+status must be handled immediately by the existing surviving-process or
+identity-conflict paths. An `unknown` status that does not settle within the
+bounded interval must continue to fail closed without accepting the result.
+Release refusal tests must bind their intentionally missing Owner trust to a
+suite-private path so an already initialized Production workstation cannot
+turn the negative test into a different command outcome.

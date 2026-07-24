@@ -4969,3 +4969,26 @@ successful PR/main runs, complete check-run pages, clean local main, and
 origin/main equality. It creates recovery backup evidence, source receipts,
 release proofs, six transition proofs, and final enforcement internally.
 Caller-supplied low-level evidence cannot invoke an Owner action.
+
+## Post-exit process identity settlement specification
+
+SYNC-ID: next_workflow_post_exit_identity_settlement
+STATUS: implemented
+ARTIFACTS: docs/as-built/IMPLEMENTATION_PLAN.md,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/HANDOFF.md,docs/workflow/TASK_TRACKER.md,docs/workflow/TEST_PLAN_MANIFEST.tsv,tools/lib/next_workflow/run_lifecycle.mjs,tools/test_next_workflow_release.mjs,tools/test_next_workflow_run_lifecycle.mjs
+TESTS: tools/check_next_workflow.sh,tools/test_next_workflow.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+`waitForPostExitProcessStatus` accepts a synchronous protected-status probe and
+positive bounded timeout. It polls only while the complete persisted identity
+check returns `unknown`; `matched`, `absent`, and `reused` return immediately,
+and every value outside that closed set is rejected.
+
+`collect_result` invokes this settlement after the detached leader has emitted
+its close event and re-reads the durable run before applying the existing
+surviving-descendant, identity-conflict, response-inode, size, schema, launch,
+and provenance checks. A grace-period expiry therefore remains a fail-closed
+identity error rather than a successful result.
+
+The release CLI negative regression creates a suite-private directory, points
+`NEXT_WORKFLOW_OWNER_TRUST_PATH` at its nonexistent child, and removes the
+directory through the common test cleanup. It therefore proves missing-trust
+refusal independently of the workstation's real Production initialization.
