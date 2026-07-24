@@ -25,6 +25,8 @@ const TRANSITION_MODES = Object.freeze([
   "archive_decommission_verified",
   "ready",
 ]);
+const ACTIVATION_CYCLE = Object.freeze([...TRANSITION_MODES, "enforced"]);
+const CURRENT_ACTIVATION_SCHEMA_VERSION = "1.1.0";
 const PROOF_EVIDENCE_FIELDS = Object.freeze({
   local_release: { repository_head: "git", checkout_instance_id: "string", command_manifest_fingerprint: "fingerprint", input_manifest_fingerprint: "fingerprint", artifact_manifest_fingerprint: "fingerprint" },
   pr_ci: { repository: "string", pr_number: "integer", head_sha: "git", run_id: "integer", check_names: "strings", artifact_digest: "fingerprint" },
@@ -340,13 +342,159 @@ function releaseSummary({ proofs, candidate, candidateFingerprint, repositoryIde
   return { ...summary, fingerprint: digest(summary) };
 }
 
+function activationCycleId({ activationId, candidateFingerprint, cycleStartRevision, previousRecordRevision, previousRecordContentFingerprint }) {
+  return digest({
+    activation_id: activationId,
+    candidate_fingerprint: candidateFingerprint,
+    cycle_start_revision: cycleStartRevision,
+    predecessor_record_revision: previousRecordRevision,
+    predecessor_record_content_fingerprint: previousRecordContentFingerprint,
+  });
+}
+
+function activationVerificationError(code) {
+  const error = new Error(code);
+  error.code = code;
+  throw error;
+}
+
+function decodeActivationRow(row, { repositoryId, checkoutId }) {
+  let payload;
+  try {
+    payload = JSON.parse(row?.payload_json);
+  } catch {
+    activationVerificationError("VERIFIED_LAUNCH_ACTIVATION_PAYLOAD_INVALID");
+  }
+  const revision = Number(row?.record_revision);
+  if (!row
+    || row.kind !== "NextWorkflowActivation"
+    || row.repository_id !== repositoryId
+    || row.checkout_id !== checkoutId
+    || row.authority_scope !== "release"
+    || row.lineage_id !== "next-development-workflow"
+    || row.lineage_id !== payload.activation_id
+    || row.schema_version !== payload.schema_version
+    || !["1.0.0", CURRENT_ACTIVATION_SCHEMA_VERSION].includes(payload.schema_version)
+    || !Number.isSafeInteger(revision)
+    || revision < 1
+    || revision !== payload.revision
+    || row.lifecycle_state !== payload.mode
+    || row.input_fp !== payload.candidate_fingerprint
+    || row.content_fp !== digest(payload)) {
+    activationVerificationError("VERIFIED_LAUNCH_ACTIVATION_ROW_BINDING_INVALID");
+  }
+  const previousRevision = payload.schema_version === CURRENT_ACTIVATION_SCHEMA_VERSION
+    ? payload.previous_record_revision
+    : revision - 1;
+  if (!Number.isSafeInteger(previousRevision)
+    || previousRevision !== revision - 1
+    || row.source_revision !== String(previousRevision)) {
+    activationVerificationError("VERIFIED_LAUNCH_ACTIVATION_SOURCE_BINDING_INVALID");
+  }
+  if (payload.mode === "enforced" && row.policy_fp !== payload.proof_summary?.fingerprint) {
+    activationVerificationError("VERIFIED_LAUNCH_ACTIVATION_POLICY_BINDING_INVALID");
+  }
+  return { row, payload, revision };
+}
+
+function verifyActivationRows(rows, { repositoryId, checkoutId }) {
+  if (!Array.isArray(rows) || rows.length === 0 || typeof repositoryId !== "string" || typeof checkoutId !== "string") {
+    activationVerificationError("VERIFIED_LAUNCH_ACTIVATION_HISTORY_REQUIRED");
+  }
+  const revisions = new Map();
+  const ids = new Set();
+  for (const row of rows) {
+    const revision = Number(row?.record_revision);
+    if (!Number.isSafeInteger(revision) || revision < 1 || ids.has(row?.id)) activationVerificationError("VERIFIED_LAUNCH_ACTIVATION_REVISION_INVALID");
+    ids.add(row.id);
+    const entries = revisions.get(revision) ?? [];
+    entries.push(row);
+    revisions.set(revision, entries);
+  }
+  const newestRevision = Math.max(...revisions.keys());
+  if (revisions.get(newestRevision).length !== 1) activationVerificationError("VERIFIED_LAUNCH_ACTIVATION_NEWEST_DUPLICATE");
+  const latest = decodeActivationRow(revisions.get(newestRevision)[0], { repositoryId, checkoutId });
+  if (latest.payload.mode !== "enforced") activationVerificationError("VERIFIED_LAUNCH_ACTIVATION_NEWEST_NOT_ENFORCED");
+  if (latest.payload.schema_version === "1.0.0") {
+    if (latest.revision !== ACTIVATION_CYCLE.length) activationVerificationError("VERIFIED_LAUNCH_LEGACY_ACTIVATION_REVISION_INVALID");
+    const cycleRows = ACTIVATION_CYCLE.map((mode, index) => {
+      const matches = revisions.get(index + 1);
+      if (!matches || matches.length !== 1) activationVerificationError("VERIFIED_LAUNCH_LEGACY_ACTIVATION_HISTORY_INVALID");
+      const entry = decodeActivationRow(matches[0], { repositoryId, checkoutId });
+      if (entry.payload.schema_version !== "1.0.0"
+        || entry.payload.mode !== mode
+        || entry.payload.candidate_fingerprint !== latest.payload.candidate_fingerprint) {
+        activationVerificationError("VERIFIED_LAUNCH_LEGACY_ACTIVATION_HISTORY_INVALID");
+      }
+      return entry;
+    });
+    return { activation: latest.payload, row: latest.row, cycleRows };
+  }
+  if (latest.payload.cycle_step !== ACTIVATION_CYCLE.length
+    || latest.revision !== latest.payload.cycle_start_revision + ACTIVATION_CYCLE.length - 1
+    || !/^[a-f0-9]{64}$/u.test(latest.payload.cycle_id ?? "")) {
+    activationVerificationError("VERIFIED_LAUNCH_ACTIVATION_CYCLE_INVALID");
+  }
+  const cycleRows = ACTIVATION_CYCLE.map((mode, index) => {
+    const revision = latest.payload.cycle_start_revision + index;
+    const matches = revisions.get(revision);
+    if (!matches || matches.length !== 1) activationVerificationError("VERIFIED_LAUNCH_ACTIVATION_CYCLE_HISTORY_INVALID");
+    const entry = decodeActivationRow(matches[0], { repositoryId, checkoutId });
+    if (entry.payload.schema_version !== CURRENT_ACTIVATION_SCHEMA_VERSION
+      || entry.payload.mode !== mode
+      || entry.payload.revision !== revision
+      || entry.payload.cycle_id !== latest.payload.cycle_id
+      || entry.payload.cycle_start_revision !== latest.payload.cycle_start_revision
+      || entry.payload.cycle_step !== index + 1
+      || entry.payload.candidate_fingerprint !== latest.payload.candidate_fingerprint) {
+      activationVerificationError("VERIFIED_LAUNCH_ACTIVATION_CYCLE_HISTORY_INVALID");
+    }
+    return entry;
+  });
+  const first = cycleRows[0];
+  const predecessorRevision = first.payload.previous_record_revision;
+  const predecessor = predecessorRevision === 0 ? null : revisions.get(predecessorRevision);
+  if (predecessorRevision !== first.revision - 1
+    || (predecessorRevision === 0
+      ? first.payload.previous_record_content_fingerprint !== null
+      : (!predecessor
+        || predecessor.length !== 1
+        || predecessor[0].content_fp !== first.payload.previous_record_content_fingerprint))
+    || first.payload.cycle_id !== activationCycleId({
+      activationId: first.payload.activation_id,
+      candidateFingerprint: first.payload.candidate_fingerprint,
+      cycleStartRevision: first.payload.cycle_start_revision,
+      previousRecordRevision: first.payload.previous_record_revision,
+      previousRecordContentFingerprint: first.payload.previous_record_content_fingerprint,
+    })) {
+    activationVerificationError("VERIFIED_LAUNCH_ACTIVATION_CYCLE_START_INVALID");
+  }
+  for (let index = 1; index < cycleRows.length; index += 1) {
+    if (cycleRows[index].payload.previous_record_revision !== cycleRows[index - 1].revision
+      || cycleRows[index].payload.previous_record_content_fingerprint !== cycleRows[index - 1].row.content_fp) {
+      activationVerificationError("VERIFIED_LAUNCH_ACTIVATION_PREDECESSOR_INVALID");
+    }
+  }
+  return { activation: latest.payload, row: latest.row, cycleRows };
+}
+
 function verifyEnforcedActivation(activation, trust, authorityEpoch, now) {
-  const allowedFields = ["activated_at", "activation_id", "authority_epoch", "candidate_definition", "candidate_fingerprint", "correctness", "evidence", "mode", "proof_summary", "release_prerequisite_fingerprint", "revision", "schema_version", "signed_release_proofs", "signed_transition_proofs", "transition_evidence"];
+  const legacyFields = ["activated_at", "activation_id", "authority_epoch", "candidate_definition", "candidate_fingerprint", "correctness", "evidence", "mode", "proof_summary", "release_prerequisite_fingerprint", "revision", "schema_version", "signed_release_proofs", "signed_transition_proofs", "transition_evidence"];
+  const currentFields = [...legacyFields, "cycle_id", "cycle_start_revision", "cycle_step", "previous_record_content_fingerprint", "previous_record_revision"];
+  const legacy = activation?.schema_version === "1.0.0";
+  const allowedFields = legacy ? legacyFields : currentFields;
   if (!exactKeys(activation, allowedFields)
-    || activation.schema_version !== "1.0.0"
+    || !["1.0.0", CURRENT_ACTIVATION_SCHEMA_VERSION].includes(activation.schema_version)
     || activation.activation_id !== "next-development-workflow"
     || activation.mode !== "enforced"
-    || activation.revision !== 7
+    || !Number.isSafeInteger(activation.revision)
+    || (legacy
+      ? activation.revision !== ACTIVATION_CYCLE.length
+      : (activation.cycle_step !== ACTIVATION_CYCLE.length
+        || activation.revision !== activation.cycle_start_revision + ACTIVATION_CYCLE.length - 1
+        || activation.previous_record_revision !== activation.revision - 1
+        || !/^[a-f0-9]{64}$/u.test(activation.previous_record_content_fingerprint ?? "")
+        || !/^[a-f0-9]{64}$/u.test(activation.cycle_id ?? "")))
     || activation.authority_epoch !== authorityEpoch
     || !Number.isFinite(Date.parse(activation.activated_at))
     || Date.parse(activation.activated_at) > Date.parse(now)) fail("VERIFIED_LAUNCH_ACTIVATION_INVALID");
@@ -431,6 +579,7 @@ function verifyEnforcedActivation(activation, trust, authorityEpoch, now) {
   return { candidate, candidateFingerprint: claimedCandidateFingerprint, activationFingerprint: digest(activation) };
 }
 
+function main() {
 const repositoryInput = process.argv[2];
 if (!repositoryInput || !path.isAbsolute(repositoryInput)) fail("VERIFIED_LAUNCH_REPOSITORY_REQUIRED");
 const repository = realpathSync(repositoryInput);
@@ -492,14 +641,14 @@ let activation;
 let generation;
 let identity;
 let authorityEpoch;
+let activationRows;
 try {
   const database = new DatabaseSync(databasePath, { readOnly: true, allowExtension: false });
   try {
     generation = JSON.parse(database.prepare("SELECT value_json FROM store_meta WHERE key='state_generation_id'").get()?.value_json ?? "null");
     identity = JSON.parse(database.prepare("SELECT value_json FROM store_meta WHERE key='identity'").get()?.value_json ?? "null");
     authorityEpoch = JSON.parse(database.prepare("SELECT value_json FROM store_meta WHERE key='revocation_epoch'").get()?.value_json ?? "null");
-    const row = database.prepare("SELECT payload_json FROM records WHERE kind='NextWorkflowActivation' ORDER BY record_revision DESC LIMIT 1").get();
-    activation = row ? JSON.parse(row.payload_json) : null;
+    activationRows = database.prepare("SELECT * FROM records WHERE kind='NextWorkflowActivation' ORDER BY record_revision,id").all();
   } finally {
     database.close();
   }
@@ -511,13 +660,36 @@ if (generation !== trust.production_state.generation_id
   || identity?.checkout_instance_id !== trust.checkout_instance_id
   || !Number.isSafeInteger(authorityEpoch)
   || authorityEpoch < 0) fail("VERIFIED_LAUNCH_PRODUCTION_STATE_BINDING_INVALID");
+try {
+  activation = verifyActivationRows(activationRows, {
+    repositoryId: trust.repository_logical_id,
+    checkoutId: trust.checkout_instance_id,
+  }).activation;
+} catch {
+  fail("VERIFIED_LAUNCH_ACTIVATION_INVALID");
+}
 const verifiedActivation = verifyEnforcedActivation(activation, trust, authorityEpoch, now);
 const candidate = verifiedActivation.candidate;
 
+const rootOwnerAppearsAsOverflow = (() => {
+  try {
+    return readFileSync("/proc/self/uid_map", "utf8").split(/\r?\n/u).some((line) => {
+      const [inside, outside, length] = line.trim().split(/\s+/u).map(Number);
+      return inside === process.getuid?.() && outside === 0 && length === 1;
+    });
+  } catch {
+    return false;
+  }
+})();
 const git = ["/usr/bin/git", "/bin/git"].find((entry) => {
   try {
-    const info = lstatSync(realpathSync(entry));
-    return info.isFile() && (info.mode & 0o111) !== 0 && (info.mode & 0o022) === 0 && info.uid === 0;
+    const canonical = realpathSync(entry);
+    const info = lstatSync(canonical);
+    return info.isFile()
+      && (info.mode & 0o111) !== 0
+      && (info.mode & 0o022) === 0
+      && (info.uid === 0 || (info.uid === 65534 && rootOwnerAppearsAsOverflow))
+      && ["/usr/bin", "/bin"].includes(path.dirname(canonical));
   } catch {
     return false;
   }
@@ -663,9 +835,14 @@ try {
   const result = spawnSync(interpreterPath, [path.join(snapshotRoot, "tools", "next-workflow.mjs"), ...process.argv.slice(3)], {
     cwd: repository,
     env: environment,
-    stdio: "inherit",
+    encoding: null,
+    maxBuffer: 16 * 1024 * 1024,
+    stdio: ["inherit", "pipe", "pipe"],
   });
   if (result.error) fail("VERIFIED_LAUNCH_CHILD_FAILED");
+  if (!Buffer.isBuffer(result.stdout) || result.stdout.length === 0) fail("VERIFIED_LAUNCH_CHILD_STDOUT_INVALID");
+  if (Buffer.isBuffer(result.stdout) && result.stdout.length > 0) writeSync(process.stdout.fd, result.stdout);
+  if (Buffer.isBuffer(result.stderr) && result.stderr.length > 0) writeSync(process.stderr.fd, result.stderr);
   process.exitCode = result.status ?? 1;
 } finally {
   for (const directory of [...snapshotDirectories].sort((left, right) => left.length - right.length)) {
@@ -673,3 +850,10 @@ try {
   }
   try { rmSync(snapshotRoot, { recursive: true, force: true }); } catch {}
 }
+}
+
+module.exports = Object.freeze({
+  verifyActivationRows,
+});
+
+if (require.main === module) main();

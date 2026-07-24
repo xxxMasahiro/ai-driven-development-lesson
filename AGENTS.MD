@@ -261,3 +261,19 @@ The live Production provider probe must retain the read-only host-root bind and
 place its pinned executable only below the private writable tmpfs. A
 prerequisite-complete release must execute that exact default Bubblewrap path;
 CI without real containment may skip only the positive probe case.
+An enforced Activation remains replaceable by a different immutable candidate,
+but only through a fresh complete `shadow`-to-`enforced` chain. The newest
+non-enforced candidate blocks Production launch instead of falling back to an
+older enforced record; same-candidate rewind and post-rollback restart remain
+forbidden, and all prior records must be preserved.
+Delivery lane is independent from L1-L5 rigor. An explicit developer lane has
+priority, but immutable CI, security, shared-contract, Production-runtime,
+Activation, and formal-publication floors cannot be lowered. Every Git action
+must recheck the exact snapshot and current saved authority immediately before
+execution.
+Install the immutable external Owner Controller only from clean synchronized
+`main`. Production release mutation must use that Controller's bounded
+`release activate-observed` action so Git/GitHub lineage, complete check runs,
+store recovery, and candidate identity are independently observed; caller
+evidence and repository-local low-level release actions never authorize
+Activation.

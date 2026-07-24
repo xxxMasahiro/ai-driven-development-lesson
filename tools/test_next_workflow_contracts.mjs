@@ -11,6 +11,7 @@ import {
   computeVerifiedProgress,
   evaluateCorrectionLoop,
   loadContracts,
+  RIGOR_HARD_L5_TRIGGERS,
   validateContractSet
 } from "./lib/next_workflow/contracts.mjs";
 
@@ -105,6 +106,8 @@ test("rigor is automatic, developer minimum only raises, and hard triggers force
   assert.equal(low.level, "L1");
   assert.equal(assessRigor({ scores: zeroScores, scoreReasons, developerMinimum: "L4" }).level, "L4");
   assert.equal(assessRigor({ scores: zeroScores, scoreReasons, hardTriggers: ["secrets"], hardTriggerEvidence: { secrets: "secret material is in scope" } }).level, "L5");
+  assert.equal(assessRigor({ scores: zeroScores, scoreReasons, hardTriggers: ["unknown_impact"], hardTriggerEvidence: { unknown_impact: "impact coverage is incomplete" } }).level, "L5");
+  assert.ok(RIGOR_HARD_L5_TRIGGERS.includes("unknown_impact"));
   assert.equal(assessRigor({ scores: { ...zeroScores, user_impact: 2 }, scoreReasons }).level, "L2");
   assert.equal(assessRigor({ scores: Object.fromEntries(Object.keys(zeroScores).map((key) => [key, 2])), scoreReasons }).level, "L5");
   assert.throws(() => assessRigor({ scores: { ...zeroScores, unexpected: 0 }, scoreReasons }), /RIGOR_SCORE_COMPONENTS_INVALID/);

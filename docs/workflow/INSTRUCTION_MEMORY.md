@@ -197,18 +197,52 @@ with a direct uncontained launch. Control Center reconstruction remains paused
 and is not required for accepted headless operation. Paid API and local-runtime
 transports remain separate work and must not be inferred from CLI availability.
 
-Before the first bootstrap, create the explicit external Owner acceptance with
-`tools/next-workflow runtime acceptance-create --confirm`, then pass its receipt
-to `runtime bootstrap --owner-acceptance <path> --confirm`. Release candidates
-bind the complete Git tree. Final release and transition signatures require
-fresh source-evidence receipts signed by the distinct source key. Tracked or
-legacy state never replaces protected Production authority.
+When a new immutable candidate replaces an already enforced release, begin a
+fresh signed transition chain at `shadow` and repeat every stage through
+`enforced`. Do not rewind the same candidate, skip a transition, restart a
+rolled-back lineage, delete old records, or launch through the older enforced
+record while the newest candidate is incomplete. A replacement-chain failure
+returns only to the nearest affected implementation or release step unless its
+purpose or scope actually changes.
+
+Install the immutable external Owner Controller only from clean synchronized
+`main` with `node tools/install-next-workflow-owner-controller.mjs --confirm`.
+Use the absolute Controller path returned by the installer for owner enrollment,
+acceptance creation, bootstrap, status, and release operations. Repository-local
+mutating entry points are not Production authority.
+
+Release candidates bind the complete Git tree. After PR CI, merge, main CI, and
+local/remote synchronization, use only the external Controller's
+`release activate-observed --candidate-file <path> --confirm` operation. The
+Controller independently observes Git/GitHub lineage and complete check-run
+pages before it creates source receipts, recovery evidence, signatures, or the
+full Activation transition chain. Caller-supplied low-level release evidence
+cannot authorize Production. Tracked or legacy state never replaces protected
+Production authority.
 
 Before every direct development-session CLI launch that is not routed through
 `team run`, continue using the advisory plan and exact prepared-configuration
 verification above. Both paths preserve the same saved model restrictions;
 neither model selection nor a successful Agent result grants filesystem, Git,
 network, credential, release, or Activation authority.
+
+### Delivery lane and correction selection
+
+Select delivery independently from L1-L5 rigor. Honor an explicit developer
+lane first; otherwise choose `none`, `local`, `remote_sync`, or `ci` from
+structured impact. Required CI, security gates, shared contracts, Production
+runtime, Activation, and formal publication impose a non-bypassable `ci`
+floor. Intersect the lane with saved Git authority, bind it to the exact Git
+snapshot, and recheck immediately before every Git action. A stale snapshot,
+unknown impact, missing authority, or failed required CI stops; it never falls
+back to a weaker lane.
+
+Production correction is stop-only. Do not automatically retry a failed
+Production run, reinterpret review advice as authority, or replay a stale
+approval. A deterministic implementation failure returns only to the nearest
+affected workflow stage, and a resumed Production attempt is a new separately
+authorized run. Re-enter earlier value or planning stages only when purpose,
+scope, or accepted constraints actually changed.
 
 ## A. Pre-Implementation Proposal
 

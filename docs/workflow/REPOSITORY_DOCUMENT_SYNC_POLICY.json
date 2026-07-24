@@ -394,7 +394,7 @@
     },
     {
       "id": "next-workflow-core",
-      "description": "Next Workflow contracts, persisted authorities, CLI and external launcher, provider/model selection, protected runtime/trust/containment owners, immutable candidate and signed activation/release chain, migrations, the live read-only-root/private-tmpfs provider probe, CI-portable non-authorizing provider fixtures for bootstrap, launcher integrity, discovery, and development selection, honest positive-case containment-prerequisite skips, and guided-refusal tests update the complete parent authority, as-built, Security, verification, CI, and workflow-state contract without traversing child repositories.",
+      "description": "Next Workflow contracts, persisted authorities, CLI and external launcher, provider/model selection, protected runtime/trust/containment owners, immutable candidate and signed activation/release chain including complete multi-candidate roll-forward and historical retention, migrations, the live read-only-root/private-tmpfs provider probe, CI-portable non-authorizing provider fixtures for bootstrap, launcher integrity, discovery, and development selection, honest positive-case containment-prerequisite skips, and guided-refusal tests update the complete parent authority, as-built, Security, verification, CI, and workflow-state contract without traversing child repositories.",
       "trigger": {
         "any_of": [
           "docs/workflow/next-workflow/**",

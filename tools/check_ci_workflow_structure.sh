@@ -30,6 +30,22 @@ require_file_contains() {
   fi
 }
 
+require_delivery_aware_triggers() {
+  local file="$1"
+  if ! awk '
+    $0 == "on:" { in_on = 1; next }
+    in_on && $0 ~ /^[^ ]/ { in_on = 0 }
+    in_on && $0 == "  push:" { push = 1; next }
+    in_on && push && $0 == "    branches:" { branches = 1; next }
+    in_on && branches && $0 == "      - main" { main = 1; next }
+    in_on && $0 == "  pull_request:" { pull_request = 1 }
+    END { exit (push && branches && main && pull_request) ? 0 : 1 }
+  ' "$file"; then
+    printf 'Workflow must run on pull requests and main pushes only: %s\n' "$file" >&2
+    return 1
+  fi
+}
+
 require_job() {
   local file="$1"
   local job="$2"
@@ -444,6 +460,7 @@ check_lesson14_ci() {
 require_file_contains "$ROOT/.github/workflows/ci.yml" "concurrency:"
 require_file_contains "$ROOT/.github/workflows/lesson14-ci.yml" "concurrency:"
 for workflow_file in "$ROOT/.github/workflows/ci.yml" "$ROOT/.github/workflows/lesson14-ci.yml"; do
+  require_delivery_aware_triggers "$workflow_file"
   if grep -Eq 'actions/(checkout|setup-node|cache|upload-artifact|download-artifact)@v[123]' "$workflow_file"; then
     printf 'Deprecated Node-action major version in %s\n' "$workflow_file" >&2
     exit 1

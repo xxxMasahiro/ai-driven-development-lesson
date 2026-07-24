@@ -4871,3 +4871,95 @@ bind but mounts a private writable tmpfs at `/tmp`. It creates
 read-only root. The provider suite executes this exact default path on hosts
 where the shared isolation diagnostic confirms Bubblewrap and namespace
 availability.
+
+## Production Activation candidate roll-forward specification
+
+SYNC-ID: next_workflow_activation_roll_forward
+STATUS: implemented
+ARTIFACTS: docs/as-built/IMPLEMENTATION_PLAN.md,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/HANDOFF.md,docs/workflow/TASK_TRACKER.md,docs/workflow/TEST_PLAN_MANIFEST.tsv,tools/lib/next_workflow/release.mjs,tools/lib/next_workflow/store.mjs,tools/next-workflow-launcher.cjs,tools/test_next_workflow_launcher.mjs,tools/test_next_workflow_release.mjs
+TESTS: tools/check_next_workflow.sh,tools/test_next_workflow.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+`persistActivationTransition` accepts candidate-definition drift only when the
+requested next mode is `shadow`, the current candidate fingerprint is present
+and different, and the current lifecycle is not `rolled_back`. The store
+recognizes that exact transition as a candidate restart even when the current
+mode is `enforced`. Every other transition still uses the fixed transition
+map, exact expected mode, revision CAS, authority epoch, signed transition
+evidence, and independent store verifier.
+
+`advanceActivation` resets the replacement lifecycle to one `shadow` evidence
+entry. The release owner therefore stores an empty prior evidence set and one
+new signed transition proof for the replacement. Later stages append only that
+candidate's proofs. The prior candidate records remain queryable; no row is
+updated, reused, or deleted.
+
+`verifyEnforcedActivationRecord` accepts a monotonic revision only when it is
+at least one complete cycle and is divisible by the seven persisted activation
+stages. It continues to require the exact six pre-enforcement transition modes,
+the signed release-proof set, candidate definition, prerequisite fingerprint,
+authority epoch, timestamps, summary, and reconstructed transition evidence.
+The independent CommonJS launcher verifier derives the same cycle length from
+its six transition modes plus final enforcement; it no longer hard-codes the
+first cycle's revision.
+The focused regression enforces direct-stage refusal, complete second-cycle
+enforcement, historical-record retention, same-candidate rewind refusal, and
+incomplete-cycle rejection.
+
+## Automatic delivery-lane efficiency specification
+
+SYNC-ID: next_workflow_delivery_lane_selection
+STATUS: implemented
+ARTIFACTS: .githooks/pre-commit,.github/workflows/ci.yml,.github/workflows/lesson14-ci.yml,docs/as-built/IMPLEMENTATION_PLAN.md,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/GIT_HOOK_RECOMMENDATION_PATHS.tsv,docs/workflow/HANDOFF.md,docs/workflow/TASK_TRACKER.md,docs/workflow/TEST_PLAN_MANIFEST.tsv,learning/NEXT_WORKFLOW_DELIVERY_SETTINGS.json,tools/check_ci_workflow_structure.sh,tools/git-workflow,tools/lib/development_instruction.mjs,tools/lib/git_hooks_policy.sh,tools/lib/git_workflow_policy.sh,tools/lib/next_workflow/delivery_lane.mjs,tools/lib/next_workflow/git_snapshot.mjs,tools/next-workflow.mjs,tools/test_git_hooks.sh,tools/test_next_workflow_delivery.mjs,tools/test_next_workflow_delivery.sh
+TESTS: tools/check_next_workflow.sh,tools/test_next_workflow.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+`delivery plan` combines an exact Git snapshot, manifest-derived change impact,
+saved preference, intended outcome, and instruction-derived Git ceiling. The
+selector applies immutable floors and returns no executable action when input
+is empty, unknown, or outside the intersection. `delivery recheck` opens an
+external evidence file with `O_NOFOLLOW`, recreates the complete observation,
+and accepts only exact context, plan, impact, and snapshot parity.
+
+`tools/git-workflow allow` invokes that just-in-time recheck for each concrete
+Git action. Protected staged paths force full no-cache hooks. Workflow triggers
+run on pull requests and main pushes, not ordinary remote branch pushes.
+
+## Rigor, lifecycle, and correction specification
+
+SYNC-ID: next_workflow_rigor_activation_correction_contract
+STATUS: implemented
+ARTIFACTS: docs/as-built/IMPLEMENTATION_PLAN.md,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/HANDOFF.md,docs/workflow/TASK_TRACKER.md,docs/workflow/TEST_PLAN_MANIFEST.tsv,tools/lib/next_workflow/correction_policy.mjs,tools/lib/next_workflow/headless_plan.mjs,tools/lib/next_workflow/headless_service.mjs,tools/lib/next_workflow/release.mjs,tools/lib/next_workflow/rigor_classification.mjs,tools/lib/next_workflow/run_controller.mjs,tools/lib/next_workflow/saga.mjs,tools/lib/next_workflow/store.mjs,tools/next-workflow-launcher.cjs,tools/next-workflow.mjs,tools/test_next_workflow_authority.mjs,tools/test_next_workflow_headless_plan.mjs,tools/test_next_workflow_launcher.mjs,tools/test_next_workflow_release.mjs,tools/test_next_workflow_run_controller.mjs,tools/test_next_workflow_store.mjs
+TESTS: tools/check_next_workflow.sh,tools/test_next_workflow.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+`rigor_classification.mjs` validates the closed operation vocabulary and all
+bounded root/child scope and data before classification. It normalizes safety
+text with NFKC and returns a fail-closed result before selection on unknown
+impact. `correction_policy.mjs` exports the immutable
+`headless_production_stop_only_v1` profile with `max_retries: 0` and phase-only
+resume advice that grants neither resume nor retry authority.
+
+Activation schema 1.1 stores cycle identity, start revision, step, and exact
+predecessor row/content bindings. Every current-schema verifier receives the
+complete cycle history. A partial newest cycle blocks runtime even when an
+older enforced row remains.
+
+## External Owner Controller specification
+
+SYNC-ID: next_workflow_owner_controller_authority
+STATUS: implemented
+ARTIFACTS: docs/as-built/IMPLEMENTATION_PLAN.md,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/HANDOFF.md,docs/workflow/TASK_TRACKER.md,docs/workflow/TEST_PLAN_MANIFEST.tsv,tools/install-next-workflow-owner-controller.mjs,tools/lib/next_workflow/owner_controller.mjs,tools/lib/next_workflow/release.mjs,tools/lib/next_workflow/release_observation.mjs,tools/next-workflow-launcher.cjs,tools/next-workflow.mjs,tools/test_next_workflow_owner_controller.mjs,tools/test_next_workflow_owner_controller.sh,tools/test_next_workflow_release_observation.mjs,tools/test_next_workflow_release_observation.sh
+TESTS: tools/check_next_workflow.sh,tools/test_next_workflow.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+The installer requires clean synchronized `main`, copies only the controller
+entry, development-instruction owner, and complete Next Workflow library to a
+versioned external private directory, normalizes directories to `0700` and
+source files to `0400`, and records every relative path, size, digest, source
+HEAD, source tree, repository identity, and allowed action in a closed
+manifest. The wrapper supplies that manifest and the verified repository root.
+
+`release activate-observed` is the sole allowed release mutation. The external
+snapshot re-observes Git ancestry, exact candidate/main trees, merged PR
+lineage, all required workflow names from the signed CI graph, latest
+successful PR/main runs, complete check-run pages, clean local main, and
+origin/main equality. It creates recovery backup evidence, source receipts,
+release proofs, six transition proofs, and final enforcement internally.
+Caller-supplied low-level evidence cannot invoke an Owner action.

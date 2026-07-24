@@ -4107,3 +4107,92 @@ Protected recovery authorization must be regenerated and exact-compared at the
 store boundary. Recovery-only mode ends only when every Agent Run has a valid
 terminal closure. A caller-supplied lookalike authorization cannot reopen
 ordinary writes.
+
+## Production Activation candidate roll-forward requirements
+
+SYNC-ID: next_workflow_activation_roll_forward
+STATUS: implemented
+ARTIFACTS: docs/as-built/IMPLEMENTATION_PLAN.md,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/HANDOFF.md,docs/workflow/TASK_TRACKER.md,docs/workflow/TEST_PLAN_MANIFEST.tsv,tools/lib/next_workflow/release.mjs,tools/lib/next_workflow/store.mjs,tools/next-workflow-launcher.cjs,tools/test_next_workflow_launcher.mjs,tools/test_next_workflow_release.mjs
+TESTS: tools/check_next_workflow.sh,tools/test_next_workflow.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+An enforced Production candidate must not make the release lifecycle
+single-use. A different immutable candidate may begin a new release cycle only
+at `shadow`; it must then repeat every signed verification stage in order
+before becoming `enforced`. It cannot skip directly from the previous
+`enforced` record to a later stage. Re-entering `shadow` for the same candidate
+and advancing from a terminal `rolled_back` state remain forbidden.
+
+Starting a replacement candidate must clear candidate-specific transition
+proofs and evidence while preserving every prior Activation record. Record
+revisions remain monotonic across release cycles. Runtime authority follows
+only the newest lifecycle record, so a replacement in `shadow` or any
+intermediate mode stops Production launch rather than silently falling back to
+the older enforced candidate.
+
+An enforced record is trusted only at the end of a complete activation cycle:
+its revision is a positive whole multiple of the seven persisted stages from
+`shadow` through `enforced`, and its six signed transition proofs plus final
+release proof reconstruct the current candidate exactly. An incomplete cycle,
+candidate drift after `shadow`, or a mismatched proof must fail closed.
+The separately installed pre-import launcher verifier must apply the same
+whole-cycle rule before loading any repository JavaScript.
+
+## Automatic delivery-lane efficiency requirements
+
+SYNC-ID: next_workflow_delivery_lane_selection
+STATUS: implemented
+ARTIFACTS: .githooks/pre-commit,.github/workflows/ci.yml,.github/workflows/lesson14-ci.yml,docs/as-built/IMPLEMENTATION_PLAN.md,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/GIT_HOOK_RECOMMENDATION_PATHS.tsv,docs/workflow/HANDOFF.md,docs/workflow/TASK_TRACKER.md,docs/workflow/TEST_PLAN_MANIFEST.tsv,learning/NEXT_WORKFLOW_DELIVERY_SETTINGS.json,tools/check_ci_workflow_structure.sh,tools/git-workflow,tools/lib/development_instruction.mjs,tools/lib/git_hooks_policy.sh,tools/lib/git_workflow_policy.sh,tools/lib/next_workflow/delivery_lane.mjs,tools/lib/next_workflow/git_snapshot.mjs,tools/next-workflow.mjs,tools/test_git_hooks.sh,tools/test_next_workflow_delivery.mjs,tools/test_next_workflow_delivery.sh
+TESTS: tools/check_next_workflow.sh,tools/test_next_workflow.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+Rigor and delivery are independent decisions. After rigor selects the amount
+of planning and review, delivery must select `none`, `local`, `remote_sync`, or
+`ci` from immutable change impact, requested outcome, saved preference, and
+the current Git authority ceiling. Unknown impact stops. CI, security,
+authority, shared contracts, Production runtime, and formal release changes
+must force `ci`; a preference may never lower that floor.
+
+A delivery plan is advisory and non-authorizing. Every Git action must
+re-observe the exact repository, HEAD, tree, index, worktree, untracked files,
+authority inputs, and selected test manifests immediately before execution.
+Remote branch pushes alone must not start duplicate workflows; PR and main
+remain the independent remote evidence owners.
+
+## Rigor, lifecycle, and correction requirements
+
+SYNC-ID: next_workflow_rigor_activation_correction_contract
+STATUS: implemented
+ARTIFACTS: docs/as-built/IMPLEMENTATION_PLAN.md,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/HANDOFF.md,docs/workflow/TASK_TRACKER.md,docs/workflow/TEST_PLAN_MANIFEST.tsv,tools/lib/next_workflow/correction_policy.mjs,tools/lib/next_workflow/headless_plan.mjs,tools/lib/next_workflow/headless_service.mjs,tools/lib/next_workflow/release.mjs,tools/lib/next_workflow/rigor_classification.mjs,tools/lib/next_workflow/run_controller.mjs,tools/lib/next_workflow/saga.mjs,tools/lib/next_workflow/store.mjs,tools/next-workflow-launcher.cjs,tools/next-workflow.mjs,tools/test_next_workflow_authority.mjs,tools/test_next_workflow_headless_plan.mjs,tools/test_next_workflow_launcher.mjs,tools/test_next_workflow_release.mjs,tools/test_next_workflow_run_controller.mjs,tools/test_next_workflow_store.mjs
+TESTS: tools/check_next_workflow.sh,tools/test_next_workflow.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+Automatic rigor must use bounded structured operations, NFKC-normalized safety
+signals, caller minima, and hard L5 floors. Unknown or contradictory scope
+must stop before topology or model selection. Production correction is
+stop-only: zero automatic retries, only `PASS` or `STOP`, and non-authorizing
+resume advice for the nearest affected phase. Authority, safety, and unknown
+failures cannot be converted into retry permission.
+
+Each replacement Activation must preserve every prior row and create a fresh,
+contiguous seven-stage `shadow` through `enforced` cycle. Runtime and status
+must verify that complete cycle, live authority epoch, current deployed Git
+tree, and signed proof lineage without falling back to legacy public state.
+
+## External Owner Controller requirements
+
+SYNC-ID: next_workflow_owner_controller_authority
+STATUS: implemented
+ARTIFACTS: docs/as-built/IMPLEMENTATION_PLAN.md,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/HANDOFF.md,docs/workflow/TASK_TRACKER.md,docs/workflow/TEST_PLAN_MANIFEST.tsv,tools/install-next-workflow-owner-controller.mjs,tools/lib/next_workflow/owner_controller.mjs,tools/lib/next_workflow/release.mjs,tools/lib/next_workflow/release_observation.mjs,tools/next-workflow-launcher.cjs,tools/next-workflow.mjs,tools/test_next_workflow_owner_controller.mjs,tools/test_next_workflow_owner_controller.sh,tools/test_next_workflow_release_observation.mjs,tools/test_next_workflow_release_observation.sh
+TESTS: tools/check_next_workflow.sh,tools/test_next_workflow.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+Production mutations must execute from an exact, owner-private, read-only
+snapshot installed outside the repository only from clean synchronized main.
+Repository code and copied launchers cannot satisfy that snapshot manifest.
+Low-level source-receipt, signing, transition, and activation commands are not
+Owner actions.
+
+The only release activation action is observed activation. It must
+independently obtain the merged PR, candidate SHA and tree, main merge SHA and
+tree, successful required PR/main workflow runs, successful check inventory,
+and exact local/origin main synchronization through trusted Git and GitHub
+executables. It then signs, advances, and enforces one exact candidate. Status
+may report Production available only after Activation, deployment, store,
+isolation, and a fresh eligible Provider all pass.

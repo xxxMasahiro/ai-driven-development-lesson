@@ -14,7 +14,16 @@ const selectionPlanner = ({ agent_id: agentId, rigor }) => ({
 
 test("headless planning derives a bounded hierarchy and explicit per-Agent model and effort", () => {
   const plan = buildHeadlessTeamPlan({
-    task: { schema_version: "1.0.0", task_id: "fixture", summary: "Implement the bounded runtime change", scope_paths: ["tools"], rigor: "L3", risk: "normal", complexity: "normal" },
+    task: {
+      schema_version: "1.1.0",
+      task_id: "fixture",
+      summary: "Implement the bounded runtime change",
+      scope_paths: ["tools/lib/next_workflow/example.mjs"],
+      operations: ["edit_code"],
+      rigor: "L3",
+      risk: "normal",
+      complexity: "normal",
+    },
     selectionPlanner,
   });
   assert.equal(plan.decision, "PASS");
@@ -24,7 +33,7 @@ test("headless planning derives a bounded hierarchy and explicit per-Agent model
   assert.deepEqual(verifyHeadlessTeamPlan(plan), plan);
 });
 
-test("L1 is routed to direct Orchestrator execution instead of reporting a zero-launch team success", () => {
+test("legacy bounded English content edits retain direct L1 Orchestrator execution", () => {
   const plan = buildHeadlessTeamPlan({
     task: { schema_version: "1.0.0", task_id: "title", summary: "Change one title", scope_paths: ["index.md"], rigor: "L1", risk: "low", complexity: "low" },
     selectionPlanner,
@@ -37,13 +46,41 @@ test("L1 is routed to direct Orchestrator execution instead of reporting a zero-
   assert.deepEqual(verifyHeadlessTeamPlan(plan), plan);
 });
 
+test("structured Japanese and English trivial text tasks remain one-Orchestrator L1 runs", () => {
+  for (const [taskId, summary, scopePath] of [
+    ["english-title", "Change one title", "index.md"],
+    ["japanese-title", "タイトルを変更する", "guides/案内.md"],
+  ]) {
+    const plan = buildHeadlessTeamPlan({
+      task: {
+        schema_version: "1.1.0",
+        task_id: taskId,
+        summary,
+        scope_paths: [scopePath],
+        operations: ["edit_text"],
+        rigor: "L1",
+        risk: "low",
+        complexity: "low",
+      },
+      selectionPlanner,
+    });
+    assert.equal(plan.decision, "PASS");
+    assert.equal(plan.task.impact_assessment.status, "known");
+    assert.equal(plan.task.rigor, "L1");
+    assert.equal(plan.topology.planned_process_launches, 1);
+    assert.deepEqual(plan.selections.map((selection) => selection.agent_id), ["orchestrator"]);
+    assert.deepEqual(verifyHeadlessTeamPlan(plan), plan);
+  }
+});
+
 test("automatic classification raises security-sensitive work to mandatory L5", () => {
   const plan = buildHeadlessTeamPlan({
     task: {
-      schema_version: "1.0.0",
+      schema_version: "1.1.0",
       task_id: "credential",
       summary: "Change the credential permission boundary",
-      scope_paths: ["tools"],
+      scope_paths: ["tools/auth.mjs"],
+      operations: ["authentication", "edit_code", "permission_boundary", "secret_material"],
       rigor: "L1",
       risk: "low",
       complexity: "low",
@@ -58,13 +95,15 @@ test("automatic classification raises security-sensitive work to mandatory L5", 
   assert.ok(plan.task.rigor_assessment.hard_triggers.includes("permissions"));
 });
 
-test("automatic classification cannot miss a safety-critical child task hidden behind a benign root summary", () => {
+test("incomplete child scope cannot reach topology or model selection even when safety text is detected", () => {
+  let selections = 0;
   const plan = buildHeadlessTeamPlan({
     task: {
-      schema_version: "1.0.0",
+      schema_version: "1.1.0",
       task_id: "benign-root",
       summary: "Update the application wording",
-      scope_paths: ["docs"],
+      scope_paths: ["docs/guide.md"],
+      operations: ["edit_text"],
       rigor: "L1",
       risk: "low",
       complexity: "low",
@@ -72,17 +111,238 @@ test("automatic classification cannot miss a safety-critical child task hidden b
       tasks: [{
         task_id: "unsafe-child",
         summary: "Delete credentials and remove authentication permissions",
-        scope_paths: ["tools/auth"],
+        scope_paths: ["tools/auth.mjs"],
+        operations: ["authentication", "delete_or_destroy", "edit_code", "permission_boundary", "secret_material"],
       }],
     },
-    selectionPlanner,
+    selectionPlanner: (input) => {
+      selections += 1;
+      return selectionPlanner(input);
+    },
   });
-  assert.equal(plan.decision, "PASS");
+  assert.equal(plan.decision, "STOP");
+  assert.equal(plan.code, "HEADLESS_IMPACT_UNKNOWN");
   assert.equal(plan.task.rigor, "L5");
   assert.equal(plan.task.effective_execution_mode, "team");
+  assert.equal(plan.task.impact_assessment.status, "unknown");
   assert.ok(plan.task.rigor_assessment.hard_triggers.includes("authentication"));
   assert.ok(plan.task.rigor_assessment.hard_triggers.includes("destructive_operation"));
   assert.ok(plan.task.rigor_assessment.hard_triggers.includes("permissions"));
+  assert.ok(plan.task.rigor_assessment.hard_triggers.includes("unknown_impact"));
+  assert.equal(plan.topology, undefined);
+  assert.deepEqual(plan.selections, []);
+  assert.equal(selections, 0);
+});
+
+test("legacy Japanese and English authentication permission deletion stop before model selection", () => {
+  for (const [taskId, summary] of [
+    ["unsafe-ja", "認証情報と権限を削除する"],
+    ["unsafe-en", "Delete authentication credentials and permissions"],
+  ]) {
+    let selections = 0;
+    const plan = buildHeadlessTeamPlan({
+      task: {
+        schema_version: "1.0.0",
+        task_id: taskId,
+        summary,
+        scope_paths: ["tools/auth.mjs"],
+        rigor: "L1",
+        risk: "low",
+        complexity: "low",
+      },
+      selectionPlanner: (input) => {
+        selections += 1;
+        return selectionPlanner(input);
+      },
+    });
+    assert.equal(plan.decision, "STOP");
+    assert.equal(plan.code, "HEADLESS_IMPACT_UNKNOWN");
+    assert.equal(plan.task.rigor, "L5");
+    assert.ok(plan.task.rigor_assessment.hard_triggers.includes("authentication"));
+    assert.ok(plan.task.rigor_assessment.hard_triggers.includes("permissions"));
+    assert.ok(plan.task.rigor_assessment.hard_triggers.includes("destructive_operation"));
+    assert.equal(plan.topology, undefined);
+    assert.equal(selections, 0);
+  }
+});
+
+test("NFKC normalization exposes full-width safety wording and contradictions stop before selection", () => {
+  let selections = 0;
+  const plan = buildHeadlessTeamPlan({
+    task: {
+      schema_version: "1.1.0",
+      task_id: "nfkc-unsafe",
+      summary: "ＤＥＬＥＴＥ ＡＵＴＨＥＮＴＩＣＡＴＩＯＮ ＰＥＲＭＩＳＳＩＯＮＳ",
+      scope_paths: ["tools/auth.mjs"],
+      operations: ["edit_code"],
+      rigor: "L1",
+      risk: "low",
+      complexity: "low",
+    },
+    selectionPlanner: (input) => {
+      selections += 1;
+      return selectionPlanner(input);
+    },
+  });
+  assert.equal(plan.decision, "STOP");
+  assert.equal(plan.task.impact_assessment.status, "unknown");
+  assert.ok(plan.task.impact_assessment.unknown_reasons.includes("structured_text_contradiction:authentication"));
+  assert.ok(plan.task.impact_assessment.unknown_reasons.includes("structured_text_contradiction:permissions"));
+  assert.ok(plan.task.impact_assessment.unknown_reasons.includes("structured_text_contradiction:destructive_operation"));
+  assert.equal(selections, 0);
+});
+
+test("missing and explicit unknown impact fail closed before model selection", () => {
+  for (const task of [
+    {
+      schema_version: "1.1.0",
+      task_id: "missing-operations",
+      summary: "Change one title",
+      scope_paths: ["index.md"],
+      rigor: "L1",
+      risk: "low",
+      complexity: "low",
+    },
+    {
+      schema_version: "1.1.0",
+      task_id: "explicit-unknown",
+      summary: "Change one title",
+      scope_paths: ["index.md"],
+      operations: ["edit_text"],
+      change_signals: ["unknown_impact"],
+      rigor: "L1",
+      risk: "low",
+      complexity: "low",
+    },
+  ]) {
+    let selections = 0;
+    const plan = buildHeadlessTeamPlan({
+      task,
+      selectionPlanner: (input) => {
+        selections += 1;
+        return selectionPlanner(input);
+      },
+    });
+    assert.equal(plan.decision, "STOP");
+    assert.equal(plan.code, "HEADLESS_IMPACT_UNKNOWN");
+    assert.equal(plan.task.rigor, "L5");
+    assert.equal(plan.task.impact_assessment.status, "unknown");
+    assert.equal(plan.topology, undefined);
+    assert.equal(selections, 0);
+  }
+});
+
+test("language-neutral operations keep unsupported-language text safe while legacy ambiguity stops", () => {
+  const structured = buildHeadlessTeamPlan({
+    task: {
+      schema_version: "1.1.0",
+      task_id: "structured-ko",
+      summary: "제목 하나를 변경",
+      scope_paths: ["guides/title.md"],
+      operations: ["edit_text"],
+      rigor: "L1",
+      risk: "low",
+      complexity: "low",
+    },
+    selectionPlanner,
+  });
+  assert.equal(structured.decision, "PASS");
+  assert.equal(structured.task.rigor, "L1");
+
+  let selections = 0;
+  const legacy = buildHeadlessTeamPlan({
+    task: {
+      schema_version: "1.0.0",
+      task_id: "legacy-ko",
+      summary: "제목 하나를 변경",
+      scope_paths: ["guides/title.md"],
+      rigor: "L1",
+      risk: "low",
+      complexity: "low",
+    },
+    selectionPlanner: (input) => {
+      selections += 1;
+      return selectionPlanner(input);
+    },
+  });
+  assert.equal(legacy.decision, "STOP");
+  assert.equal(legacy.code, "HEADLESS_IMPACT_UNKNOWN");
+  assert.equal(selections, 0);
+});
+
+test("caller risk, complexity, and rigor are minima and never lower automatic floors", () => {
+  const automatic = buildHeadlessTeamPlan({
+    task: {
+      schema_version: "1.1.0",
+      task_id: "configuration",
+      summary: "Update the bounded configuration",
+      scope_paths: ["config/runtime.json"],
+      operations: ["edit_configuration"],
+      rigor: "L1",
+      risk: "low",
+      complexity: "low",
+    },
+    selectionPlanner,
+  });
+  assert.equal(automatic.decision, "PASS");
+  assert.equal(automatic.task.rigor, "L3");
+  assert.equal(automatic.task.risk, "low");
+  assert.equal(automatic.task.complexity, "high");
+
+  const callerRaised = buildHeadlessTeamPlan({
+    task: {
+      schema_version: "1.1.0",
+      task_id: "caller-raised",
+      summary: "Change one title",
+      scope_paths: ["index.md"],
+      operations: ["edit_text"],
+      rigor: "L4",
+      risk: "critical",
+      complexity: "extreme",
+    },
+    selectionPlanner,
+  });
+  assert.equal(callerRaised.task.rigor, "L4");
+  assert.equal(callerRaised.task.risk, "critical");
+  assert.equal(callerRaised.task.complexity, "extreme");
+  assert.equal(callerRaised.task.developer_minimum_rigor, "L4");
+});
+
+test("untyped child data is unknown impact and a closed operation vocabulary rejects unsupported values", () => {
+  let selections = 0;
+  const plan = buildHeadlessTeamPlan({
+    task: {
+      schema_version: "1.1.0",
+      task_id: "untyped-data",
+      summary: "Update one bounded guide",
+      scope_paths: ["guides/guide.md"],
+      operations: ["edit_text"],
+      tasks: [{
+        task_id: "child",
+        summary: "Update one bounded guide",
+        scope_paths: ["guides/guide.md"],
+        operations: ["edit_text"],
+        data: [{ instruction: "untyped" }],
+      }],
+    },
+    selectionPlanner: (input) => {
+      selections += 1;
+      return selectionPlanner(input);
+    },
+  });
+  assert.equal(plan.decision, "STOP");
+  assert.ok(plan.task.impact_assessment.unknown_reasons.includes("untyped_child_data:child"));
+  assert.equal(selections, 0);
+  assert.throws(() => buildHeadlessTeamPlan({
+    task: {
+      schema_version: "1.1.0",
+      task_id: "bad-operation",
+      summary: "Update one guide",
+      scope_paths: ["guides/guide.md"],
+      operations: ["run_arbitrary_command"],
+    },
+    selectionPlanner,
+  }), /HEADLESS_TASK_OPERATIONS_INVALID/);
 });
 
 test("child task scope paths are validated independently", () => {
@@ -199,7 +459,16 @@ test("team preference raises otherwise minimal work to a small team without weak
 
 test("advisory recommendations plan explicit Agents without granting launch authority", () => {
   const plan = buildHeadlessTeamPlan({
-    task: { schema_version: "1.0.0", task_id: "advisory", summary: "Plan one bounded Agent", scope_paths: ["tools"], rigor: "L2", risk: "low", complexity: "normal" },
+    task: {
+      schema_version: "1.1.0",
+      task_id: "advisory",
+      summary: "Plan one bounded Agent",
+      scope_paths: ["tools/lib/next_workflow/example.mjs"],
+      operations: ["edit_code"],
+      rigor: "L2",
+      risk: "low",
+      complexity: "normal",
+    },
     selectionPlanner: ({ agent_id: agentId, role_id: roleId }) => ({
       decision: "RECOMMEND",
       profile: "development_advisory",
@@ -221,7 +490,16 @@ test("advisory recommendations plan explicit Agents without granting launch auth
 
 test("tampering with a planned model is rejected before launch", () => {
   const plan = buildHeadlessTeamPlan({
-    task: { schema_version: "1.0.0", task_id: "strict", summary: "Review a strict change", scope_paths: ["tools"], rigor: "L5", risk: "high", complexity: "high" },
+    task: {
+      schema_version: "1.1.0",
+      task_id: "strict",
+      summary: "Review a strict change",
+      scope_paths: ["tools/lib/next_workflow/example.mjs"],
+      operations: ["edit_code"],
+      rigor: "L5",
+      risk: "high",
+      complexity: "high",
+    },
     selectionPlanner,
   });
   const tampered = structuredClone(plan);

@@ -3,13 +3,14 @@ import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync } from "node:fs";
 import path from "node:path";
 import { resolveDevelopmentInstruction } from "../development_instruction.mjs";
+import { HEADLESS_PRODUCTION_CORRECTION_PROFILE } from "./correction_policy.mjs";
 import { createHeadlessRunController } from "./run_controller.mjs";
 import { normalizeHeadlessTask, buildHeadlessTeamPlan } from "./headless_plan.mjs";
 import { HEADLESS_RUNTIME_AUTHORITIES, defaultHeadlessRuntimeStateRoot } from "./headless_bootstrap.mjs";
 import { createHeadlessAuthoritySourceProvider, createHeadlessProductionRuntime } from "./headless_runtime.mjs";
 import { buildCliLaunchPlan, providerDigest, selectAgentConfiguration } from "./providers.mjs";
 import { validateContractSet, loadContracts } from "./contracts.mjs";
-import { trustedGitEnvironment, trustedGitExecutable, verifyEnforcedActivationRecord, verifyRepositoryReleaseDeployment } from "./release.mjs";
+import { activationCycleHistory, trustedGitEnvironment, trustedGitExecutable, verifyEnforcedActivationRecord, verifyRepositoryReleaseDeployment } from "./release.mjs";
 import { createSignedReleaseProofVerifier, createSignedTransitionVerifier } from "./release_trust.mjs";
 import { createLinuxIsolatedContainment } from "./runtime_containment.mjs";
 import {
@@ -81,7 +82,7 @@ function defaultBudget(rigor) {
     max_runtime_ms: 30 * 60 * 1000,
     max_tokens: 200_000,
     max_cost: 0,
-    max_retries: 0,
+    max_retries: HEADLESS_PRODUCTION_CORRECTION_PROFILE.max_retries,
   };
 }
 
@@ -147,9 +148,10 @@ export function createHeadlessProductionService({
     settings: selectionSettings,
     task: normalizedTask.fingerprint,
     instruction_fingerprint: instructionFingerprint,
+    correction_profile: HEADLESS_PRODUCTION_CORRECTION_PROFILE,
   });
   const runtimeCapabilityFingerprint = digest({
-    profile: "headless_production",
+    profile: HEADLESS_PRODUCTION_CORRECTION_PROFILE.profile_id,
     containment: "linux-user-mount-provider-net-v1",
     node: process.versions.node,
     platform: process.platform,
@@ -186,6 +188,7 @@ export function createHeadlessProductionService({
     try {
       const verified = verifyEnforcedActivationRecord({
         record,
+        cycleHistory: activationCycleHistory(store, record),
         proofVerifier,
         transitionVerifier,
         expectedRevocationEpoch: store.revocation_epoch,
@@ -380,7 +383,7 @@ export function createHeadlessProductionService({
     runtime: composition.runtime,
     async run() {
       const expiresAt = new Date(Date.parse(clock()) + 2 * 60 * 60 * 1000).toISOString();
-      return controller.run({
+      const result = await controller.run({
         topology: admittedTopology,
         expectedRigor: normalizedTask.rigor,
         taskId: normalizedTask.task_id,
@@ -406,6 +409,9 @@ export function createHeadlessProductionService({
         },
         expiresAt,
       });
+      if (result?.profile !== HEADLESS_PRODUCTION_CORRECTION_PROFILE.profile_id
+        || !HEADLESS_PRODUCTION_CORRECTION_PROFILE.allowed_decisions.includes(result.decision)) throw new Error("HEADLESS_PRODUCTION_CORRECTION_PROFILE_VIOLATION");
+      return result;
     },
     close({ cleanup = true } = {}) {
       const unresolvedAgentRuns = store.listUnresolvedAgentRuns().length;

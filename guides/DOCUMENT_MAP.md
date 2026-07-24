@@ -165,6 +165,11 @@ model/effort assertions, never as an operational provider.
 Operational provider discovery instead uses the pinned real executable under a
 private `/tmp` tmpfs while the host root remains read-only; the real
 Bubblewrap path is covered by the focused aggregate when prerequisites exist.
+`release.mjs` and `store.mjs` also own candidate roll-forward: a different
+candidate restarts at `shadow`, repeats the complete signed lifecycle, and
+becomes usable only after the newest record is enforced. The release regression
+keeps prior records and rejects direct skips, same-candidate rewind, rolled-back
+restart, and incomplete cycle revisions.
 
 ## Memory Documents
 

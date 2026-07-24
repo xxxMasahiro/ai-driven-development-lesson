@@ -2,6 +2,7 @@ import { execFileSync } from "node:child_process";
 import { accessSync, closeSync, constants as fsConstants, fstatSync, lstatSync, openSync, readFileSync, readSync, realpathSync } from "node:fs";
 import path from "node:path";
 import { providerDigest, providerIdentityKey, providerManifestFingerprint, validateExecutableDescriptor } from "./providers.mjs";
+import { resolveProviderRuntimeClosure } from "./provider_runtime_closure.mjs";
 
 const CODEX_ARGUMENT_TEMPLATE = Object.freeze([
   "exec",
@@ -162,21 +163,60 @@ function runObservedCommand(executableDescriptor, argv, { runner = runIsolatedPr
 export function runIsolatedProviderProbe(executableDescriptor, argv, options) {
   if (process.platform !== "linux") throw new Error("PROVIDER_ISOLATED_PROBE_UNAVAILABLE");
   if (!executableDescriptor || !Number.isSafeInteger(executableDescriptor.fd) || !/^[a-f0-9]{64}$/.test(executableDescriptor.digest ?? "")) throw new Error("PROVIDER_PINNED_EXECUTABLE_REQUIRED");
+  if (!Array.isArray(argv) || argv.some((argument) => typeof argument !== "string" || argument.includes("\0"))) throw new Error("PROVIDER_DISCOVERY_ARGUMENTS_INVALID");
   const unshare = ["/usr/bin/unshare", "/bin/unshare"].find((candidate) => {
-    try { return lstatSync(candidate).isFile(); } catch { return false; }
+    try {
+      const info = lstatSync(candidate);
+      return info.isFile() && (info.mode & 0o111) !== 0 && (info.mode & 0o022) === 0;
+    } catch {
+      return false;
+    }
   });
   const bwrap = ["/usr/bin/bwrap", "/usr/local/bin/bwrap"].find((candidate) => {
-    try { return lstatSync(candidate).isFile(); } catch { return false; }
+    try {
+      const info = lstatSync(candidate);
+      return info.isFile() && (info.mode & 0o111) !== 0 && (info.mode & 0o022) === 0;
+    } catch {
+      return false;
+    }
   });
   if (!unshare || !bwrap) throw new Error("PROVIDER_ISOLATED_PROBE_UNAVAILABLE");
-  return execFileSync(unshare, [
-    "--user", "--map-root-user", "--net", "--mount", "--fork",
-    bwrap, "--die-with-parent", "--unshare-pid", "--cap-drop", "ALL",
-    "--ro-bind", "/", "/", "--proc", "/proc", "--dev", "/dev", "--tmpfs", "/tmp",
-    "--clearenv", "--setenv", "HOME", "/tmp", "--setenv", "LANG", "C.UTF-8", "--setenv", "LC_ALL", "C.UTF-8",
-    "--dir", "/tmp/runtime", "--ro-bind", "/proc/self/fd/3", "/tmp/runtime/executable",
-    "/tmp/runtime/executable", ...argv,
-  ], { ...options, env: {}, shell: false, stdio: ["ignore", "pipe", "pipe", executableDescriptor.fd] });
+  const closure = resolveProviderRuntimeClosure(executableDescriptor);
+  try {
+    const directories = new Set(["/proc", "/dev", "/runtime"]);
+    for (const entry of closure.entries) {
+      for (const target of entry.mount_targets) {
+        let current = path.posix.dirname(target);
+        while (current !== "/") {
+          directories.add(current);
+          current = path.posix.dirname(current);
+        }
+      }
+    }
+    const directoryArguments = [...directories]
+      .sort((left, right) => left.split("/").length - right.split("/").length || left.localeCompare(right))
+      .flatMap((directory) => ["--dir", directory]);
+    const bindArguments = closure.entries.flatMap((entry, index) => entry.mount_targets.flatMap((target) => [
+      "--ro-bind", `/proc/self/fd/${index + 3}`, target,
+    ]));
+    const requestedStdio = Array.isArray(options?.stdio) ? options.stdio.slice(0, 3) : ["ignore", "pipe", "pipe"];
+    while (requestedStdio.length < 3) requestedStdio.push("pipe");
+    return execFileSync(unshare, [
+      "--user", "--map-root-user", "--net", "--mount", "--fork",
+      bwrap, "--die-with-parent", "--unshare-pid", "--unshare-uts", "--unshare-ipc", "--cap-drop", "ALL",
+      "--tmpfs", "/", ...directoryArguments, "--proc", "/proc", "--dev", "/dev", "--tmpfs", "/tmp",
+      ...bindArguments,
+      "--clearenv", "--setenv", "HOME", "/tmp", "--setenv", "LANG", "C.UTF-8", "--setenv", "LC_ALL", "C.UTF-8",
+      "--chdir", "/tmp", "/runtime/provider", ...argv,
+    ], {
+      ...options,
+      env: {},
+      shell: false,
+      stdio: [...requestedStdio, ...closure.entries.map((entry) => entry.fd)],
+    });
+  } finally {
+    closure.close();
+  }
 }
 
 function normalizeCodexModels(raw) {

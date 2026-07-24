@@ -54,5 +54,11 @@ docs/workflow/DEVELOPMENT_AUTONOMY_WORKFLOW.tsv	full-no-cache	A-F phase, write-s
 docs/workflow/INSTRUCTION_MEMORY.md	full-no-cache	Parent fallback instruction changes affect autonomous development authority.
 tools/lib/development_instruction.mjs	full-no-cache	Safe resolver changes affect path, file, selection, mode, scope, and output boundaries.
 tools/development-instruction	full-no-cache	Standalone instruction CLI changes affect parent and product workflow routing.
+tools/lib/next_workflow/	full-no-cache	Next Workflow runtime-owner changes require focused lifecycle tests and CI-equivalent local verification.
+tools/next-workflow*	full-no-cache	Next Workflow entry-point and launcher changes affect Production admission and delivery behavior.
+tools/install-next-workflow*	full-no-cache	Owner-controller installer changes affect the external Production authority boundary.
+tools/test_next_workflow_*.mjs	full-no-cache	Next Workflow regression changes require the aggregate runtime owner before push.
+tools/test_next_workflow_*.sh	full-no-cache	Next Workflow test wrappers affect focused and aggregate execution ownership.
+learning/NEXT_WORKFLOW_*	full-no-cache	Next Workflow settings and registries affect Production selection, delivery, and authority boundaries.
 tools/check_*.sh	full-no-cache	Checker changes affect mechanical verification behavior.
 tools/test_*.sh	full-no-cache	Regression-test changes affect aggregate and CI verification behavior.

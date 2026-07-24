@@ -118,6 +118,17 @@ git_hooks_git_root() {
   git -C "$LESSON_ROOT" rev-parse --show-toplevel 2>/dev/null || printf '%s\n' "$LESSON_ROOT"
 }
 
+git_hooks_clear_local_repository_environment() {
+  local variable_name
+  local -a variable_names=()
+  while IFS= read -r variable_name; do
+    [[ -n "$variable_name" ]] && variable_names+=("$variable_name")
+  done < <(git rev-parse --local-env-vars)
+  if (( ${#variable_names[@]} > 0 )); then
+    unset "${variable_names[@]}"
+  fi
+}
+
 git_hooks_cache_dir() {
   if [[ -n "${GIT_HOOKS_CACHE_DIR:-}" ]]; then
     printf '%s\n' "$GIT_HOOKS_CACHE_DIR"
@@ -647,6 +658,32 @@ git_hooks_changed_paths() {
     git -C "$root" diff --cached --name-only --diff-filter=ACDMRTUXB 2>/dev/null || true
     git -C "$root" ls-files --others --exclude-standard 2>/dev/null || true
   } | sed '/^[[:space:]]*$/d' | sort -u
+}
+
+git_hooks_staged_paths() {
+  local root
+  root="$(git_hooks_git_root)"
+  git -C "$root" diff --cached --name-only --diff-filter=ACDMRTUXB 2>/dev/null |
+    sed '/^[[:space:]]*$/d' |
+    sort -u
+}
+
+git_hooks_effective_staged_mode() {
+  local saved_mode
+  local matches
+  local -a paths=()
+  saved_mode="$(git_hooks_mode)" || return 1
+  mapfile -t paths < <(git_hooks_staged_paths)
+  if [[ "${#paths[@]}" -eq 0 ]]; then
+    printf '%s\tfalse\n' "$saved_mode"
+    return 0
+  fi
+  matches="$(git_hooks_recommendation_rows_for_paths "${paths[@]}")" || return 1
+  if [[ -n "$matches" ]]; then
+    printf 'full\ttrue\n'
+  else
+    printf '%s\tfalse\n' "$saved_mode"
+  fi
 }
 
 git_hooks_normalize_path() {

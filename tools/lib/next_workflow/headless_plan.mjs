@@ -1,24 +1,17 @@
 import { createHash } from "node:crypto";
 import path from "node:path";
 import { planTeamTopology } from "./agents.mjs";
-import { assessRigor } from "./contracts.mjs";
+import { assessRigor, RIGOR_HARD_L5_TRIGGERS } from "./contracts.mjs";
+import {
+  classifyHeadlessTaskImpact,
+  normalizeHeadlessOperations,
+} from "./rigor_classification.mjs";
 
 const RIGOR = new Set(["L1", "L2", "L3", "L4", "L5"]);
 const RISK = new Set(["low", "normal", "high", "critical"]);
 const COMPLEXITY = new Set(["low", "normal", "high", "extreme"]);
 const EXECUTION_PREFERENCES = new Set(["auto", "single_agent", "team"]);
-const HARD_TRIGGER_PATTERNS = Object.freeze({
-  security: /\bsecurity|secure|vulnerabilit|threat\b/iu,
-  authentication: /\bauthentication|authenticate|login|oauth|sso\b/iu,
-  secrets: /\bsecret|credential|api[ _-]?key|access[ _-]?token\b/iu,
-  permissions: /\bpermission|authorization|access control|privilege|sandbox\b/iu,
-  destructive_operation: /\bdelete|remove|destroy|purge|truncate\b/iu,
-  history_rewrite: /\bhistory rewrite|force[ -]?push|rebase\b/iu,
-  ci_or_safety_gate_change: /\bci\b|safety gate|release gate|quality gate/iu,
-  external_repository_write: /\bpush\b|pull request|\bpr\b|\bmerge\b|external repository/iu,
-  data_migration: /\bmigration|migrate|schema change|database upgrade\b/iu,
-  breaking_compatibility: /\bbreaking|incompatible|compatibility break\b/iu,
-});
+const TASK_SCHEMA_VERSIONS = new Set(["1.0.0", "1.1.0"]);
 const LEAD_ROLE_ID = Object.freeze({
   "Value Design Lead": "director",
   "Planning Design Lead": "planner",
@@ -61,6 +54,9 @@ function defaultTasks(input) {
   if (["L1", "L2"].includes(input.rigor)) return [];
   return [{
     task_id: "implementation",
+    summary: input.summary,
+    scope_paths: input.scope_paths,
+    operations: input.operations,
     role: "Implementation Task",
     parent_role: "Implementation Lead",
     writer: false,
@@ -86,87 +82,67 @@ function safeScopePaths(entries, code) {
   return paths;
 }
 
-function boundedClassificationText(input, scopePaths) {
-  const fragments = [];
-  let totalBytes = 0;
-  const append = (value) => {
-    if (typeof value !== "string") throw new Error("HEADLESS_TASK_CLASSIFICATION_FRAGMENT_INVALID");
-    const bytes = Buffer.byteLength(value);
-    if (bytes > 16 * 1024 || totalBytes + bytes + 1 > 64 * 1024) throw new Error("HEADLESS_TASK_CLASSIFICATION_INPUT_TOO_LARGE");
-    totalBytes += bytes + 1;
-    fragments.push(value);
-  };
-  append(input.summary);
-  for (const entry of scopePaths) append(entry);
-  for (const task of Array.isArray(input.tasks) ? input.tasks : []) {
-    if (typeof task?.summary === "string") append(task.summary);
-    if (Array.isArray(task?.scope_paths)) for (const entry of task.scope_paths) append(entry);
-    if (Array.isArray(task?.data)) {
-      for (const entry of task.data) {
-        let serialized;
-        try {
-          serialized = JSON.stringify(entry);
-        } catch {
-          throw new Error("HEADLESS_TASK_CLASSIFICATION_FRAGMENT_INVALID");
-        }
-        if (typeof serialized !== "string") throw new Error("HEADLESS_TASK_CLASSIFICATION_FRAGMENT_INVALID");
-        append(serialized);
-      }
-    }
-  }
-  return fragments.join("\n");
-}
-
 function safeChangeSignals(value) {
   if (value === undefined) return [];
   if (!Array.isArray(value)
-    || value.length > Object.keys(HARD_TRIGGER_PATTERNS).length
-    || value.some((entry) => typeof entry !== "string" || !Object.hasOwn(HARD_TRIGGER_PATTERNS, entry))
+    || value.length > RIGOR_HARD_L5_TRIGGERS.length
+    || value.some((entry) => typeof entry !== "string" || !RIGOR_HARD_L5_TRIGGERS.includes(entry))
     || new Set(value).size !== value.length) throw new Error("HEADLESS_TASK_CHANGE_SIGNALS_INVALID");
   return [...value].sort();
 }
 
-function automaticClassification(input, { risk, complexity, scopePaths, explicitSignals }) {
-  const searchable = boundedClassificationText(input, scopePaths);
-  const inferred = Object.entries(HARD_TRIGGER_PATTERNS).filter(([, pattern]) => pattern.test(searchable)).map(([trigger]) => trigger);
-  const hardTriggers = [...new Set([...explicitSignals, ...inferred])].sort();
-  const hardTriggerEvidence = Object.fromEntries(hardTriggers.map((trigger) => [
-    trigger,
-    explicitSignals.includes(trigger) ? `task.change_signals:${trigger}` : `independent_summary_scope_match:${trigger}`,
-  ]));
-  const riskScore = { low: 0, normal: 1, high: 2, critical: 2 }[risk];
-  const complexityScore = { low: 0, normal: 1, high: 2, extreme: 2 }[complexity];
-  const scores = {
-    user_impact: riskScore,
-    change_scope: Math.max(complexityScore, scopePaths.length > 3 ? 2 : scopePaths.length > 1 ? 1 : 0),
-    recoverability: hardTriggers.some((trigger) => ["destructive_operation", "history_rewrite", "data_migration"].includes(trigger)) ? 2 : riskScore > 1 ? 1 : 0,
-    uncertainty: complexityScore,
-    verification_difficulty: complexityScore,
-    permission_boundary_impact: hardTriggers.some((trigger) => ["security", "authentication", "secrets", "permissions", "external_repository_write"].includes(trigger)) ? 2 : 0,
-  };
-  const scoreReasons = {
-    user_impact: `derived from risk:${risk}`,
-    change_scope: `derived from complexity:${complexity} and ${scopePaths.length} scope path(s)`,
-    recoverability: "derived from destructive, history, migration, and risk signals",
-    uncertainty: `derived from complexity:${complexity}`,
-    verification_difficulty: `derived from complexity:${complexity}`,
-    permission_boundary_impact: "derived from independently detected authority-boundary signals",
-  };
-  return { scores, scoreReasons, hardTriggers, hardTriggerEvidence };
+function safeTaskData(value) {
+  if (value === undefined) return [];
+  if (!Array.isArray(value) || value.length > 256) throw new Error("HEADLESS_SUBTASK_DATA_INVALID");
+  let cloned;
+  try {
+    cloned = structuredClone(value);
+  } catch {
+    throw new Error("HEADLESS_SUBTASK_DATA_INVALID");
+  }
+  return cloned;
 }
 
 export function normalizeHeadlessTask(input) {
-  if (!input || input.schema_version !== "1.0.0" || typeof input.summary !== "string" || input.summary.length === 0 || Buffer.byteLength(input.summary) > 16 * 1024) throw new Error("HEADLESS_TASK_INVALID");
-  const developerMinimum = input.rigor ?? "L1";
-  const risk = input.risk ?? "normal";
-  const complexity = input.complexity ?? "normal";
+  if (!input || !TASK_SCHEMA_VERSIONS.has(input.schema_version) || typeof input.summary !== "string" || input.summary.length === 0 || Buffer.byteLength(input.summary) > 16 * 1024) throw new Error("HEADLESS_TASK_INVALID");
+  const normalizedInput = typeof input.fingerprint === "string";
+  if (!normalizedInput && ["developer_minimum_rigor", "developer_minimum_risk", "developer_minimum_complexity", "impact_assessment"].some((field) => input[field] !== undefined)) throw new Error("HEADLESS_TASK_INTERNAL_FIELDS_INVALID");
+  const developerMinimum = normalizedInput ? input.developer_minimum_rigor : (input.rigor ?? "L1");
+  const riskMinimum = normalizedInput ? input.developer_minimum_risk : (input.risk ?? "normal");
+  const complexityMinimum = normalizedInput ? input.developer_minimum_complexity : (input.complexity ?? "normal");
   const executionPreference = input.execution_preference ?? "auto";
-  if (!RIGOR.has(developerMinimum) || !RISK.has(risk) || !COMPLEXITY.has(complexity) || !EXECUTION_PREFERENCES.has(executionPreference)) throw new Error("HEADLESS_TASK_CLASSIFICATION_INVALID");
+  if (!RIGOR.has(developerMinimum) || !RISK.has(riskMinimum) || !COMPLEXITY.has(complexityMinimum) || !EXECUTION_PREFERENCES.has(executionPreference)) throw new Error("HEADLESS_TASK_CLASSIFICATION_INVALID");
   if (input.tasks !== undefined && (!Array.isArray(input.tasks) || input.tasks.length > 64)) throw new Error("HEADLESS_TASK_COUNT_INVALID");
   const explicitSignals = safeChangeSignals(input.change_signals);
   const scopePaths = safeScopePaths(input.scope_paths, "HEADLESS_TASK_SCOPE_INVALID");
-  if (scopePaths.length === 0) throw new Error("HEADLESS_TASK_SCOPE_INVALID");
-  const classification = automaticClassification(input, { risk, complexity, scopePaths, explicitSignals });
+  const operations = input.schema_version === "1.1.0" ? normalizeHeadlessOperations(input.operations) : [];
+  const tasks = (input.tasks ?? []).map((task) => ({
+    task_id: requireId(task.task_id, "HEADLESS_SUBTASK_ID_INVALID"),
+    summary: task.summary === undefined
+      ? input.summary
+      : (typeof task.summary === "string" && task.summary.length > 0 && Buffer.byteLength(task.summary) <= 16 * 1024
+        ? task.summary
+        : (() => { throw new Error("HEADLESS_SUBTASK_SUMMARY_INVALID"); })()),
+    scope_paths: safeScopePaths(task.scope_paths ?? scopePaths, "HEADLESS_SUBTASK_SCOPE_INVALID"),
+    operations: input.schema_version === "1.1.0" ? normalizeHeadlessOperations(task.operations, "HEADLESS_SUBTASK_OPERATIONS_INVALID") : [],
+    role: task.role ?? "Implementation Task",
+    parent_role: task.parent_role ?? "Implementation Lead",
+    writer: false,
+    parallel: task.parallel === true,
+    owned_paths: [],
+    perspectives: [...new Set(task.perspectives ?? [])].sort(),
+    data: safeTaskData(task.data),
+  }));
+  const classification = classifyHeadlessTaskImpact({
+    schemaVersion: input.schema_version,
+    summary: input.summary,
+    scopePaths,
+    operations,
+    tasks,
+    explicitSignals,
+    riskMinimum,
+    complexityMinimum,
+  });
   let rigorAssessment = assessRigor({
     ...classification,
     developerMinimum,
@@ -181,52 +157,62 @@ export function normalizeHeadlessTask(input) {
     };
   }
   const rigor = rigorAssessment.effective_level;
-  const tasks = Array.isArray(input.tasks) && input.tasks.length > 0 ? input.tasks : defaultTasks({ rigor });
   const normalized = {
-    schema_version: "1.0.0",
+    schema_version: input.schema_version,
+    schema_id: input.schema_version === "1.1.0" ? "HeadlessTask@1.1" : "HeadlessTask@1.0",
     task_id: requireId(input.task_id, "HEADLESS_TASK_ID_INVALID"),
     summary: input.summary,
     scope_paths: scopePaths,
+    operations: classification.impactAssessment.root_operations,
     rigor,
     developer_minimum_rigor: developerMinimum,
     execution_preference: executionPreference,
     effective_execution_mode: rigor === "L1" ? "single_agent" : "team",
     rigor_assessment: rigorAssessment,
-    risk,
-    complexity,
+    impact_assessment: classification.impactAssessment,
+    risk: classification.effectiveRisk,
+    complexity: classification.effectiveComplexity,
+    developer_minimum_risk: riskMinimum,
+    developer_minimum_complexity: complexityMinimum,
     required_roles: requiredRoles(rigor),
     required_perspectives: requiredPerspectives(rigor),
+    change_signals: explicitSignals,
     tasks: tasks.map((task) => ({
-      task_id: requireId(task.task_id, "HEADLESS_SUBTASK_ID_INVALID"),
-      summary: task.summary === undefined
-        ? input.summary
-        : (typeof task.summary === "string" && task.summary.length > 0 && Buffer.byteLength(task.summary) <= 16 * 1024
-          ? task.summary
-          : (() => { throw new Error("HEADLESS_SUBTASK_SUMMARY_INVALID"); })()),
-      scope_paths: safeScopePaths(task.scope_paths ?? scopePaths, "HEADLESS_SUBTASK_SCOPE_INVALID"),
-      role: task.role ?? "Implementation Task",
-      parent_role: task.parent_role ?? "Implementation Lead",
-      writer: false,
-      parallel: task.parallel === true,
-      owned_paths: [],
-      perspectives: [...new Set(task.perspectives ?? requiredPerspectives(rigor))].sort(),
-      data: task.data === undefined
-        ? []
-        : (Array.isArray(task.data) && task.data.length <= 256
-          ? structuredClone(task.data)
-          : (() => { throw new Error("HEADLESS_SUBTASK_DATA_INVALID"); })()),
+      ...task,
+      perspectives: task.perspectives.length > 0 ? task.perspectives : requiredPerspectives(rigor),
     })),
   };
-  return { ...normalized, fingerprint: digest(normalized) };
+  const result = { ...normalized, fingerprint: digest(normalized) };
+  if (normalizedInput && input.fingerprint !== result.fingerprint) throw new Error("HEADLESS_TASK_FINGERPRINT_INVALID");
+  return result;
 }
 
 export function buildHeadlessTeamPlan({ task, selectionPlanner, maxAgents = 16, maxParallel = 4, maxProcessLaunches = 32 } = {}) {
   const normalizedTask = normalizeHeadlessTask(task);
+  if (normalizedTask.impact_assessment.status === "unknown") {
+    const blocker = {
+      code: "HEADLESS_IMPACT_UNKNOWN",
+      impact_assessment_fingerprint: normalizedTask.impact_assessment.classification_input_fingerprint,
+      reasons: normalizedTask.impact_assessment.unknown_reasons,
+    };
+    const stopped = {
+      schema_version: "1.0.0",
+      decision: "STOP",
+      profile: "headless_production_plan",
+      production_executable: false,
+      code: blocker.code,
+      task: normalizedTask,
+      selections: [],
+      blocker,
+    };
+    return { ...stopped, fingerprint: digest(stopped) };
+  }
   if (typeof selectionPlanner !== "function") throw new Error("HEADLESS_SELECTION_PLANNER_REQUIRED");
+  const topologyTasks = normalizedTask.tasks.length > 0 ? normalizedTask.tasks : defaultTasks(normalizedTask);
   const topology = planTeamTopology({
     rigor: normalizedTask.rigor,
     requiredRoles: normalizedTask.required_roles,
-    tasks: normalizedTask.tasks,
+    tasks: topologyTasks,
     requiredPerspectives: normalizedTask.required_perspectives,
     budgets: { max_agents: maxAgents, max_parallel: maxParallel, max_process_launches: maxProcessLaunches },
   });

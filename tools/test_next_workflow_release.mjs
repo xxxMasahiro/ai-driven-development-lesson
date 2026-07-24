@@ -59,37 +59,37 @@ test("protected runtime trust is external, private, closed-schema, current, and 
   assert.throws(() => loadProtectedRuntimeTrust({ repositoryRoot, repositoryLogicalId: "repo", checkoutInstanceId: "checkout", trustPath, now: NOW }), /OWNER_TRUST_SCHEMA_INVALID/);
 });
 
-function proofEvidence(kind) {
+function proofEvidence(kind, candidateDefinition = candidate) {
   const fingerprint = (label) => releaseDigest({ kind, label });
-  const git = "a".repeat(40);
+  const git = candidateDefinition.repository_head;
   const merge = "c".repeat(40);
   return {
     local_release: { repository_head: git, checkout_instance_id: "checkout", command_manifest_fingerprint: fingerprint("commands"), input_manifest_fingerprint: fingerprint("inputs"), artifact_manifest_fingerprint: fingerprint("artifacts") },
     pr_ci: { repository: "owner/repository", pr_number: 42, head_sha: git, run_id: 1001, check_names: ["required"], artifact_digest: fingerprint("pr-artifact") },
     main_ci: { repository: "owner/repository", branch: "main", pr_number: 42, candidate_head_sha: git, merge_sha: merge, run_id: 1002, check_names: ["required"], artifact_digest: fingerprint("main-artifact") },
     local_remote_sync: { repository_logical_id: "repository", local_head: merge, remote_head: merge, remote_ref: "refs/remotes/origin/main" },
-    recovery: { database_identity_fingerprint: fingerprint("database"), candidate_fingerprint: candidate.candidate_fingerprint, backup_manifest_fingerprint: fingerprint("backup"), restore_proof_fingerprint: fingerprint("restore") },
-    fenced_rollback: { candidate_fingerprint: candidate.candidate_fingerprint, authority_epoch: 7, checkpoint_ids: ["checkpoint-1"], state_proof_fingerprint: fingerprint("rollback-state") },
+    recovery: { database_identity_fingerprint: fingerprint("database"), candidate_fingerprint: candidateDefinition.candidate_fingerprint, backup_manifest_fingerprint: fingerprint("backup"), restore_proof_fingerprint: fingerprint("restore") },
+    fenced_rollback: { candidate_fingerprint: candidateDefinition.candidate_fingerprint, authority_epoch: 7, checkpoint_ids: ["checkpoint-1"], state_proof_fingerprint: fingerprint("rollback-state") },
     archive_decommission: { relationship_id: "relationship-1", from_state: "DRAINING", to_state: "ARCHIVED", transition_proof_fingerprint: fingerprint("archive-transition") },
     outbox_disposition: { relationship_id: "relationship-1", effect_ids: ["effect-1"], outbox_ids: ["outbox-1"], disposition: "delivered", receipt_manifest_fingerprint: fingerprint("outbox-receipts") }
   }[kind];
 }
 
-function proofFor(kind, overrides = {}) {
+function proofFor(kind, overrides = {}, candidateDefinition = candidate) {
   const proof = {
     owner: `owner-${kind}`,
     verifier: `verifier-${kind}`,
-    candidate_fingerprint: candidate.candidate_fingerprint,
+    candidate_fingerprint: candidateDefinition.candidate_fingerprint,
     fresh_until: "2029-01-02T00:00:00.000Z",
     correctness: { status: "passed", fingerprint: releaseDigest({ kind, correctness: true }) },
-    evidence: proofEvidence(kind),
+    evidence: proofEvidence(kind, candidateDefinition),
     ...overrides
   };
   return { ...proof, fingerprint: overrides.fingerprint ?? releaseDigest({ kind, owner: proof.owner, verifier: proof.verifier, candidate_fingerprint: proof.candidate_fingerprint, fresh_until: proof.fresh_until, correctness: proof.correctness, evidence: proof.evidence }) };
 }
 
-function proofs() {
-  return Object.fromEntries(PROOF_KINDS.map((kind) => [kind, proofFor(kind)]));
+function proofs(candidateDefinition = candidate) {
+  return Object.fromEntries(PROOF_KINDS.map((kind) => [kind, proofFor(kind, {}, candidateDefinition)]));
 }
 
 function independentVerifier({ proof }) {
@@ -105,8 +105,8 @@ function independentVerifier({ proof }) {
   };
 }
 
-function transitionEvidence(nextMode, candidateFingerprint = candidate.candidate_fingerprint) {
-  const value = { kind: nextMode, owner: `owner-${nextMode}`, verifier: `verifier-${nextMode}`, candidate_fingerprint: candidateFingerprint, fresh_until: "2029-01-02T00:00:00.000Z", correctness: { status: "passed", fingerprint: releaseDigest({ nextMode, correctness: true }) }, evidence: { acceptance_prerequisite_fingerprint: releaseDigest(ACCEPTED_PREREQUISITES), repository_head: "a".repeat(40), stage_evidence_fingerprint: releaseDigest({ nextMode, stage: true }) } };
+function transitionEvidence(nextMode, candidateDefinition = candidate) {
+  const value = { kind: nextMode, owner: `owner-${nextMode}`, verifier: `verifier-${nextMode}`, candidate_fingerprint: candidateDefinition.candidate_fingerprint, fresh_until: "2029-01-02T00:00:00.000Z", correctness: { status: "passed", fingerprint: releaseDigest({ nextMode, correctness: true }) }, evidence: { acceptance_prerequisite_fingerprint: releaseDigest(ACCEPTED_PREREQUISITES), repository_head: candidateDefinition.repository_head, stage_evidence_fingerprint: releaseDigest({ nextMode, stage: true }) } };
   return { ...value, fingerprint: releaseDigest(value) };
 }
 
@@ -129,13 +129,24 @@ function fixtureStore() {
   return openWorkflowStateStore({ repositoryRoot: root, expectedIdentity: { repository_logical_id: "repo", checkout_instance_id: "checkout" }, clock: () => NOW });
 }
 
-async function prepareReady(store) {
+async function prepareReady(store, candidateDefinition = candidate) {
+  return prepareThrough(store, candidateDefinition, ["shadow", "release_verified", "recovery_verified", "rollback_verified", "archive_decommission_verified", "ready"]);
+}
+
+async function prepareThrough(store, candidateDefinition, modes) {
   let expectedRevision = store.revision;
-  for (const nextMode of ["shadow", "release_verified", "recovery_verified", "rollback_verified", "archive_decommission_verified", "ready"]) {
-    const transitioned = await persistActivationTransition({ store, expectedRevision, candidateFingerprint: candidate.candidate_fingerprint, candidateDefinition: candidate, nextMode, evidence: transitionEvidence(nextMode), transitionVerifier, releasePrerequisites: ACCEPTED_PREREQUISITES, now: NOW });
+  for (const nextMode of modes) {
+    const transitioned = await persistActivationTransition({ store, expectedRevision, candidateFingerprint: candidateDefinition.candidate_fingerprint, candidateDefinition, nextMode, evidence: transitionEvidence(nextMode, candidateDefinition), transitionVerifier, releasePrerequisites: ACCEPTED_PREREQUISITES, now: NOW });
     expectedRevision = transitioned.store_revision;
   }
   return expectedRevision;
+}
+
+function cycleHistory(store, record, { payloadsOnly = false } = {}) {
+  const rows = store.query({ kind: "NextWorkflowActivation", limit: 1000 }).records
+    .filter((entry) => entry.record_revision >= record.cycle_start_revision && entry.record_revision <= record.revision)
+    .sort((left, right) => left.record_revision - right.record_revision);
+  return payloadsOnly ? rows.map((entry) => structuredClone(entry.payload)) : rows;
 }
 
 test("one deterministic candidate fingerprint binds ordered artifacts and repository head", () => {
@@ -353,13 +364,114 @@ test("activation independently re-verifies proofs and persists through expected-
   assert.deepEqual(persisted.candidate_definition, candidate);
   assert.deepEqual(Object.keys(persisted.signed_release_proofs).sort(), [...PROOF_KINDS].sort());
   assert.equal(validateActivationRecord(persisted).mode, "enforced");
-  assert.equal(verifyEnforcedActivationRecord({ record: persisted, proofVerifier: independentVerifier, transitionVerifier, expectedRevocationEpoch: store.revocation_epoch, now: NOW }).trusted, true);
+  const history = cycleHistory(store, persisted);
+  assert.equal(verifyEnforcedActivationRecord({ record: persisted, cycleHistory: history, proofVerifier: independentVerifier, transitionVerifier, expectedRevocationEpoch: store.revocation_epoch, now: NOW }).trusted, true);
+  assert.throws(() => verifyEnforcedActivationRecord({ record: persisted, cycleHistory: history.slice(1), proofVerifier: independentVerifier, transitionVerifier, expectedRevocationEpoch: store.revocation_epoch, now: NOW }), /ENFORCED_ACTIVATION_CYCLE_HISTORY_REQUIRED/);
+  const {
+    cycle_id: ignoredCycleId,
+    cycle_start_revision: ignoredCycleStart,
+    cycle_step: ignoredCycleStep,
+    previous_record_revision: ignoredPreviousRevision,
+    previous_record_content_fingerprint: ignoredPreviousFingerprint,
+    ...legacy
+  } = structuredClone(persisted);
+  legacy.schema_version = "1.0.0";
+  assert.equal(legacy.revision, 7);
+  assert.equal(verifyEnforcedActivationRecord({ record: legacy, proofVerifier: independentVerifier, transitionVerifier, expectedRevocationEpoch: store.revocation_epoch, now: NOW }).trusted, true);
   const forgedEvidence = structuredClone(persisted);
   forgedEvidence.evidence[0].fingerprint = "f".repeat(64);
-  assert.throws(() => verifyEnforcedActivationRecord({ record: forgedEvidence, proofVerifier: independentVerifier, transitionVerifier, expectedRevocationEpoch: store.revocation_epoch, now: NOW }), /ENFORCED_ACTIVATION_EVIDENCE_BINDING_INVALID/);
+  const forgedEvidenceHistory = cycleHistory(store, persisted, { payloadsOnly: true });
+  forgedEvidenceHistory[6] = forgedEvidence;
+  assert.throws(() => verifyEnforcedActivationRecord({ record: forgedEvidence, cycleHistory: forgedEvidenceHistory, proofVerifier: independentVerifier, transitionVerifier, expectedRevocationEpoch: store.revocation_epoch, now: NOW }), /ENFORCED_ACTIVATION_EVIDENCE_BINDING_INVALID/);
   const forgedTransition = structuredClone(persisted);
   forgedTransition.transition_evidence[0].owner = "forged-owner";
-  assert.throws(() => verifyEnforcedActivationRecord({ record: forgedTransition, proofVerifier: independentVerifier, transitionVerifier, expectedRevocationEpoch: store.revocation_epoch, now: NOW }), /ENFORCED_ACTIVATION_TRANSITION_BINDING_INVALID/);
+  const forgedTransitionHistory = cycleHistory(store, persisted, { payloadsOnly: true });
+  forgedTransitionHistory[6] = forgedTransition;
+  assert.throws(() => verifyEnforcedActivationRecord({ record: forgedTransition, cycleHistory: forgedTransitionHistory, proofVerifier: independentVerifier, transitionVerifier, expectedRevocationEpoch: store.revocation_epoch, now: NOW }), /ENFORCED_ACTIVATION_TRANSITION_BINDING_INVALID/);
+  store.close();
+});
+
+test("a different candidate replaces an abandoned partial cycle through seven fresh contiguous stages", async () => {
+  const store = fixtureStore();
+  const firstReadyRevision = await prepareReady(store);
+  const firstActivation = await completeActivation({ candidateFingerprint: candidate.candidate_fingerprint, proofs: proofs(), proofVerifier: independentVerifier, transitionVerifier, store, expectedRevision: firstReadyRevision, releasePrerequisites: ACCEPTED_PREREQUISITES, now: NOW });
+  const abandoned = freezeReleaseCandidate({
+    repositoryHead: candidate.repository_head,
+    repositoryTree: candidate.repository_tree,
+    artifactFingerprints: ["abandoned-artifact"],
+    nodeVersion: candidate.node_version,
+    contractFingerprint: candidate.contract_fingerprint,
+    releasePrerequisites: ACCEPTED_PREREQUISITES,
+  });
+  assert.notEqual(abandoned.candidate_fingerprint, candidate.candidate_fingerprint);
+  await assert.rejects(() => persistActivationTransition({
+    store,
+    expectedRevision: store.revision,
+    candidateFingerprint: abandoned.candidate_fingerprint,
+    candidateDefinition: abandoned,
+    nextMode: "release_verified",
+    evidence: transitionEvidence("release_verified", abandoned),
+    transitionVerifier,
+    releasePrerequisites: ACCEPTED_PREREQUISITES,
+    now: NOW,
+  }), /ACTIVATION_CANDIDATE_DEFINITION_DRIFT|CANDIDATE_DRIFT_REQUIRES_SHADOW/);
+  await prepareThrough(store, abandoned, ["shadow", "release_verified"]);
+  const replacement = freezeReleaseCandidate({
+    repositoryHead: candidate.repository_head,
+    repositoryTree: candidate.repository_tree,
+    artifactFingerprints: ["replacement-artifact"],
+    nodeVersion: candidate.node_version,
+    contractFingerprint: candidate.contract_fingerprint,
+    releasePrerequisites: ACCEPTED_PREREQUISITES,
+  });
+  await assert.rejects(() => persistActivationTransition({
+    store,
+    expectedRevision: store.revision,
+    candidateFingerprint: replacement.candidate_fingerprint,
+    candidateDefinition: replacement,
+    nextMode: "recovery_verified",
+    evidence: transitionEvidence("recovery_verified", replacement),
+    transitionVerifier,
+    releasePrerequisites: ACCEPTED_PREREQUISITES,
+    now: NOW,
+  }), /ACTIVATION_CANDIDATE_DEFINITION_DRIFT|CANDIDATE_DRIFT_REQUIRES_SHADOW/);
+  const replacementReadyRevision = await prepareReady(store, replacement);
+  const replacementActivation = await completeActivation({ candidateFingerprint: replacement.candidate_fingerprint, proofs: proofs(replacement), proofVerifier: independentVerifier, transitionVerifier, store, expectedRevision: replacementReadyRevision, releasePrerequisites: ACCEPTED_PREREQUISITES, now: NOW });
+  assert.equal(replacementActivation.mode, "enforced");
+  assert.equal(replacementActivation.store_revision, firstActivation.store_revision + 9);
+  assert.equal(replacementActivation.revision, 16);
+  assert.notEqual(replacementActivation.revision % 7, 0);
+  assert.equal(store.get({ id: firstActivation.activation_record_id }).payload.candidate_fingerprint, candidate.candidate_fingerprint);
+  const latest = store.get({ id: replacementActivation.activation_record_id }).payload;
+  assert.deepEqual(latest.candidate_definition, replacement);
+  assert.equal(latest.cycle_start_revision, 10);
+  assert.equal(latest.cycle_step, 7);
+  assert.equal(latest.transition_evidence[0].mode, "shadow");
+  assert.equal(latest.transition_evidence.length, 7);
+  const allRows = store.query({ kind: "NextWorkflowActivation", limit: 1000 }).records.sort((left, right) => left.record_revision - right.record_revision);
+  assert.equal(allRows.length, 16);
+  assert.deepEqual(allRows.map((row) => row.record_revision), Array.from({ length: 16 }, (_, index) => index + 1));
+  const replacementHistory = cycleHistory(store, latest);
+  assert.deepEqual(replacementHistory.map((row) => row.payload.cycle_step), [1, 2, 3, 4, 5, 6, 7]);
+  assert.ok(replacementHistory.every((row) => row.schema_version === "1.1.0"
+    && row.payload.cycle_start_revision === 10
+    && typeof row.payload.cycle_id === "string"
+    && Number.isSafeInteger(row.payload.previous_record_revision)
+    && Object.hasOwn(row.payload, "previous_record_content_fingerprint")));
+  assert.equal(verifyEnforcedActivationRecord({ record: latest, cycleHistory: replacementHistory, proofVerifier: independentVerifier, transitionVerifier, expectedRevocationEpoch: store.revocation_epoch, now: NOW }).trusted, true);
+  const incompleteCycle = { ...structuredClone(latest), revision: latest.revision - 1 };
+  assert.throws(() => verifyEnforcedActivationRecord({ record: incompleteCycle, proofVerifier: independentVerifier, transitionVerifier, expectedRevocationEpoch: store.revocation_epoch, now: NOW }), /ENFORCED_ACTIVATION_RECORD_INVALID/);
+  await assert.rejects(() => persistActivationTransition({
+    store,
+    expectedRevision: store.revision,
+    candidateFingerprint: replacement.candidate_fingerprint,
+    candidateDefinition: replacement,
+    nextMode: "shadow",
+    evidence: transitionEvidence("shadow", replacement),
+    transitionVerifier,
+    releasePrerequisites: ACCEPTED_PREREQUISITES,
+    now: NOW,
+  }), /ACTIVATION_ORDER_INVALID|ACTIVATION_LIFECYCLE_TRANSITION_INVALID/);
   store.close();
 });
 
@@ -412,6 +524,8 @@ test("activation rollback is CAS-guarded, evidence-bound, and producer-readable"
   assert.equal(rolledBack.mode, "rolled_back");
   assert.deepEqual(rolledBack.rollback_evidence.steps.map((step) => step.state), ["FENCING", "DRAINING_OR_QUARANTINING", "STATE_RESTORED", "LEGACY_VERIFIED", "ROLLED_BACK"]);
   assert.equal(validateActivationRecord(rolledBack).mode, "rolled_back");
+  const replacement = freezeReleaseCandidate({ repositoryHead: candidate.repository_head, repositoryTree: candidate.repository_tree, artifactFingerprints: ["after-rollback"], nodeVersion: candidate.node_version, contractFingerprint: candidate.contract_fingerprint, releasePrerequisites: ACCEPTED_PREREQUISITES });
+  await assert.rejects(() => persistActivationTransition({ store, expectedRevision: store.revision, candidateFingerprint: replacement.candidate_fingerprint, candidateDefinition: replacement, nextMode: "shadow", evidence: transitionEvidence("shadow", replacement), transitionVerifier, releasePrerequisites: ACCEPTED_PREREQUISITES, now: NOW }), /ACTIVATION_TRANSITION_TARGET_INVALID|ACTIVATION_ROLLBACK_TERMINAL/);
   await assert.rejects(() => rollbackActivation({ store, expectedRevision: activation.store_revision, candidateFingerprint: activation.candidate_fingerprint, evidence, rollbackVerifier, stateRestorer: async () => ({ restored: true, fingerprint: "restore" }), legacyVerifier: async () => ({ verified: true, fingerprint: "legacy" }), now: NOW }), /ACTIVATION_ROLLBACK_TARGET_INVALID|REVISION_CONFLICT/);
   store.close();
 });

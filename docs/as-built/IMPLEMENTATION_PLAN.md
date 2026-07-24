@@ -6181,3 +6181,75 @@ TESTS: tools/check_next_workflow.sh,tools/test_next_workflow.sh,tools/check_as_b
 14. Keep the read-only root bind for live provider discovery, create the pinned
     probe executable under the already writable private `/tmp` mount, and run a
     real Bubblewrap regression whenever the host prerequisites are available.
+
+## Production Activation candidate roll-forward implementation plan
+
+SYNC-ID: next_workflow_activation_roll_forward
+STATUS: implemented
+ARTIFACTS: docs/as-built/IMPLEMENTATION_PLAN.md,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/HANDOFF.md,docs/workflow/TASK_TRACKER.md,docs/workflow/TEST_PLAN_MANIFEST.tsv,tools/lib/next_workflow/release.mjs,tools/lib/next_workflow/store.mjs,tools/next-workflow-launcher.cjs,tools/test_next_workflow_launcher.mjs,tools/test_next_workflow_release.mjs
+TESTS: tools/check_next_workflow.sh,tools/test_next_workflow.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+1. Admit a different candidate from an enforced lifecycle only through a fresh
+   `shadow` transition; retain the fixed ordered path for all later stages.
+2. Keep `rolled_back` terminal and reject a same-candidate rewind or a direct
+   replacement transition to any post-shadow mode.
+3. Reset candidate-specific transition evidence and signed proofs while
+   appending new immutable store records with monotonic revisions.
+4. Verify enforced records at positive whole-cycle revision boundaries while
+   retaining every existing proof, candidate, authority, and time binding.
+5. Add a focused two-candidate regression that proves complete roll-forward,
+   old-record retention, invalid direct transition refusal, same-candidate
+   rewind refusal, and incomplete-cycle rejection.
+6. Update the independent pre-import launcher verifier and prove it launches
+   only after a real second complete candidate cycle.
+7. Synchronize the complete parent authority set, then run the focused,
+   aggregate, full-hook, PR CI, main CI, exact synchronization, replacement
+   Activation, and bounded Production smoke gates.
+
+## Automatic delivery-lane efficiency implementation plan
+
+SYNC-ID: next_workflow_delivery_lane_selection
+STATUS: implemented
+ARTIFACTS: .githooks/pre-commit,.github/workflows/ci.yml,.github/workflows/lesson14-ci.yml,docs/as-built/IMPLEMENTATION_PLAN.md,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/GIT_HOOK_RECOMMENDATION_PATHS.tsv,docs/workflow/HANDOFF.md,docs/workflow/TASK_TRACKER.md,docs/workflow/TEST_PLAN_MANIFEST.tsv,learning/NEXT_WORKFLOW_DELIVERY_SETTINGS.json,tools/check_ci_workflow_structure.sh,tools/git-workflow,tools/lib/development_instruction.mjs,tools/lib/git_hooks_policy.sh,tools/lib/git_workflow_policy.sh,tools/lib/next_workflow/delivery_lane.mjs,tools/lib/next_workflow/git_snapshot.mjs,tools/next-workflow.mjs,tools/test_git_hooks.sh,tools/test_next_workflow_delivery.mjs,tools/test_next_workflow_delivery.sh
+TESTS: tools/check_next_workflow.sh,tools/test_next_workflow.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+1. Model delivery separately from L1-L5 rigor and preserve immutable CI floors.
+2. Observe exact Git, authority, and test-manifest state without shell
+   evaluation or inherited Git configuration.
+3. Intersect the selected lane with saved Git action authority.
+4. Require exact just-in-time re-observation before each Git action.
+5. Remove duplicate remote branch CI while preserving PR and main evidence.
+6. Add focused, hook, CI-structure, and manifest regressions.
+
+## Rigor, lifecycle, and correction implementation plan
+
+SYNC-ID: next_workflow_rigor_activation_correction_contract
+STATUS: implemented
+ARTIFACTS: docs/as-built/IMPLEMENTATION_PLAN.md,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/HANDOFF.md,docs/workflow/TASK_TRACKER.md,docs/workflow/TEST_PLAN_MANIFEST.tsv,tools/lib/next_workflow/correction_policy.mjs,tools/lib/next_workflow/headless_plan.mjs,tools/lib/next_workflow/headless_service.mjs,tools/lib/next_workflow/release.mjs,tools/lib/next_workflow/rigor_classification.mjs,tools/lib/next_workflow/run_controller.mjs,tools/lib/next_workflow/saga.mjs,tools/lib/next_workflow/store.mjs,tools/next-workflow-launcher.cjs,tools/next-workflow.mjs,tools/test_next_workflow_authority.mjs,tools/test_next_workflow_headless_plan.mjs,tools/test_next_workflow_launcher.mjs,tools/test_next_workflow_release.mjs,tools/test_next_workflow_run_controller.mjs,tools/test_next_workflow_store.mjs
+TESTS: tools/check_next_workflow.sh,tools/test_next_workflow.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+1. Classify bounded structured operations and multilingual safety signals.
+2. Stop unknown impact before topology and model selection.
+3. Bind Production to a zero-retry, PASS-or-STOP correction profile.
+4. Persist exact seven-stage Activation cycles and predecessor bindings.
+5. Supply complete cycle history to every status, runtime, and launcher
+   verifier.
+6. Add focused classification, correction, release, store, and launcher tests.
+
+## External Owner Controller implementation plan
+
+SYNC-ID: next_workflow_owner_controller_authority
+STATUS: implemented
+ARTIFACTS: docs/as-built/IMPLEMENTATION_PLAN.md,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/HANDOFF.md,docs/workflow/TASK_TRACKER.md,docs/workflow/TEST_PLAN_MANIFEST.tsv,tools/install-next-workflow-owner-controller.mjs,tools/lib/next_workflow/owner_controller.mjs,tools/lib/next_workflow/release.mjs,tools/lib/next_workflow/release_observation.mjs,tools/next-workflow-launcher.cjs,tools/next-workflow.mjs,tools/test_next_workflow_owner_controller.mjs,tools/test_next_workflow_owner_controller.sh,tools/test_next_workflow_release_observation.mjs,tools/test_next_workflow_release_observation.sh
+TESTS: tools/check_next_workflow.sh,tools/test_next_workflow.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+1. Install an immutable owner-private snapshot only from synchronized main.
+2. Exact-verify its manifest, repository identity, source HEAD/tree, complete
+   file inventory, permissions, and action allowlist on every mutation.
+3. Remove low-level release mutation actions from that allowlist.
+4. Re-observe GitHub PR/main CI and local/remote Git lineage inside the
+   installed snapshot.
+5. Sign and enforce only the internally reconstructed evidence.
+6. Deliver through PR/main CI, install the merged controller, bootstrap default
+   headless state, activate the observed candidate, and run a bounded smoke
+   task; keep Control Center reconstruction deferred.
