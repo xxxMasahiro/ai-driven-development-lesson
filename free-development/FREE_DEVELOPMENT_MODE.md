@@ -146,3 +146,9 @@ spawn effect.
 - `ci`: local Git, remote sync, and CI are required. This is the default and preserves the strict existing behavior.
 
 For team development or container work, use `advanced/TEAM_DEVELOPMENT_DOCKER.md`.
+
+Free Development uses the same authority-owned Agent result grammar as every
+other mode. Repository-local instructions may shape the work, but finding
+codes and evidence references still use the published bounded ASCII patterns,
+no findings is still an empty array, and malformed output is rejected without
+sanitization or automatic retry.

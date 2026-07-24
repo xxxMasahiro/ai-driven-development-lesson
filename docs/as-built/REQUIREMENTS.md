@@ -4273,3 +4273,24 @@ protected runtime-recovery authorization bound to the exact effect, target,
 operation, authority epoch, and original authority fingerprint. Current
 deployment drift, an expired decision alone, or caller-supplied recovery text
 must never grant settlement authority.
+
+## Machine-valid Agent result contract requirements
+
+SYNC-ID: next_workflow_result_contract_closure
+STATUS: implemented
+ARTIFACTS: AGENTS.MD,docs/as-built/IMPLEMENTATION_PLAN.md,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/DEVELOPMENT_AUTONOMY_WORKFLOW.tsv,docs/workflow/DEVELOPMENT_INSTRUCTION_POLICY.tsv,docs/workflow/FINAL_GATE_CI_GRAPH.tsv,docs/workflow/FINAL_GATE_COVERAGE.tsv,docs/workflow/FINAL_GATE_EXECUTION_POLICY.tsv,docs/workflow/FINAL_GATE_GAP_COMMANDS.tsv,docs/workflow/GIT_HOOK_CHECKS.tsv,docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv,docs/workflow/HANDOFF.md,docs/workflow/INSTRUCTION_MEMORY.md,docs/workflow/PRODUCT_REPOSITORY_STRUCTURE.tsv,docs/workflow/PRODUCT_SECURITY_POLICY.tsv,docs/workflow/REPOSITORY_DEVELOPMENT_RUNNER_POLICY.tsv,docs/workflow/REPOSITORY_DEVELOPMENT_WORKFLOW.tsv,docs/workflow/REPOSITORY_DOCUMENT_SYNC.md,docs/workflow/REPOSITORY_DOCUMENT_SYNC_POLICY.json,docs/workflow/SAFEFLOW_SECURITY_BACKFILL.tsv,docs/workflow/TASK_TRACKER.md,docs/workflow/TEST_PLAN_MANIFEST.tsv,free-development/FREE_DEVELOPMENT_MODE.md,guides/DOCUMENT_MAP.md,learning/REPOSITORY_DEVELOPMENT_APPROVALS.tsv,templates/TEMPLATES.md,tools/lib/next_workflow/task_delivery.mjs,tools/test_next_workflow_task_delivery.mjs
+TESTS: tools/check_next_workflow.sh,tools/test_next_workflow.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+Every trusted task-delivery envelope must publish the exact machine-valid
+shape of each Agent finding, including required fields, the closed severity
+vocabulary, bounded ASCII identifier grammars for finding codes and evidence
+references, and the empty-array representation for no findings. The contract
+must tell an Agent that prose, whitespace, slash characters, paths, commands,
+and secrets do not belong in a finding code.
+
+The protected result validator remains authoritative and fail-closed. A
+malformed code or evidence reference must be rejected rather than rewritten,
+sanitized, inferred, or accepted under a weaker grammar. This closes the gap
+between what a Production Agent is told to emit and what the runtime already
+requires without trading off containment, provenance, result rejection,
+retry authority, or any unrelated behavior.

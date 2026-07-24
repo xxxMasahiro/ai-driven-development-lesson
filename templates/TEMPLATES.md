@@ -293,3 +293,8 @@ Templates cannot weaken terminal launch reconciliation either. Protected
 process absence and persisted launch evidence are mandatory, settling a spawn
 effect never accepts a failed Agent result, and no retry authority is
 inherited.
+
+Templates inherit the exact parent Agent result grammar. They may add
+repository-specific context but must not redefine finding codes, evidence
+references, severity values, or the empty-array no-findings representation,
+and must not sanitize malformed output into acceptance.

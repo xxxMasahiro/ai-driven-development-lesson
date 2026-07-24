@@ -303,3 +303,11 @@ recovery-only service with no provider discovery, model selection, Agent plan,
 or Agent launch. It remains bound to the original signed Activation snapshot;
 an expired decision additionally requires exact protected runtime-recovery
 reauthorization before atomic finalization.
+
+The authority-owned Agent result contract must publish the same exact
+machine-valid finding and evidence-reference grammar enforced by the protected
+result validator, including the empty-array representation for no findings.
+Malformed Agent output remains untrusted data: never rewrite or sanitize an
+invalid identifier into acceptance, never weaken validation, and never infer
+retry authority from contract failure. Product-local instructions may add work
+context but cannot override this parent runtime boundary.

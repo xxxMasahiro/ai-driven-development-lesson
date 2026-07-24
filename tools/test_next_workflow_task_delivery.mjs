@@ -72,6 +72,11 @@ test("authority-owned delivery reads AGENTS and the resolved instruction, serial
   assert.equal(delivery.envelope.control.authority_owner, "Orchestrator Agent");
   assert.equal(delivery.envelope.control.result_contract.run_id, "effect-runtime-wiring-test");
   assert.equal(delivery.envelope.control.result_contract.output_format, "json_only");
+  assert.deepEqual(delivery.envelope.control.result_contract.finding_contract.required_fields, ["code", "severity", "message", "evidence_refs"]);
+  assert.equal(delivery.envelope.control.result_contract.finding_contract.code_pattern, "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,63}$");
+  assert.equal(delivery.envelope.control.result_contract.finding_contract.evidence_ref_pattern, "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$");
+  assert.deepEqual(delivery.envelope.control.result_contract.finding_contract.no_findings_representation, []);
+  assert.match(delivery.envelope.control.result_contract.finding_contract.code_format, /never use whitespace/u);
   assert.equal(delivery.envelope.data[0].interpretation, "data");
   assert.equal(delivery.verify().delivery_fingerprint, delivery.delivery_fingerprint);
   const original = readFileSync(promptFile);

@@ -4079,3 +4079,26 @@ protected runtime-recovery reauthorization at finalization. Focused tests and
 the complete Next Workflow aggregate pass. Remaining delivery is full hooks,
 PR/main CI, synchronized Controller installation, reconciliation of the
 preserved effect, replacement Activation, and a fresh bounded team smoke.
+
+## Machine-valid Agent result contract handoff
+
+SYNC-ID: next_workflow_result_contract_closure
+STATUS: implemented
+ARTIFACTS: AGENTS.MD,docs/as-built/IMPLEMENTATION_PLAN.md,docs/as-built/REQUIREMENTS.md,docs/as-built/SPECIFICATION.md,docs/workflow/AS_BUILT_SYNC_CONTRACT.tsv,docs/workflow/DEVELOPMENT_AUTONOMY_WORKFLOW.tsv,docs/workflow/DEVELOPMENT_INSTRUCTION_POLICY.tsv,docs/workflow/FINAL_GATE_CI_GRAPH.tsv,docs/workflow/FINAL_GATE_COVERAGE.tsv,docs/workflow/FINAL_GATE_EXECUTION_POLICY.tsv,docs/workflow/FINAL_GATE_GAP_COMMANDS.tsv,docs/workflow/GIT_HOOK_CHECKS.tsv,docs/workflow/GIT_HOOK_PARALLEL_GROUPS.tsv,docs/workflow/HANDOFF.md,docs/workflow/INSTRUCTION_MEMORY.md,docs/workflow/PRODUCT_REPOSITORY_STRUCTURE.tsv,docs/workflow/PRODUCT_SECURITY_POLICY.tsv,docs/workflow/REPOSITORY_DEVELOPMENT_RUNNER_POLICY.tsv,docs/workflow/REPOSITORY_DEVELOPMENT_WORKFLOW.tsv,docs/workflow/REPOSITORY_DOCUMENT_SYNC.md,docs/workflow/REPOSITORY_DOCUMENT_SYNC_POLICY.json,docs/workflow/SAFEFLOW_SECURITY_BACKFILL.tsv,docs/workflow/TASK_TRACKER.md,docs/workflow/TEST_PLAN_MANIFEST.tsv,free-development/FREE_DEVELOPMENT_MODE.md,guides/DOCUMENT_MAP.md,learning/REPOSITORY_DEVELOPMENT_APPROVALS.tsv,templates/TEMPLATES.md,tools/lib/next_workflow/task_delivery.mjs,tools/test_next_workflow_task_delivery.mjs
+TESTS: tools/check_next_workflow.sh,tools/test_next_workflow.sh,tools/check_as_built_sync_contract.sh,tools/check_as_built_docs.sh,tools/check_workflow_pair_sync.sh,tools/check_repository_development_workflow.sh,tools/test_repository_development_workflow.sh
+
+The first post-Activation team smoke reached the selected
+`gpt-5.6-sol / high` CLI provider exactly once and retained valid containment,
+network, tool, process, and model/effort evidence. It then correctly refused
+the Agent response because a finding code did not satisfy the protected
+machine-identifier grammar. The failed spawn effect was reconciled through
+the immutable external Owner Controller without starting another provider.
+
+The validator was not weakened. The trusted delivery contract now tells the
+Agent the exact required fields, closed severity values, bounded ASCII code
+and evidence-reference patterns, valid examples, single-line message rule,
+and empty-array no-findings representation. Focused delivery and lifecycle
+tests pass. Remaining delivery is the synchronized document and aggregate
+gates, one full local hook, PR/main CI, synchronized Controller replacement,
+observed Activation, and a fresh bounded team smoke. Control Center
+reconstruction and all separately deferred plans remain unchanged.
