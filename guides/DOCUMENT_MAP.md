@@ -296,3 +296,9 @@ For a first pass, use this order:
 
 The goal is not to memorize files.
 The goal is to know which document to ask the agent about when you need context.
+
+For Next Workflow runtime result safety, begin with the synchronized
+post-exit identity settlement sections in the as-built trio and
+`docs/workflow/INSTRUCTION_MEMORY.md`. They define the bounded transient wait,
+immediate reuse handling, and persistent-unknown stop shared by the parent
+authority documents.

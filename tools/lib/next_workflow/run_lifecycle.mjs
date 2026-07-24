@@ -21,6 +21,7 @@ const RUN_STATES = new Set(["STARTING", "RUNNING", "CANCELLING", "TERMINATING", 
 const TERMINAL_STATES = new Set(["COMPLETED", "FAILED", "CANCELLED", "TIMED_OUT"]);
 const RESULT_STATUSES = new Set(["succeeded", "failed", "blocked"]);
 const RESULT_SEVERITIES = new Set(["info", "warning", "error"]);
+const PROCESS_STATUSES = new Set(["matched", "absent", "reused", "unknown"]);
 const PATH_OR_COMMAND_TEXT = /(?:^|\s)(?:\/[^\s]+|[A-Za-z]:[\\/]|\\\\|git\s+(?:push|commit|merge|reset|checkout)|rm\s+-|curl\s+|wget\s+|ssh\s+|sudo\s+)|[`$<>|&\\]/iu;
 const PROTECTED_RUN_LIFECYCLE_PORTS = new WeakMap();
 const PROTECTED_RUN_LIFECYCLE_WRITERS = new WeakMap();
@@ -34,6 +35,27 @@ function canonicalJson(value) {
 function digest(value) {
   const bytes = Buffer.isBuffer(value) ? value : Buffer.from(typeof value === "string" ? value : canonicalJson(value));
   return createHash("sha256").update(bytes).digest("hex");
+}
+
+export async function waitForPostExitProcessStatus({
+  probe,
+  timeoutMs,
+  pollMs = 10,
+} = {}) {
+  if (typeof probe !== "function"
+    || !Number.isSafeInteger(timeoutMs)
+    || timeoutMs < 1
+    || !Number.isSafeInteger(pollMs)
+    || pollMs < 1) throw new Error("RUN_LIFECYCLE_POST_EXIT_WAIT_INVALID");
+  const deadline = performance.now() + timeoutMs;
+  let status;
+  do {
+    status = probe();
+    if (!PROCESS_STATUSES.has(status)) throw new Error("RUN_LIFECYCLE_PROCESS_STATUS_INVALID");
+    if (status !== "unknown") return status;
+    await new Promise((resolvePromise) => setTimeout(resolvePromise, pollMs));
+  } while (performance.now() <= deadline);
+  return status;
 }
 
 function readPinnedFile(fd, size) {
@@ -547,7 +569,18 @@ export function createRunLifecyclePort({
         return { run_id: runId, state: current.state, exit_code: current.exit_code, signal: current.signal, launch_report: null, result: null };
       }
       if (exit.exit_code !== 0 || exit.signal) throw new Error("RUN_LIFECYCLE_PROCESS_FAILED");
-      const afterExitStatus = persistedProcessStatus(current);
+      // The detached namespace helpers can briefly outlive their reaped
+      // leader while they tear down the contained process tree. During that
+      // bounded interval the leader is absent but the process group or
+      // contained marker still exists, so the conservative identity probe
+      // returns "unknown". Allow only that transitional state to settle.
+      // A matched or reused identity is never waited through, and an
+      // unresolved status still fails closed below.
+      const afterExitStatus = await waitForPostExitProcessStatus({
+        probe: () => persistedProcessStatus(store.getRuntimeRun({ runId })),
+        timeoutMs: terminationGraceMs,
+      });
+      current = store.getRuntimeRun({ runId });
       if (afterExitStatus === "matched") {
         const fence = await effectFencer({ run_id: runId, authority_epoch: Number(current.authority_epoch), reason: "surviving_descendant", now: clock() });
         if (fence?.fenced !== true) throw new Error("RUN_LIFECYCLE_EFFECT_FENCE_FAILED");
