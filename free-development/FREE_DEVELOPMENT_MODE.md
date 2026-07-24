@@ -99,7 +99,9 @@ signed-release, recovery, and activation-transition proofs. The paused Control
 Center is presentation only and cannot substitute for or block that authority.
 The parent launcher installation binds only to the parent's checkout identity;
 a child repository cannot supply, copy, or infer that per-worktree instance
-from tracked parent or child configuration.
+from tracked parent or child configuration. Later Owner actions read the same
+parent identity, and the installed wrapper's verified Controller base cannot
+be redirected by child procedure or configuration.
 
 When the parent protected runtime is used for an isolated verification or
 activated headless task,

@@ -3782,6 +3782,8 @@ TESTS: tools/check_next_workflow.sh,tools/test_next_workflow.sh,tools/check_as_b
 - [x] Implement the exact immutable external snapshot manifest and installer.
 - [x] Bind installation to the checkout-identity owner instead of expecting a
   checkout instance ID in tracked repository configuration.
+- [x] Bind every Controller action to the same persisted checkout identity and
+  carry the exact verified Controller base through the installed wrapper.
 - [x] Remove caller-evidence release actions from the Owner allowlist.
 - [x] Implement independent Git/GitHub observed activation.
 - [x] Make runtime availability depend on all live preflights.

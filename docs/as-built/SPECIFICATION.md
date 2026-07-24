@@ -4957,8 +4957,10 @@ HEAD, source tree, repository identity, and allowed action in a closed
 manifest. Before creating that manifest, it obtains the repository logical ID
 and the per-worktree checkout instance ID from the checkout-identity owner; it
 does not read a nonexistent checkout ID from the tracked repository identity
-configuration. The wrapper supplies that manifest and the verified repository
-root.
+configuration. Every bounded Controller action repeats a read-only resolution
+through the same checkout-identity owner. The wrapper supplies that manifest,
+the verified repository root, and the exact private Controller base, including
+an explicitly selected non-default base.
 
 `release activate-observed` is the sole allowed release mutation. The external
 snapshot re-observes Git ancestry, exact candidate/main trees, merged PR

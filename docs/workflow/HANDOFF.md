@@ -3993,7 +3993,9 @@ Installer identity resolution now uses the checkout-identity owner so a fresh
 synchronized-main worktree receives its persistent checkout instance ID before
 the external manifest is created. The tracked repository identity
 configuration remains only the logical repository and origin attestation
-source.
+source. Runtime Owner actions resolve the same identity without creating it,
+and the installed wrapper pins the verified Controller base so default and
+explicit private-base installations share the same authority checks.
 
 The remaining handoff is to pass the complete local gates, deliver and merge
 the immutable candidate, pass main CI, synchronize `main`, install the external

@@ -279,4 +279,6 @@ evidence and repository-local low-level release actions never authorize
 Activation.
 That installation resolves the per-worktree checkout instance through the
 checkout-identity owner; the tracked repository identity configuration is not
-a substitute for local checkout identity.
+a substitute for local checkout identity. Every Controller action resolves the
+same persisted identity read-only, and the installed wrapper pins its verified
+Controller base even when a non-default private base was selected.

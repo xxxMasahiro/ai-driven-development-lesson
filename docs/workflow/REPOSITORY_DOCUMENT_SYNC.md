@@ -149,4 +149,6 @@ transfer, or browser execution is required.
 The Next Workflow authority set also treats external Owner Controller
 installation wiring as identity-sensitive. Its synchronized documents must
 state that the installer uses the checkout-identity owner and never derives a
-per-worktree instance ID from tracked repository configuration.
+per-worktree instance ID from tracked repository configuration. They must also
+state that bounded Owner actions read the same persisted identity without
+creation and that the installed wrapper pins the verified Controller base.

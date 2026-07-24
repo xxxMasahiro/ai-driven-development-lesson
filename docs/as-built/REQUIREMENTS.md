@@ -4192,7 +4192,9 @@ Owner actions.
 The installer must resolve the repository logical ID and checkout instance ID
 through the checkout-identity owner. The tracked repository identity
 configuration does not contain, and must never be treated as containing, the
-per-checkout instance ID.
+per-checkout instance ID. Every installed Controller action must resolve that
+same persisted identity without creating or substituting it, and the wrapper
+must pin the exact verified Controller base used by the installer.
 
 The only release activation action is observed activation. It must
 independently obtain the merged PR, candidate SHA and tree, main merge SHA and

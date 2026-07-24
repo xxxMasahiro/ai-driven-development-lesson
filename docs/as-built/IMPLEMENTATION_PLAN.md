@@ -6246,6 +6246,8 @@ TESTS: tools/check_next_workflow.sh,tools/test_next_workflow.sh,tools/check_as_b
 1. Resolve the persistent checkout identity, then install an immutable
    owner-private snapshot only from synchronized main; never substitute the
    tracked repository identity configuration for the per-checkout identity.
+   Resolve the same identity read-only for every Controller action and pin the
+   installed Controller base in the wrapper.
 2. Exact-verify its manifest, repository identity, source HEAD/tree, complete
    file inventory, permissions, and action allowlist on every mutation.
 3. Remove low-level release mutation actions from that allowlist.
